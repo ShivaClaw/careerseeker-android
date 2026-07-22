@@ -25,10 +25,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.CareerSeeker">
 
+        <!-- No android:label here: it would repeat the application's, which lint flags
+             as RedundantLabel. The activity inherits it. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.CareerSeeker">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
