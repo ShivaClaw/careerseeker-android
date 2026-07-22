@@ -2,6 +2,10 @@
 <!--
   Adaptive icon only. minSdk is 26, which is exactly where adaptive icons landed, so no
   density-specific PNG fallbacks are needed and no binary assets enter the repo.
+
+  The folder is mipmap-anydpi, not mipmap-anydpi-v26, for the same reason: a -v26
+  qualifier is redundant when minSdk is already 26, which lint flags as ObsoleteSdkInt.
+
   Placeholder art. Real launcher assets are a P5 store-readiness deliverable.
 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
