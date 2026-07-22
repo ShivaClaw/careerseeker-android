@@ -54,12 +54,18 @@ copied from the spec:
 | JDK | 17 |
 | Kotlin | 2.4.10 |
 | Compose BOM | 2026.06.01 |
-| `compileSdk` / `targetSdk` | **36** (Android 16) |
+| `compileSdk` | **37** — forced by AndroidX (core-ktx 1.19.0, lifecycle 2.11.0) |
+| `targetSdk` | **36** (Android 16) — Play's floor for new apps from 2026-08-31 |
 | `minSdk` | 26 |
 
 `targetSdk` is 36, not the 35 the program spec assumed: Play requires new apps and updates
 to target API 36 from **2026-08-31**. The spec flagged its own number for re-verification,
 and re-verification changed it.
+
+The two SDK levels differ on purpose. `compileSdk` controls which APIs the code may
+reference; `targetSdk` controls which runtime behavior changes the app opts into. Current
+AndroidX refuses to be consumed below 37, while Play only requires 36 — so the app compiles
+against 37 without opting into Android 17 behavior nothing here has been tested against.
 
 ### Building
 

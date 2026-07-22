@@ -9,10 +9,19 @@ plugins {
 android {
     namespace = "app.careerseeker.dashboard"
 
-    // compileSdk/targetSdk 36 = Android 16. Verified against Play's target API policy on
-    // 2026-07-22: new apps and updates must target API 36 by 2026-08-31. The program spec
-    // guessed "assume 35+" and flagged it for re-verification -- 35 would be rejected.
-    compileSdk = 36
+    // compileSdk and targetSdk are deliberately different, and the difference matters:
+    //
+    //   compileSdk 37 -- which APIs the code may reference. Forced by the AndroidX
+    //     dependencies: core-ktx 1.19.0 and lifecycle 2.11.0 refuse to be consumed by a
+    //     project compiling against 36.
+    //   targetSdk 36 -- which runtime behaviors the app opts into. This is Play's floor
+    //     for new apps and updates from 2026-08-31 (verified 2026-07-22). Staying at 36
+    //     avoids opting into Android 17 behavior changes nothing here has been tested
+    //     against; raising it is a deliberate decision with a test pass behind it.
+    //
+    // The program spec guessed "assume 35+" and flagged it for re-verification. 35 would
+    // be rejected by Play outright.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "app.careerseeker.dashboard"
