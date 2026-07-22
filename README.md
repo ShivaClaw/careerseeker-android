@@ -36,9 +36,46 @@ vectors, which is how cross-repo drift gets caught in CI.
 
 ## Status
 
-Pre-P0. No app code yet. The phase plan and its blocking gates are in
-[`docs/P0-Runbook.md`](docs/P0-Runbook.md); scaffolding starts once that is reviewed and
-the gates are answered.
+**P0 — scaffold.** No product features yet. `:core` holds the Sync Protocol v1 constants
+and rules; `:app` renders a placeholder that proves the toolchain assembles and that
+`:core` is reachable. Pairing starts in P1.
+
+Phase plan, gate decisions, and exit criteria: [`docs/P0-Runbook.md`](docs/P0-Runbook.md).
+
+### Toolchain
+
+Versions verified against the artifact repositories and Play policy on 2026-07-22, not
+copied from the spec:
+
+| | |
+| --- | --- |
+| AGP | 9.3.0 (built-in Kotlin — do **not** apply `org.jetbrains.kotlin.android`) |
+| Gradle | 9.5 (AGP 9.3 minimum) |
+| JDK | 17 |
+| Kotlin | 2.4.10 |
+| Compose BOM | 2026.06.01 |
+| `compileSdk` / `targetSdk` | **36** (Android 16) |
+| `minSdk` | 26 |
+
+`targetSdk` is 36, not the 35 the program spec assumed: Play requires new apps and updates
+to target API 36 from **2026-08-31**. The spec flagged its own number for re-verification,
+and re-verification changed it.
+
+### Building
+
+**There is no Gradle wrapper in this repo yet.** It was scaffolded on a machine with no
+JDK, and committing a `gradle-wrapper.jar` that could not be generated or inspected there
+would have been worse than leaving it out. CI installs a pinned Gradle 9.5 instead.
+
+From a machine with JDK 17 and the Android SDK:
+
+```bash
+gradle wrapper --gradle-version 9.5
+gradle checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug
+```
+
+Commit the generated wrapper when you do; the CI step that installs Gradle by version then
+becomes redundant.
 
 ## Working rules
 

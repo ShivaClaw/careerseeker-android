@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - claude/**
+      - codex/**
+      - agent/**
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Gradle is installed by version rather than invoked through ./gradlew: the wrapper
+      # jar is a binary, and the machine this was scaffolded on has no JDK to generate one
+      # honestly. Run `gradle wrapper` once from a machine with a JDK and commit the result;
+      # this step then becomes redundant. The version is pinned either way.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: "9.5"
+
+      - name: Assert :core has no Android dependency
+        run: gradle checkCoreIsAndroidFree
+
+      - name: Unit tests (:core)
+        run: gradle :core:test
+
+      - name: Assemble debug APK
+        run: gradle :app:assembleDebug
+
+      - name: Lint
+        run: gradle :app:lintDebug
+
+      # "No analytics, no trackers" is a claim about what actually ships, so this checks
+      # the RESOLVED dependency graph rather than grepping build files. Grepping source
+      # flags the comment that says "no Firebase" -- and a transitive tracker pulled in by
+      # some other library would not appear in a build file at all, which is exactly the
+      # case worth catching.
+      - name: Assert no analytics or tracking SDKs ship
+        run: |
+          gradle -q :app:dependencies --configuration releaseRuntimeClasspath > deps.txt
+          if grep -niE 'firebase|crashlytics|gms:play-services-ads|appsflyer|com\.adjust|amplitude|mixpanel|segment\.analytics' deps.txt; then
+            echo "::error::A tracking dependency is on the release classpath. The app promises none."
+            exit 1
+          fi
+          echo "OK: no analytics or tracking SDKs on the release classpath."
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
