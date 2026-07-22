@@ -5,8 +5,8 @@
 (Fable 5, planning role) — §8 phase plan, §9 gates.
 **Written:** 2026-07-22 by Opus 4.8 (executing role), before labor, per the spec's rule
 that each phase opens with a runbook reviewed as a draft PR.
-**Status:** draft — awaiting Brandon's review and the gate decisions in §7. **No P0 labor
-has started beyond the prerequisites in §1.**
+**Status:** gates P0-BASE, P0-CIPHER and P0-ACCOUNT answered 2026-07-22 (§7); P0 labor
+underway. P0-WORKER and P0-SYNC-COPY remain open but do not block P0 code.
 
 This runbook is the plan of record for P0. It is deliberately concrete: every work item
 has the command that performs it and the observation that proves it worked.
@@ -95,11 +95,11 @@ before it can decrypt.
 **Cipher choice is settled in the protocol doc, not left to each implementation.** §7.2
 says XChaCha20-Poly1305; the Android spec offers either; .NET's
 `System.Security.Cryptography` implements **AES-GCM natively but not XChaCha20**.
-Recommendation: **AES-256-GCM**, rationale recorded in the doc. Tink supports both on the
-Android side, so the constraint is entirely on the engine side. If Brandon prefers
-XChaCha20 for its larger nonce space, that means taking a third-party C# crypto dependency
-into the engine — a real decision, not a detail, and one that cuts against the project's
-minimal-dependency posture.
+**Decided (P0-CIPHER, 2026-07-22): AES-256-GCM.** Tink supports it on the Android side, so
+neither side takes a new dependency. Because this contradicts already-written spec text,
+`docs/CareerSeeker-Spec.md` §7.2 is amended in the same commit as `docs/Sync-Protocol.md`
+— two docs disagreeing about the wire format is exactly the failure `CLAUDE.md` was
+written to prevent.
 
 **Test vectors:** `docs/sync-vectors/v1/*.json` — each vector is
 `{name, key_hex, nonce_hex, aad, plaintext_json, ciphertext_hex, envelope_json}`, with
@@ -147,6 +147,14 @@ skeleton that builds — no screens, no crypto implementation.
 
 **Acceptance:** GitHub Actions green here; `:core` has zero Android dependencies, asserted
 by a Gradle check rather than by inspection so it cannot rot; debug APK artifact produced.
+
+**Constraint — CI is the only verifier for this deliverable.** The development machine has
+**no JDK and no Android SDK installed** (checked 2026-07-22: `java` not on PATH,
+`JAVA_HOME`, `ANDROID_HOME` and `ANDROID_SDK_ROOT` all unset, no SDK at
+`%LOCALAPPDATA%\Android\Sdk`). Node 24.18.0 and .NET 8.0.422 are present, so §3.1 and §3.2
+*are* locally verifiable. Nothing in this repo can be built locally until a JDK and the
+Android SDK (or Android Studio) are installed. Per the evidence standard, no agent may
+claim a local Gradle run until that changes — Actions output is the evidence.
 
 `targetSdk` is set to the current Play requirement **verified against live Play
 documentation at build time**, not copied from the spec — spec §5.3's "assume 35+" is
@@ -206,11 +214,18 @@ A P0 PR that bumps the pin without touching the docs is a defect, not a nit.
 
 ## 7. Gates — Brandon only, blocking
 
+### Answered 2026-07-22 by Brandon
+
+| Gate | Decision | Consequence |
+| --- | --- | --- |
+| **P0-BASE** *(new — not in the spec)* | **Target `claude/alpha-finish`** | Engine-side PRs for this program base on `dca6eb5`, not `main`. `relay/` and `docs/Sync-Protocol.md` are new files that cannot conflict, so the eventual rebase onto `main` is cheap. P0 proceeds without waiting on the merge train. |
+| **P0-CIPHER** *(new — see §3.1)* | **AES-256-GCM** | Deviates from `docs/CareerSeeker-Spec.md` §7.2's stated XChaCha20-Poly1305. Rationale recorded in `docs/Sync-Protocol.md`: native in .NET and supported by Tink, so zero new dependencies on either side, and 96-bit nonces are safe given per-envelope random nonces plus monotonic sequence numbers and our message volume. **§7.2 must be amended in the same change** or the specs contradict each other — that is the drift trap in doc form. |
+| **P0-ACCOUNT** | **Organization (D-U-N-S)** | Avoids the 12-testers × 14-days rule entirely, which removes the program's longest lead time from the critical path. **Introduces a dependency the code cannot satisfy:** a registered legal entity with a D-U-N-S number, and Play's business verification. That lead time is unknown until started, and Brandon must start it — registration involves payment details and identity documents. Worth beginning well before P4. Re-verify current requirements against live Play documentation at the time of registration. |
+
+### Still open (do not block P0 code)
+
 | Gate | Decision | Blocks | Recommendation |
 | --- | --- | --- | --- |
-| **P0-BASE** *(new — not in the spec)* | Engine-side PRs target `claude/alpha-finish`, or wait for the alpha merge train to reach `main` first | §3.1, §3.2 | Target `alpha-finish`. Waiting stalls the program behind the Friday audit for no technical gain; the later rebase cost is low because `relay/` and the protocol doc are new files that cannot conflict. |
-| **P0-CIPHER** *(new — see §3.1)* | AES-256-GCM vs XChaCha20-Poly1305 | §3.1 | AES-256-GCM. XChaCha20 means a third-party crypto dependency in the engine, against the project's minimal-dependency posture, to buy nonce headroom we do not need at our message volume. |
-| **P0-ACCOUNT** | Play developer account: personal vs organization | §3.3 appId only; **P4/P5 critically** | Decide now even though it barely blocks code. Personal accounts created after Nov 2023 need **12+ testers enrolled 14 continuous days** before production access — the longest lead time in the program, and starting it early costs nothing. Organization avoids the rule but adds D-U-N-S verification lead time. Re-verify both against live Play docs before acting. |
 | **P0-WORKER** | Entitlement Worker vs phone-only license verification | P4 architecture; P0 only records it | Worker (spec §6.3). The relay stays blind either way; the phone-only fallback is weaker against piracy but ships with zero new infra. |
 | **P0-SYNC-COPY** | Opt-in sync consent wording | P1 UI, privacy policy | Draft in P0 alongside the protocol doc so app copy, privacy-policy delta, and data-safety answers stay one artifact (spec §7.3). |
 
