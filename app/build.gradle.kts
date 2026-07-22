@@ -9,24 +9,28 @@ plugins {
 android {
     namespace = "app.careerseeker.dashboard"
 
-    // compileSdk and targetSdk are deliberately different, and the difference matters:
-    //
-    //   compileSdk 37 -- which APIs the code may reference. Forced by the AndroidX
-    //     dependencies: core-ktx 1.19.0 and lifecycle 2.11.0 refuse to be consumed by a
-    //     project compiling against 36.
-    //   targetSdk 36 -- which runtime behaviors the app opts into. This is Play's floor
-    //     for new apps and updates from 2026-08-31 (verified 2026-07-22). Staying at 36
-    //     avoids opting into Android 17 behavior changes nothing here has been tested
-    //     against; raising it is a deliberate decision with a test pass behind it.
-    //
-    // The program spec guessed "assume 35+" and flagged it for re-verification. 35 would
-    // be rejected by Play outright.
+    // compileSdk = which APIs the code may reference. 37 is forced by AndroidX: core-ktx
+    // 1.19.0 and lifecycle 2.11.0 refuse to be consumed by a project compiling against 36.
     compileSdk = 37
 
     defaultConfig {
         applicationId = "app.careerseeker.dashboard"
         minSdk = 26
-        targetSdk = 36
+
+        // targetSdk = which runtime behaviors the app opts into.
+        //
+        // Play's FLOOR is 36 for new apps and updates from 2026-08-31 (verified
+        // 2026-07-22) -- the program spec's "assume 35+" would be rejected outright. 37
+        // clears that floor.
+        //
+        // Set to 37 rather than the floor because lint's OldTargetApi treats anything
+        // below the latest as an error, and it is right to: there is nothing in this
+        // scaffold whose behavior could regress under Android 17, so the usual reason to
+        // lag (untested behavior changes) does not apply yet. When real features land,
+        // bumping targetSdk becomes a decision with a test pass behind it -- and
+        // suppressing OldTargetApi now would silence the check that prompts exactly that.
+        targetSdk = 37
+
         versionCode = 1
         versionName = "0.1.0-p0"
     }

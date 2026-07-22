@@ -55,17 +55,19 @@ copied from the spec:
 | Kotlin | 2.4.10 |
 | Compose BOM | 2026.06.01 |
 | `compileSdk` | **37** — forced by AndroidX (core-ktx 1.19.0, lifecycle 2.11.0) |
-| `targetSdk` | **36** (Android 16) — Play's floor for new apps from 2026-08-31 |
+| `targetSdk` | **37** — clears Play's floor of 36 |
 | `minSdk` | 26 |
 
-`targetSdk` is 36, not the 35 the program spec assumed: Play requires new apps and updates
-to target API 36 from **2026-08-31**. The spec flagged its own number for re-verification,
-and re-verification changed it.
+**Play's floor is `targetSdk` 36** for new apps and updates from **2026-08-31**, verified
+2026-07-22. The program spec's "assume 35+" would be rejected outright; it flagged its own
+number for re-verification, and re-verification changed it.
 
-The two SDK levels differ on purpose. `compileSdk` controls which APIs the code may
-reference; `targetSdk` controls which runtime behavior changes the app opts into. Current
-AndroidX refuses to be consumed below 37, while Play only requires 36 — so the app compiles
-against 37 without opting into Android 17 behavior nothing here has been tested against.
+The two levels answer different questions — `compileSdk` is which APIs the code may
+*reference*, `targetSdk` is which runtime behaviors the app *opts into* — so they can
+legitimately differ. Both are 37 here: AndroidX forces the first, and lint's `OldTargetApi`
+treats a lagging `targetSdk` as an error. Lagging is defensible once there are features
+whose behavior could regress under a newer Android; there are none yet, and suppressing the
+check would silence the prompt to re-test when that changes.
 
 ### Building
 
