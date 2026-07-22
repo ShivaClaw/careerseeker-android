@@ -50,7 +50,7 @@ copied from the spec:
 | | |
 | --- | --- |
 | AGP | 9.3.0 (built-in Kotlin — do **not** apply `org.jetbrains.kotlin.android`) |
-| Gradle | 9.5 (AGP 9.3 minimum) |
+| Gradle | 9.6.1 (AGP 9.3 requires 9.5.0+) |
 | JDK | 17 |
 | Kotlin | 2.4.10 |
 | Compose BOM | 2026.06.01 |
@@ -65,12 +65,12 @@ and re-verification changed it.
 
 **There is no Gradle wrapper in this repo yet.** It was scaffolded on a machine with no
 JDK, and committing a `gradle-wrapper.jar` that could not be generated or inspected there
-would have been worse than leaving it out. CI installs a pinned Gradle 9.5 instead.
+would have been worse than leaving it out. CI installs a pinned Gradle 9.6.1 instead.
 
 From a machine with JDK 17 and the Android SDK:
 
 ```bash
-gradle wrapper --gradle-version 9.5
+gradle wrapper --gradle-version 9.6.1
 gradle checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug
 ```
 
