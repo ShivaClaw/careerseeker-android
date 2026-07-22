@@ -16,10 +16,11 @@
       is derived state, re-syncable from the paired PC, so backing it up buys nothing and
       would let job applications and draft correspondence outlive an unpair.
 
-      Both attributes are needed, and neither is redundant: allowBackup is what pre-Android
-      12 devices honor (minSdk is 26), while on 12 and higher it governs cloud backup only
-      and device-to-device transfer needs dataExtractionRules. Setting just the first would
-      leave the transfer channel open on every modern device.
+      Three attributes, because three mechanisms are read by different Android versions:
+      allowBackup is what pre-12 devices honor (minSdk is 26); on 12 and higher it governs
+      cloud backup only, so device-to-device transfer needs dataExtractionRules; and
+      fullBackupContent states the same exclusions for pre-12 explicitly. Setting only the
+      first would leave the transfer channel open on every modern device.
 
       usesCleartextTraffic=false is the default from API 28 but is stated explicitly,
       because this app must never accept a plaintext relay connection and a default is not
@@ -28,6 +29,7 @@
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/full_backup_content"
         android:usesCleartextTraffic="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
