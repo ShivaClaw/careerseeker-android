@@ -32,7 +32,40 @@ the device signing key. Verified 2026-07-23, both halves fail:
   which surrenders the hardware-backed non-exportability that is the entire point of a
   device key.
 
-### Gate P1-CURVE — pick the pairing curve (blocks all crypto work in this phase)
+### Gate P1-CURVE — ANSWERED 2026-07-23: **P-256 both sides**
+
+Gated alongside a standing directive to build post-quantum going forward, Q-day assumed
+2029. Both hold without conflict; the full reasoning is
+[Post-Quantum-Posture.md](Post-Quantum-Posture.md). In short: the spec's alternative
+(X25519) was *equally* quantum-broken, so nothing was surrendered by choosing P-256;
+.NET's `MLKem` requires Windows 11 25H2+/OpenSSL 3.5 and the engine is still on .NET 8, so
+a post-quantum handshake would hard-fail on real users' machines today; and NIST/IETF
+prescribe **hybrid**, not PQ-only, during transition — shipping ML-KEM alone would be
+worse practice than P-256 alone.
+
+**P1's post-quantum obligation is therefore to make the migration cheap, not to perform it
+early and badly.** Four constraints, folded into §2.1 at near-zero cost. Skipping any of
+them is what makes the eventual migration expensive:
+
+1. **The pairing payload carries its own `suite` identifier**, versioned separately from
+   the envelope's `v`: `p256-hkdf-sha256` for v1, `p256+mlkem768-hkdf-sha256` reserved.
+   Negotiated once at pairing, never mid-session.
+2. **Session keys derive via HKDF from a *concatenated* secret**, not from the raw ECDH
+   output — `ikm = ecdh_shared` today, `ikm = ecdh_shared || mlkem_shared` under hybrid.
+   Deriving straight from the ECDH result makes adding ML-KEM a breaking change for every
+   paired device; deriving through a concatenation of one element makes it a suite bump.
+   **Highest-leverage item in this runbook, and it costs one function today.**
+3. **No fixed-width key fields on the wire, and the QR payload budget checked against
+   ML-KEM-768 sizes now** (1184-byte encapsulation key vs P-256's 32). A QR that
+   physically cannot carry a hybrid key would force a pairing-UX redesign at migration
+   time — far cheaper to discover in P1 than in PQ-1.
+4. **`suite` recorded in the engine's audit chain at pairing**, so "which cryptography was
+   this pairing built on" is answerable later without surveying users.
+
+The original gate framing is retained below: the platform facts in it are what the answer
+rests on, and they will need re-checking at PQ-1.
+
+#### Original framing (retained for the platform facts)
 
 | | **A: P-256 everywhere (recommended)** | **B: X25519/Ed25519 per spec** |
 | --- | --- | --- |
@@ -50,7 +83,13 @@ support. If A is gated in, `docs/Sync-Protocol.md` §5.2/§5.4 and `:core`'s con
 amended **in the same commit** as the implementation, drift-trap style. HKDF structure,
 info strings, AAD format, and envelope shape are unchanged — only the curve names move.
 
-### Gate P1-DEPLOY — first live deploy of the relay (blocks the end-to-end exit test)
+### Gate P1-DEPLOY — ANSWERED 2026-07-23: **deploy to workers.dev for P1**
+
+The custom domain (`relay.careerseeker.app`) stays open and must be decided **before**
+P2's certificate-pinning work, since pinning wants the final hostname. Original framing
+retained below.
+
+#### Original framing
 
 The relay has never been deployed; P0 proved config validity with `--dry-run` only.
 End-to-end pairing needs it live. Facts for the gate:
@@ -184,9 +223,11 @@ without running it. Draft PRs, never self-merge, Codex audits before merge.
 
 ## 5. Gates opened by this runbook
 
-| Gate | Decision | Blocks | Recommendation |
-| --- | --- | --- | --- |
-| **P1-CURVE** | P-256 vs X25519/Ed25519 for pairing + device signatures | 2.1–2.4 crypto | **P-256** — native on both platforms, hardware-backed phone keys at minSdk 26; option B adds an engine crypto dependency *and* software phone keys below Android 13 |
-| **P1-DEPLOY** | First live relay deploy; workers.dev vs custom domain | 2.5 only | Deploy to workers.dev for P1; custom-domain decision before P2 pinning |
+| Gate | Decision | Status |
+| --- | --- | --- |
+| **P1-CURVE** | P-256 both sides, with the four PQ-migration constraints in §1 | **Answered 2026-07-23** |
+| **P1-DEPLOY** | Deploy to workers.dev for P1 | **Answered 2026-07-23** |
+| **P1-DOMAIN** *(deferred out of P1-DEPLOY)* | `relay.careerseeker.app` vs staying on workers.dev | Open — needed **before P2** cert pinning |
+| **PQ-1** | Hybrid `p256+mlkem768` migration | Open — trigger conditions in [Post-Quantum-Posture.md](Post-Quantum-Posture.md) §5; engine `.NET 8 → 10` is the current blocker, not the phone |
 
 Estimated agent labor (spec §8): 30–40 h across 2.1–2.5.
