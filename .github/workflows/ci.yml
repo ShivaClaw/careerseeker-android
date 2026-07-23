@@ -51,14 +51,33 @@ jobs:
       # would silently desynchronise the phone from the engine -- fails here rather than in
       # someone's hands. The pin lives in VECTORS.lock.
       - name: Assert vendored sync vectors match the pinned main-repo commit
+        env:
+          # The API is authenticated only to raise the anonymous rate limit; the main repo
+          # is public, so no special scope is needed.
+          GH_TOKEN: ${{ github.token }}
         run: |
           PIN=$(grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1)
           echo "pinned main-repo commit: $PIN"
-          base="https://raw.githubusercontent.com/ShivaClaw/careerseeker/$PIN/docs/sync-vectors/v1"
+
+          # Fetch via the GitHub contents API, not raw.githubusercontent: the API is
+          # immediately consistent for freshly-pushed commits, whereas raw lags a SHA by
+          # minutes and would flakily 404 a vendor pin created moments earlier. A short
+          # retry covers transient API hiccups.
+          fetch() {
+            for attempt in 1 2 3 4 5; do
+              if curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+                   -H "Accept: application/vnd.github.raw+json" \
+                   "https://api.github.com/repos/ShivaClaw/careerseeker/contents/docs/sync-vectors/v1/$1?ref=$PIN" \
+                   -o "$2"; then return 0; fi
+              echo "retry $attempt for $1"; sleep 5
+            done
+            return 1
+          }
+
           drift=0
           for f in core/src/test/resources/sync-vectors/v1/*.json; do
             name=$(basename "$f")
-            curl -fsSL "$base/$name" -o /tmp/upstream.json || { echo "::error::missing upstream $name"; drift=1; continue; }
+            fetch "$name" /tmp/upstream.json || { echo "::error::cannot fetch upstream $name at $PIN"; drift=1; continue; }
             if ! diff -q "$f" /tmp/upstream.json >/dev/null; then
               echo "::error::vendored $name differs from the pinned main-repo copy"; drift=1
             fi
