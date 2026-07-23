@@ -12,6 +12,13 @@ pluginManagement {
     }
 }
 
+plugins {
+    // :core pins jvmToolchain(17); this resolver lets Gradle download a JDK 17 when the
+    // one running Gradle differs (e.g. Android Studio's bundled JBR is 21). Without it,
+    // toolchain provisioning fails on any machine without a system JDK 17.
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+
 dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
