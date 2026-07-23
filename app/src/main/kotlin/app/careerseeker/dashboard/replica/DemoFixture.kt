@@ -24,6 +24,7 @@ object DemoFixture {
             dao.clearApplications()
             dao.clearJobs()
             dao.clearEvidenceEvents()
+            dao.clearDocuments()
 
             dao.upsertApplications(
                 listOf(
@@ -66,12 +67,34 @@ object DemoFixture {
                     EvidenceEventRow(7, "2026-07-23T10:12:40Z", "user", "application_paused", "application", "app_demo_6"),
                 ),
             )
+            dao.upsertDocuments(
+                listOf(
+                    DocumentRow(
+                        "app_demo_1", "resume",
+                        "JORDAN LEE\nSenior Platform Engineer\n\nEXPERIENCE\nNorthwind Labs adjacent: 8 years building Kubernetes platforms, " +
+                            "cut deploy lead time 40%, ran the on-call program for a 200-service fleet.\n\nSKILLS\nKubernetes, Go, Terraform, SLO design.",
+                        rev = 1,
+                    ),
+                    DocumentRow(
+                        "app_demo_1", "cover_letter",
+                        "Dear Northwind Labs team,\n\nYour posting asks for someone who has run platform migrations without " +
+                            "stopping the release train. I led exactly that at my current role and would bring the same discipline here.\n\nJordan",
+                        rev = 1,
+                    ),
+                    DocumentRow(
+                        "app_demo_1", "answers",
+                        "Q: Are you authorized to work in the US?\nA: Yes.\n\nQ: Notice period?\nA: Two weeks.",
+                        rev = 1,
+                    ),
+                ),
+            )
             dao.upsertSyncState(
                 SyncStateRow(
                     highestAppliedE2pSeq = 0,
                     lastSeenTs = "2026-07-23T10:12:40Z",
                     lastCycle = 12,
                     demoMode = true,
+                    auditOk = true,
                 ),
             )
         }

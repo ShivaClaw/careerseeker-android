@@ -32,12 +32,16 @@ interface ReplicaDao {
     @Query("SELECT * FROM applications WHERE id = :id")
     fun application(id: String): Flow<ApplicationRow?>
 
+    @Query("SELECT * FROM documents WHERE appId = :appId ORDER BY kind")
+    fun documents(appId: String): Flow<List<DocumentRow>>
+
     // ---- one-shot reads (tests, applier bookkeeping) ----
     @Query("SELECT * FROM applications ORDER BY id") suspend fun applicationsNow(): List<ApplicationRow>
     @Query("SELECT * FROM jobs ORDER BY id") suspend fun jobsNow(): List<JobRow>
     @Query("SELECT * FROM counters WHERE id = 1") suspend fun countersNow(): CountersRow?
     @Query("SELECT * FROM evidence_events ORDER BY seq") suspend fun evidenceEventsNow(): List<EvidenceEventRow>
     @Query("SELECT * FROM sync_state WHERE id = 1") suspend fun syncStateNow(): SyncStateRow?
+    @Query("SELECT * FROM documents WHERE appId = :appId ORDER BY kind") suspend fun documentsNow(appId: String): List<DocumentRow>
 
     // ---- writes (applier + fixture) ----
     @Upsert suspend fun upsertApplications(rows: List<ApplicationRow>)
@@ -45,8 +49,10 @@ interface ReplicaDao {
     @Upsert suspend fun upsertCounters(row: CountersRow)
     @Upsert suspend fun upsertEvidenceEvents(rows: List<EvidenceEventRow>)
     @Upsert suspend fun upsertSyncState(row: SyncStateRow)
+    @Upsert suspend fun upsertDocuments(rows: List<DocumentRow>)
 
     @Query("DELETE FROM applications") suspend fun clearApplications()
     @Query("DELETE FROM jobs") suspend fun clearJobs()
     @Query("DELETE FROM evidence_events") suspend fun clearEvidenceEvents()
+    @Query("DELETE FROM documents") suspend fun clearDocuments()
 }

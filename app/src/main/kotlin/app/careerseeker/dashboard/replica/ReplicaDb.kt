@@ -17,6 +17,7 @@ import androidx.room.RoomDatabase
         JobRow::class,
         CountersRow::class,
         EvidenceEventRow::class,
+        DocumentRow::class,
         SyncStateRow::class,
     ],
     version = 1,

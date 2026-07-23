@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "55d96135e62d34fad856dd7c8f153a93",
+    "identityHash": "718e0ebf3d59e304e2e79786123de88c",
     "entities": [
       {
         "tableName": "applications",
@@ -209,8 +209,45 @@
         }
       },
       {
+        "tableName": "documents",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`appId` TEXT NOT NULL, `kind` TEXT NOT NULL, `text` TEXT NOT NULL, `rev` INTEGER NOT NULL, PRIMARY KEY(`appId`, `kind`))",
+        "fields": [
+          {
+            "fieldPath": "appId",
+            "columnName": "appId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rev",
+            "columnName": "rev",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "appId",
+            "kind"
+          ]
+        }
+      },
+      {
         "tableName": "sync_state",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `highestAppliedE2pSeq` INTEGER NOT NULL, `lastSeenTs` TEXT, `lastCycle` INTEGER, `demoMode` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `highestAppliedE2pSeq` INTEGER NOT NULL, `lastSeenTs` TEXT, `lastCycle` INTEGER, `demoMode` INTEGER NOT NULL, `auditOk` INTEGER, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -239,6 +276,11 @@
             "columnName": "demoMode",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "auditOk",
+            "columnName": "auditOk",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -251,7 +293,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '55d96135e62d34fad856dd7c8f153a93')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '718e0ebf3d59e304e2e79786123de88c')"
     ]
   }
 }

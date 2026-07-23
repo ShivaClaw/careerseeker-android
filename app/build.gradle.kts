@@ -83,6 +83,7 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.core)
 
     // The Room replica (P2-Runbook §2.3): the phone-side mirror the screens project.
     implementation(libs.androidx.room.runtime)
@@ -94,6 +95,11 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core.ktx)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Compose screen tests under Robolectric (no emulator). The test-manifest artifact adds
+    // the test ComponentActivity to the DEBUG manifest only; nothing ships in release.
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     // Deliberately absent, and each absence is a commitment the store listing will repeat:
     // no Firebase, no Analytics, no Crashlytics, no ad SDK, no attribution SDK. The site

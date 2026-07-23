@@ -67,6 +67,22 @@ data class EvidenceEventRow(
 )
 
 /**
+ * One tailored document as the read-only detail screen renders it (resume, cover letter,
+ * answers). P2 renders; editing is P3's invariant-sensitive work. Populated by the demo
+ * fixture today — the engine's `doc` payload publisher is not built yet, so the applier has
+ * no branch for it and [text] can only come from fixtures until it is. Display-only text,
+ * rendered inert, never interpolated.
+ */
+@Entity(tableName = "documents", primaryKeys = ["appId", "kind"])
+data class DocumentRow(
+    val appId: String,
+    /** `resume` | `cover_letter` | `answers`, mirroring the protocol's doc_kind. */
+    val kind: String,
+    val text: String,
+    val rev: Long,
+)
+
+/**
  * Single-row (id = 1) sync bookkeeping. [highestAppliedE2pSeq] persists across process
  * restarts — the in-memory receiver's replay window resets on restart, so this row is what
  * makes re-applying an old envelope after a relaunch a no-op rather than a regression.
@@ -81,4 +97,10 @@ data class SyncStateRow(
     val lastCycle: Long?,
     /** True while the replica holds fixture data; any applied real envelope clears it. */
     val demoMode: Boolean,
+    /**
+     * The engine's audit-chain verification verdict as last reported. Null = not reported
+     * by any applied payload — the Evidence screen says "unknown" rather than guessing.
+     * Only the fixture sets it today; the wire `evidence` payload is not defined yet.
+     */
+    val auditOk: Boolean? = null,
 )

@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -52,9 +53,16 @@ class DemoFixtureTest {
         assertEquals(12L, db.dao().countersNow()!!.cycles)
         assertEquals(7, db.dao().evidenceEventsNow().size)
 
+        // The detail screen renders all three documents read-only (editing is P3).
+        assertEquals(
+            listOf("answers", "cover_letter", "resume"),
+            db.dao().documentsNow("app_demo_1").map { it.kind },
+        )
+
         val state = db.dao().syncStateNow()!!
         assertTrue("fixture data must be labeled demo", state.demoMode)
         assertEquals(0L, state.highestAppliedE2pSeq)
+        assertEquals(true, state.auditOk)
     }
 
     @Test
@@ -78,6 +86,9 @@ class DemoFixtureTest {
 
         // Wholesale replacement: no demo application survives, and the demo label is gone.
         assertEquals(listOf("app_real"), db.dao().applicationsNow().map { it.id })
-        assertEquals(false, db.dao().syncStateNow()!!.demoMode)
+        val state = db.dao().syncStateNow()!!
+        assertEquals(false, state.demoMode)
+        // Real sync has not reported an audit verdict; the screen must say unknown, not guess.
+        assertNull(state.auditOk)
     }
 }
