@@ -26,15 +26,30 @@ object Protocol {
     const val NONCE_BYTES = 12
     const val TAG_BYTES = 16
 
+    /** Pairing suite for v1 (gate P1-CURVE). The hybrid PQ suite is a reserved bump. */
+    const val SUITE = "p256-hkdf-sha256"
+    const val SUITE_HYBRID_RESERVED = "p256+mlkem768-hkdf-sha256"
+
     /**
-     * HKDF info strings for the two directional keys. Distinct by direction so a captured
-     * envelope cannot be replayed back at its sender.
+     * HKDF info strings. The two directional keys are distinct by direction so a captured
+     * envelope cannot be replayed back at its sender; the relay token and confirm code are
+     * derived rather than invented so both endpoints agree and the relay only recognises.
      */
-    const val HKDF_INFO_ENGINE_TO_PHONE = "careerseeker/v1/e2p"
-    const val HKDF_INFO_PHONE_TO_ENGINE = "careerseeker/v1/p2e"
+    const val INFO_ENGINE_TO_PHONE = "careerseeker/v1/e2p"
+    const val INFO_PHONE_TO_ENGINE = "careerseeker/v1/p2e"
+    const val INFO_RELAY_TOKEN = "careerseeker/v1/relay-token"
+    const val INFO_CONFIRM = "careerseeker/v1/confirm"
+    const val BOOTSTRAP_SALT = "careerseeker/v1/bootstrap"
+    const val PAIR_AAD_PREFIX = "careerseeker/v1/pair"
 
     /** Signature domain separator for phone-originated commands. Sync-Protocol.md section 5.4. */
     const val COMMAND_SIG_PREFIX = "careerseeker/v1/cmd"
+
+    /**
+     * Phone-originated kinds that change engine state and therefore REQUIRE the
+     * envelope-level device signature (Sync-Protocol.md §5.4).
+     */
+    val STATE_CHANGING_KINDS = setOf("doc_edit", "outcome", "entitlement")
 }
 
 enum class Direction(val wire: String) {

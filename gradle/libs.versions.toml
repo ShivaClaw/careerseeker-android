@@ -7,6 +7,7 @@ composeBom = "2026.06.01"
 coreKtx = "1.19.0"
 lifecycle = "2.11.0"
 activityCompose = "1.13.0"
+kotlinxSerialization = "1.11.0"
 junit = "4.13.2"
 
 [libraries]
@@ -19,6 +20,9 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+# Test-only in :core, for reading the shared vector JSON. Pure Kotlin/JVM — it does not
+# pull Android in, so :core's main source set stays dependency-free and Android-free.
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
