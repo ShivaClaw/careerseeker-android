@@ -4,6 +4,7 @@ plugins {
     // old plugin alongside it is an error. The Compose compiler plugin is separate and its
     // version must match Kotlin exactly.
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -55,6 +56,20 @@ android {
         warningsAsErrors = true
         abortOnError = true
     }
+
+    testOptions {
+        unitTests {
+            // Robolectric: real Android framework classes (including SQLite) on the JVM, so
+            // the Room replica tests run in CI without an emulator (P2-Runbook §2.3).
+            isIncludeAndroidResources = true
+        }
+    }
+}
+
+ksp {
+    // Committed schema snapshots make Room's schema an explicit, reviewable artifact and
+    // unlock migration tests when version 2 ever exists.
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -68,6 +83,17 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+
+    // The Room replica (P2-Runbook §2.3): the phone-side mirror the screens project.
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
+    // Payload JSON parsing in the applier — runtime tree API only, no codegen plugin.
+    implementation(libs.kotlinx.serialization.json)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core.ktx)
+    testImplementation(libs.kotlinx.coroutines.test)
 
     // Deliberately absent, and each absence is a commitment the store listing will repeat:
     // no Firebase, no Analytics, no Crashlytics, no ad SDK, no attribution SDK. The site

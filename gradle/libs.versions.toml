@@ -9,6 +9,15 @@ lifecycle = "2.11.0"
 activityCompose = "1.13.0"
 kotlinxSerialization = "1.11.0"
 junit = "4.13.2"
+# Room 2.8.4 + KSP 2.3.10 + Robolectric 4.16.1 verified against the artifact
+# repositories on 2026-07-23. KSP versions independently since the 2.3 line (no longer
+# prefixed with the exact Kotlin version). Robolectric supplies a real SQLite to JVM unit
+# tests so the Room replica is exercised without an emulator (P2-Runbook §2.3 acceptance).
+room = "2.8.4"
+ksp = "2.3.10"
+robolectric = "4.16.1"
+androidxTestCore = "1.7.0"
+coroutinesTest = "1.11.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -20,9 +29,18 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
-# Test-only in :core, for reading the shared vector JSON. Pure Kotlin/JVM — it does not
-# pull Android in, so :core's main source set stays dependency-free and Android-free.
+# Test-only in :core, for reading the shared vector JSON; also an implementation dep of
+# :app for parsing decrypted payload JSON (runtime tree API only, no codegen plugin).
+# Pure Kotlin/JVM — it does not pull Android in, so :core's main source set stays
+# dependency-free and Android-free.
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+# The replica (P2-Runbook §2.3): Room persists the phone-side mirror of dashboard state.
+# room-ktx is deliberately absent — its coroutine/Flow APIs merged into room-runtime in 2.7.
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+androidx-test-core-ktx = { group = "androidx.test", name = "core-ktx", version.ref = "androidxTestCore" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -30,3 +48,5 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 # The Compose compiler plugin is NOT built into AGP 9 and its version must track the
 # Kotlin version exactly, so it shares the `kotlin` ref rather than having its own.
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+# KSP drives Room's annotation processing in :app.
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
