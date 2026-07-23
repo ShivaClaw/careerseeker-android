@@ -226,8 +226,15 @@ without running it. Draft PRs, never self-merge, Codex audits before merge.
 | Gate | Decision | Status |
 | --- | --- | --- |
 | **P1-CURVE** | P-256 both sides, with the four PQ-migration constraints in §1 | **Answered 2026-07-23** |
-| **P1-DEPLOY** | Deploy to workers.dev for P1 | **Answered 2026-07-23** |
-| **P1-DOMAIN** *(deferred out of P1-DEPLOY)* | `relay.careerseeker.app` vs staying on workers.dev | Open — needed **before P2** cert pinning |
+| **P1-DEPLOY** | Deploy the relay | **Answered 2026-07-23 — deployed** |
+| **P1-DOMAIN** | **`relay.careerseeker.app`**, provisioned now and used from P1; `workers_dev` disabled so exactly one hostname is live | **Answered 2026-07-23 — live and verified** |
+| **P0-WORKER** | **Engine verifies Google's signed purchase payload** — neither option the spec offered | **Answered 2026-07-23** — [Entitlement-Architecture.md](Entitlement-Architecture.md) |
+| **P-MONEY** | Dashboard $4.99, Pro $2.99 one-time, Cloud $1.99/mo; Windows app stays **"CareerSeeker"** | **Answered 2026-07-23** — [Monetization-Decision.md](Monetization-Decision.md) |
 | **PQ-1** | Hybrid `p256+mlkem768` migration | Open — trigger conditions in [Post-Quantum-Posture.md](Post-Quantum-Posture.md) §5; engine `.NET 8 → 10` is the current blocker, not the phone |
+
+**The relay is live**, deployed 2026-07-23 as part of answering P1-DOMAIN. It runs the P0
+scaffold, so every `/v1/{pairing}/*` route returns 501 by design; §2.2 replaces those.
+Verified live: health 200, unauthenticated 401, authenticated 501, malformed pairing 404,
+and the `workers.dev` hostname does not resolve.
 
 Estimated agent labor (spec §8): 30–40 h across 2.1–2.5.
