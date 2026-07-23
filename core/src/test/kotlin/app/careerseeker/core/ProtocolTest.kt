@@ -83,7 +83,7 @@ class ProtocolTest {
     fun `directional key derivation uses distinct info strings`() {
         // Identical info strings would derive one key for both directions, letting a
         // captured envelope be replayed back at its sender.
-        assertTrue(Protocol.HKDF_INFO_ENGINE_TO_PHONE != Protocol.HKDF_INFO_PHONE_TO_ENGINE)
+        assertTrue(Protocol.INFO_ENGINE_TO_PHONE != Protocol.INFO_PHONE_TO_ENGINE)
     }
 
     @Test

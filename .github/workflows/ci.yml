@@ -46,6 +46,25 @@ jobs:
       - name: Assert :core has no Android dependency
         run: ./gradlew checkCoreIsAndroidFree
 
+      # The shared sync-protocol vectors are vendored from the public main repo. This
+      # re-fetches the pinned commit's copies and diffs, so a hand-edited vector -- which
+      # would silently desynchronise the phone from the engine -- fails here rather than in
+      # someone's hands. The pin lives in VECTORS.lock.
+      - name: Assert vendored sync vectors match the pinned main-repo commit
+        run: |
+          PIN=$(grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1)
+          echo "pinned main-repo commit: $PIN"
+          base="https://raw.githubusercontent.com/ShivaClaw/careerseeker/$PIN/docs/sync-vectors/v1"
+          drift=0
+          for f in core/src/test/resources/sync-vectors/v1/*.json; do
+            name=$(basename "$f")
+            curl -fsSL "$base/$name" -o /tmp/upstream.json || { echo "::error::missing upstream $name"; drift=1; continue; }
+            if ! diff -q "$f" /tmp/upstream.json >/dev/null; then
+              echo "::error::vendored $name differs from the pinned main-repo copy"; drift=1
+            fi
+          done
+          [ "$drift" -eq 0 ] && echo "OK: all vendored vectors match $PIN" || exit 1
+
       - name: Unit tests (:core)
         run: ./gradlew :core:test
 

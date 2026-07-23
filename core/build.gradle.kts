@@ -11,6 +11,9 @@ kotlin {
 
 dependencies {
     testImplementation(libs.kotlin.test)
+    // Test-only: parses the shared vector JSON. Not on the main classpath, so :core still
+    // ships zero dependencies and stays Android-free.
+    testImplementation(libs.kotlinx.serialization.json)
 }
 
 tasks.test {
