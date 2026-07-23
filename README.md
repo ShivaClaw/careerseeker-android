@@ -71,19 +71,18 @@ check would silence the prompt to re-test when that changes.
 
 ### Building
 
-**There is no Gradle wrapper in this repo yet.** It was scaffolded on a machine with no
-JDK, and committing a `gradle-wrapper.jar` that could not be generated or inspected there
-would have been worse than leaving it out. CI installs a pinned Gradle 9.6.1 instead.
-
-From a machine with JDK 17 and the Android SDK:
+The Gradle wrapper is committed and is the single source of the Gradle version
+(9.6.1). It was generated 2026-07-22 from the official distribution, with both the
+distribution zip and the resulting `gradle-wrapper.jar` verified against the sha256
+checksums published by services.gradle.org; `distributionSha256Sum` is pinned in
+`gradle-wrapper.properties` so every future download is verified too.
 
 ```bash
-gradle wrapper --gradle-version 9.6.1
-gradle checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug
+./gradlew checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug
 ```
 
-Commit the generated wrapper when you do; the CI step that installs Gradle by version then
-becomes redundant.
+`:core` targets JVM 17 via `jvmToolchain(17)` — have a JDK 17 available (Android
+Studio's bundled JBR works for running Gradle itself).
 
 ## Working rules
 
