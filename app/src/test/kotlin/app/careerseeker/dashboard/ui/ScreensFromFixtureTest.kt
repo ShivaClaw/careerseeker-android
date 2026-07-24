@@ -76,9 +76,9 @@ class ScreensFromFixtureTest {
 
         compose.onNodeWithText("Documents (read-only)").assertIsDisplayed()
         // The three documents live below the fold of the test viewport; scroll each into view.
-        compose.onNodeWithText("Resume").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Draft email").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Cover letter").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Answers").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Resume").performScrollTo().assertIsDisplayed()
     }
 
     @Test

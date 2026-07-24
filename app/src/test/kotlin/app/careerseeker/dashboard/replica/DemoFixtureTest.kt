@@ -53,9 +53,10 @@ class DemoFixtureTest {
         assertEquals(12L, db.dao().countersNow()!!.cycles)
         assertEquals(7, db.dao().evidenceEventsNow().size)
 
-        // The detail screen renders all three documents read-only (editing is P3).
+        // The detail screen renders all three documents read-only (editing is P3). Canonical
+        // doc_kind set (Sync-Protocol.md §4.3), ordered by kind ascending as the DAO returns them.
         assertEquals(
-            listOf("answers", "cover_letter", "resume"),
+            listOf("cover_letter", "draft_email", "resume_text"),
             db.dao().documentsNow("app_demo_1").map { it.kind },
         )
 

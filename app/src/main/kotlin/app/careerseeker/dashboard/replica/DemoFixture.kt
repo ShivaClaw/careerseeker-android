@@ -69,10 +69,12 @@ object DemoFixture {
             )
             dao.upsertDocuments(
                 listOf(
+                    // The three documents spec §4.1 screen 4 renders: draft_email | cover_letter | resume_text.
                     DocumentRow(
-                        "app_demo_1", "resume",
-                        "JORDAN LEE\nSenior Platform Engineer\n\nEXPERIENCE\nNorthwind Labs adjacent: 8 years building Kubernetes platforms, " +
-                            "cut deploy lead time 40%, ran the on-call program for a 200-service fleet.\n\nSKILLS\nKubernetes, Go, Terraform, SLO design.",
+                        "app_demo_1", "draft_email",
+                        "To: jobs@northwind.example\nSubject: Application — Senior Platform Engineer\n\nHi Northwind Labs team,\n\n" +
+                            "I'm applying for the Senior Platform Engineer role; my resume and cover letter are attached. " +
+                            "I'd welcome the chance to talk.\n\nJordan",
                         rev = 1,
                     ),
                     DocumentRow(
@@ -82,8 +84,9 @@ object DemoFixture {
                         rev = 1,
                     ),
                     DocumentRow(
-                        "app_demo_1", "answers",
-                        "Q: Are you authorized to work in the US?\nA: Yes.\n\nQ: Notice period?\nA: Two weeks.",
+                        "app_demo_1", "resume_text",
+                        "JORDAN LEE\nSenior Platform Engineer\n\nEXPERIENCE\nNorthwind Labs adjacent: 8 years building Kubernetes platforms, " +
+                            "cut deploy lead time 40%, ran the on-call program for a 200-service fleet.\n\nSKILLS\nKubernetes, Go, Terraform, SLO design.",
                         rev = 1,
                     ),
                 ),

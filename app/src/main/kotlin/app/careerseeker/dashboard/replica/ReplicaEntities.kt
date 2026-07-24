@@ -77,7 +77,7 @@ data class EvidenceEventRow(
 @Entity(tableName = "documents", primaryKeys = ["appId", "kind"])
 data class DocumentRow(
     val appId: String,
-    /** `resume` | `cover_letter` | `answers`, mirroring the protocol's doc_kind. */
+    /** `draft_email` | `cover_letter` | `resume_text` — the canonical doc_kind set (Sync-Protocol.md §4.3). */
     val kind: String,
     val text: String,
     val rev: Long,

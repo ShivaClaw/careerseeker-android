@@ -66,10 +66,11 @@ private fun DocumentCard(doc: DocumentRow) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text(
+                    // doc_kind vocabulary is pinned in Sync-Protocol.md §4.3: draft_email | cover_letter | resume_text.
                     when (doc.kind) {
-                        "resume" -> "Resume"
+                        "draft_email" -> "Draft email"
                         "cover_letter" -> "Cover letter"
-                        "answers" -> "Answers"
+                        "resume_text" -> "Resume"
                         else -> doc.kind
                     },
                     style = MaterialTheme.typography.titleSmall,
