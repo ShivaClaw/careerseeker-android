@@ -14,6 +14,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.careerseeker.dashboard.replica.CountersRow
 import app.careerseeker.dashboard.replica.SyncStateRow
@@ -58,7 +61,11 @@ fun HomeScreen(counters: CountersRow?, syncState: SyncStateRow?, modifier: Modif
 
 @Composable
 private fun MetricCard(label: String, value: Long) {
-    Card {
+    // A11y (P5): the label and value are two Texts, so TalkBack would land on each
+    // separately ("Cycles", then "12"). Merge them into one node that speaks "Cycles: 12".
+    // The visible layout is unchanged; onNodeWithText still finds "Cycles"/"12" in the
+    // merged node's text list.
+    Card(Modifier.semantics(mergeDescendants = true) { contentDescription = "$label: $value" }) {
         Column(Modifier.fillMaxWidth().padding(12.dp)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("$value", style = MaterialTheme.typography.headlineSmall)
@@ -84,7 +91,9 @@ internal fun StatusBanner(syncState: SyncStateRow?, modifier: Modifier = Modifie
 
 @Composable
 internal fun ScreenTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.headlineMedium)
+    // A11y (P5): mark every screen's title as a heading so TalkBack users can jump
+    // between screens' headers with the heading-navigation gesture. Shared by all five screens.
+    Text(text, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
 }
 
 @Composable
