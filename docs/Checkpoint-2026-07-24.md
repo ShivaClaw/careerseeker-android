@@ -24,6 +24,24 @@ it *indexes* everything.
 > commit) and F5/F7 (heartbeat timer, `event_count` on the phone — fold into the device
 > session). The findings text below is preserved as originally written.
 
+> **Codex audit result (2026-07-24, brief: [Codex-Android-Audit-2026-07-24.md](Codex-Android-Audit-2026-07-24.md)).**
+> Codex independently reproduced both verifications and confirmed the §3 invariant clean bills
+> (no posting body on the wire, `InjectionSignals` stays engine-side, evidence is metadata-only,
+> no send path, sync default-off, score 0–100, vectors untouched, synced strings inert). It found
+> **one high defect the checkpoint had missed**: the bridge marked its first snapshot sent
+> *before* the push succeeded, so a failed/thrown first push demoted every later publish to a
+> delta — which a fresh phone merged into demo fixture rows, presenting demo data and the
+> fixture's `auditOk=true` as real. **Fixed both sides:** engine `7158202` (flag flips only after
+> a successful snapshot push; retried until it lands; EngineHarness 105, pin **437**) and android
+> `d9f95fd` (defense-in-depth: the first applied real payload of any kind wipes all
+> fixture-populated tables and the fixture's audit claim, with parse-before-write so a malformed
+> payload still changes nothing; tests 25). The android fix also closes the wider class Codex's
+> trigger implied — a real snapshot previously left demo evidence/documents standing, and a
+> heartbeat cleared the demo label while demo rows stayed visible. Codex's low finding
+> (P2-Evidence.md stale transcript) is addressed with a historical-note banner. Codex's verdict
+> was "go to open draft PRs, no-go to merge until the demo-boundary bug is fixed" — the fix is
+> now in, so both branches stand ready for draft PRs.
+
 ---
 
 ## 1. Design goals, restated as testable invariants
