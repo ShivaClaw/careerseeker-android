@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Option C — "Monogram C + needle": a bold ring-shaped letter C holding the compass needle.
+       Combines lettermark recognizability with the seeking motif. Slate bg, off-white C, blue needle. -->
+  <rect width="512" height="512" fill="#1B2733"/>
+  <g transform="translate(256,256)">
+    <!-- open ring forming a 'C' (gap on the right) -->
+    <path d="M96,-118 A150,150 0 1 0 96,118"
+          fill="none" stroke="#F2F5F7" stroke-width="40" stroke-linecap="round"/>
+    <!-- compass needle nested inside -->
+    <path d="M0,-104 L34,0 L0,104 L-34,0 Z" fill="#7FB2D9"/>
+    <circle r="9" fill="#1B2733"/>
+  </g>
+</svg>

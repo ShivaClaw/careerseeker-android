@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <!--
+    CareerSeeker Dashboard — Play feature graphic (1024x500).
+    Brand palette from the app: slate #1B2733, off-white #F2F5F7, blue accent #7FB2D9.
+    Draft for account day; export to 24-bit PNG (no alpha) at exactly 1024x500. See README.md.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1B2733"/>
+      <stop offset="1" stop-color="#0F171F"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="500" fill="url(#bg)"/>
+
+  <!-- subtle accent underline -->
+  <rect x="360" y="300" width="150" height="4" rx="2" fill="#7FB2D9"/>
+
+  <!-- Compass mark (the app's needle motif, refined), centered in a ring on the left -->
+  <g transform="translate(200,250)">
+    <circle r="132" fill="none" stroke="#2A3948" stroke-width="10"/>
+    <circle r="132" fill="none" stroke="#7FB2D9" stroke-width="4" stroke-dasharray="6 14" opacity="0.7"/>
+    <!-- outer needle (vertical rhombus) -->
+    <path d="M0,-104 L34,0 L0,104 L-34,0 Z" fill="#F2F5F7"/>
+    <!-- inner needle -->
+    <path d="M0,-52 L17,0 L0,52 L-17,0 Z" fill="#7FB2D9"/>
+    <circle r="7" fill="#1B2733"/>
+  </g>
+
+  <!-- Wordmark + tagline -->
+  <g font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif">
+    <text x="360" y="230" font-size="64" font-weight="700" fill="#F2F5F7">CareerSeeker</text>
+    <text x="360" y="292" font-size="44" font-weight="400" fill="#7FB2D9">Dashboard</text>
+    <text x="360" y="356" font-size="26" font-weight="400" fill="#C4CDD6">Your PC&#8217;s job search, on your phone.</text>
+    <text x="360" y="392" font-size="26" font-weight="400" fill="#C4CDD6">Private &#183; end-to-end encrypted &#183; read-only.</text>
+  </g>
+</svg>
