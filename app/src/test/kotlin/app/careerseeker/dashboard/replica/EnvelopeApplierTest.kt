@@ -62,6 +62,10 @@ class EnvelopeApplierTest {
         """{"kind":"heartbeat","body":{"ts":"2026-07-23T12:05:00Z","cycle":$cycles,"counters":{"discovered":4,"acted":2,"drafted":2,"blocked":0,"rejected":1,"errors":0,"cycles":$cycles}}}"""
             .toByteArray()
 
+    private fun evidenceJson(auditOk: Boolean = true): ByteArray =
+        """{"kind":"evidence","body":{"audit_ok":$auditOk,"event_count":42,"events":[{"seq":1,"ts":"2026-07-23T09:00:11Z","actor":"engine","kind":"scout_ingest","entity":"scout","entity_id":"b41f"},{"seq":2,"ts":"2026-07-23T09:00:14Z","actor":"engine","kind":"application_created","entity":"application","entity_id":"app_1"}]}}"""
+            .toByteArray()
+
     @Test
     fun snapshotProjectsFullState() = runTest {
         val result = applier.apply(seq = 1, envelopeTs = "2026-07-23T12:00:00Z", kind = "snapshot", plaintext = snapshotJson())
@@ -172,6 +176,61 @@ class EnvelopeApplierTest {
         )
         assertEquals(ApplyResult.Ignored("doc"), result)
         assertNull(db.dao().syncStateNow()) // ignored payloads do not advance the mark
+    }
+
+    @Test
+    fun evidenceProjectsAuditTrailAndVerdict() = runTest {
+        applier.apply(1, "2026-07-23T12:00:00Z", "snapshot", snapshotJson())
+        val result = applier.apply(2, "2026-07-23T12:01:00Z", "evidence", evidenceJson(auditOk = true))
+        assertEquals(ApplyResult.Applied("evidence"), result)
+
+        val events = db.dao().evidenceEventsNow()
+        assertEquals(2, events.size)
+        assertEquals("scout_ingest", events.first { it.seq == 1L }.kind)
+        assertEquals("b41f", events.first { it.seq == 1L }.entityId)
+
+        val state = db.dao().syncStateNow()!!
+        assertEquals(true, state.auditOk)
+        assertEquals(2L, state.highestAppliedE2pSeq)
+        assertEquals(1, db.dao().applicationsNow().size) // dashboard rows untouched by evidence
+    }
+
+    @Test
+    fun evidenceReportsBrokenChainAndReplacesTrail() = runTest {
+        applier.apply(1, "2026-07-23T12:00:00Z", "evidence", evidenceJson(auditOk = true))
+        // A later evidence payload with a broken verdict and a different trail replaces wholesale.
+        val broken =
+            """{"kind":"evidence","body":{"audit_ok":false,"first_broken_seq":7,"event_count":9,"events":[{"seq":9,"ts":"2026-07-23T11:00:00Z","actor":"engine","kind":"audit_break","entity":"event","entity_id":"e9"}]}}"""
+                .toByteArray()
+        applier.apply(2, "2026-07-23T12:05:00Z", "evidence", broken)
+
+        assertEquals(listOf(9L), db.dao().evidenceEventsNow().map { it.seq })
+        assertEquals(false, db.dao().syncStateNow()!!.auditOk)
+    }
+
+    @Test
+    fun snapshotResetsAuditToUnknownButDeltaPreservesIt() = runTest {
+        applier.apply(1, "2026-07-23T12:00:00Z", "evidence", evidenceJson(auditOk = true))
+        // A delta does not re-report the audit verdict, so it must be preserved.
+        applier.apply(2, "2026-07-23T12:01:00Z", "delta", deltaJson())
+        assertEquals(true, db.dao().syncStateNow()!!.auditOk)
+        // A full snapshot is a fresh resync with no verdict reported -> unknown, not stale "intact".
+        applier.apply(3, "2026-07-23T12:02:00Z", "snapshot", snapshotJson())
+        assertNull(db.dao().syncStateNow()!!.auditOk)
+    }
+
+    @Test
+    fun malformedEvidenceChangesNothing() = runTest {
+        applier.apply(1, "2026-07-23T12:00:00Z", "evidence", evidenceJson(auditOk = true))
+        // Missing audit_ok, and an event missing entity_id: either makes the whole apply a no-op.
+        val garbled = applier.apply(
+            2, "2026-07-23T12:01:00Z", "evidence",
+            """{"kind":"evidence","body":{"events":[{"seq":1,"ts":"t","actor":"engine","kind":"k","entity":"e"}]}}""".toByteArray(),
+        )
+        assertEquals(ApplyResult.Malformed, garbled)
+        assertEquals(1L, db.dao().syncStateNow()!!.highestAppliedE2pSeq) // mark unmoved
+        assertEquals(2, db.dao().evidenceEventsNow().size) // prior trail intact
+        assertEquals(true, db.dao().syncStateNow()!!.auditOk)
     }
 
     /**

@@ -19,7 +19,7 @@ sealed interface ApplyResult {
     /** Envelope seq is at or below the persisted high-water mark — already applied. */
     data object SkippedStale : ApplyResult
 
-    /** A valid protocol kind the replica does not project (doc, conflict… — P3 concerns). */
+    /** A valid protocol kind the replica does not project yet (doc, conflict… — see §4.3). */
     data class Ignored(val kind: String) : ApplyResult
 
     /** The plaintext did not parse as the expected payload shape. Nothing changed. */
@@ -52,10 +52,16 @@ class EnvelopeApplier(private val db: ReplicaDb) {
             val state = dao.syncStateNow()
             if (seq <= (state?.highestAppliedE2pSeq ?: 0L)) return@withTransaction ApplyResult.SkippedStale
 
+            // The audit verdict is only ever set by an `evidence` payload. A full snapshot is a
+            // fresh resync whose verdict has not been re-reported, so it reverts to unknown (null)
+            // rather than carrying a stale "intact"; deltas/heartbeats preserve the last verdict.
+            var auditOk = if (kind == "snapshot") null else state?.auditOk
+
             when (kind) {
                 "snapshot" -> applySnapshot(dao, seq, body) ?: return@withTransaction ApplyResult.Malformed
                 "delta" -> applyDelta(dao, seq, body) ?: return@withTransaction ApplyResult.Malformed
                 "heartbeat" -> applyHeartbeat(dao, body) ?: return@withTransaction ApplyResult.Malformed
+                "evidence" -> auditOk = applyEvidence(dao, body) ?: return@withTransaction ApplyResult.Malformed
                 else -> return@withTransaction ApplyResult.Ignored(kind)
             }
 
@@ -66,6 +72,7 @@ class EnvelopeApplier(private val db: ReplicaDb) {
                     lastCycle = body["counters"]?.jsonObject?.get("cycles")?.jsonPrimitive?.longOrNull
                         ?: (body["cycle"]?.jsonPrimitive?.longOrNull ?: state?.lastCycle),
                     demoMode = false, // real engine data replaces any fixture claim
+                    auditOk = auditOk,
                 ),
             )
             ApplyResult.Applied(kind)
@@ -102,6 +109,20 @@ class EnvelopeApplier(private val db: ReplicaDb) {
     private suspend fun applyHeartbeat(dao: ReplicaDao, body: JsonObject): Unit? {
         dao.upsertCounters(countersOf(body) ?: return null)
         return Unit
+    }
+
+    /**
+     * Evidence carries the engine's audit-chain verdict plus recent event metadata (never event
+     * payload bodies). The event trail is replaced wholesale — it is the engine's current view,
+     * not an accumulating log. Returns the reported verdict for the caller to persist, or null if
+     * the payload is malformed (which leaves the replica untouched).
+     */
+    private suspend fun applyEvidence(dao: ReplicaDao, body: JsonObject): Boolean? {
+        val auditOk = body["audit_ok"]?.jsonPrimitive?.booleanOrNull ?: return null
+        val events = body["events"]?.jsonArray?.map { evidenceEventOf(it.jsonObject) ?: return null } ?: return null
+        dao.clearEvidenceEvents()
+        dao.upsertEvidenceEvents(events)
+        return auditOk
     }
 
     // ---- payload parsing, field names pinned to the engine's SyncPayloads ----
@@ -143,5 +164,14 @@ class EnvelopeApplier(private val db: ReplicaDb) {
         repost = o["repost"]?.jsonPrimitive?.booleanOrNull ?: return null,
         injectionFlag = o["injection_flag"]?.jsonPrimitive?.booleanOrNull ?: return null,
         updatedSeq = seq,
+    )
+
+    private fun evidenceEventOf(o: JsonObject): EvidenceEventRow? = EvidenceEventRow(
+        seq = o["seq"]?.jsonPrimitive?.longOrNull ?: return null,
+        ts = o["ts"]?.jsonPrimitive?.contentOrNull ?: return null,
+        actor = o["actor"]?.jsonPrimitive?.contentOrNull ?: return null,
+        kind = o["kind"]?.jsonPrimitive?.contentOrNull ?: return null,
+        entity = o["entity"]?.jsonPrimitive?.contentOrNull ?: return null,
+        entityId = o["entity_id"]?.jsonPrimitive?.contentOrNull ?: return null,
     )
 }

@@ -52,9 +52,9 @@ data class CountersRow(
 
 /**
  * Audit-event metadata for the Evidence screen: seq/ts/actor/kind/entity only, never event
- * payload bodies. Populated by the demo fixture today; the engine's `evidence` payload
- * builder is not defined yet, so the applier deliberately has no branch for it — a
- * speculative parser for an unshipped shape would just be a silent-drift generator.
+ * payload bodies. Populated by the demo fixture and, in a paired session, by the applier's
+ * `evidence` branch (Sync-Protocol.md §4.3) — which replaces the trail wholesale, since it is
+ * the engine's current view rather than an accumulating log.
  */
 @Entity(tableName = "evidence_events")
 data class EvidenceEventRow(
@@ -69,9 +69,10 @@ data class EvidenceEventRow(
 /**
  * One tailored document as the read-only detail screen renders it (resume, cover letter,
  * answers). P2 renders; editing is P3's invariant-sensitive work. Populated by the demo
- * fixture today — the engine's `doc` payload publisher is not built yet, so the applier has
- * no branch for it and [text] can only come from fixtures until it is. Display-only text,
- * rendered inert, never interpolated.
+ * fixture today — the engine's `doc` payload is not emitted yet (the engine renders these to
+ * PDF and persists only the file paths, not the tailored text, so it has nothing to ship
+ * until that text is persisted). The applier deliberately keeps no `doc` branch until then —
+ * a parser for an unshipped shape is a silent-drift generator. Display-only text, inert.
  */
 @Entity(tableName = "documents", primaryKeys = ["appId", "kind"])
 data class DocumentRow(
@@ -98,9 +99,10 @@ data class SyncStateRow(
     /** True while the replica holds fixture data; any applied real envelope clears it. */
     val demoMode: Boolean,
     /**
-     * The engine's audit-chain verification verdict as last reported. Null = not reported
-     * by any applied payload — the Evidence screen says "unknown" rather than guessing.
-     * Only the fixture sets it today; the wire `evidence` payload is not defined yet.
+     * The engine's audit-chain verification verdict as last reported by an `evidence` payload
+     * (or the fixture). Null = not reported — the Evidence screen says "unknown" rather than
+     * guessing. A full `snapshot` resets it to null (a fresh resync has not re-reported the
+     * verdict); deltas/heartbeats preserve it; an `evidence` payload sets it.
      */
     val auditOk: Boolean? = null,
 )
