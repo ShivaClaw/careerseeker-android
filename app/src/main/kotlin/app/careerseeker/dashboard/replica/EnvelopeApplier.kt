@@ -44,6 +44,14 @@ sealed interface ApplyResult {
  */
 class EnvelopeApplier(private val db: ReplicaDb) {
 
+    /** A fully validated payload, parsed before anything is written. */
+    private sealed interface Parsed {
+        data class Snapshot(val counters: CountersRow, val apps: List<ApplicationRow>, val jobs: List<JobRow>) : Parsed
+        data class Delta(val counters: CountersRow, val apps: List<ApplicationRow>, val jobs: List<JobRow>) : Parsed
+        data class Heartbeat(val counters: CountersRow) : Parsed
+        data class Evidence(val auditOk: Boolean, val events: List<EvidenceEventRow>) : Parsed
+    }
+
     suspend fun apply(seq: Long, envelopeTs: String, kind: String, plaintext: ByteArray): ApplyResult {
         val body = parseBody(plaintext) ?: return ApplyResult.Malformed
 
@@ -52,17 +60,57 @@ class EnvelopeApplier(private val db: ReplicaDb) {
             val state = dao.syncStateNow()
             if (seq <= (state?.highestAppliedE2pSeq ?: 0L)) return@withTransaction ApplyResult.SkippedStale
 
+            // Parse FULLY before writing anything: a malformed payload must change nothing, and
+            // the demo wipe below must never fire for a payload that then fails validation.
+            val parsed: Parsed = when (kind) {
+                "snapshot" -> parseSnapshot(body, seq)
+                "delta" -> parseDelta(body, seq)
+                "heartbeat" -> parseHeartbeat(body)
+                "evidence" -> parseEvidence(body)
+                else -> return@withTransaction ApplyResult.Ignored(kind)
+            } ?: return@withTransaction ApplyResult.Malformed
+
+            // Demo/real boundary (Codex audit finding, 2026-07-24): fixture data must never mix
+            // with or masquerade as engine data. The FIRST applied real payload of any kind wipes
+            // every fixture-populated table — a delta must not upsert into demo rows, a heartbeat
+            // must not clear the demo label while demo rows remain visible, and a snapshot's own
+            // wholesale replace does not cover the evidence/documents tables the fixture also
+            // seeded. The fixture's auditOk claim dies here too (it was never engine-reported).
+            val wasDemo = state?.demoMode ?: false
+            if (wasDemo) {
+                dao.clearApplications()
+                dao.clearJobs()
+                dao.clearEvidenceEvents()
+                dao.clearDocuments()
+            }
+
             // The audit verdict is only ever set by an `evidence` payload. A full snapshot is a
             // fresh resync whose verdict has not been re-reported, so it reverts to unknown (null)
-            // rather than carrying a stale "intact"; deltas/heartbeats preserve the last verdict.
-            var auditOk = if (kind == "snapshot") null else state?.auditOk
+            // rather than carrying a stale "intact"; deltas/heartbeats preserve the last REAL verdict.
+            var auditOk = if (kind == "snapshot" || wasDemo) null else state?.auditOk
 
-            when (kind) {
-                "snapshot" -> applySnapshot(dao, seq, body) ?: return@withTransaction ApplyResult.Malformed
-                "delta" -> applyDelta(dao, seq, body) ?: return@withTransaction ApplyResult.Malformed
-                "heartbeat" -> applyHeartbeat(dao, body) ?: return@withTransaction ApplyResult.Malformed
-                "evidence" -> auditOk = applyEvidence(dao, body) ?: return@withTransaction ApplyResult.Malformed
-                else -> return@withTransaction ApplyResult.Ignored(kind)
+            when (parsed) {
+                is Parsed.Snapshot -> {
+                    // Snapshot is FULL dashboard state: applications and jobs are replaced wholesale.
+                    dao.clearApplications()
+                    dao.clearJobs()
+                    dao.upsertApplications(parsed.apps)
+                    dao.upsertJobs(parsed.jobs)
+                    dao.upsertCounters(parsed.counters)
+                }
+                is Parsed.Delta -> {
+                    // Delta is the recent window: listed rows are upserted, everything else retained.
+                    dao.upsertApplications(parsed.apps)
+                    dao.upsertJobs(parsed.jobs)
+                    dao.upsertCounters(parsed.counters)
+                }
+                is Parsed.Heartbeat -> dao.upsertCounters(parsed.counters)
+                is Parsed.Evidence -> {
+                    // The trail is the engine's current view, not an accumulating log: replace wholesale.
+                    dao.clearEvidenceEvents()
+                    dao.upsertEvidenceEvents(parsed.events)
+                    auditOk = parsed.auditOk
+                }
             }
 
             dao.upsertSyncState(
@@ -79,51 +127,31 @@ class EnvelopeApplier(private val db: ReplicaDb) {
         }
     }
 
-    /** Snapshot is FULL dashboard state: applications and jobs are replaced wholesale. */
-    private suspend fun applySnapshot(dao: ReplicaDao, seq: Long, body: JsonObject): Unit? {
-        val counters = countersOf(body) ?: return null
-        val apps = body["applications"]?.jsonArray?.map { appOf(it.jsonObject, seq) ?: return null } ?: return null
-        val jobs = body["jobs"]?.jsonArray?.map { jobOf(it.jsonObject, seq) ?: return null } ?: return null
+    // ---- parse phase: pure, null = malformed, nothing written ----
 
-        dao.clearApplications()
-        dao.clearJobs()
-        dao.upsertApplications(apps)
-        dao.upsertJobs(jobs)
-        dao.upsertCounters(counters)
-        return Unit
-    }
+    private fun parseSnapshot(body: JsonObject, seq: Long): Parsed.Snapshot? = Parsed.Snapshot(
+        counters = countersOf(body) ?: return null,
+        apps = body["applications"]?.jsonArray?.map { appOf(it.jsonObject, seq) ?: return null } ?: return null,
+        jobs = body["jobs"]?.jsonArray?.map { jobOf(it.jsonObject, seq) ?: return null } ?: return null,
+    )
 
-    /** Delta carries what changed: listed rows are upserted, everything else is retained. */
-    private suspend fun applyDelta(dao: ReplicaDao, seq: Long, body: JsonObject): Unit? {
-        val counters = countersOf(body) ?: return null
-        val apps = body["applications"]?.jsonArray?.map { appOf(it.jsonObject, seq) ?: return null } ?: return null
-        val jobs = body["jobs"]?.jsonArray?.map { jobOf(it.jsonObject, seq) ?: return null } ?: return null
+    private fun parseDelta(body: JsonObject, seq: Long): Parsed.Delta? = Parsed.Delta(
+        counters = countersOf(body) ?: return null,
+        apps = body["applications"]?.jsonArray?.map { appOf(it.jsonObject, seq) ?: return null } ?: return null,
+        jobs = body["jobs"]?.jsonArray?.map { jobOf(it.jsonObject, seq) ?: return null } ?: return null,
+    )
 
-        dao.upsertApplications(apps)
-        dao.upsertJobs(jobs)
-        dao.upsertCounters(counters)
-        return Unit
-    }
-
-    /** Heartbeat is counters-only liveness; the row tables are untouched. */
-    private suspend fun applyHeartbeat(dao: ReplicaDao, body: JsonObject): Unit? {
-        dao.upsertCounters(countersOf(body) ?: return null)
-        return Unit
-    }
+    private fun parseHeartbeat(body: JsonObject): Parsed.Heartbeat? =
+        Parsed.Heartbeat(countersOf(body) ?: return null)
 
     /**
      * Evidence carries the engine's audit-chain verdict plus recent event metadata (never event
-     * payload bodies). The event trail is replaced wholesale — it is the engine's current view,
-     * not an accumulating log. Returns the reported verdict for the caller to persist, or null if
-     * the payload is malformed (which leaves the replica untouched).
+     * payload bodies).
      */
-    private suspend fun applyEvidence(dao: ReplicaDao, body: JsonObject): Boolean? {
-        val auditOk = body["audit_ok"]?.jsonPrimitive?.booleanOrNull ?: return null
-        val events = body["events"]?.jsonArray?.map { evidenceEventOf(it.jsonObject) ?: return null } ?: return null
-        dao.clearEvidenceEvents()
-        dao.upsertEvidenceEvents(events)
-        return auditOk
-    }
+    private fun parseEvidence(body: JsonObject): Parsed.Evidence? = Parsed.Evidence(
+        auditOk = body["audit_ok"]?.jsonPrimitive?.booleanOrNull ?: return null,
+        events = body["events"]?.jsonArray?.map { evidenceEventOf(it.jsonObject) ?: return null } ?: return null,
+    )
 
     // ---- payload parsing, field names pinned to the engine's SyncPayloads ----
 

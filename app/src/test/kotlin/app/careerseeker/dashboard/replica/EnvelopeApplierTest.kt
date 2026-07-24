@@ -233,6 +233,75 @@ class EnvelopeApplierTest {
         assertEquals(true, db.dao().syncStateNow()!!.auditOk)
     }
 
+    // ---- demo/real boundary (Codex audit finding, 2026-07-24) ----
+    //
+    // The engine-side bug: a failed first snapshot left the bridge publishing deltas, which a
+    // fresh phone merged into demo fixture rows — demo data presented as real, with the fixture's
+    // auditOk=true surviving as "engine-verified". Fixed at the source (the bridge retries the
+    // snapshot), and defended here: the FIRST applied real payload of any kind wipes every
+    // fixture-populated table and the fixture's audit claim.
+
+    @Test
+    fun firstRealDeltaWipesDemoDataInsteadOfMergingIntoIt() = runTest {
+        DemoFixture.seed(db)
+        val result = applier.apply(1, "2026-07-23T12:00:00Z", "delta", deltaJson())
+        assertEquals(ApplyResult.Applied("delta"), result)
+
+        // Only the delta's rows remain — no demo application/job survives to masquerade as real.
+        assertEquals(listOf("app_1", "app_2"), db.dao().applicationsNow().map { it.id })
+        assertEquals(listOf("job_2"), db.dao().jobsNow().map { it.id })
+        assertTrue(db.dao().evidenceEventsNow().isEmpty())
+        assertTrue(db.dao().documentsNow("app_demo_1").isEmpty())
+
+        val state = db.dao().syncStateNow()!!
+        assertEquals(false, state.demoMode)
+        assertNull(state.auditOk) // the fixture's auditOk=true was never engine-reported
+    }
+
+    @Test
+    fun firstRealHeartbeatWipesDemoRowsRatherThanRelabelingThem() = runTest {
+        DemoFixture.seed(db)
+        applier.apply(1, "2026-07-23T12:00:00Z", "heartbeat", heartbeatJson())
+
+        // Heartbeat carries no rows; clearing demoMode while demo rows stayed visible would
+        // present fixture data as real. The wipe leaves honestly empty screens instead.
+        assertTrue(db.dao().applicationsNow().isEmpty())
+        assertTrue(db.dao().jobsNow().isEmpty())
+        assertTrue(db.dao().evidenceEventsNow().isEmpty())
+        assertEquals(false, db.dao().syncStateNow()!!.demoMode)
+        assertNull(db.dao().syncStateNow()!!.auditOk)
+    }
+
+    @Test
+    fun firstRealSnapshotAlsoClearsDemoEvidenceAndDocuments() = runTest {
+        DemoFixture.seed(db)
+        applier.apply(1, "2026-07-23T12:00:00Z", "snapshot", snapshotJson())
+
+        // Snapshot replaces applications/jobs itself, but the fixture also seeded evidence
+        // events and documents — those must not survive as apparent engine data.
+        assertEquals(listOf("app_1"), db.dao().applicationsNow().map { it.id })
+        assertTrue(db.dao().evidenceEventsNow().isEmpty())
+        assertTrue(db.dao().documentsNow("app_demo_1").isEmpty())
+        assertNull(db.dao().syncStateNow()!!.auditOk)
+    }
+
+    @Test
+    fun malformedPayloadInDemoModeChangesNothing() = runTest {
+        DemoFixture.seed(db)
+        val result = applier.apply(
+            1, "2026-07-23T12:00:00Z", "delta",
+            """{"kind":"delta","body":{"counters":{"discovered":1}}}""".toByteArray(),
+        )
+        assertEquals(ApplyResult.Malformed, result)
+
+        // Validation happens before the demo wipe: a bad payload must not cost the demo rows.
+        assertEquals(6, db.dao().applicationsNow().size)
+        val state = db.dao().syncStateNow()!!
+        assertEquals(true, state.demoMode)
+        assertEquals(true, state.auditOk)
+        assertEquals(0L, state.highestAppliedE2pSeq)
+    }
+
     /**
      * The seam test: bytes travel exactly as they would in production — sealed with k_e2p,
      * opened and replay-checked by `:core`'s receiver, then projected by the applier.
