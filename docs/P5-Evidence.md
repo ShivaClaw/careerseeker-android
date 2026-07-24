@@ -214,3 +214,7 @@ the recorded pin).
 **Assets rendered + verified, 2026-07-24:** headless Chrome (`/c/Program Files/Google/Chrome`) →
 PNGs; pixel sizes confirmed via PNG IHDR (feature **1024×500**; three icons **512×512**); each PNG
 opened and visually confirmed on-brand. Recipe in `assets/README.md`.
+
+**GitHub Actions CI (branch push):** two commits pushed to `origin/claude/p5-store` (no PR). CI run
+[30131023641](https://github.com/ShivaClaw/careerseeker-android/actions/runs/30131023641) —
+**conclusion `success`** ("Build and test", 6m12s) on head `5fffdd0`, matching the local full ritual.
