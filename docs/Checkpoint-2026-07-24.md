@@ -12,6 +12,18 @@ checked line-by-line against the as-built code on `claude/p2-publisher` (engine)
 **Audience:** Brandon, Codex (audit seed), and every future session. This supersedes nothing;
 it *indexes* everything.
 
+> **Update 2026-07-24 (same session): findings F1–F4 are CLOSED.** F1 (wire score unit → 0–100
+> int, `ScoreToWire = round(total×20)`), F2 (snapshot/delta bodies pinned in protocol §4.3.1),
+> F6 (delta = recent-window latest-wins, stated), and F4 (seq-resume proof + §6.1 rule that the
+> engine resumes above `max(persisted, relay latest)` + the vault requirement in the
+> `BuildSyncBridge` seam) landed engine-side in `dbad69e` on `claude/p2-publisher`. F3
+> (doc_kind reconciled to `draft_email|cover_letter|resume_text` across all three planes) is
+> protocol-side in `dbad69e` and Android-side in `bd3f71d` on `claude/p2-replica`. Offline pin
+> **433 → 435** (SyncHarness 94, EngineHarness 103); both CI green. Deliberately still deferred:
+> the **doc-pipeline** half of F3 (persist tailored text + rev on the engine — P3's opening
+> commit) and F5/F7 (heartbeat timer, `event_count` on the phone — fold into the device
+> session). The findings text below is preserved as originally written.
+
 ---
 
 ## 1. Design goals, restated as testable invariants
