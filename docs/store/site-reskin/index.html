@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CareerSeeker — Your job search, handled.</title>
+<meta name="description" content="CareerSeeker runs quietly on your computer. It finds real openings, learns each company, and tailors your resume and cover letter for every one — then leaves finished drafts in your Gmail. You read them. You hit send.">
+<!--
+  STAGED at P5 (branch claude/p5-store) from Claude Design "CareerSeeker Site Reskin".
+  DO NOT DEPLOY before the P6 one-artifact launch (app + privacy + data-safety + site ship together).
+
+  P6 pre-deploy notes:
+  1. PRICING CARD below still says "Our only revenue" — Monetization-Decision §1 flags that sentence
+     as breaking the moment Pro ships. The P6 pricing rewrite (docs/todo/Pricing-Page-Rewrite.md)
+     must reconcile this card + /pricing/ in the same change. Implemented faithfully from the mock.
+  2. HERO EYEBROW "Free during beta" sits against the live promise "free to download and free
+     forever" (pricing page). If the app is free forever, say so here too — P6 copy call.
+  3. FONTS load from Google Fonts per the mock. The footer promises "This page loads nothing that
+     watches you" — for launch, consider self-hosting the two WOFF2 families so no third-party
+     request fires at all. (Design unchanged either way.)
+  4. Inner pages (/how-it-works/, /pricing/, /privacy/, ...) still carry the old skin; the shared
+     tokens live in the :root block below for the P6 site-wide pass.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<style>
+  :root{
+    /* CareerSeeker brand tokens (Claude Design "Site Reskin") */
+    --cs-bg:#0A0A0B; --cs-panel:#101114; --cs-panel-lime:#131707;
+    --cs-border:#26282E; --cs-border-lime:#4E6612;
+    --cs-lime:#A3FF12; --cs-lime-link:#B9E866; --cs-lime-hover:#D6FF8F; --cs-lime-soft:#C8FF6A;
+    --cs-yellow:#FFE500; --cs-yellow-hover:#FFF04D;
+    --cs-text:#E8E9ED; --cs-text-dim:#9DA1AD; --cs-text-faint:#5F6470; --cs-text-mossy:#B4BCA0;
+    --cs-sans:'Space Grotesk',system-ui,sans-serif; --cs-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cs-bg);-webkit-font-smoothing:antialiased;
+       font-family:var(--cs-sans);color:var(--cs-text);min-height:100vh}
+  a{color:var(--cs-lime-link)} a:hover{color:var(--cs-lime-hover)}
+  .nav{max-width:1040px;margin:0 auto;padding:22px 32px;display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+  .nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;margin-right:auto}
+  .nav-brand span{font-size:19px;font-weight:600;letter-spacing:-.02em;color:#fff}
+  .nav-brand b{color:var(--cs-lime);font-weight:inherit}
+  .nav a.link{font-size:15px;color:var(--cs-text-dim);text-decoration:none}
+  .nav a.link:hover{color:var(--cs-lime-hover)}
+  main{max-width:1040px;margin:0 auto;padding:0 32px 88px}
+  .hero{display:flex;align-items:center;gap:48px;padding:56px 0 24px;flex-wrap:wrap}
+  .hero-copy{flex:1 1 480px;min-width:320px}
+  .eyebrow{font-family:var(--cs-mono);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--cs-lime);margin:0 0 18px}
+  h1{font-size:58px;font-weight:600;line-height:1.06;letter-spacing:-.025em;color:#fff;margin:0 0 22px;text-wrap:pretty}
+  h1 em{font-style:normal;color:var(--cs-yellow)}
+  .lede{font-size:19px;line-height:1.6;color:var(--cs-text-dim);margin:0 0 30px;max-width:560px;text-wrap:pretty}
+  .cta-row{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .cta{display:inline-block;background:var(--cs-yellow);color:var(--cs-bg);text-decoration:none;
+       padding:14px 30px;border-radius:10px;font-weight:600;font-size:17px}
+  .cta:hover{background:var(--cs-yellow-hover);color:var(--cs-bg)}
+  .cta-note{font-family:var(--cs-mono);font-size:12px;color:var(--cs-text-faint)}
+  .hero-mark{flex:0 0 auto;padding:26px}
+  .schematic{border:1px solid var(--cs-border);border-radius:18px;overflow:hidden;margin:24px 0 0}
+  .schematic-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--cs-panel)}
+  .schematic-bar .l{font-family:var(--cs-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--cs-lime)}
+  .schematic-bar .r{font-family:var(--cs-mono);font-size:11px;color:var(--cs-text-faint)}
+  .schematic-body{background:var(--cs-bg);padding:20px}
+  .schematic-body img{width:100%;height:auto;display:block}
+  .section{margin-top:80px}
+  .kicker{font-family:var(--cs-mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--cs-lime);margin:0 0 10px}
+  h2{font-size:32px;font-weight:600;letter-spacing:-.02em;color:#fff;margin:0 0 28px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+  .card{background:var(--cs-panel);border:1px solid var(--cs-border);border-radius:14px;padding:26px}
+  .card .tick{width:34px;height:3px;background:var(--cs-lime);border-radius:2px;margin-bottom:18px}
+  .card h3{font-size:19px;font-weight:600;color:#fff;margin:0 0 10px}
+  .card p{font-size:15px;line-height:1.6;color:var(--cs-text-dim);margin:0}
+  .divider{display:flex;gap:10px;justify-content:center;margin:72px 0}
+  .divider span{width:12px;height:42px;background:var(--cs-yellow);border-radius:6px}
+  .divider span:first-child{transform:rotate(-14deg)} .divider span:last-child{transform:rotate(14deg)}
+  .price-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-bottom:26px}
+  .price-cards h3{font-size:16px;font-weight:600;color:var(--cs-text-dim);margin:0 0 4px}
+  .price-cards .big{font-size:44px;font-weight:600;letter-spacing:-.02em;color:var(--cs-yellow);margin:0 0 8px}
+  .price-cards p{font-size:15px;line-height:1.6;color:var(--cs-text-dim);margin:0}
+  .card.fuel{background:var(--cs-panel-lime);border-color:var(--cs-border-lime)}
+  .card.fuel h3{color:var(--cs-lime-soft);margin-bottom:12px}
+  .card.fuel p{color:var(--cs-text-mossy)}
+  .more-link{margin:0;font-size:16px}
+  footer{border-top:1px solid var(--cs-border)}
+  .foot{max-width:1040px;margin:0 auto;padding:30px 32px;display:flex;gap:22px;flex-wrap:wrap;align-items:center;font-size:14px;color:var(--cs-text-faint)}
+  .foot a{color:var(--cs-text-dim);text-decoration:none}
+  .foot a:hover{color:var(--cs-lime-hover)}
+  .foot .mono{font-family:var(--cs-mono);font-size:12px}
+  @media (max-width:640px){ h1{font-size:42px} .hero-mark{margin:0 auto} }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <defs>
+    <symbol id="sk-mark" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="46" fill="none" stroke="#A3FF12" stroke-width="2" opacity="0.4"></circle>
+      <circle cx="50" cy="50" r="24" fill="none" stroke="#A3FF12" stroke-width="2" opacity="0.28"></circle>
+      <path d="M73.5 9.3 L71 13.6 M90.7 26.5 L86.4 29 M90.7 73.5 L86.4 71 M73.5 90.7 L71 86.4 M26.5 90.7 L29 86.4 M9.3 73.5 L13.6 71 M9.3 26.5 L13.6 29 M26.5 9.3 L29 13.6" stroke="#A3FF12" stroke-width="2" opacity="0.5" stroke-linecap="round"></path>
+      <path d="M50 3 L50 12 M97 50 L88 50 M50 97 L50 88 M3 50 L12 50" stroke="#A3FF12" stroke-width="2.6" opacity="0.6" stroke-linecap="round"></path>
+      <path d="M50 50 L73.3 12.7 A44 44 0 0 0 43.9 6.4 Z" fill="#A3FF12" opacity="0.12"></path>
+      <polygon points="52.48,49.65 46.1,22.3 47.52,50.35" fill="#FFE500" opacity="0.75"></polygon>
+      <polygon points="52.54,51.59 73.3,12.7 47.46,48.41" fill="#FFE500"></polygon>
+      <circle cx="50" cy="50" r="4.2" fill="#FFE500"></circle>
+      <circle cx="50" cy="50" r="1.6" fill="#0A0A0B"></circle>
+    </symbol>
+  </defs>
+</svg>
+
+<nav class="nav">
+  <a class="nav-brand" href="/">
+    <svg width="30" height="30" style="flex:none"><use href="#sk-mark"></use></svg>
+    <span>Career<b>Seeker</b></span>
+  </a>
+  <a class="link" href="/how-it-works/">How it works</a>
+  <a class="link" href="/pricing/">Pricing</a>
+  <a class="link" href="/download/">Download</a>
+  <a class="link" href="/dashboard/">Dashboard</a>
+  <a class="link" href="/contact/">Contact</a>
+  <a class="link" href="/support/">Support</a>
+</nav>
+
+<main>
+
+  <div class="hero">
+    <div class="hero-copy">
+      <!-- P6 copy call: "Free during beta" vs the live "free forever" promise — see head comment #2 -->
+      <p class="eyebrow">For Windows · Free during beta</p>
+      <h1>Your job search, <em>handled.</em></h1>
+      <p class="lede">CareerSeeker runs quietly on your computer. It finds real openings, learns each company, and tailors your resume and cover letter for every one — then leaves finished drafts in your Gmail. You read them. You hit send.</p>
+      <div class="cta-row">
+        <a class="cta" href="/beta/">Join the alpha</a>
+        <span class="cta-note">no trackers · no servers · no sends</span>
+      </div>
+    </div>
+    <div class="hero-mark">
+      <svg width="252" height="252" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#A3FF12" stroke-width="2" opacity="0.4"></circle>
+        <circle cx="50" cy="50" r="24" fill="none" stroke="#A3FF12" stroke-width="2" opacity="0.28"></circle>
+        <path d="M73.5 9.3 L71 13.6 M90.7 26.5 L86.4 29 M90.7 73.5 L86.4 71 M73.5 90.7 L71 86.4 M26.5 90.7 L29 86.4 M9.3 73.5 L13.6 71 M9.3 26.5 L13.6 29 M26.5 9.3 L29 13.6" stroke="#A3FF12" stroke-width="2" opacity="0.5" stroke-linecap="round"></path>
+        <path d="M50 3 L50 12 M97 50 L88 50 M50 97 L50 88 M3 50 L12 50" stroke="#A3FF12" stroke-width="2.6" opacity="0.6" stroke-linecap="round"></path>
+        <path id="cs-wedge" d="M50 50 L73.3 12.7 A44 44 0 0 0 43.9 6.4 Z" fill="#A3FF12" opacity="0.12"></path>
+        <polygon id="cs-hour" points="52.48,49.65 46.1,22.3 47.52,50.35" fill="#FFE500" opacity="0.75"></polygon>
+        <polygon id="cs-minute" points="52.54,51.59 73.3,12.7 47.46,48.41" fill="#FFE500"></polygon>
+        <circle cx="50" cy="50" r="4.2" fill="#FFE500"></circle>
+        <circle cx="50" cy="50" r="1.6" fill="#0A0A0B"></circle>
+      </svg>
+    </div>
+  </div>
+
+  <div class="schematic">
+    <div class="schematic-bar">
+      <span class="l">System schematic</span>
+      <span class="r">five specialists · one machine · yours</span>
+    </div>
+    <div class="schematic-body">
+      <img src="assets/careerseeker-hero-schematic.svg" alt="How CareerSeeker works: job boards feed five specialists on your computer — scout, researcher, writer, fabrication gate, dispatcher — drawing on your work history and your own AI provider key, and ending in Gmail drafts you review and send.">
+    </div>
+  </div>
+
+  <div class="section">
+    <p class="kicker">// trust</p>
+    <h2>Three fears, answered</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="tick"></div>
+        <h3>Everything stays on your PC</h3>
+        <p>Your resume, your history, your answers — stored on your machine, not our servers. We don't have servers to put them on.</p>
+      </div>
+      <div class="card">
+        <div class="tick"></div>
+        <h3>It cannot make things up</h3>
+        <p>Every line it writes passes through a fact-checker that blocks anything not backed by your real experience. If you didn't do it, it doesn't ship. <a href="/trust/">How the gate works</a></p>
+      </div>
+      <div class="card">
+        <div class="tick"></div>
+        <h3>It never sends. You do.</h3>
+        <p>CareerSeeker only creates drafts. There is no code in the app that sends an email — the send button is yours alone. <a href="/autonomy-contract/">Read the details</a></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <div>
+    <p class="kicker">// pricing</p>
+    <h2>How the money works</h2>
+    <div class="price-cards">
+      <div class="card">
+        <h3>The app</h3>
+        <p class="big">$0</p>
+        <p>The Windows app is free. Really.</p>
+      </div>
+      <div class="card fuel">
+        <h3>The fuel</h3>
+        <p>Writing tailored applications uses AI computing power. You pay your AI provider directly, at cost. We take nothing and see nothing.</p>
+      </div>
+      <div class="card">
+        <h3>The dashboard</h3>
+        <!-- P6 pricing rewrite: "Our only revenue" breaks when Pro ships — see head comment #1 -->
+        <p>An optional Android app to watch progress. A few dollars, once. Our only revenue.</p>
+      </div>
+    </div>
+    <p class="more-link"><a href="/pricing/">The full honest money story &rarr;</a></p>
+  </div>
+
+</main>
+
+<footer>
+  <div class="foot">
+    <a href="/privacy/">Privacy</a>
+    <a href="/trust/">Trust &amp; security</a>
+    <a href="/support/">Support</a>
+    <span class="mono">support@careerseeker.app</span>
+    <span class="mono">This page loads nothing that watches you — no trackers, no cookies, no analytics.</span>
+  </div>
+</footer>
+
+<script>
+/* Radar-clock hero animation — vanilla port of the Claude Design mock's React logic. */
+(function () {
+  var CYCLE = 36, MSPEED = 120;
+  var wedge = document.getElementById('cs-wedge');
+  var hour = document.getElementById('cs-hour');
+  var minute = document.getElementById('cs-minute');
+  function pt(a, r) {
+    var rad = a * Math.PI / 180;
+    return [50 + r * Math.sin(rad), 50 - r * Math.cos(rad)];
+  }
+  function tick() {
+    var t = (performance.now() / 1000) % CYCLE;
+    var m = 32 + t * MSPEED;
+    var h = m / 12;
+    var ma = ((m % 360) + 360) % 360, ha = ((h % 360) + 360) % 360;
+    if (minute) minute.setAttribute('transform', 'rotate(' + (ma - 32) + ' 50 50)');
+    if (hour) hour.setAttribute('transform', 'rotate(' + (ha + 8) + ' 50 50)');
+    var g = (((ma - ha) % 360) + 360) % 360;
+    if (wedge) {
+      if (g > 0.5 && g < 359.5) {
+        var p1 = pt(ha, 44), p2 = pt(ma, 44);
+        wedge.setAttribute('d', 'M50 50 L' + p1[0].toFixed(2) + ' ' + p1[1].toFixed(2) +
+          ' A44 44 0 ' + (g > 180 ? 1 : 0) + ' 1 ' + p2[0].toFixed(2) + ' ' + p2[1].toFixed(2) + ' Z');
+        wedge.setAttribute('opacity', '0.12');
+      } else {
+        wedge.setAttribute('opacity', '0');
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+
+</body>
+</html>

@@ -221,3 +221,34 @@ Recipe in `assets/README.md`.
 **GitHub Actions CI (branch push):** two commits pushed to `origin/claude/p5-store` (no PR). CI run
 [30131023641](https://github.com/ShivaClaw/careerseeker-android/actions/runs/30131023641) —
 **conclusion `success`** ("Build and test", 6m12s) on head `5fffdd0`, matching the local full ritual.
+
+## 7. Claude Design import — brand, site reskin, app design language (2026-07-24)
+
+Brandon supplied two Claude Design projects (read via the DesignSync tool; nothing written back):
+`d57594ba…` **CareerSeeker Design Language** (product-UI cockpit system + Android mockups) and
+`e03c8d14…` **CareerSeeker Site Reskin** (homepage redesign + brand logo + full `site-v2` backup).
+
+**Two palettes, by design:** brand/marketing = `#0A0A0B` + lime `#A3FF12` + yellow `#FFE500`
+radar logo (Space Grotesk/Inter/Plex Mono); product UI = "cockpit" `#07090D`/`#0C1017` +
+trust-blue `#45C4FF` + status lamps (IBM Plex Sans/Mono).
+
+**Decisions (Brandon, in-session):** app Design Language → **plan now, build after P4 merges**
+(full reskin isn't additive; P4 owns the screens) — plan staged at
+`docs/todo/Design-Language-Implementation.md` with tokens, screen mapping, the do-NOT-ship list
+(kill switch — protocol `kill` reserved-and-rejected; OPEN DRAFT actions — P3), gates G-DL-1/2.
+Site Reskin → **staged on `claude/p5-store`, no deploy** (P6 one-artifact) at
+`docs/store/site-reskin/` — faithful implementation of the mock as a self-contained static page
+(vanilla-JS port of the mock's React radar-clock animation) + assets.
+
+**Render proof:** headless-Chrome screenshot of the staged homepage (1280w) viewed — nav, animated
+hero (needle mid-sweep), schematic panel, trust cards, divider, pricing cards, footer all render
+per the mock with Space Grotesk loaded.
+
+**P5-FIND-2 (copy flags carried in HTML comments for the P6 pass):** (a) the reskin pricing card
+says "Our only revenue" — one of the three sentences Monetization-Decision §1 marks as breaking
+when Pro ships; P6's pricing rewrite must reconcile it. (b) hero eyebrow "Free during beta" sits
+against the live "free to download and free forever" promise — P6 copy call. (c) Google-Fonts
+requests vs the footer's "loads nothing that watches you" — recommend self-hosting WOFF2 at deploy.
+
+**Gate P5-ICON:** brand resolved (radar logo); store icon + feature graphic regenerated earlier in
+§4; the in-app launcher swap is scheduled inside the Design-Language TODO (step 5).
