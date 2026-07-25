@@ -126,8 +126,8 @@ the Data-safety/privacy copy re-checked for the phone→PC edit path. Until then
   (`assets/CAPTURE.md`). Order for the listing: Home → Applications → Application detail → Jobs →
   Evidence. The demo-mode banner in the shots is fine and honest — no need to hide it.
 - **Feature graphic (1024×500):** `assets/feature-graphic.svg` → PNG.
-- **App icon (512×512):** pending **Gate P5-ICON** (`assets/Gate-P5-ICON.md`) — the launcher icon is
-  still the template default; options are filed for Brandon, no placeholder shipped.
+- **App icon (512×512):** `assets/icon.png` — the **official CareerSeeker radar logo** (Gate P5-ICON
+  RESOLVED). In-app adaptive launcher swap is pending the Design-Language decision (`Gate-P5-ICON.md`).
 
 ---
 

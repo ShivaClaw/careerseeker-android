@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    CareerSeeker Dashboard — Play hi-res icon (512x512), from the OFFICIAL logo mark
+    (CareerSeeker Logo / Claude Design). Near-black #0A0A0B field, radar/targeting mark in
+    lime #A3FF12 + yellow #FFE500. Mark centred and inset so the adaptive-icon mask (central
+    ~66/108) never clips the outer ring. Export 512x512 32-bit PNG (alpha ok), <=1024KB.
+  -->
+  <rect width="512" height="512" fill="#0A0A0B"/>
+  <g transform="translate(36,36) scale(4.4)">
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#A3FF12" stroke-width="2" opacity="0.4"/>
+    <circle cx="50" cy="50" r="24" fill="none" stroke="#A3FF12" stroke-width="2" opacity="0.28"/>
+    <path d="M73.5 9.3 L71 13.6 M90.7 26.5 L86.4 29 M90.7 73.5 L86.4 71 M73.5 90.7 L71 86.4 M26.5 90.7 L29 86.4 M9.3 73.5 L13.6 71 M9.3 26.5 L13.6 29 M26.5 9.3 L29 13.6" stroke="#A3FF12" stroke-width="2" opacity="0.5" stroke-linecap="round"/>
+    <path d="M50 3 L50 12 M97 50 L88 50 M50 97 L50 88 M3 50 L12 50" stroke="#A3FF12" stroke-width="2.6" opacity="0.6" stroke-linecap="round"/>
+    <path d="M50 50 L73.3 12.7 A44 44 0 0 0 43.9 6.4 Z" fill="#A3FF12" opacity="0.12"/>
+    <polygon points="52.48,49.65 46.1,22.3 47.52,50.35" fill="#FFE500" opacity="0.75"/>
+    <polygon points="52.54,51.59 73.3,12.7 47.46,48.41" fill="#FFE500"/>
+    <circle cx="50" cy="50" r="4.2" fill="#FFE500"/>
+    <circle cx="50" cy="50" r="1.6" fill="#0A0A0B"/>
+  </g>
+</svg>

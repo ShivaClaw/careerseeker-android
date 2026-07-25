@@ -177,8 +177,8 @@ All under `docs/store/` (+ this evidence file), on `claude/p5-store`.
 | `Play-Data-Safety.md` | 2.1 | Done — answers grounded in the verified E2EE exception; permissions truth-matching (both manifest states) + red-box AAB-match rule; IARC/ads/18+/not-financial staged. |
 | `Privacy-Policy-Delta.md` | 2.2 | Done — publish-ready `/privacy/` relay section (Cloudflare named) + corrected `/dashboard/` copy (fixes P5-FIND-1); one-artifact / do-not-deploy rules; site-source discrepancy noted for P6. |
 | `Play-Listing.md` | 2.3 | Done — title 22/30, short 72/80, full **2,522/4000** (all counted); reviewer notes; read-only v1 truth fence; conditional editing block gated on P3. |
-| `assets/feature-graphic.{svg,png}` | 2.4 | Done — rendered **1024×500**, viewed, on-brand (one cosmetic tweak noted). |
-| `assets/icon-option-{a,b,c}.{svg,png}` + `Gate-P5-ICON.md` | 2.4 | Done — three **512×512** options rendered + viewed; **Gate P5-ICON** filed for Brandon (recommend A). No placeholder shipped as final. |
+| `assets/feature-graphic.{svg,png}` | 2.4 | Done — rendered **1024×500**, viewed. **Rebranded 2026-07-24** to the official Claude Design brand (logo + wordmark). |
+| `assets/icon.{svg,png}` + `Gate-P5-ICON.md` | 2.4 | **Gate P5-ICON RESOLVED** — Brandon supplied the official radar logo in Claude Design; **512×512** icon adapted from it, rendered + viewed. Earlier 3 slate/blue drafts removed. In-app launcher swap folded into the Design-Language decision. |
 | `assets/CAPTURE.md` + `assets/README.md` | 2.4 | Done — capture procedure + specs staged; screenshots device-gated (§5). |
 | `Accessibility-Pass.md` + 6 additive code fixes + 5 a11y tests | 2.5 | Done (code) — full ritual green; on-device TalkBack sweep device-gated (§5). |
 | `Account-Day-Checklist.md` | 2.6 | Done — 16-step ordered afternoon, owner column, each step → its staged artifact; policy re-verify reminders. |
@@ -212,8 +212,11 @@ the recorded pin).
 - Code diff vs `claude/p2-replica`: 3 screen files + 1 test, **+94/−6**, additive semantics only.
 
 **Assets rendered + verified, 2026-07-24:** headless Chrome (`/c/Program Files/Google/Chrome`) →
-PNGs; pixel sizes confirmed via PNG IHDR (feature **1024×500**; three icons **512×512**); each PNG
-opened and visually confirmed on-brand. Recipe in `assets/README.md`.
+PNGs; pixel sizes confirmed via PNG IHDR; each PNG opened and visually confirmed. **Rebrand
+2026-07-24:** after Brandon supplied the official brand in Claude Design (radar logo; near-black
+`#0A0A0B` / lime `#A3FF12` / yellow `#FFE500`), the feature graphic + a 512² icon were regenerated
+from the official `logo.svg` and re-verified; the three earlier slate/blue icon drafts were removed.
+Recipe in `assets/README.md`.
 
 **GitHub Actions CI (branch push):** two commits pushed to `origin/claude/p5-store` (no PR). CI run
 [30131023641](https://github.com/ShivaClaw/careerseeker-android/actions/runs/30131023641) —

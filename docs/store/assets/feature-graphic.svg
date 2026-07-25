@@ -1,37 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
   <!--
-    CareerSeeker Dashboard — Play feature graphic (1024x500).
-    Brand palette from the app: slate #1B2733, off-white #F2F5F7, blue accent #7FB2D9.
-    Draft for account day; export to 24-bit PNG (no alpha) at exactly 1024x500. See README.md.
+    CareerSeeker Dashboard — Play feature graphic (1024x500), REBRANDED to the official
+    Claude Design brand: near-black #0A0A0B, lime #A3FF12, yellow #FFE500; the radar/targeting
+    logo mark (from CareerSeeker Logo, uploads/.../assets/logo.svg). Fonts: Space Grotesk / Inter
+    (system fallback in this draft render; embed/convert-to-paths for the final). Export 24-bit PNG.
   -->
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1B2733"/>
-      <stop offset="1" stop-color="#0F171F"/>
-    </linearGradient>
-  </defs>
+  <rect width="1024" height="500" fill="#0A0A0B"/>
 
-  <rect width="1024" height="500" fill="url(#bg)"/>
-
-  <!-- subtle accent underline -->
-  <rect x="360" y="300" width="150" height="4" rx="2" fill="#7FB2D9"/>
-
-  <!-- Compass mark (the app's needle motif, refined), centered in a ring on the left -->
-  <g transform="translate(200,250)">
-    <circle r="132" fill="none" stroke="#2A3948" stroke-width="10"/>
-    <circle r="132" fill="none" stroke="#7FB2D9" stroke-width="4" stroke-dasharray="6 14" opacity="0.7"/>
-    <!-- outer needle (vertical rhombus) -->
-    <path d="M0,-104 L34,0 L0,104 L-34,0 Z" fill="#F2F5F7"/>
-    <!-- inner needle -->
-    <path d="M0,-52 L17,0 L0,52 L-17,0 Z" fill="#7FB2D9"/>
-    <circle r="7" fill="#1B2733"/>
+  <!-- Official logo mark (100x100 space), placed left, centred ~ (250,250) -->
+  <g transform="translate(70,70) scale(3.6)">
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#A3FF12" stroke-width="2" opacity="0.4"/>
+    <circle cx="50" cy="50" r="24" fill="none" stroke="#A3FF12" stroke-width="2" opacity="0.28"/>
+    <path d="M73.5 9.3 L71 13.6 M90.7 26.5 L86.4 29 M90.7 73.5 L86.4 71 M73.5 90.7 L71 86.4 M26.5 90.7 L29 86.4 M9.3 73.5 L13.6 71 M9.3 26.5 L13.6 29 M26.5 9.3 L29 13.6" stroke="#A3FF12" stroke-width="2" opacity="0.5" stroke-linecap="round"/>
+    <path d="M50 3 L50 12 M97 50 L88 50 M50 97 L50 88 M3 50 L12 50" stroke="#A3FF12" stroke-width="2.6" opacity="0.6" stroke-linecap="round"/>
+    <path d="M50 50 L73.3 12.7 A44 44 0 0 0 43.9 6.4 Z" fill="#A3FF12" opacity="0.12"/>
+    <polygon points="52.48,49.65 46.1,22.3 47.52,50.35" fill="#FFE500" opacity="0.75"/>
+    <polygon points="52.54,51.59 73.3,12.7 47.46,48.41" fill="#FFE500"/>
+    <circle cx="50" cy="50" r="4.2" fill="#FFE500"/>
+    <circle cx="50" cy="50" r="1.6" fill="#0A0A0B"/>
   </g>
 
   <!-- Wordmark + tagline -->
-  <g font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif">
-    <text x="360" y="230" font-size="64" font-weight="700" fill="#F2F5F7">CareerSeeker</text>
-    <text x="360" y="292" font-size="44" font-weight="400" fill="#7FB2D9">Dashboard</text>
-    <text x="360" y="356" font-size="26" font-weight="400" fill="#C4CDD6">Your PC&#8217;s job search, on your phone.</text>
-    <text x="360" y="392" font-size="26" font-weight="400" fill="#C4CDD6">Private &#183; end-to-end encrypted &#183; read-only.</text>
+  <g font-family="'Space Grotesk','Inter','Segoe UI',system-ui,sans-serif">
+    <text x="470" y="232" font-size="66" font-weight="600" fill="#EAECF2">CareerSeeker</text>
+    <text x="470" y="296" font-size="44" font-weight="500" fill="#A3FF12">Dashboard</text>
+    <text x="470" y="358" font-size="24" fill="#9A9EB4">Your PC&#8217;s job search, on your phone.</text>
+    <text x="470" y="392" font-size="24" fill="#9A9EB4">Private &#183; end-to-end encrypted &#183; read-only.</text>
   </g>
 </svg>
