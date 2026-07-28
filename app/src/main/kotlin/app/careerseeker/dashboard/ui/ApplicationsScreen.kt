@@ -20,6 +20,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.careerseeker.dashboard.replica.ApplicationRow
 
@@ -66,7 +69,16 @@ fun ApplicationsScreen(
 
 @Composable
 private fun ApplicationCard(app: ApplicationRow, onOpen: (String) -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().clickable { onOpen(app.id) }) {
+    // A11y (P5): announce the row as a Button with an explicit action label, so TalkBack
+    // says "…double tap to open application details" instead of an unlabeled activation.
+    // We intentionally do NOT set a contentDescription here: the card is a merging boundary,
+    // and a contentDescription would suppress the child title/company/score text in the
+    // spoken output. Leaving them as text lets TalkBack read the whole row in order.
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClickLabel = "Open application details", role = Role.Button) { onOpen(app.id) },
+    ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 StateBadge(app.state)
@@ -99,10 +111,15 @@ internal fun StateBadge(state: String, modifier: Modifier = Modifier) {
 /** Small labeled badge used by the Jobs screen for repost/injection flags. */
 @Composable
 internal fun FlagBadge(text: String, error: Boolean, modifier: Modifier = Modifier) {
+    // A11y (P5): the flag colour carries severity; announce it in words so TalkBack conveys
+    // the same meaning ("Warning: injection flagged" / "Flag: repost"), not just a colour.
+    // Safe to merge here: the Jobs card is not clickable, so this badge is a standalone node.
     androidx.compose.material3.Surface(
         color = if (error) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.tertiaryContainer,
         shape = MaterialTheme.shapes.extraSmall,
-        modifier = modifier,
+        modifier = modifier.semantics(mergeDescendants = true) {
+            contentDescription = (if (error) "Warning: " else "Flag: ") + text
+        },
     ) {
         Text(
             text,

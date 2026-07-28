@@ -1,8 +1,13 @@
 package app.careerseeker.dashboard.ui
 
 import android.content.Context
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.room.Room
@@ -106,5 +111,53 @@ class ScreensFromFixtureTest {
     fun evidenceSaysUnknownWhenNoVerdictReported() {
         compose.setContent { EvidenceScreen(events = emptyList(), auditOk = null) }
         compose.onNodeWithText("Audit status unknown — not yet reported").assertIsDisplayed()
+    }
+
+    // ---- Accessibility assertions (P5 §2.5) — lock in the additive semantics fixes. ----
+
+    @Test
+    fun homeTitleIsAHeading() = runBlocking<Unit> {
+        val counters = db.dao().countersNow()
+        val syncState = db.dao().syncStateNow()
+        compose.setContent { HomeScreen(counters, syncState) }
+        // ScreenTitle marks the header as a heading for TalkBack heading-navigation.
+        compose.onNodeWithText("CareerSeeker")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+    }
+
+    @Test
+    fun metricCardSpeaksLabelAndValueAsOneNode() = runBlocking<Unit> {
+        val counters = db.dao().countersNow()
+        val syncState = db.dao().syncStateNow()
+        compose.setContent { HomeScreen(counters, syncState) }
+        // cycles = 12 in the fixture; the merged card announces "Cycles: 12", not two swipes.
+        compose.onNodeWithContentDescription("Cycles: 12").assertExists()
+    }
+
+    @Test
+    fun applicationRowIsAnAnnouncedButton() = runBlocking<Unit> {
+        val apps = db.dao().applicationsNow()
+        compose.setContent { ApplicationsScreen(apps, onOpen = {}) }
+        // The clickable card now carries Role.Button (announced label "Open application details").
+        compose.onNodeWithText("Senior Platform Engineer")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+    }
+
+    @Test
+    fun jobFlagsAnnounceSeverityNotJustColour() = runBlocking<Unit> {
+        val jobs = db.dao().jobsNow()
+        compose.setContent { JobsScreen(jobs) }
+        // job_demo_4 is injection-flagged (error colour); job_demo_3 is a repost (neutral).
+        compose.onNodeWithContentDescription("Warning: injection flagged").assertExists()
+        compose.onNodeWithContentDescription("Flag: repost").assertExists()
+    }
+
+    @Test
+    fun detailBackButtonHasASpokenLabel() = runBlocking<Unit> {
+        val app = db.dao().applicationsNow().first { it.id == "app_demo_1" }
+        val docs = db.dao().documentsNow("app_demo_1")
+        compose.setContent { ApplicationDetailScreen(app, docs, onBack = {}) }
+        // The visible "< Back" is overridden with a clean "Back" content description.
+        compose.onNodeWithContentDescription("Back").assertExists()
     }
 }

@@ -14,6 +14,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.careerseeker.dashboard.replica.ApplicationRow
 import app.careerseeker.dashboard.replica.DocumentRow
@@ -36,7 +39,9 @@ fun ApplicationDetailScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text("< Back") }
+            // A11y (P5): the visible "< Back" reads as punctuation to TalkBack; give the
+            // button a clean spoken label. Non-clearing semantics keep the click action intact.
+            TextButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back" }) { Text("< Back") }
         }
 
         if (application == null) {
@@ -51,7 +56,11 @@ fun ApplicationDetailScreen(
             Text("score ${application.score}", style = MaterialTheme.typography.labelLarge)
         }
 
-        Text("Documents (read-only)", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Documents (read-only)",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { heading() }, // A11y (P5): section header
+        )
         if (documents.isEmpty()) {
             EmptyHint("No documents for this application in the replica.")
         } else {

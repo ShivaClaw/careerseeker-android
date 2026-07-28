@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <!--
+    CareerSeeker Dashboard — Play feature graphic (1024x500), REBRANDED to the official
+    Claude Design brand: near-black #0A0A0B, lime #A3FF12, yellow #FFE500; the radar/targeting
+    logo mark (from CareerSeeker Logo, uploads/.../assets/logo.svg). Fonts: Space Grotesk / Inter
+    (system fallback in this draft render; embed/convert-to-paths for the final). Export 24-bit PNG.
+  -->
+  <rect width="1024" height="500" fill="#0A0A0B"/>
+
+  <!-- Official logo mark (100x100 space), placed left, centred ~ (250,250) -->
+  <g transform="translate(70,70) scale(3.6)">
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#A3FF12" stroke-width="2" opacity="0.4"/>
+    <circle cx="50" cy="50" r="24" fill="none" stroke="#A3FF12" stroke-width="2" opacity="0.28"/>
+    <path d="M73.5 9.3 L71 13.6 M90.7 26.5 L86.4 29 M90.7 73.5 L86.4 71 M73.5 90.7 L71 86.4 M26.5 90.7 L29 86.4 M9.3 73.5 L13.6 71 M9.3 26.5 L13.6 29 M26.5 9.3 L29 13.6" stroke="#A3FF12" stroke-width="2" opacity="0.5" stroke-linecap="round"/>
+    <path d="M50 3 L50 12 M97 50 L88 50 M50 97 L50 88 M3 50 L12 50" stroke="#A3FF12" stroke-width="2.6" opacity="0.6" stroke-linecap="round"/>
+    <path d="M50 50 L73.3 12.7 A44 44 0 0 0 43.9 6.4 Z" fill="#A3FF12" opacity="0.12"/>
+    <polygon points="52.48,49.65 46.1,22.3 47.52,50.35" fill="#FFE500" opacity="0.75"/>
+    <polygon points="52.54,51.59 73.3,12.7 47.46,48.41" fill="#FFE500"/>
+    <circle cx="50" cy="50" r="4.2" fill="#FFE500"/>
+    <circle cx="50" cy="50" r="1.6" fill="#0A0A0B"/>
+  </g>
+
+  <!-- Wordmark + tagline -->
+  <g font-family="'Space Grotesk','Inter','Segoe UI',system-ui,sans-serif">
+    <text x="470" y="232" font-size="66" font-weight="600" fill="#EAECF2">CareerSeeker</text>
+    <text x="470" y="296" font-size="44" font-weight="500" fill="#A3FF12">Dashboard</text>
+    <text x="470" y="358" font-size="24" fill="#9A9EB4">Your PC&#8217;s job search, on your phone.</text>
+    <text x="470" y="392" font-size="24" fill="#9A9EB4">Private &#183; end-to-end encrypted &#183; read-only.</text>
+  </g>
+</svg>
