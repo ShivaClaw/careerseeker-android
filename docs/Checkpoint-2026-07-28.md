@@ -11,6 +11,18 @@ comes from a prior session's commit message rather than a run I performed, it is
 
 ---
 
+> **Resolved same day (2026-07-28).** Both at-risk branches are **pushed** and origin
+> confirms the SHAs (`claude/p4-entitlement` `d5bdb9d`, `fix/engine-actually-runs` `40bc9a7`).
+> Four draft PRs are open, stacked: engine **#7** (P2 → P1) and **#8** (P4 → P2); android
+> **#4** (P2 → P1) and **#5** (P5 → P2). **F-A and F-B are closed.**
+>
+> **F-C is now partly closed:** pushing P4 triggered its first-ever CI run, which came back
+> **success** — so the pin-500 / EngineHarness-129 claim is no longer unreproduced; the
+> verifier that enforces the pinned total ran green in CI. What remains of F-C is the missing
+> `docs/P4-Evidence.md` narrative (P4 §2.7).
+>
+> The findings below are preserved as originally written.
+
 ## 0. The one thing to act on first
 
 **Two branches carrying real work exist only on this machine.** `git ls-remote` confirms
