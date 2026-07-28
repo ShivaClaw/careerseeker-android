@@ -3,64 +3,42 @@ package app.careerseeker.dashboard
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import app.careerseeker.core.Protocol
+import app.careerseeker.dashboard.replica.DemoFixture
+import app.careerseeker.dashboard.replica.ReplicaDb
+import app.careerseeker.dashboard.ui.DashboardApp
 
 /**
- * P0 scaffold. Renders enough to prove the toolchain assembles and that `:core` is
- * reachable from the app module. Real screens start in P2.
+ * P2: the read-only dashboard. Screens are pure projections of the Room replica; with no
+ * pairing yet (that flow is device-bound, later in P2), the replica is seeded with the demo
+ * fixture on first launch so every screen renders honestly labeled demo data. A real
+ * snapshot replaces the fixture wholesale and clears the label.
  */
 class MainActivity : ComponentActivity() {
+    private lateinit var db: ReplicaDb
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        db = ReplicaDb.open(this)
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    PlaceholderScreen()
+                    LaunchedEffect(Unit) {
+                        // Seed only an empty replica: never clobber live-synced state.
+                        if (db.dao().syncStateNow() == null) DemoFixture.seed(db)
+                    }
+                    DashboardApp(db)
                 }
             }
         }
     }
-}
 
-@Composable
-private fun PlaceholderScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = stringResource(R.string.p0_placeholder_title),
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Text(
-            text = stringResource(R.string.p0_placeholder_body),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        // Reading a :core constant here is the point: it proves the pure-Kotlin module is
-        // wired into the Android module and that the dependency direction is app -> core.
-        Text(
-            text = "Sync protocol v${Protocol.VERSION} · ${Protocol.CIPHER}",
-            style = MaterialTheme.typography.labelSmall,
-        )
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isFinishing) db.close()
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun PlaceholderScreenPreview() {
-    MaterialTheme { PlaceholderScreen() }
 }
