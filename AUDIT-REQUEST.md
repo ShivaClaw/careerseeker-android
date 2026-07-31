@@ -142,9 +142,30 @@ git -C C:/Users/bkirk/Documents/CareerSeeker worktree list
 git -C C:/Users/bkirk/Documents/CareerSeeker reflog -n 20
 ```
 
-*Expected:* no worktree added by this session (the list is unchanged from its pre-session
-state: the main checkout plus the pre-existing `.claude/worktrees/*` and temp review trees),
-and no new commits authored during this session's window.
+*Expected:* no worktree added by this session — the list holds 8 entries, unchanged from its
+pre-session state (the main checkout, the pre-existing `.claude/worktrees/*`, and temp review
+trees).
+
+**Do not read new commits there as mine.** A parallel session was working in that repo
+throughout this window, and a naive `git log --since` will show its work:
+
+```bash
+git -C C:/Users/bkirk/Documents/CareerSeeker log --all --since='2026-07-30 20:00' \
+    --pretty=format:'%h %an %s'
+```
+
+*Expected:* ~11 commits, all on `codex/beta-*` branches (Beta B0–B3: redraft prevention, crash
+recovery/`ReconcileAsync`, lexical ranking) plus merges of PRs #9–#11. **None touch
+`docs/Sync-Protocol.md`, `docs/sync-vectors/`, or `relay/`.** Confirm the boundary that
+actually matters — that the normative contract and vectors were not modified:
+
+```bash
+git -C C:/Users/bkirk/Documents/CareerSeeker log --all --since='2026-07-30 20:00' \
+    --oneline -- docs/Sync-Protocol.md docs/sync-vectors relay/
+```
+
+*Expected:* no output. This session read those paths with `git show` and wrote nothing
+anywhere in that repo.
 
 ---
 
