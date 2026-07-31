@@ -431,10 +431,166 @@ APK rebuilt: 12,164,050 bytes (up 16,384 from A0's 12,147,666 — one dex page, 
 
 Test count across the ladder so far: **42 → 55** (+13, all in `:core`).
 
-### A2.8 Prohibitions
+### A2.8 Prohibitions (A3 entry continues below)
 
 No push, no PR, no reference-repo write (the engine's `EnvelopeReceiver.cs` and the upstream
 vectors were read via `git show`), no relay contact, no secrets. The vector files carry
 published test keys and are marked as such upstream; they are test resources and reach no
 build — `core/src/test/resources` is not on the app's runtime classpath.
+
+Milestone artifact: commit `7bc5667`; bundle refreshed (643,537 bytes).
+
+---
+
+## A3 — Protocol client + persistence · 2026-07-30 · **COMPLETE**
+
+### A3.1 The honesty bug this milestone was really about
+
+A3's spec text asks for a reducer covering "the P2 rule's client side (a missing first
+snapshot is awaited, never faked from deltas)". The applier had **no such rule**, and the
+16-test applier suite did not cover it.
+
+Why it matters concretely: `delta` carries the *recent window*, not the pipeline (§4.3.1).
+The phone pulls from `since=0` on pairing, and the relay purges on a TTL (≤30 days, §2) — so
+the snapshot can legitimately be **gone** by the time the phone arrives. The applier would
+then have upserted the delta's two applications into an empty replica, cleared `demoMode`, and
+the Applications screen would have rendered *two* applications as the user's entire pipeline
+when the engine had forty. Counters would have been right and the list silently wrong.
+
+That is the phone-side twin of the engine's own postmortem — "running" over counters nothing
+could increment (JULY-SUMMARY §S5) — and exactly what the mission means by *make the phone
+unable to fabricate a status*.
+
+**Fix.** `SyncStateRow.snapshotSeen` (persisted, latching), Room schema **v1 → v2** with a real
+migration. The applier refuses a `delta` until a snapshot has been applied and returns a new
+`ApplyResult.AwaitingSnapshot`, whose contract is "ask the engine to re-publish
+(`pull_request`)", not "error".
+
+It cannot be inferred from `highestAppliedE2pSeq`, because a *heartbeat* advances that mark
+while carrying no rows at all — `aHeartbeatDoesNotCountAsASnapshot` pins precisely that.
+
+The migration defaults existing replicas to `0` (no snapshot seen), which is the safe
+direction: deltas are refused until the engine sends a snapshot, which it does on start and on
+pairing. Defaulting to `1` would assert a snapshot the replica may never have received — the
+fabrication the column exists to prevent.
+
+### A3.2 An audit-derived test was amended — stated plainly, not buried
+
+Two existing tests failed against the new rule. One needed a genuine amendment:
+`firstRealDeltaWipesDemoDataInsteadOfMergingIntoIt`, which came from the **Codex audit
+finding of 2026-07-24** and is the subject of this branch's tip commit ("the first real payload
+wipes demo data, never merges it"). Changing an audit-derived test deserves scrutiny, so:
+
+- **The invariant it protects** — *fixture data must never mix with, or masquerade as, engine
+  data* — is now held **more** strictly. The delta is refused outright, so it cannot mix with
+  anything.
+- **What changed is the mechanism.** Demo rows survive a refused delta carrying their honest
+  "Demo data — not a live engine" label, instead of being replaced by a partial window
+  presented as real.
+- **The wipe defense itself is untouched** for the kinds that legitimately arrive first —
+  `firstRealSnapshotAlsoClearsDemoEvidenceAndDocuments` and
+  `firstRealHeartbeatWipesDemoRowsRatherThanRelabelingThem` still pass unmodified.
+- A new test, `aSnapshotAfterARefusedDeltaStillWipesTheDemoFixture`, proves refusing the delta
+  does not strand the replica in demo mode.
+
+The test was renamed to describe what it now proves, and carries an in-file note explaining the
+amendment so a reader does not have to reconstruct this from git history.
+
+The second failure, `malformedPayloadInDemoModeChangesNothing`, was **not** a real conflict —
+it was my ordering mistake. I had put the snapshot gate before payload validation, so a
+malformed delta reported `AwaitingSnapshot` instead of `Malformed`. Rejecting for the wrong
+reason is the §10 failure mode, so the gate moved to *after* validation and *before* the demo
+wipe. That test now passes unmodified, as it should have all along.
+
+### A3.3 `RelayClient` — Ktor, engine-agnostic, never dials production in tests
+
+New `core/.../RelayClient.kt` covering §2's transport table: `create`, `pair`, `push`,
+`pull`, `unpair`, `health`, and the `wss://` live URL.
+
+Design points that are load-bearing rather than stylistic:
+
+- **The relay stays a dumb pipe.** `pull` returns envelope wire text **unparsed**;
+  `EnvelopeReceiver` owns every trust decision. A transport that helpfully parsed payloads
+  would become a second place where trust decisions live, and the second place is the one that
+  gets them wrong.
+- **TLS is enforced at construction**, not per request — §2 says clients MUST reject cleartext,
+  and a per-request check is one a retry path can skip. `liveUrl()` derives `wss://` from the
+  same validated base, so one check covers both schemes.
+- **4xx is a decision and is never retried**; only 5xx and transport exceptions back off
+  (250 ms × 3, capped at 8 s). Retrying "not ever" burns battery and loads a relay that already
+  answered.
+- **The bearer never reaches `toString()`** — a token in a crash report is the cheap failure to
+  prevent.
+
+`:core` takes `ktor-client-core` only (no engine), so it stays Android-free and the whole
+protocol is testable against a `MockEngine`. **No test opens a socket**: the relay is
+production infrastructure and this session is a client of it, not a load generator. Ktor
+**3.2.0** was read off Maven Central this session rather than assumed, per the repo's rule that
+versions are verified against the artifact repositories.
+
+### A3.4 Deviation from the spec: Room, not SQLDelight
+
+The roadmap spec names **SQLDelight** for persistence (§2). This repo already uses **Room**,
+with an exported schema, a KSP pipeline, and 16 applier tests running against real SQLite under
+Robolectric.
+
+Kept Room. Re-platforming working, tested persistence to satisfy a spec written on the
+assumption that the repo did not exist would burn the milestone's budget and throw away the
+audit-derived demo/real boundary tests, in exchange for nothing a user could observe. This is
+the same call as A0.6's: the ladder is not greenfield.
+
+The cost is real and worth stating: SQLDelight is multiplatform and Room is not, so the day an
+iOS target is attempted, `:app`'s persistence is a rewrite. `:core` — which holds the protocol,
+the crypto, the receiver, and now the relay client — stays fully portable, so the rewrite is
+confined to the layer that was always going to be platform-specific. Recorded for Brandon as a
+deviation rather than decided permanently.
+
+### A3.5 Verification
+
+```
+$ ./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:test --rerun-tasks
+:core is Android-free.
+BUILD SUCCESSFUL in 2m 19s
+36 actionable tasks: 36 executed
+```
+
+| Suite | Tests | Fail | Err |
+| --- | --- | --- | --- |
+| `core…ProtocolTest` | 11 | 0 | 0 |
+| `core…ProtocolVectorsTest` | 6 | 0 | 0 |
+| `core…EntitlementVectorsTest` | 5 | 0 | 0 |
+| `core…EnvelopeJsonTest` | 8 | 0 | 0 |
+| `core…RelayClientTest` *(new)* | 14 | 0 | 0 |
+| `dashboard.replica.DemoFixtureTest` | 3 | 0 | 0 |
+| `dashboard.replica.EnvelopeApplierTest` | 21 (was 16) | 0 | 0 |
+| `dashboard.ui.ScreensFromFixtureTest` | 6 | 0 | 0 |
+| **TOTAL** | **74** | **0** | **0** |
+
+Ladder progression: **42 → 55 → 74**. Room schema `2.json` exported alongside `1.json`.
+
+### A3.6 Known gaps in A3, stated rather than left to be discovered
+
+1. **The v1→v2 migration is not covered by a test.** No `MigrationTestHelper` case opens a v1
+   database and migrates it. It is a one-column `ALTER TABLE` and Room validates the result
+   against the exported `2.json` on open, so the risk is low — but low risk is not verified,
+   and this is the schema's first migration. Adding `androidx.room:room-testing` and one test
+   is the fix; it is on the hardening backlog rather than done, and the code comment says so
+   too rather than implying coverage that does not exist.
+2. **`RelayClient` is not yet wired into `:app`.** `:core` deliberately takes no HTTP engine, so
+   `:app` must supply one (Ktor's OkHttp or CIO engine) when pairing is wired in A4/A5. The
+   dependency is not added yet, because an unused engine on the release classpath is exactly
+   the kind of thing the "what actually ships" CI check exists to catch.
+3. **The WSS live route is a URL, not a socket.** `liveUrl()` returns the `wss://` endpoint;
+   nothing opens or manages that connection yet. Pull-on-open plus the reducer is the working
+   path; live fan-out is A5's if a device materialises.
+4. **`AwaitingSnapshot` has no caller yet.** The applier returns it correctly and the tests pin
+   the behaviour, but nothing currently reacts by sending `pull_request`. That wiring belongs
+   with the transport, in A4/A5.
+
+### A3.7 Prohibitions
+
+No push, no PR, no reference-repo write. **The production relay was not contacted**: every
+`RelayClient` test runs against a Ktor `MockEngine`, and no test in the repo opens a socket.
+Ktor 3.2.0 was confirmed against Maven Central (a package-repository query, which the
+live-network policy permits) rather than assumed.
 

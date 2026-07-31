@@ -18,6 +18,11 @@ ksp = "2.3.10"
 robolectric = "4.16.1"
 androidxTestCore = "1.7.0"
 coroutinesTest = "1.11.0"
+# Ktor 3.2.0 is the newest release on Maven Central as of 2026-07-30, checked against the
+# repository rather than assumed. :core uses the engine-agnostic client only; the platform
+# engine is supplied by :app, which keeps :core Android-free and lets tests drive a MockEngine
+# with no sockets at all.
+ktor = "3.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -47,6 +52,13 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 # Compose screen tests run on the JVM under Robolectric — versions ride the Compose BOM.
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+# Relay transport (Sync-Protocol.md §2). ktor-client-core carries no engine, so :core states
+# WHAT it speaks and :app decides HOW it reaches the network.
+ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
+# MockEngine: the whole relay protocol is testable offline and deterministically. The relay is
+# production infrastructure -- unit tests must never dial it.
+ktor-client-mock = { group = "io.ktor", name = "ktor-client-mock", version.ref = "ktor" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

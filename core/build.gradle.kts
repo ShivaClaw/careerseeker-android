@@ -27,8 +27,14 @@ dependencies {
     // third-party CRYPTO (Tink was dropped for it); that still holds -- crypto is JCA-only.
     implementation(libs.kotlinx.serialization.json)
 
+    // Engine-agnostic HTTP only. :core says what it speaks to the relay; :app supplies the
+    // platform engine. Keeps this module Android-free and lets tests use a MockEngine.
+    implementation(libs.ktor.client.core)
+
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 
 tasks.test {

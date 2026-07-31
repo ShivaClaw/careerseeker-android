@@ -317,3 +317,111 @@ matching the engine's `JsonDocument.Parse` behaviour.
   A6 and is driven by the engine's `entitlement_ack`. See PQ-A2-4.
 - **The CI vector-drift step still was not run locally** (GitHub API required). Unchanged
   from C-A1-5.
+
+---
+
+## A3 — Protocol client + persistence
+
+### C-A3-1 — A delta before any snapshot is refused, and nothing is invented
+
+> **Claim.** The applier had no such rule; a delta arriving first would have rendered a
+> recent window as the user's whole pipeline.
+
+Confirm the rule was genuinely absent before:
+
+```bash
+git show 7bc5667:app/src/main/kotlin/app/careerseeker/dashboard/replica/EnvelopeApplier.kt | grep -c snapshotSeen   # 0
+grep -c snapshotSeen app/src/main/kotlin/app/careerseeker/dashboard/replica/EnvelopeApplier.kt                     # >0
+```
+
+Then run the rule's tests:
+
+```powershell
+.\gradlew.bat --no-daemon :app:test --tests '*EnvelopeApplierTest*' --rerun-tasks
+```
+
+*Expected:* green, including `deltaBeforeAnySnapshotIsAwaitedNotApplied`,
+`aHeartbeatDoesNotCountAsASnapshot`, `deltaIsAppliedOnceASnapshotHasBeenSeen`,
+`snapshotSeenLatchesAcrossLaterPayloads`.
+
+### C-A3-2 — **An audit-derived test was amended. Read this one properly.**
+
+`firstRealDeltaWipesDemoDataInsteadOfMergingIntoIt` (from the Codex audit of 2026-07-24, and
+the subject of this branch's tip commit) is now
+`firstRealDeltaIsRefusedOutrightRatherThanMergedIntoDemoData`.
+
+```bash
+git diff 7bc5667..HEAD -- app/src/test/kotlin/app/careerseeker/dashboard/replica/EnvelopeApplierTest.kt
+```
+
+Judge it against the invariant, not the assertions: *fixture data must never mix with, or
+masquerade as, engine data*. The claim is that refusing the delta holds that invariant **more**
+strictly than wiping-and-applying did, and that the wipe defense survives untouched for the
+kinds that legitimately arrive first. Verify that last part directly — these two must still
+pass **unmodified**:
+
+```bash
+git diff 7bc5667..HEAD -- app/src/test/kotlin/... | grep -A2 'firstRealSnapshotAlsoClears\|firstRealHeartbeatWipes'
+```
+
+*Expected:* no changes to either test body.
+
+If you disagree with the amendment, the change is small and self-contained: the gate is one
+`if` in `EnvelopeApplier.apply` plus one persisted column.
+
+### C-A3-3 — Room schema v2 migration exists and is not destructive
+
+```bash
+ls app/schemas/app.careerseeker.dashboard.replica.ReplicaDb/     # expect 1.json AND 2.json
+grep -n 'MIGRATION_1_2' -A4 app/src/main/kotlin/app/careerseeker/dashboard/replica/ReplicaDb.kt
+```
+
+*Expected:* an `ALTER TABLE sync_state ADD COLUMN snapshotSeen INTEGER NOT NULL DEFAULT 0`,
+registered via `addMigrations`, with **no** `fallbackToDestructiveMigration` anywhere:
+
+```bash
+grep -rn 'fallbackToDestructive' app/src/ || echo "none — good"
+```
+
+### C-A3-4 — The relay client never dials production in tests
+
+```powershell
+.\gradlew.bat --no-daemon :core:test --tests '*RelayClientTest*' --rerun-tasks
+```
+
+*Expected:* 14 tests green. Confirm no test can reach the network — every one builds its
+client over a `MockEngine`:
+
+```bash
+grep -c 'MockEngine' core/src/test/kotlin/app/careerseeker/core/RelayClientTest.kt
+grep -rn 'CIO\|OkHttp\|HttpClient()' core/src/test/kotlin/app/careerseeker/core/RelayClientTest.kt || echo "no real engine — good"
+```
+
+### C-A3-5 — Transport invariants
+
+```bash
+grep -n 'startsWith("https://")' core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+grep -n 'redacted' core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+```
+
+*Expected:* TLS enforced in `init` (construction-time, so no retry path skips it), and
+`toString` redacting the bearer. Both are asserted by
+`cleartext is refused at construction, not at request time` and `the bearer never appears in
+toString`.
+
+### C-A3-6 — `:core` is still Android-free after gaining Ktor
+
+```powershell
+.\gradlew.bat --no-daemon checkCoreIsAndroidFree --rerun-tasks
+```
+
+*Expected:* `:core is Android-free.` Ktor 3.2.0's `ktor-client-core` carries no engine and no
+Android dependency; the platform engine is `:app`'s choice.
+
+### C-A3-7 — Ktor version was verified, not guessed
+
+```powershell
+(Invoke-RestMethod 'https://search.maven.org/solrsearch/select?q=g:io.ktor+AND+a:ktor-client-core&core=gav&rows=5&wt=json').response.docs | ForEach-Object { $_.v }
+```
+
+*Expected:* `3.2.0` is the newest listed (as of 2026-07-30).

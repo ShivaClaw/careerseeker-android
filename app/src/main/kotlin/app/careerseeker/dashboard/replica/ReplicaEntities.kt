@@ -105,4 +105,19 @@ data class SyncStateRow(
      * verdict); deltas/heartbeats preserve it; an `evidence` payload sets it.
      */
     val auditOk: Boolean? = null,
+    /**
+     * True once a full `snapshot` has been applied to this replica.
+     *
+     * A `delta` carries the *recent window*, not the whole pipeline (§4.3.1). Applying one to
+     * an empty replica would therefore render three applications as though they were all of
+     * them — a fabricated status, and the exact failure the engine's own postmortem was about.
+     * The phone can legitimately arrive mid-stream (it pairs and pulls from seq 0, and the
+     * relay's TTL may already have purged the snapshot), so this is a real path, not a
+     * theoretical one.
+     *
+     * The applier refuses deltas until this is true and asks for a snapshot instead. It cannot
+     * be inferred from [highestAppliedE2pSeq] — a heartbeat also advances that — so it is
+     * stored.
+     */
+    val snapshotSeen: Boolean = false,
 )
