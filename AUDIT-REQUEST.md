@@ -201,3 +201,119 @@ git diff dd64160..HEAD -- .github/workflows/ci.yml | grep -E '^[-+].*(VECTORS.lo
 ```
 
 *Expected:* no output — that step was not modified. Its pass/fail is CI's to report on push.
+
+---
+
+## A2 — Vector conformance
+
+### C-A2-1 — Vendored vectors are byte-identical to the new pin
+
+> **Claim.** All 26 vendored files match upstream `679a3175590dcd021b21c85af9daf12114e131fd`
+> exactly, and the pin in `VECTORS.lock` was moved to that commit.
+
+Compare **blobs, not working-tree bytes** — `core.autocrlf=true` on this machine gives the
+working tree CRLF while git blobs and upstream are LF, so a byte compare of files on disk
+reports 20 false "drift" hits. This is the check CI actually performs (it runs on Linux):
+
+```powershell
+$e='C:\Users\bkirk\Documents\CareerSeeker'; $pin='679a3175590dcd021b21c85af9daf12114e131fd'
+git ls-files core/src/test/resources/sync-vectors/v1 | ForEach-Object {
+  $name=[IO.Path]::GetFileName($_)
+  $mine=(git rev-parse ":$_"); $theirs=(git -C $e rev-parse "${pin}:docs/sync-vectors/v1/$name")
+  if ($mine -ne $theirs) { "DRIFT: $name" } }
+```
+
+*Expected:* no output (26 files compared). And:
+
+```bash
+grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock
+```
+
+*Expected:* `679a3175590dcd021b21c85af9daf12114e131fd`.
+
+### C-A2-2 — The added vectors were genuinely absent before
+
+```bash
+git show dd64160:core/src/test/resources/sync-vectors/v1/index.json | grep -c entitlement  # 0
+ls core/src/test/resources/sync-vectors/v1/entitlement-*.json | wc -l                      # 5
+```
+
+### C-A2-3 — Only one upstream commit touched vectors, and the other 20 did not change
+
+> This is why re-vendoring was additive rather than a full resync.
+
+```bash
+git -C C:/Users/bkirk/Documents/CareerSeeker log --oneline \
+    fff4bce9790788217d72be882f776b882993d640..claude/p4-entitlement -- docs/sync-vectors
+git -C C:/Users/bkirk/Documents/CareerSeeker diff --name-status \
+    fff4bce9790788217d72be882f776b882993d640 claude/p4-entitlement -- docs/sync-vectors
+```
+
+*Expected:* one commit `679a317`; the diff shows 5 additions plus modifications to
+`index.json` and `generate.mjs` only — no `M` on any pre-existing vector.
+
+### C-A2-4 — 100% conformance, including every invalid vector
+
+```powershell
+.\gradlew.bat --no-daemon :core:test --rerun-tasks
+```
+
+*Expected:* `BUILD SUCCESSFUL`. Per-suite, from the XML:
+
+```powershell
+Get-ChildItem core\build\test-results\test\*.xml | ForEach-Object {
+  $x=[xml](Get-Content $_.FullName)
+  "{0,-24} tests={1} fail={2} err={3}" -f $x.testsuite.name.Split('.')[-1],
+    $x.testsuite.tests,$x.testsuite.failures,$x.testsuite.errors }
+```
+
+*Expected:* `ProtocolTest` 11, `ProtocolVectorsTest` 6, `EntitlementVectorsTest` 5,
+`EnvelopeJsonTest` 8 — **30 total, 0 failures, 0 errors**.
+
+The conformance assertions worth reading rather than just running:
+
+- `ProtocolVectorsTest.the receiver classifies every envelope vector exactly as the engine
+  does` — walks `index.json`, accepts every valid envelope and asserts each invalid one
+  rejects with its **stated** `expect_error`, then asserts the rejections did not advance the
+  sequence tracker.
+- `EntitlementVectorsTest.every entitlement payload classifies with the exact reason the
+  vector names` — the five signed vectors, each compared against its own `entitlement.expect`
+  field rather than a hardcoded list.
+- `EntitlementVectorsTest.every entitlement envelope is accepted at the envelope layer` — a
+  bad *purchase* must still be a good *envelope*.
+
+### C-A2-5 — The receiver no longer routes on untrusted text (F-8)
+
+```bash
+git show dd64160:core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt | grep -n 'indexOf'
+grep -n 'indexOf' core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt
+```
+
+*Expected:* the old version shows a hand-rolled substring scan for `"kind"`; the current one
+shows none — `kindOf` parses JSON and returns null (→ `unknown_kind`) on malformed input,
+matching the engine's `JsonDocument.Parse` behaviour.
+
+### C-A2-6 — §3's unknown-field rule is now enforced (F-6)
+
+```powershell
+.\gradlew.bat --no-daemon :core:test --tests '*EnvelopeJsonTest*' --rerun-tasks
+```
+
+*Expected:* 8 tests pass, including `an unknown top-level field is rejected, not ignored` and
+`fields of the wrong JSON type are rejected rather than coerced`.
+
+### C-A2-7 — Claims deliberately **not** made
+
+- **F-7 (size cap) was not fixed.** The engine measures the ciphertext exactly as the phone
+  does; changing one side alone would break cross-implementation agreement. Recorded as
+  PQ-A2-1 instead. Verify the engine's behaviour for yourself:
+  ```bash
+  git -C C:/Users/bkirk/Documents/CareerSeeker show \
+      claude/p4-entitlement:src/Sync/EnvelopeReceiver.cs | grep -n 'MaxEnvelopeBytes'
+  ```
+  *Expected:* `if (ciphertext.Length > Protocol.MaxEnvelopeBytes)` — i.e. same as the phone.
+- **The phone does not grant Pro.** `EntitlementVerifier` returning `ACCEPTED` means "worth
+  forwarding to the engine". Nothing in `:core` sets an entitlement flag; the unlock path is
+  A6 and is driven by the engine's `entitlement_ack`. See PQ-A2-4.
+- **The CI vector-drift step still was not run locally** (GitHub API required). Unchanged
+  from C-A1-5.

@@ -265,3 +265,176 @@ already evidenced in A0.5: `:core` = 17 tests, 0 failures, forced execution.
 Same as A0.9. No push, no PR, no reference-repo write, no network action beyond Gradle
 dependency resolution.
 
+Milestone artifacts: commits `46064b8`, `0aa4c16`; bundle refreshed (609,293 bytes).
+
+---
+
+## A2 — Vector conformance · 2026-07-30 · **COMPLETE**
+
+The milestone the mission calls the crown jewel: *"a dashboard that can be fooled is worse
+than no dashboard"*, and "any mostly-passing state is failing".
+
+### A2.1 Re-vendored to the current contract
+
+The phone was pinned at `fff4bce` (P1-era, 20 vectors) while the contract had moved to 25.
+Exactly one upstream commit touched vectors in between:
+
+```
+$ git log --oneline fff4bce..claude/p4-entitlement -- docs/sync-vectors
+679a317 P4 §2.2: entitlement body {voucher}->{original_json,signature} + five Play-signed vectors
+
+$ git diff --name-status fff4bce claude/p4-entitlement -- docs/sync-vectors
+M  docs/sync-vectors/generate.mjs
+A  docs/sync-vectors/v1/entitlement-not-purchased.json
+A  docs/sync-vectors/v1/entitlement-tampered-json.json
+A  docs/sync-vectors/v1/entitlement-valid.json
+A  docs/sync-vectors/v1/entitlement-wrong-package.json
+A  docs/sync-vectors/v1/entitlement-wrong-product.json
+M  docs/sync-vectors/v1/index.json
+```
+
+No pre-existing vector changed, so re-vendoring was purely additive. `VECTORS.lock` now pins
+`679a3175590dcd021b21c85af9daf12114e131fd` — the precise commit that last modified the
+vectors, and an ancestor of `p4-entitlement`, so the pin survives that branch being merged or
+deleted.
+
+**A false alarm worth recording**, because it will bite the next person: comparing the
+vendored files byte-for-byte against `git show` output reported all 20 pre-existing vectors as
+drifted. They had not drifted. `core.autocrlf=true` on this machine means the working tree
+holds CRLF while git blobs (and upstream, and CI's Linux checkout) hold LF. The correct
+comparison is blob-to-blob:
+
+```
+OK: all 26 vendored vector blobs are byte-identical to upstream 679a317
+```
+
+### A2.2 Conformance suite extended — 30 `:core` tests, 0 failures
+
+```
+$ ./gradlew --no-daemon :core:test --rerun-tasks
+BUILD SUCCESSFUL in 25s
+5 actionable tasks: 5 executed
+```
+
+| Suite | Tests | Fail | Err |
+| --- | --- | --- | --- |
+| `ProtocolTest` | 11 | 0 | 0 |
+| `ProtocolVectorsTest` | 6 | 0 | 0 |
+| `EntitlementVectorsTest` *(new)* | 5 | 0 | 0 |
+| `EnvelopeJsonTest` *(new)* | 8 | 0 | 0 |
+| **TOTAL** | **30** | **0** | **0** |
+
+The entitlement vectors are asserted at **two independent layers**, because they fail for
+different reasons:
+
+- **Envelope layer** — all five must be *accepted*. A bad purchase is still a well-formed,
+  device-signed `p2e` envelope; rejecting it would mean the phone could not deliver a receipt
+  it is supposed to forward, and would hide the real verdict behind a transport error.
+- **Payload layer** — each must classify with the **exact** reason its own vector names
+  (`accepted`, `signature_invalid`, `wrong_product`, `wrong_package`, `not_purchased`). The
+  expectation is read out of the vector rather than hardcoded, so a renamed verdict cannot
+  quietly pass.
+
+Two assertions go beyond the vectors: the verifier reads its package/product **configuration**
+(the real values only exist once the Play app is created), and a semantically-identical
+re-encoding of `original_json` must **fail** — pinning §4.3.2's "verify over the exact bytes,
+never re-serialise" as a test rather than a comment.
+
+### A2.3 F-8 closed — untrusted text can no longer choose the route
+
+`EnvelopeReceiver.kindOf` scanned the decrypted bytes for the first `"kind"` substring. The
+decrypted body is exactly where untrusted job and recruiter text lives (§8.6), so carried text
+containing `"kind":"snapshot"` ahead of the real field would have selected the route. It now
+parses the JSON and returns null on malformed input, which the caller maps to `unknown_kind` —
+matching the engine's `JsonDocument.Parse` behaviour so both sides classify garbage identically.
+
+This required promoting `kotlinx-serialization-json` from a test-only to an implementation
+dependency of `:core`, which retires that module's "zero dependencies" line. The trade is
+recorded in `core/build.gradle.kts`: the library is **already** in the shipped APK via `:app`,
+so this adds no artifact and no attack surface; it is pure Kotlin and multiplatform, so the
+Android-free rule and a future iOS target are unaffected; and the posture that actually
+matters — no third-party **crypto** — is untouched, since crypto remains JCA-only.
+
+### A2.4 F-6 closed — §3's unknown-field rule is enforced
+
+> "Other unknown top-level fields MUST be rejected, not ignored. A permissive parser here is
+> how a future version's field silently becomes an injection point."
+
+Nothing in `:core` enforced this: envelopes were assembled field-by-field by callers, so an
+extra field was simply dropped. New `EnvelopeJson.parse` rejects unknown top-level fields,
+missing required fields, wrong-typed fields (notably `"seq":"1"`, which a lenient parser
+coerces into an attacker-chosen sequence number), a non-string `sig`, and malformed JSON —
+all before any crypto runs.
+
+It is wired into the actual receive path as `EnvelopeReceiver.receiveWire(...)` rather than
+left as an unused utility, so transport code in A3 cannot accidentally bypass it.
+
+### A2.5 F-7 deliberately **not** fixed — and why that is the correct call
+
+§3.1 caps the *envelope* at 1 MiB; the phone checks the decoded *ciphertext*. That is a real
+divergence from the prose — but reading the engine first showed it does the identical thing:
+
+```csharp
+// src/Sync/EnvelopeReceiver.cs
+if (ciphertext.Length > Protocol.MaxEnvelopeBytes) return Reject(SyncError.TooLarge);
+```
+
+Changing only the phone would create a window where the engine accepts an envelope the phone
+rejects — breaking exactly the cross-implementation agreement the shared vectors exist to
+guarantee. Being unilaterally "more correct" than the engine is a field bug, not a fix.
+Recorded as **PQ-A2-1** in `docs/protocol-questions.md` for a both-sides decision.
+
+New file `docs/protocol-questions.md` records four items: PQ-A2-1 (size cap), PQ-A2-2 (§7.2
+has no error code for a structurally malformed envelope; both sides fold it into
+`decrypt_failed`), PQ-A2-3 (no shared vector covers the unknown-field MUST), and PQ-A2-4 (the
+courier/verifier boundary — see below).
+
+### A2.6 The entitlement boundary, stated before A6 can erode it
+
+§4.3.2 makes the phone a **courier**: it forwards `{original_json, signature}`; the *engine*
+verifies and answers `entitlement_ack`. The roadmap spec's A6 wording — "`entitlement-valid`
+unlocks" — read literally would put the unlock decision on the device that benefits from
+getting it wrong.
+
+`EntitlementVerifier` therefore classifies but never grants: a local `ACCEPTED` verdict means
+only *"worth sending to the engine"*, and the KDoc says so at length. Pro is unlocked by an
+`entitlement_ack` envelope and by nothing else. This is the phone-side expression of the
+mission's one rule — the engine cannot fabricate a skill; the phone must not be able to
+fabricate a status.
+
+### A2.7 Whole-project verification after the dependency change
+
+Adding a dependency to `:core` could have broken the Android-free rule or the app build, so
+the full set was re-executed rather than assumed:
+
+```
+$ ./gradlew --no-daemon checkCoreIsAndroidFree :app:test :app:assembleDebug :app:lintDebug --rerun-tasks
+:core is Android-free.
+BUILD SUCCESSFUL in 1m 47s
+59 actionable tasks: 59 executed
+```
+
+| Suite | Tests | Fail | Err |
+| --- | --- | --- | --- |
+| `core…ProtocolTest` | 11 | 0 | 0 |
+| `core…ProtocolVectorsTest` | 6 | 0 | 0 |
+| `core…EntitlementVectorsTest` | 5 | 0 | 0 |
+| `core…EnvelopeJsonTest` | 8 | 0 | 0 |
+| `dashboard.replica.DemoFixtureTest` | 3 | 0 | 0 |
+| `dashboard.replica.EnvelopeApplierTest` | 16 | 0 | 0 |
+| `dashboard.ui.ScreensFromFixtureTest` | 6 | 0 | 0 |
+| **TOTAL** | **55** | **0** | **0** |
+
+APK rebuilt: 12,164,050 bytes (up 16,384 from A0's 12,147,666 — one dex page, consistent with
+`:core` gaining code that was already on the app classpath). `lintDebug` green under
+`warningsAsErrors`.
+
+Test count across the ladder so far: **42 → 55** (+13, all in `:core`).
+
+### A2.8 Prohibitions
+
+No push, no PR, no reference-repo write (the engine's `EnvelopeReceiver.cs` and the upstream
+vectors were read via `git show`), no relay contact, no secrets. The vector files carry
+published test keys and are marked as such upstream; they are test resources and reach no
+build — `core/src/test/resources` is not on the app's runtime classpath.
+
