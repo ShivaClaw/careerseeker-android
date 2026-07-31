@@ -145,3 +145,59 @@ git -C C:/Users/bkirk/Documents/CareerSeeker reflog -n 20
 *Expected:* no worktree added by this session (the list is unchanged from its pre-session
 state: the main checkout plus the pre-existing `.claude/worktrees/*` and temp review trees),
 and no new commits authored during this session's window.
+
+---
+
+## A1 — Scaffold + CI reconciliation
+
+### C-A1-1 — CI now gates `:app:test` (F-1 closed)
+
+```bash
+grep -n 'gradlew' .github/workflows/ci.yml
+```
+
+*Expected:* a `./gradlew :app:test` invocation now present (≈line 96), between `:core:test`
+and `:app:assembleDebug`. Compare against the parent commit to see it was genuinely absent:
+
+```bash
+git show dd64160:.github/workflows/ci.yml | grep -c ':app:test'   # expect 0
+git show HEAD:.github/workflows/ci.yml    | grep -c ':app:test'   # expect 1
+```
+
+### C-A1-2 — The newly-gated step actually passes
+
+```powershell
+.\gradlew.bat --no-daemon :app:test --rerun-tasks
+```
+
+*Expected:* `BUILD SUCCESSFUL`; XML shows 25 tests / 0 failures across `DemoFixtureTest` (3),
+`EnvelopeApplierTest` (16), `ScreensFromFixtureTest` (6).
+
+### C-A1-3 — Analytics promise holds on the resolved release classpath
+
+```powershell
+.\gradlew.bat --no-daemon -q :app:dependencies --configuration releaseRuntimeClasspath > deps.txt
+Select-String deps.txt -Pattern 'firebase|crashlytics|gms:play-services-ads|appsflyer|com\.adjust|amplitude|mixpanel|segment\.analytics'
+```
+
+*Expected:* no matches, over ~710 resolved lines.
+
+### C-A1-4 — README states the real status and the PROVISIONAL id
+
+```bash
+git diff dd64160..HEAD -- README.md
+```
+
+*Expected:* the "P0 — scaffold. No product features yet" claim is gone, replaced by a status
+naming both what is built and what is not; a PROVISIONAL `applicationId` note is present.
+
+### C-A1-5 — Not verified locally, and not claimed
+
+The workflow's **vendored-vector drift step** requires the GitHub contents API and was not
+executed in this session. It is asserted only to be *unchanged*, not *passing*:
+
+```bash
+git diff dd64160..HEAD -- .github/workflows/ci.yml | grep -E '^[-+].*(VECTORS.lock|api.github.com)'
+```
+
+*Expected:* no output — that step was not modified. Its pass/fail is CI's to report on push.
