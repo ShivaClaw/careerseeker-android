@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DocumentRow::class,
         SyncStateRow::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class ReplicaDb : RoomDatabase() {
@@ -55,9 +55,21 @@ abstract class ReplicaDb : RoomDatabase() {
             }
         }
 
+        /**
+         * v2 → v3: carries the nullable Pro `outcome` on each application (§4.3.1, A6).
+         *
+         * Nullable with no default, because NULL is the protocol's own "unset" — inventing a
+         * default here would turn "the engine never said" into a claim about the application.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE applications ADD COLUMN outcome TEXT")
+            }
+        }
+
         fun open(context: Context): ReplicaDb =
             Room.databaseBuilder(context.applicationContext, ReplicaDb::class.java, NAME)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
 
         /** Unpair: drop the replica entirely. Everything in it is re-syncable. */

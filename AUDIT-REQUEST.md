@@ -425,3 +425,148 @@ Android dependency; the platform engine is `:app`'s choice.
 ```
 
 *Expected:* `3.2.0` is the newest listed (as of 2026-07-30).
+
+---
+
+## A4 — Pairing logic + provenance labelling
+
+### C-A4-1 — The banner was on one screen and is now on all of them
+
+```bash
+git show 9992718:app/src/main/kotlin/app/careerseeker/dashboard/ui/HomeScreen.kt | grep -c StatusBanner   # 2 — Home only
+for f in ApplicationsScreen JobsScreen EvidenceScreen ApplicationDetailScreen; do
+  echo -n "$f: "; git show 9992718:app/src/main/kotlin/app/careerseeker/dashboard/ui/$f.kt | grep -c StatusBanner
+done   # all 0 — this is the bug
+grep -n 'topBar' app/src/main/kotlin/app/careerseeker/dashboard/ui/DashboardApp.kt   # the fix
+```
+
+```powershell
+.\gradlew.bat --no-daemon :app:test --tests '*ScreensFromFixtureTest*' --rerun-tasks
+```
+
+*Expected:* 8 tests green, including `theProvenanceBannerIsShownOnEveryTab` (walks all four
+tabs) and `theBannerFollowsIntoTheApplicationDetailOverlay`.
+
+### C-A4-2 — Pairing agrees with the engine, and refuses to downgrade
+
+```powershell
+.\gradlew.bat --no-daemon :core:test --tests '*PairingSessionTest*' --rerun-tasks
+```
+
+*Expected:* 8 green. The two worth reading: `the completion this phone builds is the one the
+engine opens` (builds the completion, then derives from the wire `phone_pub` and opens it as
+the engine would, asserting both sides compute the same confirm code) and `an unrecognised
+suite refuses to pair instead of falling back` (§5.2's no-silent-downgrade rule, exercised with
+the reserved PQ suite).
+
+### C-A4-3 — No private key material in `:core`
+
+```bash
+grep -rn 'PrivateKey\|getPrivate\|KeyStore' core/src/main/kotlin/app/careerseeker/core/PairingSession.kt || echo "none — good"
+```
+
+*Expected:* none. The device signing key enters as a public point plus a signing function.
+
+---
+
+## A5 — Live end-to-end
+
+### C-A5-1 — The one live call that was made
+
+```bash
+curl -s -i https://relay.careerseeker.app/v1/health
+```
+
+*Expected:* `200` with `{"ok":true,"protocol":1,"phase":"p1"}`. This is the whole of this
+session's contact with production: a GET on the route §2 defines as returning no pairing
+information. **No pairing was created, no envelope pushed, nothing deployed.** Confirm by
+absence:
+
+```bash
+git log --all --oneline -- relay/ 2>/dev/null | head   # nothing; relay/ is the other repo
+grep -rn 'careerseeker.app' core/src/test app/src/test || echo "no test targets production"
+```
+
+### C-A5-2 — Why full e2e was not reachable (verify the claim, do not take it)
+
+```bash
+grep -n 'sync' HANDOFF.md | grep -i 'no-op'
+emulator -list-avds ; adb devices
+```
+
+*Expected:* `HANDOFF.md` §4 states the engine's `--sync` is honored but no-ops pending a
+device-bound pairing; no AVDs and no attached devices. The blocker is engine-side, not
+phone-side — see `BLOCKED.md` B-2.
+
+---
+
+## A6 — Outcomes + entitlement
+
+### C-A6-1 — The `outcome` field was being dropped (F-5)
+
+```bash
+git show 54b8937:app/src/main/kotlin/app/careerseeker/dashboard/replica/EnvelopeApplier.kt | grep -c outcome  # 0
+grep -n 'outcome' app/src/main/kotlin/app/careerseeker/dashboard/replica/EnvelopeApplier.kt
+ls app/schemas/app.careerseeker.dashboard.replica.ReplicaDb/   # 1.json 2.json 3.json
+```
+
+### C-A6-2 — A state-changing envelope cannot be built unsigned
+
+```powershell
+.\gradlew.bat --no-daemon :core:test --tests '*OutboundEnvelopesTest*' --rerun-tasks
+```
+
+*Expected:* 9 green. Note these round-trip through `EnvelopeReceiver` rather than asserting on
+strings — in particular `a tampered outcome envelope stops verifying` and `the entitlement
+courier forwards original_json byte-for-byte`.
+
+### C-A6-3 — **The phone cannot claim Pro.** The central check.
+
+```powershell
+.\gradlew.bat --no-daemon :core:test --tests '*ProStateTest*' --rerun-tasks
+```
+
+*Expected:* 5 green, including `the unlocked state is unreachable from any entitlement
+verdict`, which checks every verdict exhaustively. Then confirm structurally:
+
+```bash
+grep -rn 'Unlocked(' core/src/main/kotlin/ app/src/main/kotlin/
+```
+
+*Expected:* exactly one construction site, inside `ProState.afterEngineAck`. Any other would
+be a path from a device-local opinion to a paid feature.
+
+### C-A6-4 — Nothing unlocks Pro today, and that is deliberate
+
+```bash
+grep -rn 'afterEngineAck' app/src/ || echo "no caller — expected"
+grep -rn 'entitlement_ack' app/src/main/ || echo "no applier branch — expected"
+```
+
+*Expected:* no callers. §4.3 defines `entitlement_ack` with **no body**, so no parser was
+written for it (PQ-A6-1). The app is honestly Free with no way to become anything else.
+
+### C-A6-5 — Ktor is pinned below the newest release on purpose
+
+> **Claim.** Ktor 3.2.0 cannot be dexed at minSdk 26; the pin is 3.1.3.
+
+Reproduce the failure if you want to see it (edit `gradle/libs.versions.toml` to `3.2.0`, then):
+
+```powershell
+.\gradlew.bat --no-daemon :app:assembleDebug --rerun-tasks
+```
+
+*Expected on 3.2.0:* `:app:mergeExtDexDebug FAILED` with `Space characters in SimpleName 'use
+streaming syntax' are not allowed prior to DEX version 040`. Restore `3.1.3` afterwards.
+
+Note that **`:core:test` and `:app:test` pass on 3.2.0** — unit tests are not dexed. Only the
+APK build catches it, which is the argument for assembling at every milestone.
+
+*Expected fix NOT taken:* `minSdk` is still 26.
+
+```bash
+grep -n 'minSdk' app/build.gradle.kts
+```
+
+Raising it to 30 would clear the error by dropping Android 8–10 devices — a product decision,
+not a build fix.

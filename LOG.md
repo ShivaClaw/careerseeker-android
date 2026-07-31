@@ -738,3 +738,154 @@ week and its working tree sits on `codex/beta-M0-preflight`.
 | Engine → relay → phone with a real envelope | **NOT reached** (engine-side, B-2) |
 | Phone → relay → engine with a real command | **NOT reached** (same) |
 
+Milestone artifact: commit `54b8937`; bundle refreshed (676,583 bytes).
+
+---
+
+## A6 — Outcomes + entitlement surface · 2026-07-30 · **PARTIAL** (display done; controls gated)
+
+### A6.1 F-5 closed — the replica was dropping the `outcome` field
+
+§4.3.1 was amended in P4 to carry a nullable `outcome` on each application summary.
+`EnvelopeApplier.appOf()` did not parse it, so the field arrived from the engine and was
+discarded: the phone could not have shown outcome tracking even against a Pro engine.
+
+Now projected onto `ApplicationRow.outcome` (Room **v2 → v3**, `ALTER TABLE applications ADD
+COLUMN outcome TEXT`, nullable with no default — NULL *is* the protocol's "unset", and a
+default would turn "the engine never said" into a claim about the application).
+
+Two details that are contract, not preference:
+
+- **Absent is not malformed.** §4.3.1 says a receiver treats an absent field as "no outcome",
+  never as a malformed value. A non-Pro engine simply omits it, and its snapshots must still
+  parse — so the field is read leniently while every other field stays strict.
+- **It is stored as an opaque string, not the phone's enum.** The wire vocabulary is the
+  *store's superset* and includes `no_reply`, a desktop-set observation. Validating against the
+  phone's narrower enum would silently drop legitimate engine values.
+
+`ApplicationRow.outcome` is declared last with a default so the existing positional
+constructions in the demo fixture and applier tests keep meaning what they meant.
+
+### A6.2 Outbound envelopes — two rules made structural
+
+New `core/.../OutboundEnvelopes.kt`. Rather than documenting the p2e rules, it enforces them:
+
+1. **A state-changing kind is signed, or it is not built.** `doc_edit`, `outcome`, and
+   `entitlement` require the envelope `sig` (§5.4). `build()` throws `UnsignableEnvelope` when
+   no signer is configured instead of emitting an envelope the engine must reject. The audit
+   chain's ability to prove *which paired device* asked for a change depends on that signature
+   existing.
+2. **The sequence number is owned, not passed in.** The factory takes a `SeqSource`, so a
+   caller cannot supply — or reuse — a number. A reused p2e seq is silently dropped by the
+   engine as a replay, which to a user looks exactly like "the outcome didn't save".
+
+`Outcome` models the **five values a phone may set**, deliberately not the six the wire carries
+back. `no_reply` is in `Outcome.ENGINE_ONLY` and `Outcome.fromWire("no_reply")` is null — the
+phone renders it, and cannot send it. That distinction is what stops a future screen offering a
+button the engine would reject.
+
+Correctness is proven by round-tripping through `EnvelopeReceiver` — the same state machine the
+engine mirrors — rather than by inspecting strings:
+
+- an outcome envelope this factory builds is **accepted**, signature and all;
+- flipping one ciphertext character makes it **rejected**, so the signature covers the real
+  thing;
+- three queued offline outcomes replay in order and all three are accepted;
+- the entitlement courier forwards `original_json` **byte-for-byte** (tested with a record
+  containing quotes and a backslash, since re-serialising would destroy the RSA signature);
+- the sealed wire contains neither the application id nor the outcome nor the key — and
+  decrypts to the truth under the right key, so that check is not vacuous;
+- `send_email` and every reserved L2 kind are **unbuildable** (§8.1 as a test).
+
+### A6.3 `ProState` — the phone structurally cannot claim Pro
+
+`ProState.Unlocked` has exactly one producer: `ProState.afterEngineAck(...)`. There is no path
+from a locally computed `EntitlementVerdict` to `Unlocked` — a local `ACCEPTED` maps to
+`AwaitingEngine` ("the desktop is checking"), never to an optimistic unlock that might revoke
+itself later. `ProStateTest` asserts exhaustively that **no** verdict yields `Unlocked`.
+
+This is the phone-side expression of the project's one rule. The engine cannot fabricate a
+skill; the phone cannot fabricate a status.
+
+### A6.4 What A6 did not deliver, and the two different reasons
+
+**The outcome-marking control is not built** — same blocker as the pairing screen (B-1). Marking
+an outcome *sends a device-signed envelope*, so it needs the Android Keystore key, which needs
+gate `P2-KEYSTORE-FALLBACK` answered and a device to test on. The display half has no such
+dependency and is done: `OutcomeBadge` renders the engine's outcome on each application card,
+including `no_reply`.
+
+**The unlock path cannot be completed at all**, and this one is a contract gap rather than a
+gate — recorded as **PQ-A6-1**. §4.3 lists `entitlement_ack` with a one-line description and
+**no body definition**, while every other shipping kind has its fields specified. Since
+`entitlement_ack` is the only thing that may unlock Pro, and its fields are unknown, the applier
+has **no `entitlement_ack` branch** — guessing field names would be inventing wire format, and
+writing a parser for an unshipped shape is the drift generator this repo already forbids for the
+`doc` kind.
+
+Consequence, stated plainly: **`ProState.afterEngineAck` has no caller.** The app is honestly
+Free with no way to become anything else, which is the correct behaviour for a build that cannot
+receive an ack. Suggested body in PQ-A6-1.
+
+### A6.5 A build failure worth recording: newest ≠ compatible
+
+A3 picked Ktor **3.2.0** after checking Maven Central — following the repo's rule that versions
+are verified against the artifact repository rather than copied from a spec. That rule was
+necessary and insufficient. The APK build failed:
+
+```
+D8: Space characters in SimpleName 'use streaming syntax' are not allowed prior to
+    DEX version 040 (field name `use streaming syntax` on class io.ktor.client.plugins.Messages)
+> Task :app:mergeExtDexDebug FAILED
+```
+
+Ktor 3.2.0 ships a field whose name contains spaces — legal JVM bytecode, rejected by D8 below
+DEX 040, which needs **minSdk 30**. This project is minSdk **26**.
+
+Two things this teaches, both recorded rather than quietly fixed:
+
+1. **Every JVM test passed on 3.2.0**, because unit tests are never dexed. Only `assembleDebug`
+   caught it. That is precisely why the ladder builds the APK at every milestone instead of
+   saving packaging for A7 — this would otherwise have surfaced at the end, attributed to
+   whatever was touched last.
+2. **The tempting fix is a product decision in disguise.** Raising `minSdk` to 30 would make the
+   error vanish and silently drop Android 8, 9, and 10 devices. That is Brandon's call about who
+   can install the app, not a build workaround. The dependency moved instead: **Ktor 3.1.3**,
+   the previous release, which dexes cleanly at 26.
+
+### A6.6 Verification
+
+```
+$ ./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:test :app:assembleDebug :app:lintDebug --rerun-tasks
+:core is Android-free.
+BUILD SUCCESSFUL in 1m 47s
+62 actionable tasks: 62 executed
+```
+
+| Suite | Tests | Fail |
+| --- | --- | --- |
+| `core…ProtocolTest` | 11 | 0 |
+| `core…ProtocolVectorsTest` | 6 | 0 |
+| `core…EntitlementVectorsTest` | 5 | 0 |
+| `core…EnvelopeJsonTest` | 8 | 0 |
+| `core…RelayClientTest` | 14 | 0 |
+| `core…PairingSessionTest` | 8 | 0 |
+| `core…OutboundEnvelopesTest` *(new)* | 10 | 0 |
+| `core…ProStateTest` *(new)* | 5 | 0 |
+| `dashboard.replica.DemoFixtureTest` | 3 | 0 |
+| `dashboard.replica.EnvelopeApplierTest` | 21 | 0 |
+| `dashboard.ui.ScreensFromFixtureTest` | 8 | 0 |
+| **TOTAL** | **99** | **0** |
+
+Ladder progression: **42 → 55 → 74 → 84 → 99**.
+
+APK: `app/build/outputs/apk/debug/app-debug.apk`, **13,180,026 bytes**, sha256
+`CD7B8A26A9B0FEE1E1C756159B5BFAC0D256607F6265D4220A4310E2487AB9CE`, built 2026-07-30 21:27:49.
+The ~1 MB growth over A2's 12,164,050 is Ktor entering the APK.
+
+### A6.7 Prohibitions
+
+No Play Billing code exists anywhere in the repo — entitlement is exercised **only** with the
+signed test vectors. No push, no PR, no reference-repo write, no purchase, no account action.
+The relay was contacted once in this session (A5.1, `/v1/health`) and not at all in A6.
+

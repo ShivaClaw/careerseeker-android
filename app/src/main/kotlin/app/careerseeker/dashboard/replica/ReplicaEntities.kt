@@ -24,6 +24,22 @@ data class ApplicationRow(
     val score: Int,
     /** The e2p envelope seq that last touched this row — recency for list ordering. */
     val updatedSeq: Long,
+    /**
+     * Pro outcome-tracking state (§4.3.1), or null when unset or non-Pro.
+     *
+     * Nullable on the wire and nullable here: §4.3.1 says a receiver treats an absent field as
+     * "no outcome", **never** as a malformed value — so a snapshot from a non-Pro engine must
+     * not fail to parse.
+     *
+     * The vocabulary is the *store's superset* (`sent | no_reply | replied | interview | offer |
+     * rejected`), which is wider than the five values a phone may set. It is carried as a
+     * display-only string for exactly that reason: the replica must be able to render
+     * `no_reply` — a desktop-set observation — without the phone being able to send it.
+     *
+     * Declared last, with a default, so the existing positional constructions in the demo
+     * fixture and the applier tests keep meaning what they meant.
+     */
+    val outcome: String? = null,
 )
 
 /** One discovered job as the Jobs screen renders it. Flags are display-only booleans. */

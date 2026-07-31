@@ -210,6 +210,11 @@ class EnvelopeApplier(private val db: ReplicaDb) {
         title = o["title"]?.jsonPrimitive?.contentOrNull ?: return null,
         score = o["score"]?.jsonPrimitive?.intOrNull ?: return null,
         updatedSeq = seq,
+        // Absent means "no outcome", never malformed (§4.3.1) — a non-Pro engine simply omits
+        // it, and a snapshot from one must still parse. Carried as an opaque display string:
+        // the engine's vocabulary is a superset of what the phone may set, and validating it
+        // against the phone's narrower enum here would drop legitimate desktop-set values.
+        outcome = o["outcome"]?.jsonPrimitive?.contentOrNull,
     )
 
     private fun jobOf(o: JsonObject, seq: Long): JobRow? = JobRow(

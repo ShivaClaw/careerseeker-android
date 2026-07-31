@@ -106,3 +106,37 @@ reason when a receipt will not work, not to grant anything.
 
 **To close:** nothing required — recorded so a later session does not "simplify" the local
 verdict into the entitlement flag and quietly make the phone self-certifying.
+
+---
+
+## PQ-A6-1 — `entitlement_ack` has no defined body, so the unlock path cannot be completed
+
+**Spec (§4.3):** the e2p kind table lists
+
+> `entitlement_ack` | Engine confirms a verified Pro entitlement was applied.
+
+…and that is the entire definition. Every other shipping kind has its body specified (§4.3.1
+for `snapshot`/`delta`, inline shapes for `evidence`, `heartbeat`, `conflict`, `error`,
+§4.3.2 for `entitlement`). This one has no fields at all.
+
+**Why it blocks A6.** `entitlement_ack` is the **only** thing that may unlock Pro on the phone
+(§4.3.2 and PQ-A2-4: the engine verifies, the phone couriers). To act on it the applier needs to
+know what it carries — at minimum the `product_id` that was granted, and plausibly the
+acknowledging timestamp and the order id for support. Guessing those field names would be
+inventing wire format, which this session does not do; and writing a parser for an unshipped
+shape is the drift generator this repo's own rule already forbids (the `doc` kind is
+deliberately unparsed for exactly that reason).
+
+**Chosen here:** `ProState` is implemented as the contract — `Unlocked` is reachable only
+through `ProState.afterEngineAck(...)` — and **nothing calls it yet**. The applier has no
+`entitlement_ack` branch. The app is therefore honestly Free, with no way to become anything
+else, which is the correct behaviour for a build that cannot yet receive an ack.
+
+**To close:** specify the `entitlement_ack` body in §4.3 alongside the others. Suggested
+minimum, matching what the engine's `StoreEntitlementStateStore` already tracks:
+`{product_id, acknowledged_at, order_id?}`. Then add an applier branch, a shared vector, and
+the C# side in the same commit, per the drift trap.
+
+**Severity:** blocks the phone half of Pro. Not urgent — Pro ships complete on the desktop, and
+the phone's outcome *display* works without it — but the phone cannot show an unlocked state
+until it exists.
