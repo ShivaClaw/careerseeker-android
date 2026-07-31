@@ -189,9 +189,79 @@ debug-packaging notice from AGP, not a project defect.
 
 **Lane A is selected and demonstrated.** No `BLOCKED.md` is needed for A0.
 
-### A0.9 Prohibitions honoured in A0
+### A0.9 Prohibitions honoured in A0 (see also A1 below)
 
 No pushes anywhere; no PRs; no edit to the reference repo (reads via `git show` only, no
 worktree created); no Cloudflare/Play/Google-console/email/purchase/account actions; the
 relay was not contacted at all in A0; no secrets read, printed, or committed.
+
+Milestone artifacts: commit `dd64160`; bundle
+`C:\Users\bkirk\Desktop\careerseeker-android-2026-07-30.bundle` (604,773 bytes,
+`git bundle verify` → "The bundle records a complete history").
+
+---
+
+## A1 — Scaffold + CI reconciliation · 2026-07-30 · **COMPLETE**
+
+The spec's A1 ("KMP scaffold, version catalogs, `.gitignore`, GitHub Actions") was already
+satisfied by prior sessions, so A1 became a *reconciliation*: verify what exists, and close
+the gaps A0 found rather than rebuild.
+
+### A1.1 Verified as already present — no change needed
+
+| A1 requirement | State |
+| --- | --- |
+| `:core` module with zero Android deps | present; enforced by the `checkCoreIsAndroidFree` Gradle task, which ran and printed `:core is Android-free.` |
+| Gradle version catalog | `gradle/libs.versions.toml`, all versions dated and justified in comments |
+| `.gitignore` covers keystores / `local.properties` / captures | present (`*.keystore`, `*.jks`, `local.properties`, `captures/`) — added `.kotlin/`, which was showing up untracked |
+| GitHub Actions workflow | `.github/workflows/ci.yml`, ubuntu-latest, JDK 17, wrapper validation |
+| `applicationId` = `app.careerseeker.dashboard` | already exactly the spec's value (`app/build.gradle.kts:18`) |
+
+Two CI checks in this repo are better than the spec asked for and are called out so they are
+not lost: the vendored vectors are re-fetched from the pinned upstream commit and diffed (so
+cross-repo protocol drift fails CI), and the "no analytics" promise is checked against the
+**resolved release classpath** rather than by grepping build files.
+
+### A1.2 F-1 closed — CI now runs `:app:test`
+
+The workflow gated `:core:test`, `assembleDebug`, and `lintDebug`, but never `:app:test`.
+The 25 Robolectric tests — including the applier's demo/real boundary, which exists because
+of a Codex audit finding — were ungated on every push. Added as a step between `:core:test`
+and the assemble (`.github/workflows/ci.yml:95-96`).
+
+Locally executed proof that the newly-gated step passes (from A0.5, forced re-run):
+`:app:test` = 25 tests, 0 failures.
+
+CI's analytics check was also run locally to confirm the step I did not touch still holds:
+
+```
+$ ./gradlew -q :app:dependencies --configuration releaseRuntimeClasspath > deps.txt
+$ grep -niE 'firebase|crashlytics|gms:play-services-ads|appsflyer|com\.adjust|amplitude|mixpanel|segment\.analytics' deps.txt
+OK: no analytics or tracking SDKs on the release classpath.   (710 resolved lines scanned)
+```
+
+The vendored-vector drift step was **not** run locally — it needs the GitHub contents API and
+is CI-only. It will run on push. Recorded here rather than implied.
+
+### A1.3 F-4 closed — README no longer under-claims
+
+The README said "**P0 — scaffold.** No product features yet" while the repo holds a Room
+replica, an envelope applier, and five screens. Under this project's own rule that a
+document and the thing it describes move together, an under-claiming README is the same
+class of defect as an over-claiming one — it just fails safe. Rewritten to state what is
+built *and what is not* (pairing UI, live transport, outcomes, entitlement).
+
+Added the spec-mandated **PROVISIONAL `applicationId`** note: the id is permanent once
+published on Play, so Brandon confirms it before any upload. Also added `--rerun-tasks`
+guidance to the build section, for the same reason A0.5 needed it.
+
+### A1.4 Exit criterion
+
+The spec's A1 exit is "`:core` tests green on a hello-world test". Substantially exceeded and
+already evidenced in A0.5: `:core` = 17 tests, 0 failures, forced execution.
+
+### A1.5 Prohibitions
+
+Same as A0.9. No push, no PR, no reference-repo write, no network action beyond Gradle
+dependency resolution.
 

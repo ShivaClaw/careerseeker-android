@@ -87,6 +87,14 @@ jobs:
       - name: Unit tests (:core)
         run: ./gradlew :core:test
 
+      # The Room replica, the envelope applier, and the screens are all exercised by
+      # Robolectric on the JVM -- no emulator needed -- so there is no reason for them to
+      # sit outside CI. They did until A0 found it: the workflow gated :core:test,
+      # assembleDebug and lint, but never ran :app:test, leaving the applier's
+      # demo/real boundary and every screen assertion ungated on every push.
+      - name: Unit tests (:app, Robolectric)
+        run: ./gradlew :app:test
+
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug
 
