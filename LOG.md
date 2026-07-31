@@ -889,3 +889,44 @@ No Play Billing code exists anywhere in the repo — entitlement is exercised **
 signed test vectors. No push, no PR, no reference-repo write, no purchase, no account action.
 The relay was contacted once in this session (A5.1, `/v1/health`) and not at all in A6.
 
+Milestone artifact: commit `26b9aee`; bundle refreshed (696,755 bytes).
+
+---
+
+## A7 — Package + handoff · 2026-07-30 · **COMPLETE**
+
+Deliverables:
+
+- **APK** — `app/build/outputs/apk/debug/app-debug.apk`, 13,180,026 bytes, sha256
+  `CD7B8A26A9B0FEE1E1C756159B5BFAC0D256607F6265D4220A4310E2487AB9CE`, built from a forced
+  full run (62/62 tasks executed), lint green under `warningsAsErrors`.
+- **[`SIDELOAD.md`](SIDELOAD.md)** — build/install steps, a review tour that says which parts
+  of each screen are real and which are fixture, five things worth deliberately checking
+  (they are the claims the app makes), and an explicit list of what is *not* in the build.
+- **[`HANDOFF-Android-Alpha.md`](HANDOFF-Android-Alpha.md)** — lane achieved, e2e level, every
+  deviation, the merge hazard, decisions waiting on Brandon, and the next three Beta tasks.
+- **`LOG.md`** and **`AUDIT-REQUEST.md`** — this file, and a re-verification command for every
+  claim in it.
+- **Bundle** — `C:\Users\bkirk\Desktop\careerseeker-android-2026-07-30.bundle`, refreshed at
+  every milestone, `git bundle verify` clean.
+
+Named `HANDOFF-Android-Alpha.md` rather than `HANDOFF.md` deliberately: `HANDOFF.md` exists on
+`main` with the program-level handoff and is absent from every code branch, so a same-named
+file here would force a merge resolution between two unrelated documents.
+
+### A7.1 The hardening backlog was NOT started
+
+Spec §6 lists it for the case where the ladder completes early. The ladder did not complete
+early — A4, A5, and A6 are partial for reasons recorded in `BLOCKED.md` and `PQ-A6-1`, and the
+remaining budget went into stating those honestly rather than into reducer fuzzing. Listed in
+the handoff as queued work.
+
+### A7.2 Final state
+
+| | |
+| --- | --- |
+| Tests | **99**, 0 failures, 0 errors |
+| Vector conformance | 25/25 — every valid vector accepted, every invalid one rejected with its stated reason |
+| Commits | 8 on `claude/android-a0-probe`, off `claude/p4-pro` |
+| Pushed | **no** — house rule is that Brandon decides when draft PRs open |
+
