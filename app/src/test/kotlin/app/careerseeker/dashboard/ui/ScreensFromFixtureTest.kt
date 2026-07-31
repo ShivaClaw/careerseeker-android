@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -46,15 +47,44 @@ class ScreensFromFixtureTest {
     }
 
     @Test
-    fun homeRendersCountersAndDemoBanner() = runBlocking<Unit> {
+    fun homeRendersCounters() = runBlocking<Unit> {
         val counters = db.dao().countersNow()
         val syncState = db.dao().syncStateNow()
         compose.setContent { HomeScreen(counters, syncState) }
 
-        compose.onNodeWithText("Demo data — not a live engine").assertIsDisplayed()
         compose.onNodeWithText("Drafted").assertIsDisplayed()
         compose.onNodeWithText("23").assertIsDisplayed() // discovered
         compose.onNodeWithText("12").assertIsDisplayed() // cycles
+    }
+
+    @Test
+    fun theProvenanceBannerIsShownOnEveryTab() {
+        // A4: the banner used to be drawn by HomeScreen alone, so Applications, Jobs and
+        // Evidence rendered fixture rows with nothing on screen saying they were fixture rows.
+        // It now lives in the shell. This walks the whole navigation surface rather than
+        // trusting that, because "labelled on every screen" is the actual honest-UI rule.
+        compose.setContent { DashboardApp(db) }
+        val label = "Demo data — not a live engine"
+
+        compose.onNodeWithText(label).assertIsDisplayed()
+
+        for (tab in listOf("Applications", "Jobs", "Evidence", "Home")) {
+            compose.onNodeWithText(tab).performClick()
+            compose.onNodeWithText(label).assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun theBannerFollowsIntoTheApplicationDetailOverlay() {
+        // The detail view is an overlay rather than a tab, which is exactly the kind of screen
+        // a per-screen banner gets forgotten on.
+        compose.setContent { DashboardApp(db) }
+
+        compose.onNodeWithText("Applications").performClick()
+        compose.onNodeWithText("Senior Platform Engineer").performClick()
+
+        compose.onNodeWithText("Documents (read-only)").assertIsDisplayed()
+        compose.onNodeWithText("Demo data — not a live engine").assertIsDisplayed()
     }
 
     @Test

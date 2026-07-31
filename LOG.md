@@ -594,3 +594,147 @@ No push, no PR, no reference-repo write. **The production relay was not contacte
 Ktor 3.2.0 was confirmed against Maven Central (a package-repository query, which the
 live-network policy permits) rather than assumed.
 
+Milestone artifact: commit `9992718`; bundle refreshed (661,778 bytes).
+
+---
+
+## A4 — Pairing logic + honest replay labelling · 2026-07-30 · **PARTIAL** (screen blocked, see B-1)
+
+### A4.1 The honesty bug: four screens showed fixture data with no label
+
+The honest-UI rule is that replay/demo data is labelled **on every screen**. It was labelled on
+**one**. `StatusBanner` was drawn by `HomeScreen` alone, so Applications, Jobs, Evidence, and
+the Application-detail overlay rendered demo rows with nothing anywhere on screen saying they
+were demo. A user who opened the app on the Jobs tab saw six fabricated postings presented as
+their pipeline.
+
+Verified before fixing, not assumed:
+
+```
+ApplicationDetailScreen.kt   StatusBanner refs=0
+ApplicationsScreen.kt        StatusBanner refs=0
+EvidenceScreen.kt            StatusBanner refs=0
+JobsScreen.kt                StatusBanner refs=0
+HomeScreen.kt                StatusBanner refs=2
+```
+
+**Fix.** The banner moved out of `HomeScreen` and into the `Scaffold`'s `topBar` in
+`DashboardApp`. That is the structural version of the rule rather than the polite version: no
+screen draws the banner, so no screen can forget it, including screens added later.
+
+Two new tests walk the actual navigation surface — `theProvenanceBannerIsShownOnEveryTab`
+clicks through all four tabs and `theBannerFollowsIntoTheApplicationDetailOverlay` opens the
+overlay, which is exactly the kind of screen a per-screen banner gets forgotten on.
+
+On wording: the spec asks for the label "REPLAY". The existing string is
+**"Demo data — not a live engine"**, which is kept — it says the same thing in the consumer
+register the copy rules require, and "REPLAY" is closer to the internal jargon those rules ban.
+The rule being enforced is *provenance is always visible*, and it now is.
+
+### A4.2 Pairing logic — complete and vector-proven
+
+New `core/.../PairingSession.kt` implements the phone's half of §5.2.2 as pure logic:
+
+- **Invite parsing** with distinct, honest rejections: `SUITE_UNSUPPORTED`,
+  `VERSION_UNSUPPORTED`, `INSECURE_RELAY`, `MALFORMED`. The suite check is the one that matters
+  — §5.2 requires a phone that does not recognise `suite` to refuse and show the mismatch,
+  **never** silently fall back. The realistic trigger is the reserved post-quantum suite on a
+  newer desktop meeting an older phone, and a downgrade the user cannot see is worse than a
+  pairing that fails loudly. Pinned by `an unrecognised suite refuses to pair instead of
+  falling back`.
+- **Completion building**, proven end-to-end against `pairing-basic`: the test builds the
+  completion, then *plays the engine* — deriving from the `phone_pub` on the wire and opening
+  the ciphertext — and asserts both sides compute the same six-digit confirm code. Derived
+  values (`k_p2e`, relay token, provisional token, confirm) all equal the vector's.
+- `the device signing key never appears outside the ciphertext` asserts §5.2.2's privacy
+  property directly on the body the relay would see: the relay must never learn which signing
+  key belongs to a pairing.
+- `a swapped phone_pub breaks the handshake rather than hijacking it` reproduces the MITM the
+  AAD binding exists to stop, using the `pairing-mitm-keyswap` vector's attacker key.
+
+**No Android types, and no private key material.** The device signing key is taken as a public
+point plus a signing function, so this class never sees a private key — the Keystore key is
+non-exportable by construction and this API does not tempt anyone to change that. That design
+choice is also *why* this half could be completed and tested while the screen could not.
+
+### A4.3 What is NOT built, and why that is a gate rather than a shortfall
+
+The pairing **screen** is not built. Two independent blockers, both recorded in `BLOCKED.md`
+B-1:
+
+1. Gate **`P2-KEYSTORE-FALLBACK` is open and Brandon-only** — it decides whether a device
+   without StrongBox pairs anyway with a logged software-key downgrade, or refuses. That is a
+   security-posture promise the screen would have to state; guessing it means shipping a claim
+   nobody approved.
+2. **No device and no emulator** (probe output in B-1). The device key is an Android Keystore
+   key, which is exactly what Robolectric does not model — a screen written now could be
+   compiled but not honestly tested.
+
+### A4.4 Verification
+
+```
+$ ./gradlew --no-daemon :core:test :app:test --rerun-tasks
+BUILD SUCCESSFUL in 58s
+35 actionable tasks: 35 executed
+```
+
+`PairingSessionTest` 8 · `ScreensFromFixtureTest` 6 → **8** · **TOTAL 84 tests, 0 failures**
+(74 → 84).
+
+---
+
+## A5 — Live end-to-end · 2026-07-30 · **NOT REACHED — honest statement of the level achieved**
+
+The spec asks for "an honest statement of exactly how far e2e got, with evidence". Here it is.
+
+### A5.1 What was achieved: the client works against the real relay
+
+One probe, on the single route that carries no pairing information (§2: "Liveness. Returns no
+pairing information."):
+
+```
+$ GET https://relay.careerseeker.app/v1/health
+status : 200 OK
+elapsed: 243 ms
+body   : {"ok":true,"protocol":1,"phase":"p1"}
+server : cloudflare
+```
+
+This proves the relay is live, TLS-reachable from here, and speaking protocol 1. It is a
+client GET and nothing more — **no pairing was created, no envelope pushed, nothing deployed
+or configured.**
+
+Worth flagging for Brandon: the deployed relay self-reports **`"phase":"p1"`**. If that string
+tracks the deployment rather than the protocol, the live Worker predates the P2/P4 work. Not
+investigated further — the relay is production and belongs to the engine program.
+
+### A5.2 What was not achieved, and the real reason
+
+**Not** "no phone". The binding constraint is engine-side:
+
+- No device, no emulator, no system image (probe in `BLOCKED.md` B-1).
+- The spec's fallback — drive `:core`'s client against a locally-run engine — is blocked
+  because, per `HANDOFF.md` §4, the engine's `--sync` flag is honored but **no-ops with an
+  explicit note**: publishing needs a completed pairing, and the desktop `/pair` page that
+  would create one is listed as still-to-build. `BuildSyncBridge` is a documented seam with no
+  `RelayClient`-backed sink behind it.
+
+So there is currently no way for an engine on this machine to publish a real envelope for a
+phone to read. **Until the engine can publish, the phone has nothing to receive** — no amount
+of phone-side work changes that, which is why this is recorded rather than worked around.
+
+The reference repo was also left alone for a second reason: a parallel session owns it this
+week and its working tree sits on `codex/beta-M0-preflight`.
+
+### A5.3 The e2e level actually achieved
+
+| Layer | Status |
+| --- | --- |
+| Envelope codec ↔ engine, byte-for-byte | **proven** — 25 shared vectors, 100% |
+| Pairing derivation ↔ engine | **proven** — `pairing-basic`, both sides compute the same confirm code |
+| Entitlement classification ↔ engine | **proven** — 5 signed vectors, exact reasons |
+| Relay client protocol behaviour | **proven offline** — 14 MockEngine tests |
+| Relay reachable over TLS from this machine | **proven live** — `/v1/health` 200 |
+| Engine → relay → phone with a real envelope | **NOT reached** (engine-side, B-2) |
+| Phone → relay → engine with a real command | **NOT reached** (same) |
+
