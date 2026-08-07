@@ -1,0 +1,28 @@
+[versions]
+# Verified against the artifact repositories on 2026-07-22, not copied from a spec.
+# AGP 9.3.0 requires Gradle 9.5.0 and JDK 17 (developer.android.com/build/releases/gradle-plugin).
+agp = "9.3.0"
+kotlin = "2.4.10"
+composeBom = "2026.06.01"
+coreKtx = "1.19.0"
+lifecycle = "2.11.0"
+activityCompose = "1.13.0"
+junit = "4.13.2"
+
+[libraries]
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+# The Compose compiler plugin is NOT built into AGP 9 and its version must track the
+# Kotlin version exactly, so it shares the `kotlin` ref rather than having its own.
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

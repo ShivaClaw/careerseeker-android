@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The pre-Android-12 half of the same rule as data_extraction_rules.xml: nothing this app
+  stores is eligible for backup.
+
+  android:allowBackup="false" already disables backup outright on these API levels, so this
+  file is belt and braces. It exists because minSdk is 26 and the two mechanisms are read
+  by different Android versions; stating the same intent in both places is cheaper than
+  reasoning later about which one a given device honors.
+
+  Note the shape difference from data_extraction_rules.xml: exclude entries here require
+  both domain and path.
+-->
+<full-backup-content>
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+</full-backup-content>

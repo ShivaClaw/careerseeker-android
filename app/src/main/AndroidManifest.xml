@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      The app talks to one thing: the blind relay, over HTTPS/WSS.
+
+      CAMERA (QR pairing) and POST_NOTIFICATIONS are in the program spec but are NOT
+      declared here. They arrive with the features that use them, in P1 and later. A
+      permission declared before anything needs it is a permission that shows up in the
+      store listing and the data-safety form with no honest justification behind it.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      The local replica never leaves the device through a backup or transfer channel. It
+      is derived state, re-syncable from the paired PC, so backing it up buys nothing and
+      would let job applications and draft correspondence outlive an unpair.
+
+      Three attributes, because three mechanisms are read by different Android versions:
+      allowBackup is what pre-12 devices honor (minSdk is 26); on 12 and higher it governs
+      cloud backup only, so device-to-device transfer needs dataExtractionRules; and
+      fullBackupContent states the same exclusions for pre-12 explicitly. Setting only the
+      first would leave the transfer channel open on every modern device.
+
+      usesCleartextTraffic=false is the default from API 28 but is stated explicitly,
+      because this app must never accept a plaintext relay connection and a default is not
+      a commitment.
+    -->
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/full_backup_content"
+        android:usesCleartextTraffic="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.CareerSeeker">
+
+        <!-- No android:label here: it would repeat the application's, which lint flags
+             as RedundantLabel. The activity inherits it. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.CareerSeeker">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
