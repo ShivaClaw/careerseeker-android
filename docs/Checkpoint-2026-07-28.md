@@ -21,6 +21,27 @@ comes from a prior session's commit message rather than a run I performed, it is
 > verifier that enforces the pinned total ran green in CI. What remains of F-C is the missing
 > `docs/P4-Evidence.md` narrative (P4 §2.7).
 >
+> **Correction to F-E — `fix/engine-actually-runs` was never at risk.** This checkpoint
+> listed it as unbacked-up work. That was wrong, and the cause was a **stale local
+> `origin/main`**: after `git fetch`, its tip `40bc9a7` proves to be an **ancestor of
+> `origin/main`** — already merged upstream via **PR #10 `codex/beta-M1-engine-runs`**. The
+> local branch was a leftover ref. No PR was opened for it; one would have been empty.
+> Pushing it was harmless but redundant, and the remote ref is worth deleting so it does not
+> read as unmerged work.
+>
+> **The larger miss that correction exposed:** `origin/main` is **33 commits ahead** of the
+> local `main` this checkpoint was written against. An entire **beta hardening track** landed
+> via Codex PRs #10–#18 — engine-runs, crash recovery, onboarding v2, single-executable
+> **MSIX packaging**, evidence, and a hardening pass. The Android program's publisher rides on
+> that engine, so **§1's picture of the alpha track is stale**. Re-derive against `origin/main`
+> before the next engine-side phase, and check how the P2/P4 branches (cut from
+> `claude/alpha-finish`) now relate to it — that base may have been overtaken.
+>
+> **Method note, worth keeping:** this checkpoint claimed to derive state from the repos, and
+> it did — but from **unfetched** remote refs. "Derive, don't recall" is only as good as the
+> freshness of what you derive from. `git fetch` belongs at the *start* of a state survey, not
+> after a contradiction surfaces.
+>
 > The findings below are preserved as originally written.
 
 ## 0. The one thing to act on first
