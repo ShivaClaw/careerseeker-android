@@ -930,3 +930,132 @@ the handoff as queued work.
 | Commits | 8 on `claude/android-a0-probe`, off `claude/p4-pro` |
 | Pushed | **no** — house rule is that Brandon decides when draft PRs open |
 
+
+---
+
+## S0 — Re-entry + derivation · 2026-08-08 · **COMPLETE**
+
+First rung of the unattended window (2026-08-07 → 2026-08-18). No source was touched: this rung
+exists to replace assumption with measurement before anything is built on top of it. Full
+derivation in [`docs/S-Ladder.md`](docs/S-Ladder.md); one re-verification command per claim in
+[`AUDIT-REQUEST.md`](AUDIT-REQUEST.md) §S0.
+
+### S0.1 The mandatory fetch immediately earned its place
+
+Both trees were fetched before any ref was read. The android tree had no ref changes. The main-repo
+clone's `main` moved **`e95b1b3..3a89fb5` — 27 commits** — and seven `codex/r0..r6` branches plus
+`autonomy/codex-state` appeared for the first time. Every count in this entry was taken *after*
+that fetch. Had it been skipped, the behind-counts in S0.4 would have been wrong by 27.
+
+### S0.2 The two-lineage hazard is not the shape it was described as
+
+Expected: a chain `p2-replica → p4-pro → p5-store`. Measured:
+
+- **`claude/p4-pro` and `claude/p2-replica` are the same commit** (`d9f95fd`, identical SHA).
+  There is **no android-side P4 work on any branch** — P4 exists only engine-side as PR #8.
+- **`a0-probe` and `p5-store` are siblings**, both branching from `d9f95fd`. `p5-store` is not an
+  ancestor of `a0-probe` (`merge-base --is-ancestor` → exit 1).
+- **`main` has diverged**, not merely fallen behind: `main…p2-replica` = **10 ahead / 23 ahead**,
+  and `main` is not an ancestor of the code lineage. `main`'s tree is exactly `HANDOFF.md`,
+  `README.md`, `docs` — docs-only, as expected.
+
+The collision set between the two siblings was computed rather than predicted — a set intersection
+of the two diffs from `d9f95fd`:
+
+| Overlapping file | |
+| --- | --- |
+| `app/.../ui/HomeScreen.kt` | both branches |
+| `app/.../ui/ApplicationsScreen.kt` | both branches |
+| `app/src/test/.../ScreensFromFixtureTest.kt` | both branches |
+
+`ApplicationDetailScreen.kt` was expected to collide and **does not** — only `p5-store` touches it.
+Flagged, deliberately unresolved: the merge policy is Brandon's alone.
+
+### S0.3 B-3 is now locally verified, not merely expected
+
+A7 recorded the vendored-vector drift check as *expected to pass*, because CI's step could not run
+here and the only local comparison available was against a same-machine reference tree owned by a
+parallel session. This window supplies a dedicated independent clone, so the check was re-run
+properly — blob-to-blob, comparing git object hashes, which is the identity CI actually asserts:
+
+```
+pin 679a3175590dcd021b21c85af9daf12114e131fd present in clone: exit=0
+vendored vectors compared = 26    mismatches = 0
+```
+
+All 26 files under `core/src/test/resources/sync-vectors/v1/` are byte-identical to the pin.
+
+This also surfaced a caveat worth stating before it bites: **the pin is not an ancestor of
+`origin/main`.** It is reachable only through the unmerged sync stack. Nothing is wrong today, but
+cross-repo vector identity currently hangs off an unmerged branch, and S1 must confirm the content
+survives the rebase byte-for-byte.
+
+### S0.4 The engine stack is intact — and missing from `main` entirely
+
+Stacked ancestry verified, all three checks exit 0: **5 ⊂ 6 ⊂ 7 ⊂ 8**, with ahead-counts
+**3 / 6 / 13 / 21** exactly as expected. Behind-count is **85 for all four**, not the expected ~58
+— the difference is precisely S0.1's 27 commits.
+
+The finding that reorders the ladder came from a path check on `origin/main`:
+
+```
+matches for relay/ | src/Sync/ | Sync-Protocol | sync-vectors/ | SyncHarness
+  on origin/main                      :  0
+  on origin/claude/p4-entitlement     :  45+
+```
+
+The protocol spec, the 26 shared vectors, the blind relay and the C# sync sources exist **only on
+the unmerged PR stack**. S2, S4, S5 and S6 all edit files that are not on the branch anyone would
+build from. **S1 is therefore not housekeeping — it is the gate for everything downstream**, and
+B-2 cannot be closed by writing publisher code first. `BLOCKED.md` B-2 was updated to say so with
+the measurement rather than the inference.
+
+### S0.5 Two superseded rules, both recorded rather than silently dropped
+
+- **Gate `P0-BASE`** targeted `claude/alpha-finish`. That PR (#4) is **MERGED**; the alpha train
+  landed long ago. New base of record: `origin/main` = `3a89fb5`.
+- **A7.2's "Pushed: no"** house rule — that Brandon decides when draft PRs open — is reversed by
+  mission §3(c), which explicitly permits pushing branches and opening draft PRs in both repos.
+  Acted on this rung; the android repo remains **never-self-merge**.
+
+Also corrected: A7.2 records 8 commits on `a0-probe`. A ninth (`d839e48`) landed after that table
+was written, so `d9f95fd..HEAD` is **9**. The table was accurate when written; this is the update.
+
+### S0.6 Documents the mission points at that are not in this repo
+
+Searched across `main`, `p2-replica`, `p5-store` and `a0-probe` — zero hits for `docs/P2-Runbook.md`
+and `docs/Sync-Protocol.md`. The former was where §2.1 asked for the `P2-KEYSTORE-FALLBACK` gate
+record; it is recorded in `docs/S-Ladder.md` §4 instead and carried to S3. `Sync-Protocol.md` lives
+in the main repo on the unmerged stack. `HUMAN-QUEUE.md` is really `docs/autonomy/HUMAN-QUEUE.md`,
+in the main repo.
+
+### S0.7 Housekeeping
+
+The stale `careerseeker-android-p5` worktree was removed. `git worktree remove` de-registered it
+and then **failed** with `Filename too long`, leaving orphaned Gradle `build/` output on disk; the
+residue was cleared with a robocopy mirror-empty, the standard Windows long-path removal. Verified
+before and after: the tree was clean, and `claude/p5-store` still resolves to `bb7f4d0` locally and
+on the remote, with PR #5 an untouched draft. One worktree remains.
+
+Terra's `autonomy/codex-state:STATE.md` was read: **R6(b) BLOCKED**, PR #26 draft, **files claimed:
+none** — no collision with this slice. Terra's measured `$ExpectedOfflineTotal` is now **412** (was
+407); S1 must re-derive rather than copy it.
+
+### S0.8 State
+
+| | |
+| --- | --- |
+| Tests | not re-run — **no source file was touched this rung** |
+| Vector conformance | 26/26 byte-identical to pin `679a317` (blob-to-blob, independent clone) |
+| Android PRs | #1–#5 left **draft and unmodified** |
+| Rung | S0 **DONE**; next is S1 |
+
+### S0.9 What was not touched
+
+No deploys of any kind, and the production relay was not contacted at all this rung — not even
+`GET /v1/health`. `Documents\CareerSeeker` and Terra's `CareerSeeker-r6-sbom` worktree were never
+read from or written to. No Google, Play, OAuth or Console action; no accounts, no purchases, no
+Play Billing code; no email or Gmail anything; no cert-store or MSIX action; no reboot; no
+force-push and no history rewrite; no secrets read or written; no `.appdata` originals; no edits to
+`Desktop\site-v2`. Nothing was merged in either repository, and no android PR was taken out of
+draft. No android source file was edited — this rung is documentation and derivation only.

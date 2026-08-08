@@ -591,3 +591,137 @@ grep -n 'minSdk' app/build.gradle.kts
 
 Raising it to 30 would clear the error by dropping Android 8–10 devices — a product decision,
 not a build fix.
+
+---
+
+## S0 — re-entry and derivation (2026-08-08)
+
+Every claim in [`docs/S-Ladder.md`](docs/S-Ladder.md) and [`STATE.md`](STATE.md) has its command
+here. `$A` is this repo; `$S` is the main-repo clone at
+`C:\Users\bkirk\Documents\careerseeker-sync`. **Fetch both first** — every count below is
+meaningless against stale refs.
+
+```powershell
+$A='C:\Users\bkirk\Documents\careerseeker-android'; $S='C:\Users\bkirk\Documents\careerseeker-sync'
+git -C $A fetch --all --prune; git -C $S fetch --all --prune
+```
+
+### C-S0-1 — The vendored vectors have not drifted from pin `679a317`
+
+> **Claim.** All 26 vendored vector files are byte-identical to the pinned upstream commit.
+> This is B-3's check, run for real against an independent clone rather than a same-machine tree.
+
+```powershell
+$pin='679a3175590dcd021b21c85af9daf12114e131fd'
+git -C $S cat-file -e "$pin^{commit}"; "pin present: exit=$LASTEXITCODE"
+$files = git -C $A ls-tree -r --name-only HEAD -- core/src/test/resources/sync-vectors/v1
+$m=0; $n=0
+foreach ($f in $files) {
+  $name = Split-Path $f -Leaf
+  $h1 = git -C $A rev-parse "HEAD:$f"
+  $h2 = git -C $S rev-parse "${pin}:docs/sync-vectors/v1/$name" 2>$null
+  $n++; if ($h1 -ne $h2) { $m++; "MISMATCH: $name" }
+}
+"compared=$n mismatches=$m"
+```
+
+*Expected:* `pin present: exit=0`, then `compared=26 mismatches=0`. Blob hashes are compared, not
+working-tree bytes, so line-ending and checkout settings cannot produce a false pass or fail.
+
+*Caveat this check surfaces:* the pin is **not** an ancestor of `origin/main` — see C-S0-5.
+
+### C-S0-2 — `p4-pro` is not a separate lineage, and `main` has diverged
+
+> **Claim.** `claude/p4-pro` and `claude/p2-replica` are the same commit; `a0-probe` and
+> `p5-store` are siblings off it; `main` is docs-only and is not an ancestor of the code lineage.
+
+```powershell
+git -C $A rev-parse origin/claude/p4-pro origin/claude/p2-replica
+git -C $A ls-tree --name-only origin/main
+git -C $A merge-base --is-ancestor origin/main origin/claude/p2-replica; "main ancestor: exit=$LASTEXITCODE"
+git -C $A rev-list --left-right --count origin/main...origin/claude/p2-replica
+git -C $A merge-base --is-ancestor origin/claude/p5-store HEAD; "p5 ancestor of a0-probe: exit=$LASTEXITCODE"
+git -C $A merge-base origin/claude/p5-store HEAD
+```
+
+*Expected:* the two rev-parses print the **same** SHA `d9f95fd…`; `main`'s tree is exactly
+`HANDOFF.md README.md docs`; `main ancestor: exit=1` (diverged); the counts are `10  23`;
+`p5 ancestor of a0-probe: exit=1`; and the merge-base is `d9f95fd…` — i.e. siblings.
+
+### C-S0-3 — The two-lineage collision is three files, and `ApplicationDetailScreen` is not one
+
+> **Claim.** `a0-probe` ∩ `p5-store` = HomeScreen, ApplicationsScreen, ScreensFromFixtureTest.
+
+```powershell
+$x = git -C $A diff --name-only d9f95fd..HEAD
+$y = git -C $A diff --name-only d9f95fd..origin/claude/p5-store
+Compare-Object $x $y -IncludeEqual -ExcludeDifferent | ForEach-Object { $_.InputObject }
+```
+
+*Expected:* exactly three paths. `ApplicationDetailScreen.kt` is **absent** — it is touched only
+by `p5-store`, correcting the mission's expectation. Nothing here was resolved: merge policy is
+Brandon's.
+
+### C-S0-4 — The engine stack is intact and 85 behind
+
+```powershell
+$b = 'claude/android-apk-build-setup-90d9d5','claude/p1-sync','claude/p2-publisher','claude/p4-entitlement'
+foreach ($x in $b) { "$x " + (git -C $S rev-list --left-right --count "origin/main...origin/$x") }
+git -C $S merge-base --is-ancestor origin/claude/android-apk-build-setup-90d9d5 origin/claude/p1-sync; "5in6=$LASTEXITCODE"
+git -C $S merge-base --is-ancestor origin/claude/p1-sync origin/claude/p2-publisher; "6in7=$LASTEXITCODE"
+git -C $S merge-base --is-ancestor origin/claude/p2-publisher origin/claude/p4-entitlement; "7in8=$LASTEXITCODE"
+```
+
+*Expected:* ahead-counts `3 / 6 / 13 / 21` and behind-count **85** for all four (the mission's
+"~58" predates `main` advancing 27); all three ancestry checks `exit=0`.
+
+### C-S0-5 — The whole sync track is missing from `main` (the finding that gates S2–S6)
+
+```powershell
+$pat = '^relay/|^src/Sync/|Sync-Protocol|sync-vectors/|SyncHarness'
+"main:  " + (git -C $S ls-tree -r --name-only origin/main | Select-String $pat | Measure-Object).Count
+"PR#8:  " + (git -C $S ls-tree -r --name-only origin/claude/p4-entitlement | Select-String $pat | Measure-Object).Count
+```
+
+*Expected:* `main: 0` and `PR#8:` a number in the mid-40s. The protocol spec, the 26 shared
+vectors, the blind relay and the C# sync sources exist **only** on the unmerged stack — which is
+why S1 gates S2, S4, S5 and S6, and why B-2 cannot be closed by writing publisher code first.
+
+### C-S0-6 — Gate `P0-BASE` is superseded
+
+```powershell
+gh pr view 4 --repo ShivaClaw/careerseeker --json state,headRefName,mergedAt
+git -C $S rev-parse origin/main
+```
+
+*Expected:* PR #4 (`claude/alpha-finish`) is `MERGED`. The alpha train landed, so "target
+`claude/alpha-finish`" is dead; the base of record is `origin/main` =
+`3a89fb58673712ac46aff82b35d7d269cb15793c`.
+
+### C-S0-7 — The stale `p5` worktree is gone, and nothing was lost with it
+
+```powershell
+git -C $A worktree list
+Test-Path C:\Users\bkirk\Documents\careerseeker-android-p5
+git -C $A rev-parse claude/p5-store origin/claude/p5-store
+```
+
+*Expected:* one worktree (the main tree); `False`; and both p5 refs still resolve to `bb7f4d0`.
+The tree was verified clean before removal. `git worktree remove` itself **failed** with
+`Filename too long` after de-registering the worktree, leaving orphaned Gradle `build/` output on
+disk; that residue was cleared with a robocopy mirror-empty (the standard Windows long-path
+removal). No commit, branch or PR was affected — `p5-store` is intact on the remote and PR #5
+remains an untouched draft.
+
+### C-S0-8 — No collision with Terra this iteration
+
+```powershell
+git -C $S show origin/autonomy/codex-state:STATE.md | Select-String -Pattern 'Files claimed' -Context 0,2
+```
+
+*Expected:* "Files claimed: **none** for the next iteration." Terra is BLOCKED on R6(b)/PR #26.
+Terra's worktree `C:\Users\bkirk\Documents\CareerSeeker-r6-sbom` and the tree
+`C:\Users\bkirk\Documents\CareerSeeker` were not read or written this rung.
+
+*Also note:* Terra's measured `$ExpectedOfflineTotal` is **412** (was 407). S1 must re-derive it
+rather than copy it, and sweep every count-reporting doc in the same commit.

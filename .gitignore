@@ -11,3 +11,8 @@ captures/
 *.aab
 *.keystore
 *.jks
+
+# Brandon's local autonomy staging kit (both agents' missions, auditor prompt, backstop
+# scripts). Operator scaffolding, not repository content -- the Claude mission is committed
+# on its own as docs/CLAUDE-ANDROID-MISSION.md. Ignored so no iteration commits it by reflex.
+_autonomy-kit/
