@@ -1469,3 +1469,210 @@ run and `total_count: 0` while one is queuing. To re-verify *this* claim after f
 the run id above directly. Second, **the run does not report test counts** — Gradle does not print
 them and the workflow does not collect them, so the `93 / 0 / 0` of C-S4A-2 stays a probe
 measurement and is not corroborated by CI. Green means every step passed, nothing more.
+
+---
+
+## S6 (phone half) — the outcome-marking decision · 2026-08-09 (fifth cloud iteration)
+
+Every claim below was produced by a command run in this session. The `:core` numbers come from a
+**reduced** probe (C-S6A-1); the gate is CI (C-S6A-8). Where a claim is unverified, it says so and
+says why.
+
+### C-S6A-1 — The reduced `:core` harness, and why it is reduced
+
+> **Claim.** `:core` test numbers in this section come from a throwaway Gradle root in the
+> scratchpad that includes **`:core` only**, resolves from **Maven Central only**, and forces the
+> Kotlin toolchain **17 → 21**. It is not the repo build and it is not the gate. `:app`, AGP and
+> every `androidx` artifact come from `dl.google.com`, which is an egress **policy denial** here
+> (B-7), and `api.foojay.io` is denied too, so a JDK 17 cannot be provisioned.
+>
+> Gradle 9 removed the `-c` / `--settings-file` option, so the probe cannot be a stray settings
+> file passed on the command line — it has to be a separate root that points at the real `:core`.
+> That is why the recipe below is longer than "run gradlew with a flag".
+
+```bash
+R=/path/to/careerseeker-android
+P=$(mktemp -d)/coreprobe && mkdir -p "$P" && cd "$P"
+cat > settings.gradle.kts <<EOF
+pluginManagement { repositories { mavenCentral(); gradlePluginPortal() } }
+dependencyResolutionManagement {
+    repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
+    repositories { mavenCentral() }
+    versionCatalogs { create("libs") { from(files("$R/gradle/libs.versions.toml")) } }
+}
+rootProject.name = "coreprobe"
+include(":core")
+project(":core").projectDir = file("$R/core")
+EOF
+cat > init.gradle.kts <<'EOF'
+allprojects {
+    afterEvaluate {
+        if (plugins.hasPlugin("org.jetbrains.kotlin.jvm")) {
+            extensions.findByName("kotlin")?.withGroovyBuilder { "jvmToolchain"(21) }
+        }
+    }
+}
+EOF
+"$R/gradlew" -I init.gradle.kts :core:test --rerun-tasks --console=plain
+```
+
+*Expected:* `BUILD SUCCESSFUL`. The `afterEvaluate` is load-bearing — a `plugins.withId` block runs
+*before* `core/build.gradle.kts`'s own `jvmToolchain(17)`, which then overwrites it and the build
+fails with "Cannot find a Java installation … matching: {languageVersion=17}".
+
+*Verify the denial rather than taking B-7 on trust:*
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' https://dl.google.com/ ; echo "exit=$?"
+```
+
+*Expected:* a CONNECT tunnel failure / 403 from the proxy, not a 200.
+
+### C-S6A-2 — `:core` was 93 tests before this slice and is 115 after, 0 failures, 0 skipped
+
+> **Claim.** Baseline measured on the untouched branch at `66bf167`: **93 / 0 / 0**, which matches
+> the figure `STATE.md` already carried. After the slice: **115 / 0 / 0** — `+22`, all of them
+> `OutcomeMarkPolicyTest`. They passed on the **first** run; no test was adjusted to make it green.
+
+```bash
+# after the C-S6A-1 recipe:
+python3 - <<'PY'
+import glob, xml.etree.ElementTree as ET
+t=f=s=0
+for p in sorted(glob.glob('<repo>/core/build/test-results/test/TEST-*.xml')):
+    r=ET.parse(p).getroot()
+    t+=int(r.get('tests')); f+=int(r.get('failures'))+int(r.get('errors')); s+=int(r.get('skipped'))
+print(t, f, s)
+PY
+```
+
+*Expected:* `115 0 0`, across 11 test classes, with `OutcomeMarkPolicyTest` contributing 22. For the
+baseline, `git stash` the two new files (or check out `66bf167`) and repeat: `93 0 0` across 10.
+
+### C-S6A-3 — There is no `outcome_ack` in the protocol (the first half of PQ-S6-1)
+
+> **Claim.** §4.3's engine → phone table acknowledges `doc_edit` (via `conflict`) and `entitlement`
+> (via `entitlement_ack`) and nothing else. No kind acknowledges or rejects an `outcome`.
+
+```bash
+cd <careerseeker>
+sed -n '/^Engine → phone:/,/^Phone → engine:/p' docs/Sync-Protocol.md
+grep -n "outcome_ack" docs/Sync-Protocol.md ; echo "exit=$?"
+```
+
+*Expected:* the engine → phone table lists exactly `snapshot`, `delta`, `doc`, `evidence`,
+`heartbeat`, `conflict`, `entitlement_ack`, `error`; the grep returns **no matches, `exit=1`**.
+
+### C-S6A-4 — The engine reports `OutcomeApplied` even with a null applier (the second half)
+
+> **Claim.** `case "outcome"` calls the applier only when it is non-null, then returns
+> `InboundOutcome.OutcomeApplied` unconditionally — and `IOutcomeApplier` is nullable by design,
+> documented as "a null applier means outcome dispatch is a no-op seam for now".
+
+```bash
+cd <careerseeker>
+sed -n '28,36p;96,104p' src/Sync/InboundDispatcher.cs
+```
+
+*Expected:* the interface doc-comment naming the null-applier no-op, and a `case "outcome"` whose
+`return new InboundResult(InboundOutcome.OutcomeApplied, ...)` sits outside the `if
+(_outcomeApplier is not null)` guard.
+
+### C-S6A-5 — The two directions' sequence numbers are not comparable
+
+> **Claim.** §6.1 gives each direction an independent counter, and §4.3.1's application summary has
+> no per-application timestamp. So a `snapshot` arriving after a mark cannot be ordered against it,
+> which is why reconciliation is by value convergence rather than by recency.
+
+```bash
+cd <careerseeker>
+sed -n '/^### 6.1 Sequence numbers/,/^### 6.2/p' docs/Sync-Protocol.md
+grep -n '"applications": \[' docs/Sync-Protocol.md
+```
+
+*Expected:* "Each direction has an independent counter starting at 1"; and the summary field list
+`{ "id","state","company","title","score","outcome"? }` — no timestamp, no per-app sequence.
+
+### C-S6A-6 — Each decision is pinned by a named test, not by a comment
+
+> **Claim.** Every rule the policy asserts has a test whose name states it.
+
+```bash
+grep -n "fun \`" core/src/test/kotlin/app/careerseeker/core/OutcomeMarkPolicyTest.kt
+```
+
+*Expected:* 22 names, including — a Free user cannot mark; awaiting the engine is not Pro enough;
+`no_reply` is never offered even while the engine is reporting it; a stale snapshot does not revert
+a mark that is still in flight; a mark the engine keeps disagreeing with is eventually abandoned; a
+failed push keeps the mark queued and does not count as a disagreement; a reaching-the-relay report
+does not confirm anything; re-marking one application collapses to a single latest envelope.
+
+### C-S6A-7 — Nothing was re-vendored and no existing vector's bytes moved
+
+> **Claim.** The vendored pin is still `679a317`, all **26** files are byte-identical to it, and
+> this slice touched no vector, no `VECTORS.lock`, and no `:app` source.
+
+```bash
+grep -n "Pinned commit" core/src/test/resources/sync-vectors/VECTORS.lock
+ls core/src/test/resources/sync-vectors/v1/*.json | wc -l
+git diff --name-only 66bf167..HEAD
+# byte-identity against the pin, checked out of the main repo rather than assumed:
+cd <careerseeker> && git archive 679a3175590dcd021b21c85af9daf12114e131fd docs/sync-vectors/v1 \
+  | tar -x -C /tmp/vecchk && diff -r /tmp/vecchk/docs/sync-vectors/v1 \
+  <android>/core/src/test/resources/sync-vectors/v1 && echo IDENTICAL
+```
+
+*Expected:* `679a3175590dcd021b21c85af9daf12114e131fd`; `26`; a name-only diff listing exactly
+`core/src/main/kotlin/app/careerseeker/core/OutcomeMarking.kt`,
+`core/src/test/kotlin/app/careerseeker/core/OutcomeMarkPolicyTest.kt`,
+`docs/protocol-questions.md` plus this iteration's record files; and `IDENTICAL`.
+
+Also, `:core` stayed Android-free:
+
+```bash
+grep -rn "^import android" core/src/ ; echo "exit=$?"
+```
+
+*Expected:* no matches, `exit=1`.
+
+### C-S6A-8 — What this slice did NOT verify, stated before anyone infers it
+
+> **Claim.** S6 is **not** end-to-end. `OutcomeMarkPolicy` has **no production caller**: no screen
+> offers the control, no transport pushes the envelope, and the send path needs a device signature
+> (§5.4) from an Android Keystore key that does not exist until S3 — which needs an emulator
+> (B-4). The `:app` half additionally needs a toolchain this sandbox cannot fetch (B-7).
+
+```bash
+grep -rn "OutcomeMarkPolicy\|MarkDecision\|DisplayedOutcome" app/src/ ; echo "exit=$?"
+```
+
+*Expected:* **no matches, `exit=1`** — the policy is a tested `:core` unit and nothing more. Any
+future claim that S6 is DONE must first make this command return hits, and must additionally show a
+`DeviceSigner` backed by a real Keystore key.
+
+Two further things this slice does not establish, both worth an auditor's attention:
+
+- **`disagreementLimit = 3` is chosen, not measured.** There is no deployment to derive it from.
+  If PQ-S6-1 closes as option (a) — a real `outcome_ack` — the bound stops being the mechanism and
+  becomes a fallback, and the number matters much less.
+- **The convergence rule cannot distinguish "the engine applied my mark" from "the desktop
+  independently reached the same value".** With no ack, nothing in v1 can. The policy treats them
+  as equivalent, which is correct for display and would be wrong for anything that needed
+  attribution.
+
+### C-S6A-9 — CI is the gate, and this claim is open until it runs
+
+> **Claim.** *Unverified at the time of writing.* The android gate
+> (`:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug`, `checkCoreIsAndroidFree`, the
+> vendored-vector drift step) **was not run in this session** and cannot be: no Android SDK, and
+> `dl.google.com` is an egress policy denial (B-7). The reduced probe of C-S6A-1/-2 is a local
+> signal on JDK 21, not the gate on JDK 17.
+
+```bash
+# MCP: pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker-android pullNumber=6
+gh run list --repo ShivaClaw/careerseeker-android --branch claude/android-a0-probe --limit 3
+```
+
+*Expected once CI has run on this push:* job *Build and test*, `conclusion: success`. **If it is
+red, C-S6A-2's counts stand but every "the slice is green" reading of this section does not.**
+`get_check_runs` reports the PR's *current* head, so check the commit it names before believing it.
