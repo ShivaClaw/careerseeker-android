@@ -274,3 +274,71 @@ explicitly that the threshold is receiver policy.
 because the field is inert. The risk is a third implementation reading §4.3, implementing
 resumption, and finding that the phone's `0` asks for the full history on every reconnect while the
 engine's answer never depended on the field at all.
+
+---
+
+## PQ-S6-1 — An `outcome` is never acknowledged, and the engine reports it applied either way
+
+**Spec (§4.3).** The phone → engine table has `outcome` | Pro: `{app_id, outcome, at}`. The
+engine → phone table acknowledges exactly two phone-originated kinds: `conflict` rejects a
+`doc_edit`, and `entitlement_ack` confirms an `entitlement`. **There is no `outcome_ack`, and no
+rejection kind for `outcome`.** §7.2's `error` covers envelope-level faults (bad kind, replay, size),
+not "the mark was received and then not applied".
+
+**What the engine actually does**, which is worse than silence:
+
+- `src/Sync/InboundDispatcher.cs:98-103` — `case "outcome"` calls `_outcomeApplier.ApplyAsync(...)`
+  **only if the applier is non-null**, then returns `InboundResult(InboundOutcome.OutcomeApplied, ...)`
+  unconditionally.
+- `IOutcomeApplier` is nullable by design and documented as such
+  (`src/Sync/InboundDispatcher.cs:30-31`): "a null applier means outcome dispatch is a no-op seam
+  for now."
+
+So the engine can accept a signed `outcome`, do nothing with it, and report `OutcomeApplied`. That
+is an internal dispatch result rather than a wire claim — nothing is sent to the phone saying so —
+but it means even an engine-side caller cannot distinguish applied from dropped.
+
+**The second half: the phone cannot order its own mark against an arriving snapshot.** §6.1 gives
+each direction "an independent counter, starting at 1" — the e2p seq carrying a `snapshot` and the
+p2e seq carrying the mark are not comparable — and §4.3.1's application summary
+(`{id, state, company, title, score, outcome?}`) carries no per-application timestamp. A payload
+that arrives after a mark may have been generated before it, and there is nothing in v1 that says
+which.
+
+**Chosen here** (`OutcomeMarkPolicy`, `core/.../OutcomeMarking.kt`): a pending mark **shadows**
+whatever the engine reports for that application, and the shadow is retired by **value
+convergence** — the engine carrying the marked value in a later §4.3.1 payload — because that is
+the only evidence v1 offers. The shadow is **bounded** by a count of disagreeing dashboard payloads
+(`disagreementLimit`, default **3**, chosen not measured), after which the mark is abandoned and
+the engine's value shows through.
+
+Both halves of that are forced. Letting the engine win on arrival reverts the badge under the
+user's finger for a mark that is merely in flight, which is indistinguishable from "it didn't
+save". Letting the mark win forever means a silently dropped mark displays as the user's truth
+permanently — the exact fabrication shape this project exists to refuse, pointed at the user
+instead of at the engine. The bound counts *reports*, not seconds, because §6.3 makes clocks
+untrustworthy and a disagreeing report is the only monotone evidence the phone has.
+
+`DisplayedOutcome.pending` is what keeps the compromise honest: the UI is expected to render an
+unconfirmed mark differently from one the desktop has confirmed.
+
+**To close (engine + phone + spec).** Two options, and unlike PQ-S4-1 the cheap one is not clearly
+right:
+
+- **(a) Add `outcome_ack`** to §4.3's engine → phone table — minimally `{app_id, outcome, applied}`
+  — and have `InboundDispatcher` emit it from the applier's real result rather than from reaching
+  the `case`. Then the phone retires a mark on evidence instead of on inference, the bound becomes
+  a fallback rather than the mechanism, and `disagreementLimit` stops being a guess. This also
+  makes `IOutcomeApplier`-is-null observable instead of silently successful.
+- **(b) Declare marks fire-and-forget** and say so in §4.3: the phone MUST NOT display an
+  unconfirmed mark as confirmed, and convergence-with-a-bound is the specified behaviour. Cheaper,
+  and it at least stops a third implementation inventing a different reconciliation rule — but it
+  leaves the engine's dispatch result over-reporting, which is a separate small fix worth making
+  either way.
+
+**(a) is recommended**, with the `InboundDispatcher` result fix regardless of which is chosen.
+
+**Severity:** medium. Nothing is broken today because no shipping caller marks outcomes yet — the
+`:app` wiring is unwritten and the send path needs S3's device key. It becomes a user-visible
+correctness problem the moment the first mark is sent, and a third implementation reading §4.3
+today has no way to know reconciliation is even required.
