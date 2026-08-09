@@ -1316,16 +1316,24 @@ not start.** This entry says so plainly rather than reporting a ladder that was 
 | **S0** re-entry + derivation | **DONE** | `LOG.md` §S0, `docs/S-Ladder.md`, `AUDIT-REQUEST.md` C-S0-1…9 |
 | **S1** land the engine sync track | **DONE** | §S1, C-S1-1…6; PRs #27–#30 merged |
 | **S2** engine publishes for real | **PARTIAL** — B-2 narrowed to one screen | §S2; PR #31 merged |
-| **S3** pairing screen | **NOT STARTED** | — |
-| **S4** transport loop | **NOT STARTED** | — |
-| **S5** entitlement ack | **NOT STARTED** | — |
-| **S6** outcome marking (phone) | **NOT STARTED** | — |
-| **S7** Play-readiness pack | **NOT STARTED** | — |
-| **S8** hardening | **NOT STARTED** | — |
+| **S3** pairing screen | **BLOCKED — B-4** | `BLOCKED.md` B-4 (probe output) |
+| **S4** transport loop | **BLOCKED — B-4** | needs S3's device key + an emulator |
+| **S6** outcome marking (phone) | **BLOCKED — B-4** | needs S3 + S4 |
+| **S5** entitlement ack | **NOT STARTED** | capacity; engine half needs no device |
+| **S7** Play-readiness pack | **NOT STARTED** | capacity; screenshots also need B-4 |
+| **S8** hardening | **NOT STARTED** | capacity; mechanical, no device needed |
 
-**S3–S8 are not "blocked".** Nothing external stopped them; the session's capacity went into S0–S2.
-Recording them as BLOCKED would imply an obstacle that does not exist, and would send the next
-session hunting for it. Each has a precise next action below.
+**The distinction is deliberate.** S3/S4/S6 are genuinely **BLOCKED**, on a blocker found by probing
+rather than assumed: `sdkmanager` and `avdmanager` are **not installed anywhere on this machine** —
+no `cmdline-tools` directory in the SDK, none bundled with Android Studio. Mission §3a authorized
+*using* `sdkmanager` to install a system image; it does not exist, and installing the toolchain that
+provides it is a machine change nobody authorized. Without an AVD, Keystore behaviour cannot be
+honestly verified (Robolectric does not model it) and compile-only screen claims are forbidden — so
+building S3 now would produce exactly the unverifiable artifact B-1 already refused once.
+
+S5/S7/S8 are **NOT STARTED**, which is different: nothing external stopped them and the session's
+capacity simply ran out. Calling those BLOCKED would send the next session hunting for an obstacle
+that does not exist.
 
 ## What actually changed
 
@@ -1387,10 +1395,15 @@ self-audit; #1–#5 left untouched drafts. **Nothing in this repo was merged.**
 - **Finish S2:** the `/pair` route. `PairingInvite.ToQrJson()` is the exact payload, so a QR encoder
   is the only genuinely new dependency; poll `TakeCompletionAsync`, show the confirm code, write
   `SyncPairing` to the vault. Everything else exists and is vector-proven. **This closes B-2.**
-- **S3** needs the emulator lane first (`sdkmanager` + AVD is explicitly permitted, §3a) — Keystore
-  cannot be modelled by Robolectric, and compile-only claims are forbidden.
+- **Unblock S3/S4/S6 first — it is one checkbox.** Android Studio → Settings → Android SDK → SDK
+  Tools → tick **"Android SDK Command-line Tools (latest)"**. That creates `sdkmanager.bat`, after
+  which §3a applies as written and the rest is unattended:
+  `sdkmanager "system-images;android-36;google_apis;x86_64"` → `avdmanager create avd` →
+  `emulator -no-window`. (Or authorize an agent to install that package itself.)
 - **S4** then has a rig: engine ↔ local relay ↔ emulator on `10.0.2.2`. The local-relay half is
-  already proven.
+  already proven (30/30).
+- **S5 and S8 need none of that** and could proceed immediately — S5's engine half and S8's
+  migration coverage/lint hold are device-free.
 
 ## Boundary — what was never touched
 

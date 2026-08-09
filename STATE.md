@@ -11,8 +11,24 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 | **S1 result** | PRs #27–#30 merged; pin **591**; sync-track paths on main **0 → 54**; vector drift **0** every check |
 | **S2 result** | PR #31 merged; `main` = `00b3705`; pin **598**; engine ↔ **local** relay **30/30**, no deploy |
 
-**Ladder:** S0 ✅ · S1 ✅ · S2 ◐ (B-2 narrowed to the `/pair` page) · S3–S8 ✗ not started.
-Full handoff at the end of [`LOG.md`](LOG.md).
+## Ladder
+
+| Rung | Status | Why |
+| --- | --- | --- |
+| **S0** re-entry + derivation | **DONE** | `docs/S-Ladder.md`; `LOG.md` §S0; C-S0-1…9 |
+| **S1** land the engine sync track | **DONE** | PRs #27–#30 merged; sync paths on main 0→54; pin 591 |
+| **S2** engine publishes for real | **PARTIAL** | PR #31 merged; E2E 30/30 vs local relay. B-2 open: no `/pair` page |
+| **S3** pairing screen | **BLOCKED — B-4** | `sdkmanager`/`avdmanager` absent; Keystore cannot be honestly verified without an AVD |
+| **S4** transport loop | **BLOCKED — B-4** | needs S3's device key + an emulator for the E2E claim |
+| **S6** outcome marking (phone) | **BLOCKED — B-4** | needs S3 + S4 |
+| **S5** entitlement ack | **NOT STARTED** | capacity; not blocked — engine half needs no device |
+| **S7** Play-readiness pack | **NOT STARTED** | capacity; screenshots additionally need B-4 resolved |
+| **S8** hardening | **NOT STARTED** | capacity; mechanical, no device needed |
+
+**S3/S4/S6 are blocked on one checkbox** — Android Studio → SDK Tools → *Android SDK Command-line
+Tools (latest)*. Mission §3a authorized *using* `sdkmanager`; it does not exist on this machine, and
+installing the toolchain that provides it was not authorized. Full detail and the exact probe output
+are in [`BLOCKED.md`](BLOCKED.md) B-4. Full handoff at the end of [`LOG.md`](LOG.md).
 | **Android branch** | `claude/android-a0-probe` @ `d839e48` |
 | **Android health** | green — **CI run `31278769047` success** (vectors, `:core`, `:app`, APK, lint, no-analytics). Not re-run locally this rung; no source touched. |
 | **Draft PR** | [#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) — `a0-probe` → base `claude/p2-replica`, with self-audit |

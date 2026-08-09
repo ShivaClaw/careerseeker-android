@@ -56,6 +56,12 @@ recorded in `docs/P2-Runbook.md` §4; that file does not exist in this repo on a
 (verified across `main`, `p2-replica`, `p5-store`, `a0-probe`), so it is recorded in
 [`docs/S-Ladder.md`](docs/S-Ladder.md) §4 and carried to S3.
 
+**Correction 2026-08-09 (S3 probe).** The sentence above — "creating an AVD via `sdkmanager` is now
+explicitly permitted… B-1 moves from *blocked* to **scheduled at S3**" — was written before anyone
+checked that `sdkmanager` is installed. **It is not on this machine at all.** See **B-4**. B-1's
+device half is therefore still blocked, on a smaller and more specific thing than before: one
+checkbox in Android Studio's SDK Tools.
+
 ---
 
 ## B-2 — Full live end-to-end could not be reached
@@ -215,3 +221,58 @@ authoritative GitHub-API fetch, and it agrees with the local blob-to-blob result
 
 The caveat above stands and is *not* part of this blocker: the pin remains a non-ancestor of
 `origin/main`, and S1 must confirm vector content survives the rebase byte-for-byte.
+
+---
+
+## B-4 — The emulator lane cannot be created: `sdkmanager` is not on this machine
+
+**Milestone:** S3 (and therefore S4, S6).
+
+**Symptom.** Mission §3a explicitly permits "`sdkmanager` system-image install + AVD creation" —
+the allowance that was supposed to unblock B-1's device half. The tool it names does not exist here.
+
+**Probed this session, not assumed:**
+
+```powershell
+$sdk="$env:LOCALAPPDATA\Android\Sdk"
+Test-Path "$sdk\cmdline-tools\latest\bin\sdkmanager.bat"   -> False
+Test-Path "$sdk\cmdline-tools\latest\bin\avdmanager.bat"   -> False
+Test-Path "$sdk\emulator\emulator.exe"                     -> True
+Get-ChildItem $sdk -Directory                              -> .temp build-tools emulator
+                                                              licenses platform-tools platforms sources
+Get-ChildItem $sdk -Recurse -Filter "sdkmanager*"          -> (nothing)
+Get-ChildItem "C:\Program Files\Android\Android Studio" -Recurse -Filter "sdkmanager*"  -> (nothing)
+$sdk\system-images                                         -> does not exist
+emulator -list-avds                                        -> (empty)
+```
+
+So: the emulator **binary** is installed, but there is **no `cmdline-tools` directory at all**, no
+system image, and no AVD. Disk is not the constraint — 765 GB free.
+
+**Why this is a blocker rather than a task.** Creating the lane needs a prior step the mission did
+not authorize: downloading and installing the *Android SDK Command-line Tools* package into
+Brandon's SDK. §3a authorizes using `sdkmanager`; it does not authorize installing the toolchain
+that provides it. That is a new SDK component on his machine, and the house rule is that machine
+changes are named and logged, not assumed.
+
+**Deliberately not worked around.** Without an AVD, S3's Keystore behaviour cannot be honestly
+verified — Robolectric does not model the Android Keystore, and the mission forbids compile-only
+claims for screens ("label exactly what ran where"). Writing the pairing screen now would produce
+precisely the unverifiable artifact B-1 already refused to produce once.
+
+**Cascade.** S4 (transport loop) needs S3's device key and an emulator to be an end-to-end claim;
+S6 (outcome marking) needs both. All three are blocked on the same one-time setup.
+
+**Smallest unblock — one checkbox, ~2 minutes.** In Android Studio: *Settings → Languages &
+Frameworks → Android SDK → SDK Tools →* tick **"Android SDK Command-line Tools (latest)"** → Apply.
+That creates `cmdline-tools\latest\bin\sdkmanager.bat`, after which §3a applies exactly as written
+and an agent can do the rest unattended:
+
+```powershell
+sdkmanager "system-images;android-36;google_apis;x86_64"
+avdmanager create avd -n careerseeker-test -k "system-images;android-36;google_apis;x86_64"
+emulator -avd careerseeker-test -no-window -no-audio
+```
+
+(Alternatively: authorize an agent to install the command-line tools package itself, and the whole
+lane becomes unattended.)
