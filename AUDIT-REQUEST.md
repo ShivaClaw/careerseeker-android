@@ -1006,3 +1006,129 @@ a run go green, which is the lesson B-3 was closed on. That step has no `if:` co
 *Expected NOT to be found:* a test count. `./gradlew ... :app:test` prints none, so anyone wanting to
 re-verify 102/0/0/3 must run the verification command of record locally with `--rerun-tasks` and read
 the XML reports. Until someone does, that number is inherited and this entry says so.
+
+---
+
+## C-MT — Merge topology, measured 2026-08-09
+
+All of these run from a clone of `ShivaClaw/careerseeker-android` with a sibling clone of
+`ShivaClaw/careerseeker`. **Run `git fetch --all --prune` in both first** — every count below is
+taken after that fetch, and the 2026-08-06 stale-refs incident is why that is rule one.
+
+### C-MT-1 — `claude/p4-pro` is the same commit as `claude/p2-replica`
+
+> **Claim.** There is no separate P4 branch to merge. The P4 Pro work is inside the `p2-replica`
+> tip, which is why no PR exists for it.
+
+```bash
+git rev-parse origin/claude/p4-pro origin/claude/p2-replica
+```
+
+*Expected:* the same SHA twice — `d9f95fd76d39a1ba8fdfe582486172c0e53ab9c0`. If these ever differ,
+`docs/Merge-Topology.md` §2 is stale and P4 needs its own row in §7.
+
+### C-MT-2 — The PR stack is a real stack
+
+> **Claim.** Each PR's base is an ancestor of its head for #3–#6, and `main` is an ancestor of
+> nothing (it has diverged, docs-only, 10 commits).
+
+```bash
+for p in claude/p1-pairing:claude/p0-scaffold claude/p2-replica:claude/p1-pairing \
+         claude/p5-store:claude/p2-replica claude/android-a0-probe:claude/p2-replica; do
+  h=${p%%:*}; b=${p##*:}
+  git merge-base --is-ancestor origin/$b origin/$h && echo "$h <- $b : stacked" || echo "$h <- $b : DIVERGED"
+done
+git rev-list --left-right --count origin/main...origin/claude/android-a0-probe
+```
+
+*Expected:* four `stacked` lines, and `10<TAB>40` for the last command (10 behind, 40 ahead).
+
+### C-MT-3 — The whole stack merges into `main` without a conflict
+
+> **Claim.** Seven of the nine branches merge into `main` cleanly, sequentially, carrying each
+> result forward. This is a simulation: it creates dangling objects only and moves no ref.
+
+```bash
+cur=$(git rev-parse origin/main)
+for s in claude/p0-scaffold claude/p1-pairing claude/p2-replica claude/p5-store \
+         claude/android-a0-probe claude/p2-runbook claude/todos-pq1-pricing; do
+  t=$(git rev-parse origin/$s)
+  out=$(git merge-tree --write-tree --name-only "$cur" "$t") \
+    && cur=$(git commit-tree "$(echo "$out" | head -1)" -p "$cur" -p "$t" -m "sim $s") \
+    && echo "$s: clean" || { echo "$s: CONFLICT"; echo "$out" | tail -n +2; }
+done
+```
+
+*Expected:* seven `clean` lines and no conflict output. Requires git ≥ 2.38 for
+`merge-tree --write-tree`; measured on 2.43.0.
+
+### C-MT-4 — Exactly one conflicting file exists in the repository
+
+> **Claim.** `claude/p1-runbook` is the only branch that conflicts, on exactly one path,
+> `docs/Monetization-Decision.md`, as an **add/add** — and the difference is a product-naming
+> decision, not formatting.
+
+```bash
+git merge-tree --write-tree --name-only origin/claude/android-a0-probe origin/claude/p1-runbook
+diff <(git show origin/claude/p1-runbook:docs/Monetization-Decision.md) \
+     <(git show origin/claude/android-a0-probe:docs/Monetization-Decision.md)
+```
+
+*Expected:* a non-zero exit naming `docs/Monetization-Decision.md` and
+`CONFLICT (add/add)`; then a two-hunk diff, 9 insertions / 12 deletions, whose whole substance is
+"CareerSeeker" vs "CareerSeeker **Basic**" and "Naming — decided" vs "Naming note (worth a decision,
+not urgent)". If the diff has grown beyond those two hunks, §5's recommendation needs re-deriving.
+
+### C-MT-5 — #5 and #6 overlap on three files and are auto-fused without conflict
+
+> **Claim.** Both branches modify the same three files since `d9f95fd`, and git merges all three
+> without asking. The overlap is real; the *conflict* is not. Both halves of that sentence matter.
+
+```bash
+mb=$(git merge-base origin/claude/p5-store origin/claude/android-a0-probe)
+comm -12 <(git diff --name-only $mb origin/claude/p5-store | sort) \
+         <(git diff --name-only $mb origin/claude/android-a0-probe | sort)
+git merge-tree --write-tree origin/claude/p5-store origin/claude/android-a0-probe > /dev/null; echo "exit=$?"
+```
+
+*Expected:* `$mb` = `d9f95fd`; exactly three paths — `ui/HomeScreen.kt`, `ui/ApplicationsScreen.kt`,
+`test/…/ScreensFromFixtureTest.kt`; and `exit=0`, meaning no textual conflict.
+
+**The claim this does NOT support:** that the fused tree is correct. It has never been built,
+tested or linted — CI runs per-branch. `docs/Merge-Topology.md` §6 says so, and §9 lists it as an
+explicit non-claim. Anyone integrating must run the verification command of record on the *merged*
+tree.
+
+### C-MT-6 — The vendored vector pin is intact
+
+> **Claim.** All 26 vendored vector files are byte-identical to upstream pin `679a317`. Upstream
+> now has 28; the gap is the two unmerged `entitlement-ack` vectors, not drift.
+
+```bash
+S=../careerseeker   # sibling clone of ShivaClaw/careerseeker
+for f in $(git ls-tree -r origin/claude/android-a0-probe --name-only | grep 'sync-vectors/v1/'); do
+  a=$(git rev-parse origin/claude/android-a0-probe:$f)
+  b=$(git -C $S rev-parse 679a317:docs/sync-vectors/v1/$(basename $f)) || echo "MISSING $f"
+  [ "$a" = "$b" ] || echo "DIFFERS $f"
+done; echo "compared: $(git ls-tree -r origin/claude/android-a0-probe --name-only | grep -c 'sync-vectors/v1/')"
+git -C $S ls-tree -r origin/claude/s5-entitlement-ack-spec --name-only | grep -c 'sync-vectors/v1/.*json'
+```
+
+*Expected:* no `DIFFERS` or `MISSING` output, `compared: 26`, and `28` upstream on the S5 branch.
+Any `DIFFERS` line is a cross-repo drift event: stop and escalate, per `VECTORS.lock`.
+
+### C-MT-7 — The relay suite passes, and it is the only gate this environment can run
+
+> **Claim.** `relay/`'s own test suite runs to green in a Linux sandbox with only Node — 32 tests,
+> 1 file. This is the sole executable gate available here; the android gate and
+> `Verify-Alpha.ps1` are **not runnable** in this environment and were not run.
+
+```bash
+cd ../careerseeker/relay && npm ci && npx vitest run
+```
+
+*Expected:* `Test Files  1 passed (1)` / `Tests  32 passed (32)`. Measured on Node v22.22.2.
+
+*Expected to remain unavailable here:* `dotnet`, `pwsh`, `sdkmanager`, `ANDROID_HOME` — all absent
+(`which` returns nothing). Any claim in this repo that depends on those is carried from another
+machine and must say so.
