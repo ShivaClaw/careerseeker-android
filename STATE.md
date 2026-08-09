@@ -9,7 +9,9 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 | **Heartbeat** | 2026-08-08T15:07:57-06:00 |
 | **Rung** | **S0 — DONE.** Next: S1 (rebase/land engine stack, main repo) |
 | **Android branch** | `claude/android-a0-probe` @ `d839e48` |
-| **Android health** | green — 99 tests / 0 failures at A7; not re-run this rung (no source touched) |
+| **Android health** | green — **CI run `31278769047` success** (vectors, `:core`, `:app`, APK, lint, no-analytics). Not re-run locally this rung; no source touched. |
+| **Draft PR** | [#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) — `a0-probe` → base `claude/p2-replica`, with self-audit |
+| **Coordination bus** | `autonomy/claude-state` created @ `01ade62` |
 | **Main-repo base of record** | `origin/main` = `3a89fb5` (gate `P0-BASE` superseded — see S-Ladder §2.3) |
 | **Terra (Codex)** | R6(b) BLOCKED, PR #26 draft, **files claimed: none** — no collision |
 
@@ -43,7 +45,7 @@ All four are 85 behind. Each: rebase → full local gate (`Verify-Alpha.ps1 -Inc
 | --- | --- |
 | B-1 pairing UI | gate `P2-KEYSTORE-FALLBACK` **answered**; device half open → S3 sets up the emulator lane |
 | B-2 no live E2E | unchanged; root cause now precisely scoped — the publisher seam lives on unmerged PR #7 |
-| B-3 vector drift check | **locally verified this rung** (26/26 byte-identical vs pin `679a317`); CI confirmation follows the push |
+| ~~B-3 vector drift check~~ | **CLOSED** — local 26/26 byte-identical vs pin `679a317`, then CI's own step confirmed it (run `31278769047`) |
 
 ## Standing pins (verify at decision time, never copy from spec)
 

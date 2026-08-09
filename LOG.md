@@ -1059,3 +1059,33 @@ Play Billing code; no email or Gmail anything; no cert-store or MSIX action; no 
 force-push and no history rewrite; no secrets read or written; no `.appdata` originals; no edits to
 `Desktop\site-v2`. Nothing was merged in either repository, and no android PR was taken out of
 draft. No android source file was edited — this rung is documentation and derivation only.
+
+### S0.10 CI confirmed B-3 after the push — the blocker is closed
+
+The push in S0.7 triggered CI run
+[`31278769047`](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31278769047)
+(6m01s, **success**). Per-step, not just per-workflow:
+
+```
+Assert :core has no Android dependency                            success
+Assert vendored sync vectors match the pinned main-repo commit    success   <-- B-3
+Unit tests (:core)                                                success
+Unit tests (:app, Robolectric)                                    success
+Assemble debug APK                                                success
+Lint                                                              success
+Assert no analytics or tracking SDKs ship                         success
+```
+
+The step list was inspected deliberately rather than reading the overall green: a *skipped* step
+also produces a green run, so "CI passed" would not have closed a blocker whose whole content was
+"this specific step has never executed." It executed, and it agrees with S0.3's local 26/26.
+
+**B-3 is closed** — the first of the three A-ladder blockers to be retired. CI also ran the full
+gate on this branch, so the alpha code is independently green on a clean Linux checkout; that is
+CI's result, not a local re-run, and S0.8's "tests not re-run" stands as written for this machine.
+
+`autonomy/claude-state` was created in the main repo (`01ade62`) as the counterpart to
+`autonomy/codex-state`, answering Terra's note that it "remained absent." One config change to
+record: my sync clone had **no git identity**, so commits there are made with a per-invocation
+`git -c user.name/user.email` matching the android repo's existing identity. Nothing was written
+to global git config, and no persistent repo config was altered.

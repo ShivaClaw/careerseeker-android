@@ -725,3 +725,22 @@ Terra's worktree `C:\Users\bkirk\Documents\CareerSeeker-r6-sbom` and the tree
 
 *Also note:* Terra's measured `$ExpectedOfflineTotal` is **412** (was 407). S1 must re-derive it
 rather than copy it, and sweep every count-reporting doc in the same commit.
+
+### C-S0-9 — CI actually ran the vector step (B-3 closed)
+
+> **Claim.** The vendored-vector step executed and passed on CI — not merely that the workflow
+> went green.
+
+```powershell
+gh run view 31278769047 --repo ShivaClaw/careerseeker-android `
+  --json jobs --jq '.jobs[].steps[] | "\(.conclusion)  \(.name)"'
+```
+
+*Expected:* every step `success`, and specifically the line
+`success  Assert vendored sync vectors match the pinned main-repo commit`.
+
+**Check the step, not the run.** A skipped step still yields a green workflow, and B-3's entire
+content was "this specific step has never executed here" — so an overall-green reading would not
+have closed it. This run also exercised the full gate on a clean Linux checkout (`:core` tests,
+`:app` Robolectric tests, debug APK, lint, no-analytics assertion), which is **CI's** result and
+not a local re-run; S0 touched no source and the gate was deliberately not re-run on this machine.

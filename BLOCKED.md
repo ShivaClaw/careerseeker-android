@@ -151,3 +151,29 @@ if vector *content* moves, that is a drift event and a hard stop.
 
 **Remaining:** CI's own run of the step, which this rung's push triggers. Downgraded from
 *blocked* to **awaiting CI confirmation**.
+
+### B-3 RESOLVED — 2026-08-08, CI confirmed
+
+The branch was pushed and CI ran. Run
+[`31278769047`](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31278769047),
+6m01s, conclusion **success**. The step that mattered is named in the job list and did not skip:
+
+```
+- Assert :core has no Android dependency                            [success]
+- Assert vendored sync vectors match the pinned main-repo commit    [success]   <-- B-3
+- Unit tests (:core)                                                [success]
+- Unit tests (:app, Robolectric)                                    [success]
+- Assemble debug APK                                                [success]
+- Lint                                                              [success]
+- Assert no analytics or tracking SDKs ship                         [success]
+```
+
+Checking the step individually rather than trusting the workflow's overall green matters here: a
+skipped step also lets a run go green, and "CI passed" would have been a weaker claim than the one
+this blocker actually needed.
+
+**B-3 is closed.** The check that could not run on this machine has now run on CI, with the
+authoritative GitHub-API fetch, and it agrees with the local blob-to-blob result (26/26).
+
+The caveat above stands and is *not* part of this blocker: the pin remains a non-ancestor of
+`origin/main`, and S1 must confirm vector content survives the rebase byte-for-byte.
