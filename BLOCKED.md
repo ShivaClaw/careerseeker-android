@@ -93,6 +93,44 @@ real `RelayClient` sink (engine work, and the parallel session's territory), **t
 Until the engine can publish, the phone has nothing to receive, and no amount of phone-side work
 changes that.
 
+### B-2 status 2026-08-09 (S2) — most of the way closed, and the rest is one screen
+
+**Engine ↔ relay is now proven end to end on this machine**, which is what B-2 said had never been
+reached. The relay ran **locally** under miniflare (no deploy); `SyncLiveSmoke` accepts the relay
+URL as an argument, so the production-relay proof ran unchanged against `127.0.0.1:8787`:
+
+```
+=== 30 passed, 0 failed ===
+```
+
+pairing · snapshot + delta · signed p2e `doc_edit` and its rejection under the wrong device key ·
+entitlement → outcome → `pull_request` in order · republished snapshot · duplicate seq refused
+(409) · unpair.
+
+The engine side of the gap is also built: `BuildSyncBridge` no longer returns `null`. A DPAPI
+pairing vault (`src/Engine/SyncPairingVault.cs`) persists the pairing, both directional keys, the
+device signing key, the relay token, the `key_id`, and **both** §6.1 sequence high-water marks; the
+seam constructs a `RelayClient`-backed publisher resuming above the persisted mark. PR
+[#31](https://github.com/ShivaClaw/careerseeker/pull/31).
+
+**Still open, and it is exactly one thing: the desktop `/pair` page.** Until it exists the vault has
+no product path to being populated, so `--sync` publishes nothing for a real user. A harness
+creating a pairing is not a person pairing a phone, and this entry will not claim otherwise.
+
+**Smallest unblock:** a `/pair` route on the local dashboard that (1) creates a `PairingManager`,
+(2) renders the invite — `PairingInvite.ToQrJson()` is the exact payload, so a QR encoder is the
+only genuinely new dependency — (3) polls `RelayClient.TakeCompletionAsync`, (4) shows the confirm
+code for the human to compare against the phone, and (5) writes `SyncPairing` to the vault. Every
+piece except the QR rendering and the route already exists and is vector-proven.
+
+**Correction to this entry's original premise.** It cited the live Worker self-reporting
+`phase: "p1"` as evidence the deployment predates P2/P4. That inference does not hold:
+`phase: 'p1'` is **hard-coded at `relay/src/index.ts:47`**, so current source reports the same
+string — the local instance did too. A redeploy may still be wanted, but this is not the evidence
+for it; use the deployed script hash or add a build stamp.
+
+---
+
 **Status update 2026-08-08 (S0).** Still blocked, but the root cause is now measured rather than
 inferred, and the engine side is now *this* agent's territory (mission §4) rather than a parallel
 session's.

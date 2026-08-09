@@ -1223,3 +1223,185 @@ C# sync sources are in `main`, and the phone's vendored vectors are byte-identic
 | S0 re-entry + derivation | **DONE** |
 | S1 land the engine sync track | **DONE** — 4 PRs merged, 0 vector drift |
 | S2 engine publishes for real | **NEXT** — B-2 still open, seam now specified |
+
+---
+
+## S2 — The engine can publish for real · 2026-08-09 · **PARTIAL** (B-2 still open)
+
+Engine-side rung, logged here because B-2 lives in this repo's `BLOCKED.md`. PR
+[#31](https://github.com/ShivaClaw/careerseeker/pull/31) in `careerseeker`.
+
+### S2.1 End-to-end against a local relay — the proof B-2 has been waiting for
+
+The relay was run **locally** under miniflare (Durable Object in local mode), never deployed:
+
+```
+cd relay && npm ci && npx wrangler dev --port 8787 --local
+dotnet run --project tests/SyncLiveSmoke -c Release -- http://127.0.0.1:8787
+
+=== 30 passed, 0 failed ===
+```
+
+`SyncLiveSmoke` takes the relay URL as `args[0]`, so the *same* proof that was written for the
+production relay runs against a local one with no deploy and no embargo problem. The run covers
+pairing, snapshot + delta round-trip, a signed p2e `doc_edit` **and its rejection under the wrong
+device key**, entitlement → outcome → `pull_request` dispatch in order, a republished snapshot, the
+relay refusing a duplicate seq (409), and unpair.
+
+This is the first time in the program that engine ↔ relay has been demonstrated end to end on this
+machine.
+
+### S2.2 The vault, and why its two counters are correctness
+
+`src/Engine/SyncPairingVault.cs` — DPAPI-backed, current-Windows-user scoped, holding the pairing,
+both directional keys, the device signing key, the relay token, the `key_id`, and both sequence
+high-water marks. `BuildSyncBridge` now loads it and constructs a `RelayClient`-backed publisher
+with `startSeq` = the persisted mark.
+
+§6.1 applies in both directions, and getting it wrong fails **silently**:
+
+- resuming **e2p** at 1 → every envelope the engine sends is rejected as a replay, *including the
+  recovery snapshot*. The phone stops updating while the engine logs success.
+- resuming **p2e** at 0 → an already-applied entitlement or outcome is applied again.
+
+So the record methods are monotonic by construction: a lower seq is ignored, never written. Seven
+EngineHarness assertions cover round-trip, advance, ignore-lower, equal-value, no-key-leak in
+`Describe`, partial-vault-loads-as-nothing, and delete.
+
+### S2.3 A standing assumption, corrected
+
+The mission (and `BLOCKED.md` B-2) treat the live Worker's
+`{"ok":true,"protocol":1,"phase":"p1"}` as evidence that it predates P2/P4. **It is not.**
+`phase: 'p1'` is hard-coded at `relay/src/index.ts:47` — the *current* source reports exactly the
+same string, as the local instance did. Whether the deployed Worker is stale must be established
+some other way (deployed script hash, or a build stamp added to the response). The redeploy may
+still be wanted; the health string is simply not the evidence for it.
+
+### S2.4 Why B-2 is not closed
+
+**The desktop `/pair` page does not exist.** Until it does, the vault has no product path to being
+populated, so `--sync` still publishes nothing for a real user. The handshake itself is complete
+and vector-proven, and S2.1 exercises it end to end — but a harness creating a pairing is not a
+person pairing a phone.
+
+I stopped at the page rather than rush a UI I could only partially verify. The remaining work is
+specified precisely in `BLOCKED.md` B-2.
+
+### S2.5 Verification and boundary
+
+```
+scripts\Verify-Alpha.ps1 -IncludePublish -IncludePackage  ->  PS_EXIT=0
+Offline total: 598 passed, 0 failed   (EngineHarness 210 -> 217)
+dotnet build -c Release  ->  0 Warning(s), 0 Error(s)
+```
+
+No deploy of any kind. The **production** relay was not contacted at all this rung — every request
+went to `127.0.0.1:8787`, and the local process was stopped afterwards (port confirmed free). The
+one machine change was `npm ci` in `relay/` (dependencies installed locally; `node_modules` is
+gitignored). No Google/Play/OAuth console, no accounts, no purchases, no Gmail, no secrets read or
+printed, no `.appdata` originals, no `Desktop\site-v2`, no force-push, no history rewrite. Nothing
+in the android repo changed except these records.
+
+---
+
+# HANDOFF — unattended window, 2026-08-08/09
+
+Written at the end of this session's capacity, not at the end of the ladder. **S0–S2 ran; S3–S8 did
+not start.** This entry says so plainly rather than reporting a ladder that was not climbed.
+
+## Ladder status — honest
+
+| Rung | Status | Evidence |
+| --- | --- | --- |
+| **S0** re-entry + derivation | **DONE** | `LOG.md` §S0, `docs/S-Ladder.md`, `AUDIT-REQUEST.md` C-S0-1…9 |
+| **S1** land the engine sync track | **DONE** | §S1, C-S1-1…6; PRs #27–#30 merged |
+| **S2** engine publishes for real | **PARTIAL** — B-2 narrowed to one screen | §S2; PR #31 merged |
+| **S3** pairing screen | **NOT STARTED** | — |
+| **S4** transport loop | **NOT STARTED** | — |
+| **S5** entitlement ack | **NOT STARTED** | — |
+| **S6** outcome marking (phone) | **NOT STARTED** | — |
+| **S7** Play-readiness pack | **NOT STARTED** | — |
+| **S8** hardening | **NOT STARTED** | — |
+
+**S3–S8 are not "blocked".** Nothing external stopped them; the session's capacity went into S0–S2.
+Recording them as BLOCKED would imply an obstacle that does not exist, and would send the next
+session hunting for it. Each has a precise next action below.
+
+## What actually changed
+
+**The roadmap was unblocked.** S0 measured that the entire engine sync track was absent from
+`careerseeker`'s `main` — 0 path matches for `relay/`, `src/Sync/`, `Sync-Protocol`,
+`sync-vectors/`, `SyncHarness`. It is now **54**. S2, S4, S5 and S6 had all been specified against
+files that were not on any branch anyone would build from.
+
+**Engine ↔ relay works end to end on this machine** — 30/30 against a local miniflare relay, no
+deploy. That is what B-2 said had never been reached.
+
+**Two A-ladder blockers moved.** B-3 is **closed** (CI ran the vendored-vector step; 26/26
+byte-identical to pin `679a317`). B-2 is narrowed from "the engine has no publisher" to "there is no
+`/pair` page". B-1's gate is answered and it is scheduled at S3.
+
+## PR stack
+
+**`careerseeker` (merged by me, per this window's policy):** #27 `7f3e61e` → #28 `f0b9bd5` →
+#29 `160b317` → #30 `a8ef552` → #31 `00b3705`. Originals #5–#8 **closed as superseded** (force-push
+embargoed, so each was re-cut rather than rewritten; **no branch deleted**, which keeps pin
+`679a317` reachable). Each PR carries its own self-audit section.
+
+**`careerseeker-android` (never self-merge):** PR
+[#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) opened as a **draft** with a
+self-audit; #1–#5 left untouched drafts. **Nothing in this repo was merged.**
+
+## The three things most worth distrusting
+
+1. **`Host.cs` was merged by hand, twice.** Two independently-evolved designs were fused: main's
+   backoff/pause/runtime-status wiring, the sync publish-after-cycle tick, and P4's Pro seam. The
+   gate proves it compiles and 598 assertions pass. It does not prove I preserved each side's intent
+   exactly. Read the `EngineHost` constructor and `LocalDashboard`'s signature first.
+2. **A green build proved nothing about the worst bug found.** P4's Pro assertions hit a hard-coded
+   `localhost:7777` while main had moved to a free port; it compiled perfectly and then killed the
+   whole harness with an unhandled `TaskCanceledException`. Only *running* the harnesses surfaced it.
+3. **Doc resolutions dropped whatever only the stale branch knew.** Five docs were resolved to
+   main's text wholesale, four times over. The code and vectors merged cleanly; the judgement calls
+   are all in prose.
+
+## HUMAN-QUEUE — for return day
+
+1. **Android two-lineage merge decision — Brandon only.** `main` is docs-only and has *diverged*
+   (10/23, not an ancestor). `claude/android-a0-probe` and `claude/p5-store` are **siblings** off
+   `d9f95fd`, colliding on exactly three files (`HomeScreen.kt`, `ApplicationsScreen.kt`,
+   `ScreensFromFixtureTest.kt` — *not* `ApplicationDetailScreen.kt`). Flagged, never resolved.
+2. **Relay redeploy — but not for the stated reason.** `phase: "p1"` is hard-coded at
+   `relay/src/index.ts:47`, so the live Worker reporting it is **not** evidence of staleness. If a
+   redeploy is wanted, establish staleness from the deployed script hash, and consider adding a build
+   stamp so this question is answerable next time. Deploys were embargoed all window.
+3. **Confirm `purchaseState == 0` against a real purchase.** It means *purchased* in the raw
+   `original_json`; the runbook's "(1)" is the `getPurchaseState()` API enum, a different layer. It
+   is a named constant. If it is wrong, entitlement is wrong.
+4. **Re-pin the android's vendored vectors to a `main` commit.** Pin `679a317` is now
+   content-identical to `main` (26/26) but still names a non-`main` commit. Tidiness, not
+   correctness — and it must be done by comparing content, never by assuming.
+
+## Next actions, in the order I would take them
+
+- **Finish S2:** the `/pair` route. `PairingInvite.ToQrJson()` is the exact payload, so a QR encoder
+  is the only genuinely new dependency; poll `TakeCompletionAsync`, show the confirm code, write
+  `SyncPairing` to the vault. Everything else exists and is vector-proven. **This closes B-2.**
+- **S3** needs the emulator lane first (`sdkmanager` + AVD is explicitly permitted, §3a) — Keystore
+  cannot be modelled by Robolectric, and compile-only claims are forbidden.
+- **S4** then has a rig: engine ↔ local relay ↔ emulator on `10.0.2.2`. The local-relay half is
+  already proven.
+
+## Boundary — what was never touched
+
+No deploys of any kind (Cloudflare, Workers, relay, site, Pages). The **production relay was
+contacted zero times** this window — the only relay traffic went to `127.0.0.1:8787`, and that
+process was stopped (port confirmed free). `Documents\CareerSeeker` and Terra's
+`CareerSeeker-r6-sbom` worktree were never read from or written to. No Google, Play, OAuth or
+Console action; no accounts, no purchases, no Play Billing code beyond the signed test vectors; no
+email or Gmail anything; no cert-store or MSIX signing; no reboot; no force-push; no history
+rewrite; no branch deletion; no secrets read, written or printed; no `.appdata` originals; no edits
+to `Desktop\site-v2`. No android PR was merged or taken out of draft. `SyncLiveSmoke` was never run
+against the production relay. One machine change: `npm ci` in `relay/` (gitignored). One config
+note: my sync clone has no git identity, so its commits use a per-invocation `git -c` — `git config`
+writes are blocked by the permission classifier, and hand-editing `.git/config` would defeat that.
