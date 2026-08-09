@@ -1681,3 +1681,154 @@ suite are green; it does not re-prove the number, and the number is not upgraded
 
 Nothing in this iteration touched Kotlin, so a green result was expected. It is recorded because
 "expected" is not evidence, which is the whole point of the house rule.
+
+---
+
+## Merge topology — the S0 derivation finished with measurements · 2026-08-09 · **COMPLETE**
+
+### Why this slice, and not a rung
+
+The scheduled prompt for this iteration assigned S5's first half: amend §4.3 with the
+`entitlement_ack` body, add the vector via `generate.mjs`, close PQ-A2-1/-2/-3. **That work was
+already done** — by the previous iteration, earlier the same day, on
+`claude/s5-entitlement-ack-spec` (careerseeker draft [#32](https://github.com/ShivaClaw/careerseeker/pull/32),
+two commits). The prompt was stored before that session ran. Re-doing it would have duplicated a
+draft PR and put two branches on the same three files.
+
+So the rung had to be re-picked, and every candidate above it needs a toolchain this environment
+does not have. Measured, not assumed:
+
+```
+node v22.22.2 · npm 10.9.7 · java present · python3 present
+dotnet ABSENT · pwsh ABSENT · sdkmanager ABSENT · ANDROID_HOME unset
+```
+
+- **S5's second half** (both appliers) — C# and Kotlin. No compiler. Explicitly out of scope per the
+  prompt, and per `docs/protocol-questions.md`'s own rule.
+- **S2's remainder** (the `/pair` route) — a C# dashboard page plus a new QR-encoder dependency.
+- **S3/S4/S6** — B-4, unchanged.
+- **B-6** (the `invalid-unknown-field` vector) — I checked whether it could be added here under its
+  own `type` so no consumer picks it up, since that is exactly how the `entitlement-ack` vectors
+  landed. **`BLOCKED.md` B-6 had already considered and rejected that**, and is right: it would make
+  the suite *look* like it covers a §3 MUST while enforcing nothing, which is the failure PQ-A2-3
+  was raised about. Not attempted.
+- **S7's store pack** — I got as far as reading the source material before finding
+  `docs/S7-Release-Signing.md` §4: the listing copy, data-safety dossier, privacy delta and account-
+  day checklist already exist on `claude/p5-store`, and the pricing rewrite exists on
+  `claude/todos-pq1-pricing` as `docs/todo/Pricing-Page-Rewrite.md`. Creating them here would have
+  duplicated five files onto a second branch — the exact conflict S7 deliberately avoided
+  manufacturing. **Not created.**
+
+What was left is a thing this environment can do completely and honestly: **replace the
+merge-hazard prediction with a measurement.** git needs no SDK.
+
+### MT.1 The prediction that has been steering decisions since S0
+
+S0 recorded a "two-lineage merge hazard" and predicted that `p5-store` would collide with the
+records lineage on `HomeScreen`/`ApplicationsScreen`/`ApplicationDetailScreen`. That prediction has
+been load-bearing ever since — S7 declined to create `docs/store/` *because* of it. Three weeks of
+decisions rested on something nobody had run.
+
+It is now run. `docs/Merge-Topology.md` is the result; `AUDIT-REQUEST.md` C-MT-1…7 re-verifies every
+number in it.
+
+### MT.2 The whole stack merges clean, and that is the finding
+
+Simulating the real integration — `git merge-tree --write-tree`, the same ort strategy `git merge`
+uses, each result carried forward as the base for the next:
+
+```
+main ebfaf81 ← p0-scaffold : clean   ← p1-pairing : clean   ← p2-replica : clean
+             ← p5-store    : clean   ← a0-probe   : clean
+             ← p2-runbook  : clean   ← todos-pq1-pricing : clean
+             ← p1-runbook  : CONFLICT (1 file)
+```
+
+Seven of eight clean. The integrated tree was inspected and contains `app/`, `core/`, the full
+`docs/store/` dossier, the pricing rewrite, and this branch's records — nothing was silently
+dropped. **No ref was created, moved or pushed:** the simulation writes dangling objects only.
+
+Two structural facts fell out that were not previously recorded:
+
+- **`claude/p4-pro` and `claude/p2-replica` are the same commit** (`d9f95fd`). There is no separate
+  P4 branch and no P4 PR because the P4 work is already in the `p2-replica` tip. Written down so
+  nobody spends an hour looking for it.
+- **Every branch is exactly 10 behind `main`**, and those 10 are docs-only. Merging *into* `main`
+  absorbs that. Nothing needs a rebase; nothing needs a force-push.
+
+### MT.3 The one conflict is a product decision wearing a diff
+
+`docs/Monetization-Decision.md`, add/add: `p0-scaffold` and `p1-runbook` each created the path
+independently. Nine insertions, twelve deletions, two hunks, one question:
+
+| | `a0-probe` lineage | `p1-runbook` |
+| --- | --- | --- |
+| Price table | "**CareerSeeker Basic** (.exe)" | "**CareerSeeker** — *the product*, not a tier" |
+| §3 heading | "Naming note (worth a decision, not urgent)" | "Naming — **decided** 2026-07-23" |
+
+The branch carrying all the recent work — this one — still says the naming question is open and
+still prints "Basic" in the price table, while `p1-runbook` records it as closed and rejected,
+because a tier name implies withheld features and contradicts the pricing page's strongest promise.
+The store listing derives from this table. Resolving by taking either side silently would re-open a
+closed decision or quietly close an open one, which is why this is in the human queue rather than
+fixed here.
+
+### MT.4 The real hazard is the clean merge, not the dirty one
+
+`p5-store` (#5) and `a0-probe` (#6) fork at `d9f95fd` and both modify the same three files —
+`HomeScreen.kt` (+11/−2 vs 0/−1), `ApplicationsScreen.kt` (+19/−2 vs +27/−0),
+`ScreensFromFixtureTest.kt` (+53/−0 vs +32/−2). Git fuses all three **without asking**.
+
+So the earlier HUMAN-QUEUE entry was right about *overlap* and imprecise about *conflict*, and the
+correction is not reassuring. Two independently-evolved sets of screen edits and two independently-
+written test sets get merged by a strategy with no opinion about whether the result is coherent, and
+**no gate has ever run on the fused tree** — CI runs per-branch. This repo already has the precedent
+in its own "three things most worth distrusting": P4's Pro assertions compiled perfectly and then
+killed the harness on a hard-coded port. A clean merge is not a passing gate, and whoever integrates
+must run the verification command of record on the *merged* tree.
+
+The prediction was also wrong in one detail worth correcting: `ApplicationDetailScreen.kt` is **not**
+among the overlapping files.
+
+### MT.5 Two integrity checks, run because they were cheap and load-bearing
+
+**The vendored vector pin holds.** Blob-by-blob against `679a317`: **26 identical, 0 differing, 0
+missing.** Upstream is now 28 files — the two `entitlement-ack` vectors from the unmerged #32. The
+26/28 gap is the pin working, not drift.
+
+**The relay suite is the one gate this environment can run, and it is green.** `npm ci` +
+`npx vitest run` in `careerseeker/relay`: **32 passed, 1 file, 2.58s**, on Node v22.22.2. Recorded
+because it is the only executable evidence available from a Linux sandbox, and because the relay's
+storage-schema test is what backs the data-safety dossier's "the relay stores ciphertext it cannot
+read" claim — a compliance declaration that should rest on a run, not a reading. Also re-ran
+`node docs/sync-vectors/generate.mjs --check` on the S5 branch: `OK: 28 vector files match the
+generator.`
+
+### MT.6 What this iteration did not establish
+
+The android gate and `Verify-Alpha.ps1` were **not run** — there is no Android SDK, JBR, Gradle,
+.NET or PowerShell here, and no emulator. Nothing in this entry claims otherwise. The integrated
+tree of MT.2 has never been compiled by anyone; `git merge-tree` reports textual conflicts and is
+blind to two branches editing different files that must agree, which is the entire class the
+doc/verifier drift trap exists for. `STATE.md`'s 102/0/0/3 test counts remain carried, not
+re-measured.
+
+No new blocker was opened: nothing here is blocked. The merge decisions are Brandon's by policy,
+not by obstacle, and they are queued below rather than filed in `BLOCKED.md` — calling a decision a
+blocker sends the next session hunting for a phantom.
+
+### Boundary — what was not touched
+
+**Nothing was merged, rebased, retargeted, force-pushed or deleted, in either repo.** No branch was
+created or moved; the merge simulation produced dangling objects only and left every ref where it
+found it. PR #6 stays a draft and #1–#5 were not touched; careerseeker #32 stays a draft and was not
+merged. No `.cs`, `.kt`, `.ts` or Gradle file was modified anywhere — this slice is one new document
+and records. No existing vector's bytes were changed and nothing was re-vendored. `docs/store/` was
+deliberately **not** created here. No deploys of any kind (Cloudflare, Workers, relay, site, Pages);
+**the production relay was contacted zero times** — not even `/v1/health`; the only relay code that
+ran was `vitest` against miniflare in-process. No emulator, no `sdkmanager`, no machine change
+beyond `npm ci` in `relay/` (gitignored). No Google, Play, OAuth or Console action; no accounts, no
+purchases, no Play Billing code; no email or Gmail anything; no cert-store, MSIX or keystore action —
+the upload keystore and its password file were neither read nor referenced beyond their paths. No
+secrets read, written or printed. Terra's worktree and `Documents\CareerSeeker` are on a machine
+this session cannot reach at all.

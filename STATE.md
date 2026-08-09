@@ -6,8 +6,9 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 
 | | |
 | --- | --- |
-| **Heartbeat** | 2026-08-09 (S5 first half — cloud iteration, Linux sandbox) |
+| **Heartbeat** | 2026-08-09 (merge topology measured — cloud iteration, Linux sandbox; second run of the day) |
 | **Android branch** | `claude/android-a0-probe` — pushed, draft [PR #6](https://github.com/ShivaClaw/careerseeker-android/pull/6) with self-audit. **10 behind `main`** (docs-only commits, no overlap with this branch's files); left as found — merging `main` in would reshape PR #6's diff and is not this slice |
+| **Merge topology** | **measured, not predicted** — [`docs/Merge-Topology.md`](docs/Merge-Topology.md). The whole stack merges into `main` **clean**; exactly **one** conflicting file repo-wide (`docs/Monetization-Decision.md`, add/add, a naming *decision*). `p4-pro` == `p2-replica` (`d9f95fd`) — no separate P4 branch exists. Re-verify: `AUDIT-REQUEST.md` C-MT-1…7 |
 | **Android health** | **green on CI at `53710a6`** — [run 31292342258](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31292342258), success: vendored-vector step, `:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug` all `BUILD SUCCESSFUL`, plus *"OK: no analytics or tracking SDKs on the release classpath."* **Not run by me** — no Android SDK/JBR/Gradle on this machine. The **102 / 0 / 0 / 3** test *counts* remain carried from the S8 local run: Gradle does not print counts, so CI proves green, not the number |
 | **Main-repo base of record** | `origin/main` = `00b3705` (gate `P0-BASE` superseded — S-Ladder §2.3) |
 | **Main-repo PRs merged** | #27 `7f3e61e` · #28 `f0b9bd5` · #29 `160b317` · #30 `a8ef552` · #31 `00b3705` |
@@ -28,7 +29,7 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 | **S4** transport loop | **BLOCKED — B-4** | needs S3's device key + an emulator for the claim to be E2E |
 | **S5** entitlement ack | **PARTIAL** | **spec + vectors DONE** (PR #32 draft): §4.3.3 body, PQ-A2-1 + PQ-A2-2 closed, 2 vectors, CI green. **Appliers NOT written** — no .NET, no Android SDK here. PQ-A2-3 → **B-6** |
 | **S6** outcome marking (phone) | **BLOCKED — B-4** | needs S3 + S4 |
-| **S7** Play-readiness pack | **PARTIAL** | upload keystore generated (§3b); Play floor **re-verified live**; `versionCode` scheme recorded → `docs/S7-Release-Signing.md`. No `.aab`, no Console action; screenshots need B-4 |
+| **S7** Play-readiness pack | **PARTIAL** | upload keystore generated (§3b); Play floor **re-verified live**; `versionCode` scheme recorded → `docs/S7-Release-Signing.md`. Listing copy, data-safety dossier, privacy delta, account-day checklist and assets **already exist on `claude/p5-store`**; pricing rewrite on `claude/todos-pq1-pricing` — *not* duplicated here. No `.aab`, no Console action; screenshots need B-4 |
 | **S8** hardening | **PARTIAL / BLOCKED — B-5** | migration test written; Room 2.8.4 cannot open a file-backed DB under Robolectric. Lint hold, full gate, bundle refresh **done** |
 
 **S3, S4 and S6 are blocked on one checkbox** — Android Studio → SDK Tools → *Android SDK
@@ -79,8 +80,29 @@ next three items are all local-session work.
    `invalid-unknown-field` vector. In that order — the reverse turns CI red.
 
 **Do not re-vendor the shared vectors casually.** Upstream is now 28 files, this repo is pinned at
-26 (`679a317`). That is not drift — the pin is a deliberate contract — and a re-vendor should happen
-in the same slice as the Kotlin applier that consumes the new files, not on its own.
+26 (`679a317`) and **verified 26/26 byte-identical 2026-08-09** (C-MT-6). That is not drift — the
+pin is a deliberate contract — and a re-vendor should happen in the same slice as the Kotlin applier
+that consumes the new files, not on its own.
+
+## For return day — decisions, not blockers
+
+Queued here rather than in `BLOCKED.md`: nothing below is obstructed, each is Brandon's call by
+policy. Full derivation in [`docs/Merge-Topology.md`](docs/Merge-Topology.md).
+
+1. **The product name, and it is on the critical path for the store listing.** The one merge
+   conflict in the repo is `docs/Monetization-Decision.md`: `p1-runbook` records "the Windows app is
+   **CareerSeeker**, not *Basic*" as **decided 2026-07-23**; the lineage carrying all recent work
+   (this branch) still calls it an open suggestion and still prints "CareerSeeker **Basic**" in the
+   price table. `docs/store/Play-Listing.md` derives from that table. Recommended: take the
+   `p1-runbook` side, then grep the store copy for "Basic" before submission.
+2. **Merge order** — `docs/Merge-Topology.md` §7. Nothing needs a rebase or a force-push; every
+   branch is 10 behind `main` and merging *into* `main` absorbs it.
+3. **Run the full gate on the merged tree, not on the branches.** #5 and #6 auto-fuse three screen
+   files with no conflict and **no gate has ever run on the combination** (§6). This is the
+   `Host.cs` failure mode, and P4's hard-coded-port bug is the precedent: a clean merge is not a
+   passing gate.
+4. **Whether #3–#6 should be retargeted at `main`** as the stack lands, rather than at sibling
+   branches.
 
 `--sync` stays default OFF (opt-in, privacy-load-bearing per `docs/Sync-Consent-Copy.md`).
 
