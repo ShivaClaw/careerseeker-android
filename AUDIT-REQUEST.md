@@ -852,3 +852,134 @@ git -C $S show origin/main:src/Engine/EngineSyncBridge.cs | Select-String -Conte
 *Expected:* the flag flips **only** after a successful push (`if (ok) Volatile.Write(...)`), with the
 2026-07-24 audit-finding comment intact. A failed first snapshot is retried and never demoted to a
 delta — which is what stops a fresh phone merging deltas into demo fixture rows.
+
+---
+
+## S5 (first half) — entitlement_ack spec + vectors (2026-08-09)
+
+`$S` is a clone of `ShivaClaw/careerseeker`; the branch under test is
+`origin/claude/s5-entitlement-ack-spec` (draft PR #32). Every command below was executed this
+session unless the entry says otherwise, and where it says otherwise it says so in the *Expected*
+line.
+
+### C-S5-1 — The vectors are reproducible, and not hand-written
+
+> **Claim.** `entitlement-ack` and `entitlement-ack-no-order-id` are generator output, byte-for-byte
+> reproducible by anyone.
+
+```bash
+git -C $S checkout origin/claude/s5-entitlement-ack-spec
+node docs/sync-vectors/generate.mjs --check
+```
+
+*Expected:* `OK: 28 vector files match the generator.`, exit 0. A regenerate-then-check
+(`node docs/sync-vectors/generate.mjs && node docs/sync-vectors/generate.mjs --check`) must print
+`Wrote 28 files to docs/sync-vectors/v1/ (9 valid, 18 invalid).` and leave the working tree clean —
+if it does not, a vector was hand-edited.
+
+### C-S5-2 — The change is additive: no existing vector's bytes moved
+
+> **Claim.** All 25 pre-existing vector files are byte-identical to `origin/main`. `index.json` is
+> the only existing file that changed, and only by two appended entries. This is the check that
+> would catch a cross-repo drift event.
+
+```bash
+cd $S && git checkout origin/claude/s5-entitlement-ack-spec
+for f in docs/sync-vectors/v1/*.json; do
+  git cat-file -e origin/main:$f 2>/dev/null || { echo "NEW: $f"; continue; }
+  [ "$(git rev-parse origin/main:$f)" = "$(git hash-object $f)" ] || echo "CHANGED: $f"
+done
+git diff origin/main...HEAD -- docs/sync-vectors/v1/index.json
+```
+
+*Expected:* exactly two `NEW:` lines (`entitlement-ack.json`, `entitlement-ack-no-order-id.json`),
+**zero `CHANGED:` lines**, and an `index.json` diff that is purely two appended array entries with
+no deletions. Measured: 25 unchanged, 0 changed. **Any `CHANGED:` line other than `index.json` is a
+drift event and a hard stop** — this repo vendors those bytes.
+
+### C-S5-3 — This repo's vendored vectors are untouched, and its pin still holds
+
+> **Claim.** Adding vectors upstream did not disturb the vendored copies pinned at `679a317`.
+
+```powershell
+git -C . diff --stat origin/main -- core/src/test/resources/sync-vectors/
+git -C . show origin/claude/android-a0-probe:core/src/test/resources/sync-vectors/VECTORS.lock
+```
+
+*Expected:* no diff under `core/src/test/resources/sync-vectors/` from this iteration, and the lock
+still naming `679a317`. This repo's CI step compares vendored files against **that pin**, not
+against upstream `main`, so upstream growing by two files cannot fail it. Seeing the new vectors
+here requires a deliberate re-vendor, which this iteration did not do.
+
+### C-S5-4 — The vectors decrypt, independently of the generator that made them
+
+> **Claim.** Both ciphertexts open to the stated plaintext under the published key/nonce/AAD, carry
+> no `sig` (they are `e2p`), and reject a tampered AAD.
+
+```bash
+node - <<'JS'
+const { createDecipheriv } = require('node:crypto'), { readFileSync } = require('node:fs');
+const unb64u = s => Buffer.from(s.replace(/-/g,'+').replace(/_/g,'/'), 'base64');
+for (const n of ['entitlement-ack','entitlement-ack-no-order-id']) {
+  const v = JSON.parse(readFileSync(`docs/sync-vectors/v1/${n}.json`,'utf8'));
+  const c = unb64u(v.ciphertext_b64u);
+  const d = createDecipheriv('aes-256-gcm', Buffer.from(v.key_hex,'hex'), unb64u(v.nonce_b64u));
+  d.setAAD(Buffer.from(v.aad,'ascii')); d.setAuthTag(c.subarray(c.length-16));
+  const pt = Buffer.concat([d.update(c.subarray(0,c.length-16)), d.final()]).toString('utf8');
+  console.log(n, pt === JSON.stringify(v.plaintext_json), v.envelope_json.sig === undefined);
+}
+JS
+```
+
+*Expected:* `true true` for both. Measured: both open, `kind` is `entitlement_ack`, `order_id`
+present in the first and absent in the second, neither envelope carries `sig`, the AAD reconstructs
+from the envelope header, and a `dir=e2p`→`dir=p2e` AAD tamper breaks the tag on both.
+
+### C-S5-5 — The engine gate ran, and the offline pin did not need to move
+
+> **Claim.** SyncHarness stayed at 130 assertions and `$ExpectedOfflineTotal` held at 598, so no
+> count-reporting doc needed the drift-trap sweep. **I did not run this** — there is no .NET on the
+> machine this iteration ran on. CI on `windows-latest` is the gate of record.
+
+```bash
+gh run view 31292158471 --repo ShivaClaw/careerseeker --log | rg 'Offline total|=== 130 passed'
+# or, without gh:
+#   open https://github.com/ShivaClaw/careerseeker/actions/runs/31292158471
+```
+
+*Expected, and measured from the job log:*
+
+```
+=== 130 passed, 0 failed ===
+=== Offline total: 598 passed, 0 failed ===
+CareerSeeker alpha verification complete.
+```
+
+Job conclusion **success**. The reason it holds is checkable independently of the run: both
+consumers filter vectors on `type == "envelope"`, and that partition is unchanged at 18 envelope /
+2 pairing / 5 entitlement before and after —
+
+```bash
+node -e 'const i=require("./docs/sync-vectors/v1/index.json");
+  const c={}; i.vectors.forEach(v=>c[v.type]=(c[v.type]||0)+1); console.log(c)'
+```
+
+*Expected:* `{ envelope: 18, pairing: 2, entitlement: 5, entitlement_ack: 2 }`, with the first three
+matching `origin/main`'s index. The two new vectors are invisible to every harness loop, which is
+why the count did not move.
+
+### C-S5-6 — The new vectors are specified, not implemented (the claim NOT to over-read)
+
+> **Claim.** Nothing asserts against `entitlement-ack` yet, in either language, and the phone still
+> cannot reach an unlocked state.
+
+```powershell
+git -C $S grep -n 'entitlement_ack' -- src tests        # engine: no applier branch
+git -C . grep -rn 'afterEngineAck'                      # phone: contract exists, no caller
+```
+
+*Expected:* in the engine, `entitlement_ack` appears in `Protocol.cs`'s `ShippingKinds` and nowhere
+else that acts on it. On the phone, `ProState.afterEngineAck` is defined and **called only from its
+own unit test** — no applier branch calls it. `Sync-Protocol.md` §10.2 states this in the spec
+itself. If a future session finds a caller without a corresponding gate run, that is the drift this
+entry exists to catch.

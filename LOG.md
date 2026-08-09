@@ -1504,3 +1504,154 @@ hazard.
 No deploys. The production relay was not contacted. No Console, account, purchase, Gmail, or
 cert-store action; no secrets printed; no force-push or history rewrite; nothing merged in the
 android repo. The keystore and its password file live outside every repository and are not tracked.
+
+---
+
+## S5 (first half) — the entitlement_ack body exists, and three questions are answered · 2026-08-09
+
+Taken because S5 was the one rung on the ladder that was **neither done nor blocked**, and because
+its first half — spec plus generated vectors — is the only S5 work that can be honestly verified
+from a Linux sandbox with no Android SDK, no .NET, no emulator and no Windows. S3/S4/S6 are still
+B-4; S2's remainder is a `/pair` page in a C# dashboard I cannot build. The appliers, which are the
+second half of S5, are deliberately not here.
+
+Landed as draft [careerseeker#32](https://github.com/ShivaClaw/careerseeker/pull/32) on
+`claude/s5-entitlement-ack-spec`, two commits. Nothing in this repo's code changed; this repo's
+changes are records and `docs/protocol-questions.md`.
+
+### S5.1 PQ-A6-1 — `entitlement_ack` had a name and no body
+
+Gate answered default-proceed (Brandon, 2026-08-07) with exactly the body PQ-A6-1 proposed.
+`docs/Sync-Protocol.md` §4.3.3 now defines `{product_id, acknowledged_at, order_id?}` and pins three
+things an implementer would otherwise guess:
+
+- **`acknowledged_at` is advisory** (§6.3) and MUST NOT expire or re-lock an entitlement. An unlock
+  that lapsed because two clocks disagreed would be indistinguishable from a revocation nobody
+  performed.
+- **`order_id` is optional and carries no authorisation weight.** An ack without it is complete.
+- **There is no negative form.** A rejected receipt produces an `error`, never an ack with a failure
+  flag inside it. This is the one payload that turns a paid feature on, and a kind whose meaning
+  depends on reading a field inside the body is the parser mistake §4.2 exists to avoid.
+
+One confirmation worth having: the phone's existing contract already takes exactly this shape.
+`ProState.afterEngineAck(productId, acknowledgedAt)` (`core/.../ProState.kt:52`) was written at A6
+against PQ-A6-1's *suggested* body, and the gate answer landed on the same two required fields — so
+§4.3.3 and the phone's unlock contract agree without either side moving. That is luck confirming a
+guess, not evidence the applier works; there is still no caller.
+
+### S5.2 Two vectors, because optionality belongs in an artifact and not in prose
+
+`entitlement-ack` carries `order_id`; `entitlement-ack-no-order-id` does not; both are valid. An
+implementation that requires the field now fails on a vector rather than in a support ticket about
+an unlock that never happened. `entitlement-ack`'s `order_id` matches `entitlement-valid`'s, so the
+two read as one story: that receipt, acknowledged.
+
+```
+$ node docs/sync-vectors/generate.mjs
+Wrote 28 files to docs/sync-vectors/v1/ (9 valid, 18 invalid).
+$ node docs/sync-vectors/generate.mjs --check
+OK: 28 vector files match the generator.
+```
+
+Verified **independently of the generator**, because a generator agreeing with itself proves
+nothing: a standalone script reading only the published files re-opened both ciphertexts from
+`key_hex` + `nonce_b64u` + `aad`, matched `plaintext_json` exactly, confirmed the AAD reconstructs
+from the envelope header, confirmed neither `e2p` envelope carries `sig`, and confirmed that
+flipping one AAD field breaks the tag. `ALL OK`, exit 0.
+
+### S5.3 The finding: a new *valid* `e2p` envelope vector cannot be added at all
+
+This was not anticipated by the mission and is the most useful thing this iteration produced.
+
+The `envelope` vectors are fed through **one receiver in sequence order** — valid first, then
+invalid. The valid `e2p` vectors occupy seq 1–4, and every invalid `e2p` vector sits above them
+depending on the high-water mark staying at **4**. A new valid vector needs `seq > 4` to be accepted
+at all, and `seq < 5` to leave `invalid-truncated-tag` (seq 5) and `invalid-unknown-kind` (seq 8)
+alone — the replay check runs before both decryption and the kind check
+(`src/Sync/EnvelopeReceiver.cs:53`). **No integer satisfies both.** Their expected `decrypt_failed`
+and `unknown_kind` would silently become `replay_rejected`, which is precisely the "rejected for the
+wrong reason" failure the suite exists to catch.
+
+Renumbering the existing vectors is not available: their bytes are a published wire artifact that
+this repo vendors at pin `679a317`.
+
+The resolution is the one the suite already used for `entitlement`: a new kind gets its **own
+`type`**, consumed by a dedicated section. Both consumers filter on the same string
+(`tests/SyncHarness/Program.cs:62`, `core/.../ProtocolVectorsTest.kt:55`). Recorded as
+`Sync-Protocol.md` §10.1 so the next person does not rediscover it by turning the gate red.
+
+### S5.4 PQ-A2-1 and PQ-A2-2, closed
+
+**PQ-A2-1** — §3.1 now says the 1 MiB cap is on the **decoded ciphertext**, so both implementations
+stand and no wire-visible change was made to satisfy a sentence. Checking the claim turned up a
+correction to my own entry in `docs/protocol-questions.md`: there are **three** measurements, not
+two. The relay tests the `ciphertext` *string* length against 1 MiB and the raw body against
+1 MiB + 4 KiB (`relay/src/channel.ts:160`, `:139`). Base64url expands by 4/3, so the relay's test is
+the **stricter** one — the original worry ("a receiver accepting something the relay would not have
+carried") is inverted from the real relationship. There is no gap. §3.1 now states all three.
+
+**PQ-A2-2** — §3 and §7.2 now say structural rejection reports `decrypt_failed`, and that v1 adds no
+`malformed` code, because a distinct code is a new observable and §7.2 already forbids letting an
+observer separate `decrypt_failed` from `bad_signature`.
+
+### S5.5 What did NOT get done, and why it is a blocker rather than laziness
+
+**PQ-A2-3's `invalid-unknown-field` vector was not added.** The engine has nowhere to reject the
+field: `ReceivedEnvelope` (`src/Sync/EnvelopeReceiver.cs:7`) is constructed *by callers* from
+already-parsed JSON, and `SyncHarness`'s `ToReceived` (`tests/SyncHarness/Program.cs:200`) reads nine
+fields and drops the rest silently. A vector added today would be **accepted** and would turn the
+offline gate red. The parser comes first, the vector second. Recorded as **B-6**.
+
+**Neither applier was written.** No .NET and no Android SDK on this machine, so a `entitlement_ack`
+branch in either language would be a parser against a compiler nobody ran — the exact drift
+`docs/protocol-questions.md` exists to prevent. `ProState.afterEngineAck(...)` still has no caller,
+and the app is still honestly Free with no way to become anything else. `Sync-Protocol.md` §10.2
+says out loud that **no consumer asserts against the new vectors yet**, so nobody can mistake their
+presence for implemented behaviour.
+
+### S5.6 Cross-repo: additive by construction, and re-vendoring is a separate step
+
+All **25** pre-existing vector files are byte-identical to `origin/main` (blob-to-blob: 25 unchanged,
+0 changed). `index.json` is the only existing file that moved, and only by two appended entries.
+This repo's vendored copies at pin `679a317` are **untouched** and its CI drift step compares against
+that pin, so it is unaffected. Seeing the new vectors here requires a deliberate re-vendor, which is
+not part of this slice.
+
+### S5.7 The engine gate — run by CI, not by me
+
+I cannot run `Verify-Alpha.ps1`: there is no .NET on this machine (`which dotnet` → nothing). So the
+claim that the type partition is unchanged and the offline pin holds was *reasoned* from measured
+inputs (18 envelope / 2 pairing / 5 entitlement, before and after), and then **actually tested by CI
+on `windows-latest`**, which is the gate of record:
+
+```
+=== 130 passed, 0 failed ===              <- SyncHarness, unchanged
+=== Offline total: 598 passed, 0 failed ===
+CareerSeeker alpha verification complete.
+```
+
+Run [`31292158471`](https://github.com/ShivaClaw/careerseeker/actions/runs/31292158471),
+**success**; the relay job passed too. `$ExpectedOfflineTotal` did not need to move, so no
+count-reporting doc needed the drift-trap sweep. Had the reasoning been wrong, this is where it
+would have failed — which is the point of pushing before claiming.
+
+### S5.8 One record-keeping gap noticed in passing, not fixed
+
+`AUDIT-REQUEST.md` stops at **C-S1-6**. The S2, S3, S7 and S8 slices recorded evidence in `LOG.md`
+but never appended their re-verification commands here, which is a drift from the house rule that
+every claim carries its command. Noted rather than backfilled — reconstructing commands for
+iterations I did not run would be inventing evidence, which is worse than the gap. This iteration's
+claims are appended as C-S5-1…5.
+
+### Boundary — what was not touched
+
+No deploys of any kind (Cloudflare, Workers, relay, site, Pages). **The production relay was
+contacted zero times** — not even `/v1/health`. No emulator, no `sdkmanager`, no machine change of
+any kind. No Google, Play, OAuth or Console action; no accounts, no purchases, no Play Billing code;
+no email or Gmail anything; no cert-store, MSIX or keystore action — the upload keystore and its
+password file were neither read nor referenced beyond their paths. No secrets read, written or
+printed. **Nothing was merged in either repo**, and PR #32 was opened as a draft; the android repo's
+PR #6 was not touched, taken out of draft, or merged. No force-push, no history rewrite, no branch
+deleted. No existing vector's bytes were changed. No C# or Kotlin source file was modified in either
+repo — this slice is spec, generated vectors, and records. `Documents\CareerSeeker` and Terra's
+`CareerSeeker-r6-sbom` worktree are on a machine this session cannot reach at all.

@@ -44,6 +44,20 @@ but the wording should stop saying "envelope … total" either way.
 **Severity:** low. Not exploitable on its own; it is a spec/implementation divergence that
 would surface as an interop surprise for a third implementation reading only the document.
 
+### CLOSED 2026-08-09 (S5) — option (a), and a third measurement nobody had written down
+
+§3.1 is amended in [careerseeker#32](https://github.com/ShivaClaw/careerseeker/pull/32): the cap
+is on the **decoded ciphertext**, so **both implementations stand unchanged** and no wire-visible
+change was made for a sentence's sake.
+
+Writing it down surfaced something this entry had missed. There are not two measurements, there are
+**three**: the relay tests the `ciphertext` **string** length against 1 MiB, and the raw request body
+against 1 MiB + 4 KiB (`relay/src/channel.ts:160` and `:139`). Since base64url expands by 4/3, the
+relay's test is the **stricter** of the two — an envelope the relay agrees to carry can never be one
+a receiver rejects on size, so there is no gap, and the original worry ("a receiver accepting
+something the relay would not have carried") is inverted from the real relationship. §3.1 now states
+all three limits rather than implying one number.
+
 ---
 
 ## PQ-A2-2 — §7.2 has no error code for a structurally malformed envelope
@@ -70,6 +84,16 @@ and documents what both implementations already do.
 **Severity:** cosmetic for interop, but worth pinning: a third implementation reading §3 will
 ask exactly this question, and "whatever the first implementation did" is not a spec.
 
+### CLOSED 2026-08-09 (S5) — the second option, as recommended
+
+§3 and §7.2 now say structural rejection reports `decrypt_failed`, and say explicitly that v1 adds
+**no** `malformed` code — because a distinct code is a new observable, and §7.2 already requires that
+`decrypt_failed` and `bad_signature` be indistinguishable. Landed in
+[careerseeker#32](https://github.com/ShivaClaw/careerseeker/pull/32). The phone's existing behaviour
+(`EnvelopeJson.parse`) is now the documented behaviour rather than a local convention, and the
+engine being laxer is now a *spec* gap with a name — see PQ-A2-3 below, which is where that gap has
+to be closed.
+
 ---
 
 ## PQ-A2-3 — No vector covers the unknown-top-level-field rule
@@ -85,6 +109,19 @@ rule is enforced cross-language like every other MUST in §3.
 
 **Severity:** low, now that both a phone implementation and a test exist — but it stays open
 until the engine is held to the same rule by a shared vector.
+
+### STILL OPEN 2026-08-09 (S5) — and now with a measured reason, recorded as B-6
+
+S5 was supposed to close this by adding `invalid-unknown-field` via `generate.mjs`. It did not, and
+the reason is worth having written down rather than retried blindly next iteration: **the engine has
+no wire-JSON envelope parser to reject the field in.** `ReceivedEnvelope`
+(`src/Sync/EnvelopeReceiver.cs:7`) is a record constructed *by callers* from already-parsed JSON, and
+`SyncHarness`'s `ToReceived` (`tests/SyncHarness/Program.cs:200`) reads the nine fields it wants and
+drops anything else silently. A vector added today would therefore be **accepted** by the engine and
+would turn the offline gate red.
+
+So the vector is not the first step; the engine-side parser is. See [`BLOCKED.md`](../BLOCKED.md)
+**B-6** for the symptom, what was checked, and the smallest unblock.
 
 ---
 
@@ -140,3 +177,36 @@ the C# side in the same commit, per the drift trap.
 **Severity:** blocks the phone half of Pro. Not urgent — Pro ships complete on the desktop, and
 the phone's outcome *display* works without it — but the phone cannot show an unlocked state
 until it exists.
+
+### SPEC HALF CLOSED 2026-08-09 (S5) — the body exists; the appliers do not
+
+Gate PQ-A6-1 was answered **default-proceed** (Brandon, 2026-08-07) with exactly the suggested
+minimum. `docs/Sync-Protocol.md` §4.3.3 now defines it in
+[careerseeker#32](https://github.com/ShivaClaw/careerseeker/pull/32):
+
+```
+entitlement_ack body = { product_id, acknowledged_at, order_id? }
+```
+
+Three things the spec pins that an implementer would otherwise have to guess, and that this repo
+should hold itself to when the applier is written:
+
+1. **`acknowledged_at` is advisory** (§6.3). A receiver MUST NOT expire or re-lock on it. An
+   entitlement that lapsed because two clocks disagreed would be indistinguishable from a
+   revocation nobody performed.
+2. **`order_id` is optional and carries no authorisation weight.** An ack without it is complete.
+   Two vectors pin this rather than prose: `entitlement-ack` carries it,
+   `entitlement-ack-no-order-id` does not, both valid.
+3. **There is no negative form.** A rejected receipt produces an `error`, never an ack with a
+   failure flag inside it. This matters here more than anywhere: it is the one payload that turns a
+   paid feature on, and a kind whose meaning depends on a field inside the body is the parser
+   mistake §4.2 exists to avoid.
+
+**What is still open:** `ProState.afterEngineAck(...)` still has **no caller**. The applier branch is
+not written, in either language. That is not an oversight — the unattended session that specified
+this had no Kotlin or .NET toolchain, and a parser written against a compiler nobody ran is exactly
+the drift this file exists to prevent. `docs/Sync-Protocol.md` §10.2 says so out loud: the vectors
+are a fixed target for the appliers, **not** evidence that either side implements §4.3.3.
+
+PQ-A2-4's boundary is untouched and stays load-bearing: a local `ACCEPTED` verdict still unlocks
+nothing.

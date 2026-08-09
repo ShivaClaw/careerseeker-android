@@ -323,3 +323,65 @@ instrumented test it runs on a real Android runtime and never sees Robolectric's
 needs an emulator, so this is **downstream of B-4**. Failing that, the alternative is upstream: a
 Room/Robolectric fix for `SupportSQLiteDriver` path handling. Downgrading Room to dodge it would
 trade a test for a runtime dependency regression and is not recommended.
+
+---
+
+## B-6 — PQ-A2-3's `invalid-unknown-field` vector cannot be added yet: the engine has nowhere to reject it
+
+**Milestone:** S5 (first half). This is the one part of the S5 spec/vector slice that did not land.
+
+**Symptom.** Adding `invalid-unknown-field` to `docs/sync-vectors/v1/` — a §3 MUST with no vector
+behind it — would make the shared suite **fail** on the engine side, because the engine would
+*accept* the envelope. The vector would not enforce the rule; it would turn the offline gate red
+while proving nothing.
+
+**Why. Checked in the engine tree this session, not assumed:**
+
+```
+src/Sync/EnvelopeReceiver.cs:7   public sealed record ReceivedEnvelope(
+                                     int V, string Pairing, string Dir, long Seq, string Ts,
+                                     string KeyId, string Nonce, string Ciphertext, string? Sig);
+
+$ grep -n "Deserialize\|JsonNode.Parse\|JsonSerializer" src/Sync/*.cs
+src/Sync/PairingManager.cs:9     ToQrJson()          <- outbound
+src/Sync/SyncPayloads.cs:19,43   serialise           <- outbound
+src/Sync/SyncPublisher.cs:105    serialise           <- outbound
+```
+
+There is **no inbound envelope JSON parser in `src/Sync` at all.** `ReceivedEnvelope` is a record
+that callers construct from already-parsed JSON, so there is no code path where an unknown
+top-level field is even visible, let alone rejectable. `SyncHarness` proves the point: its
+`ToReceived` (`tests/SyncHarness/Program.cs:200`) reads the nine fields it wants by name and drops
+everything else silently, so a vector with a tenth field would decrypt and be **accepted**.
+
+The phone is the stricter side here, and always was — `EnvelopeJson.parse` rejects unknown top-level
+fields today (that is what PQ-A2-3 records). The gap is engine-side.
+
+**Deliberately not worked around.** Three things were considered and rejected:
+
+1. **Add the vector anyway.** It would fail CI on `windows-latest` for whoever pushes next, on a
+   branch whose author could not run the gate. Shipping a known-red pin is worse than an open
+   blocker.
+2. **Add it with a non-`envelope` `type`** so no consumer picks it up. That is worse than not adding
+   it: the suite would *look* like it covers the rule while enforcing nothing, which is precisely
+   the failure PQ-A2-3 was raised about.
+3. **Write the engine parser here.** No .NET on this machine (`which dotnet` → nothing), so it could
+   not be compiled, let alone tested. A parser written against an unrun compiler is the drift
+   `docs/protocol-questions.md` exists to prevent.
+
+**Smallest unblock — engine work, on a machine with .NET, in this order:**
+
+1. Add an inbound wire-JSON parser to `src/Sync` (the C# counterpart of the phone's
+   `EnvelopeJson.parse`) that enumerates top-level properties and rejects any name outside the nine
+   §3 defines, reporting `decrypt_failed` per the §3/§7.2 amendment that just landed in
+   [careerseeker#32](https://github.com/ShivaClaw/careerseeker/pull/32).
+2. Route `SyncHarness`'s invalid-vector loop through it instead of `ToReceived`, so the rule is
+   exercised where the vectors are consumed.
+3. *Then* add `invalid-unknown-field` via `generate.mjs` and regenerate.
+4. Expect the offline assertion count to move, and run the full drift-trap sweep:
+   `$ExpectedOfflineTotal` plus every count-reporting doc, in the same commit.
+
+Steps 1–2 are the actual work; step 3 is two lines. Doing 3 first is the trap.
+
+**Not blocking anything else.** S5's other three questions (PQ-A6-1, PQ-A2-1, PQ-A2-2) all closed
+without it, and the `entitlement_ack` vectors landed. This is a standalone hardening item.
