@@ -2168,3 +2168,180 @@ head from `3e1e51a` to `044d829`, retiring run `31315093971` mid-flight and queu
 result as "no answer yet" and, if the push had been the last one, waited forever. Same failure
 shape as the previous iteration's silent 403: the loop's idea of *nothing to report* and the API's
 idea of *nothing here* are indistinguishable unless you check which commit you are asking about.
+
+---
+
+## S6 (phone half) — a mark that nothing ever acknowledges · 2026-08-09 · **PARTIAL**
+
+Fifth cloud iteration of the day, Linux sandbox. **The assigned slice was already done**, so this
+one took a different rung; the justification is S6.A-0 and it is the first thing to check if you
+think this iteration went off-mission.
+
+### S6.A-0 Why this is not the assigned slice
+
+The iteration prompt assigned S5's first half: §4.3.3's `entitlement_ack` body, PQ-A2-1, PQ-A2-2,
+PQ-A2-3's `invalid-unknown-field` vector, and `generate.mjs --check`. Read after the mandatory
+fetch, **all of it is already landed or already known-impossible**:
+
+- §4.3.3 + PQ-A2-1 + PQ-A2-2 + two generated vectors are in the main repo's **draft PR #32**
+  (`claude/s5-entitlement-ack-spec`, commits `8575539` and `22b028e`, `origin/main..` measured this
+  session). The prompt's own ladder summary says "S5 … NOT STARTED"; the repo disagrees, and the
+  repo wins.
+- PQ-A2-3's vector is **B-6**, and adding it is the documented trap: the engine has no inbound
+  wire-JSON parser — `EnvelopeReceiver.Receive` takes an already-parsed record and the harness's
+  `ToReceived` cherry-picks named keys — so an unknown top-level field is dropped *before* any
+  check runs. The engine would **accept** the envelope and the vector would turn the offline gate
+  red. Parser first, vector second; the parser is C# and there is no .NET here.
+
+So the prompt's slice was zero real work plus one action that would break CI. The rung actually
+picked is the one `STATE.md` had already nominated in writing — "**S6 is the next candidate for the
+same re-read**" — after S4 turned out to be mislabelled `BLOCKED` over a decision layer that needed
+no emulator. S6 is the same shape, and it is the topmost rung with a half that is genuinely
+verifiable here.
+
+### S6.A-1 Baseline first
+
+Reduced `:core` probe on the untouched branch at `66bf167`: **93 tests, 0 failures, 0 skipped**,
+`BUILD SUCCESSFUL`. That matches the number `STATE.md` already carried, which is the point of
+measuring it — a baseline that agrees with the record is evidence the record is live.
+
+One mechanical note for whoever rebuilds the probe: **Gradle 9 removed `-c` / `--settings-file`**,
+so the previous iteration's recipe ("a throwaway `settings.gradle.kts` in the scratchpad") no
+longer works as a flag. The probe now has to be a separate Gradle root that points `:core`'s
+`projectDir` at the real module and declares the version catalog explicitly. The toolchain override
+also has to run in `afterEvaluate` — a `plugins.withId` block fires *before* `core/build.gradle.kts`
+applies its own `jvmToolchain(17)`, which then overwrites the override and the build fails looking
+for a JDK 17 it cannot download (`api.foojay.io` is denied). Full recipe in C-S6A-1.
+
+### S6.A-2 The finding, and it is the reason the rung is worth doing at all
+
+**`outcome` is the only state-changing phone→engine kind with no acknowledgement of any sort.**
+
+§4.3's engine→phone table acks exactly two things: `conflict` rejects a `doc_edit`,
+`entitlement_ack` confirms an `entitlement`. There is no `outcome_ack` and no rejection kind for
+`outcome`; `grep -n "outcome_ack" docs/Sync-Protocol.md` returns nothing (C-S6A-3).
+
+The engine side is worse than silence. `InboundDispatcher.cs:98-103`:
+
+```csharp
+case "outcome":
+{
+    if (_outcomeApplier is not null)
+        await _outcomeApplier.ApplyAsync(BodyJson(received.Plaintext!), _deviceFingerprint, ct)...;
+    return new InboundResult(InboundOutcome.OutcomeApplied, null, received.Kind);
+}
+```
+
+The `return` is **outside** the guard, and `IOutcomeApplier` is nullable by design — its own
+doc-comment says "a null applier means outcome dispatch is a no-op seam for now". So the engine can
+accept a signed `outcome`, do nothing, and report `OutcomeApplied` (C-S6A-4). Nothing goes back to
+the phone claiming that, so it is not a wire-level lie — but not even an engine-side caller can
+tell applied from dropped.
+
+**And the phone cannot fall back on ordering.** §6.1: "Each direction has an independent counter
+starting at 1." The e2p seq carrying a `snapshot` and the p2e seq carrying the mark are different
+counters, and §4.3.1's application summary — `{id, state, company, title, score, outcome?}` — has no
+per-application timestamp. A payload that arrives after a mark may have been generated before it,
+and **there is nothing in v1 that says which** (C-S6A-5).
+
+Recorded as **PQ-S6-1** with both closure options. Option (a), a real `outcome_ack`, is
+recommended; unlike PQ-S4-1 the cheap option is not clearly the right one, and the write-up says so
+rather than picking the convenient answer.
+
+### S6.A-3 What the finding forces
+
+`OutcomeMarkPolicy` (`core/.../OutcomeMarking.kt`). A pending mark **shadows** the engine's carried
+value; the shadow retires on **value convergence** — the engine reporting that value in a later
+§4.3.1 payload — and is **bounded** by a count of disagreeing payloads (`disagreementLimit`,
+default **3**, chosen and labelled as chosen).
+
+Both halves are forced, and it is worth stating why neither simpler rule survives:
+
+- **Engine wins on arrival** → the badge reverts under the user's finger for a mark that is merely
+  in flight. To the user that is indistinguishable from "it didn't save", and they will tap again.
+- **Mark wins forever** → with no ack, a mark the engine silently dropped displays as the user's
+  truth permanently. That is the project's own fabrication shape, turned around to point at the
+  user instead of at the engine, and it is the worse of the two.
+
+The bound counts **reports, not seconds**, because §6.3 makes clocks untrustworthy and a disagreeing
+report is the only monotone evidence the phone actually holds. `DisplayedOutcome.pending` is what
+keeps the compromise honest — the UI must render an unconfirmed mark differently from a confirmed
+one, and the flag exists so that is a compile-time obligation rather than a note.
+
+### S6.A-4 Three smaller decisions, each a test rather than a comment
+
+1. **Pro gating reaches the mark, not just the screen.** `ProState.Unlocked` alone may mark;
+   `AwaitingEngine` may not. The state after forwarding a receipt is deliberately not an optimistic
+   unlock, and letting a user mark during the round trip would spend signed, sequence-burning
+   envelopes on an unproven entitlement.
+2. **`no_reply` is renderable but never offerable.** §4.3.1's carried superset has six values;
+   §4.3's phone-settable subset has five. `Outcome` cannot represent `no_reply` at all — the type is
+   the guard — and `offerFor` is where that guarantee becomes visible to a screen that might
+   otherwise build its buttons from whatever the engine last reported.
+3. **A re-mark collapses.** §4.3.1 makes the carried outcome latest-wins *state*, not an event log,
+   so two taps on one application before either leaves the phone are one intention and must cost
+   one §6.1 sequence number, not two. The entry moves to the end of the queue: newest decision,
+   newest thing to send.
+
+A failed push is explicitly **not** a disagreement — that bound measures the engine's opinion, and
+an envelope that never arrived is not the engine's opinion about anything. `onSent` and
+`onSendFailed` are deliberately empty and say so in their bodies: reaching the blind relay is not
+the engine applying anything, and the decision *not* to change state there is worth a name so it can
+be tested and cited rather than "fixed" later.
+
+### S6.A-5 What ran
+
+Reduced `:core` probe, `--rerun-tasks`: **115 tests, 0 failures, 0 skipped**, `BUILD SUCCESSFUL` —
+93 + 22 new, all 22 `OutcomeMarkPolicyTest` cases named `PASSED`. **Passed on the first run**; no
+test was adjusted to make it green. Recorded because the precedent in this log is to say whether a
+slice was green immediately or green after a fix.
+
+`git status --porcelain` after the code commit: exactly two `??` lines, both new. The vendored
+vectors were checked against the pin the hard way rather than trusted — `git archive 679a317
+docs/sync-vectors/v1` out of the main repo, `diff -r` against the vendored copy: **26 files, 0
+differences** (C-S6A-7). `VECTORS.lock` untouched, pin still `679a317`, nothing re-vendored.
+
+### S6.A-6 What this does NOT establish
+
+`OutcomeMarkPolicy` has **no production caller**. `grep -rn "OutcomeMarkPolicy\|MarkDecision\|
+DisplayedOutcome" app/src/` returns nothing, and that is the honest status: no screen offers the
+control, no transport pushes the envelope, and the send path needs a §5.4 device signature from an
+Android Keystore key that does not exist until S3 — which needs an emulator (**B-4**) — on a
+toolchain this sandbox cannot fetch (**B-7**). C-S6A-8 is written as the command that must start
+returning hits before anyone may call S6 `DONE`.
+
+S6 therefore moves **BLOCKED → PARTIAL**, and that is a **label correction, not progress against
+the blocker**: B-4 and B-7 are untouched and still block everything S6 needs to *prove*. This is
+now the second rung in two iterations found carrying a blanket `BLOCKED` over a half that had no
+blocker. The pattern is worth naming: a rung's blocker applies to the claims that depend on it, not
+to the rung's name.
+
+**The android gate did not run and could not.** No Android SDK; `dl.google.com` is an egress policy
+denial. The 115/0/0 is a reduced JDK-21 probe, not the gate. CI on `ubuntu-latest` with JDK 17 is
+the gate, and at the time of writing it has not reported — C-S6A-9 is recorded as an **open**
+claim rather than a passing one.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo** — the android repo is never-self-merge and the main-repo
+merge policy is conditional on a full local gate this machine cannot run. PR #6 stays a **draft**;
+careerseeker PR #32 stays a draft and was not merged, retargeted, rebased, or checked out for
+writing. No force-push, no history rewrite, no branch created, moved or deleted beyond pushing this
+one and the docs-only coordination branch. **No existing vector's bytes changed, nothing was
+re-vendored, `VECTORS.lock` untouched** — and no *new* vector was added either, because the only one
+outstanding is B-6's and it would turn the gate red. No `.cs`, `.ts`, Gradle, manifest or
+version-catalog file was modified; **`docs/Sync-Protocol.md` was read but never edited** — it is
+normative and this repo does not write it. No `:app` source, no screens, no Room schema. No
+`$ExpectedOfflineTotal`, no `Verify-Alpha.ps1`, no harness, no count-reporting doc in the main repo.
+This slice is two new Kotlin files plus records.
+
+No deploys of any kind (Cloudflare, Workers, relay, site, Pages); **the production relay was
+contacted zero times, not even `GET /v1/health`**; no relay code ran. No emulator, no `sdkmanager`,
+no AVD, and no attempt to route around the `dl.google.com` denial — the proxy's own README says to
+report it rather than work around it, and the two toolchain workarounds used (a probe root, a
+toolchain override) are local substitutions that are labelled as such everywhere they are cited,
+not egress evasion. No Google, Play, OAuth or Console action; no accounts, no purchases, no Play
+Billing code; no email or Gmail anything; no cert-store, MSIX or keystore action — the upload
+keystore and its password file were neither read nor referenced beyond their paths. No secrets read,
+written or printed. Terra's state was read at iteration start and claims **no files**, so there was
+no collision; Terra remains R6(b) BLOCKED on draft PR #26.
