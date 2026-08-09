@@ -1748,13 +1748,15 @@ Seven of eight clean. The integrated tree was inspected and contains `app/`, `co
 `docs/store/` dossier, the pricing rewrite, and this branch's records — nothing was silently
 dropped. **No ref was created, moved or pushed:** the simulation writes dangling objects only.
 
-Two structural facts fell out that were not previously recorded:
+Two structural facts carried forward. The first is **not new** — S0 measured it already
+(`LOG.md:954`, `docs/S-Ladder.md:36`); it is re-confirmed here and folded into the merge order,
+where it had never been applied:
 
 - **`claude/p4-pro` and `claude/p2-replica` are the same commit** (`d9f95fd`). There is no separate
-  P4 branch and no P4 PR because the P4 work is already in the `p2-replica` tip. Written down so
-  nobody spends an hour looking for it.
+  P4 branch and no P4 PR because the P4 work is already in the `p2-replica` tip. Still true; still
+  worth stating in a document someone reads before merging.
 - **Every branch is exactly 10 behind `main`**, and those 10 are docs-only. Merging *into* `main`
-  absorbs that. Nothing needs a rebase; nothing needs a force-push.
+  absorbs that. Nothing needs a rebase; nothing needs a force-push. This one is new.
 
 ### MT.3 The one conflict is a product decision wearing a diff
 
@@ -1787,8 +1789,10 @@ in its own "three things most worth distrusting": P4's Pro assertions compiled p
 killed the harness on a hard-coded port. A clean merge is not a passing gate, and whoever integrates
 must run the verification command of record on the *merged* tree.
 
-The prediction was also wrong in one detail worth correcting: `ApplicationDetailScreen.kt` is **not**
-among the overlapping files.
+One correction *not* to claim as mine: `ApplicationDetailScreen.kt` is not among the overlapping
+files, and **S0 already established that** (`LOG.md:971` — "expected to collide and does not"). The
+mission's original three-file prediction was corrected three weeks ago; what is new here is only
+that the three files which *do* overlap merge without conflict.
 
 ### MT.5 Two integrity checks, run because they were cheap and load-bearing
 

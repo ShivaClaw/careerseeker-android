@@ -37,8 +37,9 @@ docs-only commits that no feature branch has ever contained.
 `p4-pro` and `p2-replica` are **the same commit** — both `d9f95fd`. The P4 Pro work is already
 inside the `p2-replica` tip, which is why PR #4 is titled for P2 and no PR exists for P4.
 
-There is nothing to merge for P4 separately, and nothing missing. Recorded because "where did P4
-go?" is otherwise a question someone will spend an hour on.
+There is nothing to merge for P4 separately, and nothing missing. **First measured at S0**
+(`LOG.md:954`, `S-Ladder.md:36`), re-confirmed here and repeated because this is the document
+someone will read *while merging*, which is the moment "where did P4 go?" costs an hour.
 
 ## 3. The stack is clean, and it is a real stack
 
@@ -123,9 +124,11 @@ for the word "Basic" before submission.
 | `ui/ApplicationsScreen.kt` | +19 / −2, 4 hunks | +27 / −0, 2 hunks | auto-fused, no conflict |
 | `test/…/ScreensFromFixtureTest.kt` | +53 / −0, 3 hunks | +32 / −2, 4 hunks | auto-fused, no conflict |
 
-The earlier record (LOG.md, HUMAN-QUEUE item 1) called these three files a *collision*. That is
-accurate as **file overlap** and imprecise as **conflict**: git resolves all three without asking,
-because the two sides edited different regions.
+S0 computed this set correctly as an intersection of both diffs, and also corrected the mission's
+prediction that `ApplicationDetailScreen.kt` would be in it — it is not. What S0 did not do is run
+the merge. The earlier record (LOG.md, HUMAN-QUEUE item 1) called these three files a *collision*,
+which is accurate as **file overlap** and imprecise as **conflict**: git resolves all three without
+asking, because the two sides edited different regions.
 
 That is the risk, not the reassurance. Two independently-evolved sets of screen edits and two
 independently-written test sets get fused by a strategy with no opinion about whether the result is
