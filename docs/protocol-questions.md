@@ -202,11 +202,75 @@ should hold itself to when the applier is written:
    paid feature on, and a kind whose meaning depends on a field inside the body is the parser
    mistake §4.2 exists to avoid.
 
-**What is still open:** `ProState.afterEngineAck(...)` still has **no caller**. The applier branch is
-not written, in either language. That is not an oversight — the unattended session that specified
-this had no Kotlin or .NET toolchain, and a parser written against a compiler nobody ran is exactly
-the drift this file exists to prevent. `docs/Sync-Protocol.md` §10.2 says so out loud: the vectors
-are a fixed target for the appliers, **not** evidence that either side implements §4.3.3.
+**What is still open** *(revised 2026-08-09, later the same day)*: the paragraph here previously
+said the applier was "not written, in either language". The **phone half is now written** —
+`EntitlementAckApplier` calls `ProState.afterEngineAck(...)`, 9 tests, measured in a reduced `:core`
+probe and green on CI run
+[31305289509](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31305289509). The
+**engine half is still unwritten**: no C# applier answers `entitlement_ack` after
+`GoogleSignedPayloadVerifier` accepts. That remains unblocked, merely unwritten — the unattended
+sessions doing this work have no .NET toolchain, and a parser written against a compiler nobody ran
+is exactly the drift this file exists to prevent. `docs/Sync-Protocol.md` §10.2 still holds: the
+vectors are a fixed target for the appliers, **not** evidence that either side implements §4.3.3.
 
 PQ-A2-4's boundary is untouched and stays load-bearing: a local `ACCEPTED` verdict still unlocks
 nothing.
+
+---
+
+## PQ-S4-1 — `pull_request` is described as resumable, but the engine only ever re-publishes everything
+
+**Spec (§4.3, phone → engine):** `pull_request` | `{since_seq}` — "ask the engine to re-publish
+**from a sequence point**." §6.2 separately says a receiver should "treat a large gap as a signal
+to request a fresh `snapshot`, not as an error", and pins **no threshold** for "large".
+
+**What the engine actually does.** It parses the field and then discards its meaning:
+
+- `src/Sync/InboundDispatcher.cs:105-111` — `case "pull_request"` reads `since_seq`
+  (`ReadSinceSeq`, defaulting to `0` on any parse failure) and passes it to
+  `ISnapshotRepublisher.RepublishSnapshotAsync(since, ct)`.
+- **Every implementation of that interface ignores the argument.**
+  `LiveRepublisher.RepublishSnapshotAsync` (`tests/SyncLiveSmoke/Program.cs:311-312`) calls
+  `publisher.PublishSnapshotAsync(...)` unconditionally; `RecordingRepublisher`
+  (`tests/SyncHarness/Program.cs:756-759`) only records the value so the harness can assert it
+  round-tripped. There is no shipping code path in which `since_seq` changes what is sent.
+
+So in v1 `pull_request` has exactly one meaning — *send me a full snapshot* — and `since_seq` is
+carried but inert. The engine's own live smoke sends `since_seq = 0`
+(`tests/SyncLiveSmoke/Program.cs:191`); the harness sends `7` purely to prove the plumbing
+(`tests/SyncHarness/Program.cs:639`).
+
+**Chosen here:** the phone always sends `since_seq: 0`
+(`PullPolicy.SINCE_SEQ_FULL_REPUBLISH`), for every reason it asks — cold start, a `delta` refused
+for want of a snapshot, or a §6.2 gap.
+
+The reasoning is worth stating because the alternative looks more honest and is in fact more
+dangerous. Reporting the phone's real high-water mark (`since_seq = highestAppliedSeq`) would encode
+a request the current engine ignores but a future one might honour — and if it were honoured, the
+gap case would come back as *deltas resuming after N*, when §6.2 explicitly wants a fresh snapshot.
+`0` is the only value that means "I hold nothing usable, send everything" under both the engine that
+exists and the engine that might. `PullPolicyTest.every reason sends since_seq zero` pins it so a
+later "improvement" has to argue with a failing test first.
+
+**The unpinned threshold is a second, smaller question.** Since §6.2 gives no number and the engine
+has no opinion (it never *sends* a `pull_request`, it only answers one), "large gap" is phone-side
+policy. It is therefore a constructor parameter, `PullPolicy(gapThreshold = ...)`, defaulting to
+**32** — chosen, not measured, and labelled as such in the source. There is no deployment to derive
+it from yet.
+
+**To close (engine + phone + spec, one commit):** decide which `pull_request` is.
+
+- **(a) It is a snapshot request.** Amend §4.3 to drop "from a sequence point" and either remove
+  `since_seq` or document it as reserved-and-ignored. Smallest change; matches every line of
+  shipping code today.
+- **(b) It is genuinely resumable.** Then `ISnapshotRepublisher` needs an implementation that
+  honours `sinceSeq`, §6.2 needs to say how a receiver asks for a *snapshot* specifically (a
+  resumable pull cannot express it), and the phone's zero becomes wrong.
+
+(a) is recommended. Whichever is chosen, §6.2's "large gap" should either name a number or say
+explicitly that the threshold is receiver policy.
+
+**Severity:** low today, medium if unaddressed. Nothing is broken — both sides agree in practice
+because the field is inert. The risk is a third implementation reading §4.3, implementing
+resumption, and finding that the phone's `0` asks for the full history on every reconnect while the
+engine's answer never depended on the field at all.
