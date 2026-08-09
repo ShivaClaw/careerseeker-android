@@ -7,10 +7,10 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 | | |
 | --- | --- |
 | **Heartbeat** | 2026-08-09 (S4 pull decision — cloud iteration, Linux sandbox; **fourth** run of the day) |
-| **Android branch** | `claude/android-a0-probe` — pushed at `3e1e51a`, draft [PR #6](https://github.com/ShivaClaw/careerseeker-android/pull/6) with self-audit. **10 behind `main`** (docs-only commits, no overlap with this branch's files); left as found — merging `main` in would reshape PR #6's diff and is not this slice |
+| **Android branch** | `claude/android-a0-probe` — pushed at `044d829`, **CI green** ([run 31315292165](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31315292165)), draft [PR #6](https://github.com/ShivaClaw/careerseeker-android/pull/6) with self-audit. **10 behind `main`** (docs-only commits, no overlap with this branch's files); left as found — merging `main` in would reshape PR #6's diff and is not this slice |
 | **Merge topology** | **measured, not predicted** — [`docs/Merge-Topology.md`](docs/Merge-Topology.md). The whole stack merges into `main` **clean**; exactly **one** conflicting file repo-wide (`docs/Monetization-Decision.md`, add/add, a naming *decision*). `p4-pro` == `p2-replica` (`d9f95fd`) — no separate P4 branch exists. Re-verify: `AUDIT-REQUEST.md` C-MT-1…7 |
-| **`:core` health** | **93 tests / 0 failures / 0 skipped — measured here**, up from a measured 76 baseline (+17, `PullPolicyTest`). Counts come from a reduced probe (`:core` alone, JDK 21); the **gate** is CI run [`31315093971`](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31315093971) on `3e1e51a` — see the CI row. CI proves green, not the number |
-| **CI on this push** | run [`31315093971`](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31315093971), job *Build and test* — **result recorded in `LOG.md` S4.A-7**. The previous slice's green was run [`31305289509`](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31305289509) on `a37c185` |
+| **`:core` health** | **93 tests / 0 failures / 0 skipped — measured here**, up from a measured 76 baseline (+17, `PullPolicyTest`). Counts come from a reduced probe (`:core` alone, JDK 21); the **gate** is the CI run in the row below. CI proves green, not the number |
+| **CI on this push** | **green** — run [`31315292165`](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31315292165) on `044d829`, job *Build and test*, **success**, 13:14:40 → 13:21:05 UTC. JDK 17 + real SDK; `checkCoreIsAndroidFree`, vendored-vector drift, `:core:test`, `:app:test`, `assembleDebug`, `lintDebug` and the tracker check all passed (C-S4A-8). Run `31315093971` on `3e1e51a` was retired mid-flight when the records commit moved the head |
 | **Android health** | **green on CI at `53710a6`** — [run 31292342258](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31292342258), success: vendored-vector step, `:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug` all `BUILD SUCCESSFUL`, plus *"OK: no analytics or tracking SDKs on the release classpath."* **Not run by me** — no Android SDK/JBR/Gradle on this machine. The **102 / 0 / 0 / 3** test *counts* remain carried from the S8 local run: Gradle does not print counts, so CI proves green, not the number |
 | **Main-repo base of record** | `origin/main` = `00b3705` (gate `P0-BASE` superseded — S-Ladder §2.3) |
 | **Main-repo PRs merged** | #27 `7f3e61e` · #28 `f0b9bd5` · #29 `160b317` · #30 `a8ef552` · #31 `00b3705` |
@@ -34,16 +34,24 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 | **S7** Play-readiness pack | **PARTIAL** | upload keystore generated (§3b); Play floor **re-verified live**; `versionCode` scheme recorded → `docs/S7-Release-Signing.md`. Listing copy, data-safety dossier, privacy delta, account-day checklist and assets **already exist on `claude/p5-store`**; pricing rewrite on `claude/todos-pq1-pricing` — *not* duplicated here. No `.aab`, no Console action; screenshots need B-4 |
 | **S8** hardening | **PARTIAL / BLOCKED — B-5** | migration test written; Room 2.8.4 cannot open a file-backed DB under Robolectric. Lint hold, full gate, bundle refresh **done** |
 
-**S3, S4 and S6 are blocked on one checkbox** — Android Studio → SDK Tools → *Android SDK
-Command-line Tools (latest)*. Mission §3a authorized *using* `sdkmanager`; it does not exist here,
-and installing the toolchain that provides it was not authorized. B-5 is downstream of the same
-thing (the migration test runs fine as an instrumented test).
+**S3 and S6, plus S4's E2E proof, are blocked on one checkbox** — Android Studio → SDK Tools →
+*Android SDK Command-line Tools (latest)*. Mission §3a authorized *using* `sdkmanager`; it does not
+exist here, and installing the toolchain that provides it was not authorized. B-5 is downstream of
+the same thing (the migration test runs fine as an instrumented test).
 
-**S5 was the one rung that was neither done nor blocked, and 2026-08-09 took its first half.** What
-landed is the part that needed no compiler: the §4.3.3 body, two closed protocol questions, and two
-generated vectors. What remains is the part that needs one — the engine and phone appliers — and it
-is **still not blocked**, only unstarted. Do not let the `PARTIAL` label send the next session
-hunting for an obstacle: the obstacle was the missing spec, and the spec now exists.
+**Read that sentence precisely: it blocks the E2E *claims*, not every line of code in those rungs.**
+2026-08-09 found S4 carrying a blanket `BLOCKED` label over a decision layer that needed neither an
+emulator nor a device key, and building it cost one iteration. Before believing any rung label here,
+check which half of the rung the blocker actually touches. **S6 is the next candidate for the same
+re-read** — its `OutcomeBadge` display half is already done, and only the device-signed send needs
+S3's key.
+
+**S5 and S4 are the two rungs now sitting at PARTIAL for the same reason: a half that needs a
+compiler this program's cloud sessions do not have.** S5 has its spec, vectors and *phone* applier;
+the **C# applier** is unwritten. S4 has its pull *decision*; the `:app` wiring is unwritten. Neither
+is **blocked** — do not let the `PARTIAL` label send the next session hunting for an obstacle. Both
+are waiting on a machine with .NET and an Android SDK respectively, which is a scheduling fact, not
+a technical one.
 
 ## Open blockers
 

@@ -2132,3 +2132,39 @@ Gmail anything; no cert-store, MSIX or keystore action — the upload keystore a
 were neither read nor referenced beyond their paths. No secrets read, written or printed. Terra's
 state was read at iteration start and claims **no files**, so there was no collision; Terra's
 worktree is on a machine this session cannot reach.
+
+### S4.A-7 The gate result, which arrived after the records were written
+
+CI run [31315292165](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31315292165) on
+`044d829` — job *Build and test*, **`success`**, 13:14:40 → 13:21:05 UTC. That is the
+**authoritative** result for this slice and it supersedes the reduced probe: it ran on
+`ubuntu-latest` with **JDK 17** (not the probe's 21) and a real Android SDK, so it executed the
+steps the probe structurally could not — `checkCoreIsAndroidFree`, the vendored-vector drift check
+against pin `679a317`, `:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug`, and the
+release-classpath tracker check. A green job means every one of those passed.
+
+Three things it settles, and one it does not:
+
+- **`PullPolicy` compiles and passes on the pinned toolchain**, not just the substituted one. The
+  17 → 21 gap named in S4.A-1 is closed by this run; the probe drops back to being a fast local
+  signal and nothing more.
+- **`:core` is still Android-free under the real check**, which is a different check from my grep —
+  it walks every `.kt` file and also scans `core/build.gradle.kts`'s `plugins {}` block.
+- **`:app` still builds and lints clean** even though this slice did not touch it. Worth stating
+  because adding a public type to `:core` is exactly the kind of change that can break a downstream
+  module without the author noticing.
+- **It does not produce test counts.** Gradle does not print them and this workflow does not
+  collect them, so the measured **93 / 0 / 0** for `:core` remains the probe's number and
+  `STATE.md`'s combined `:core` + `:app` figure stays **carried**. CI proves green; it does not
+  prove the count.
+
+An honest note on process, continuing the one the previous entry started. The Actions REST API is
+still unusable from here — it needs `actions:read` and returns `403 Resource not accessible by
+integration` without it — so this result was read through the GitHub MCP check-runs endpoint again.
+The first poll after pushing the records commit returned `total_count: 0` rather than the run I was
+watching: the endpoint reports check runs **for the PR's current head**, and pushing had moved the
+head from `3e1e51a` to `044d829`, retiring run `31315093971` mid-flight and queuing
+`31315292165` in its place. A poll loop keyed on "is it complete yet" would have read that empty
+result as "no answer yet" and, if the push had been the last one, waited forever. Same failure
+shape as the previous iteration's silent 403: the loop's idea of *nothing to report* and the API's
+idea of *nothing here* are indistinguishable unless you check which commit you are asking about.

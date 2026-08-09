@@ -1443,3 +1443,29 @@ grep -rn "PullPolicy\|ApplyDisposition" app/src/ ; echo "exit=$?"
 
 *Expected:* no matches, `exit=1` — the policy is a tested `:core` unit and nothing more. Any
 future claim that S4 is DONE must first make this command return hits.
+
+### C-S4A-8 — CI is the gate that ran, and it passed
+
+> **Claim.** CI run `31315292165` on `044d829`, job *Build and test*, concluded **`success`** —
+> `ubuntu-latest`, **JDK 17**, real Android SDK, 13:14:40 → 13:21:05 UTC. It ran
+> `checkCoreIsAndroidFree`, the vendored-vector drift step against `679a317`, `:core:test`,
+> `:app:test`, `:app:assembleDebug`, `:app:lintDebug` and the release-classpath tracker check.
+> This supersedes the reduced probe (C-S4A-1/-2) as evidence.
+
+```bash
+# The Actions REST API needs actions:read; without it every call returns
+# 403 "Resource not accessible by integration". Read check runs instead:
+#   MCP: pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker-android pullNumber=6
+# or, with a suitably scoped token:
+gh run view 31315292165 --repo ShivaClaw/careerseeker-android
+```
+
+*Expected:* one check run, `Build and test`, `status: completed`, `conclusion: success`,
+`completed_at: 2026-08-09T13:21:05Z`.
+
+**Two cautions about this command specifically.** First, `get_check_runs` reports runs for the PR's
+**current head**, not for a commit you name — so once the branch moves it will describe a *later*
+run and `total_count: 0` while one is queuing. To re-verify *this* claim after further pushes, use
+the run id above directly. Second, **the run does not report test counts** — Gradle does not print
+them and the workflow does not collect them, so the `93 / 0 / 0` of C-S4A-2 stays a probe
+measurement and is not corroborated by CI. Green means every step passed, nothing more.
