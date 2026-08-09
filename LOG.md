@@ -1418,3 +1418,89 @@ to `Desktop\site-v2`. No android PR was merged or taken out of draft. `SyncLiveS
 against the production relay. One machine change: `npm ci` in `relay/` (gitignored). One config
 note: my sync clone has no git identity, so its commits use a per-invocation `git -c` — `git config`
 writes are blocked by the permission classifier, and hand-editing `.git/config` would defeat that.
+
+---
+
+## S7 / S8 — partial, and one blocker each · 2026-08-09
+
+Taken after the handoff above was written, because both rungs have device-free halves that the
+emulator blocker does not touch. The handoff's ladder table is superseded by `STATE.md`.
+
+### S8.1 The migration gap is now covered by a test that cannot run here
+
+`ReplicaDb` has carried its own indictment since A3: *"NOT YET COVERED BY A TEST: there is no
+`MigrationTestHelper` case opening a v1 database and migrating it."* All three schema versions are
+exported (`1.json`, `2.json`, `3.json`), so the test is writable — and it is written, asserting what
+the migrations must guarantee rather than merely that they run:
+
+- `snapshotSeen` arrives as **0**. A 1 would claim a snapshot this replica may never have received,
+  and deltas would then be applied over demo fixture rows — the exact fabrication the column exists
+  to prevent.
+- `outcome` arrives **NULL**, because "not recorded" and "known" are different claims.
+- The full v1→v3 chain in one pass, which is the path a real device on an old build takes and is not
+  the same code path as either step alone.
+
+**It cannot execute on this machine.** Room 2.8.4 routes every open through `SupportSQLiteDriver`,
+which compares the requested path against the configured database *name* and throws on Robolectric's
+absolute temp path. In-memory databases are unaffected — which is why the existing 16 replica tests
+pass and why nobody hit this before. A migration test cannot use in-memory: it must persist a v1 file
+and reopen it.
+
+Four attempts, same failure: `runMigrationsAndValidate`; fixing the asset path (that part now works —
+`createDatabase` succeeds and builds the v1 DB from the committed schema); opening via
+`Room.databaseBuilder`; and forcing the legacy path with `openHelperFactory`. Recorded as **B-5**.
+
+The test is kept under `@Ignore` carrying that diagnosis rather than deleted — the assertions are the
+valuable part, and reviving it is one annotation away once the class can move to `androidTest`.
+
+### S8.2 The rest of S8, done
+
+Full gate, forced re-run: **`BUILD SUCCESSFUL`, 62 actionable tasks, 62 executed.**
+
+```
+tests=102 failures=0 errors=0 skipped=3
+```
+
+99 running (unchanged from A7) + 3 skipped (B-5). Lint stayed clean under `warningsAsErrors`. Bundle
+refreshed: `C:\Users\bkirk\Desktop\careerseeker-android-2026-08-09.bundle`, 750,192 bytes,
+`git bundle verify` → *okay*.
+
+### S7.1 The Play floor, verified live rather than copied
+
+House rule is that policy facts are checked against the live source at decision time. Checked
+2026-08-09 against `developer.android.com/google/play/requirements/target-sdk`:
+
+| | Requirement | Deadline |
+| --- | --- | --- |
+| New apps and updates | **API 36** | **2026-08-31** (extension to 11-01 on request) |
+| Existing apps | API 35 | 2026-08-31 |
+
+**This app targets 37** — it clears the floor by one level, and the mission's gate record (§2.4) is
+confirmed correct. Worth noting the deadline is **23 days** out: nothing that would tempt a targetSdk
+downgrade before then is a build preference, it is a launch blocker.
+
+### S7.2 Upload keystore, generated under §3(b)
+
+`%USERPROFILE%\.careerseeker-signing\upload-keystore.jks` — **outside every git repository**, not
+merely gitignored. RSA 4096, alias `careerseeker-upload`, 10,000-day validity (well past Play's
+"valid beyond 2033"). The password was generated in-process and written straight to a sibling file
+whose ACL had inheritance removed and is granted to the current user only. **It was never printed** —
+not to a terminal, not to a log, not into a commit message. A README alongside explains what the
+files are, how to print the certificate fingerprint without echoing a secret, and why loss is
+recoverable (it is the *upload* key; Play App Signing holds the irreplaceable one).
+
+A `versionCode` scheme is recorded in `docs/S7-Release-Signing.md` — a plain monotonic integer, not
+a date-derived code, with the reasoning for rejecting the latter.
+
+**Not done:** no `.aab` was built or signed, no Gradle signing config was added (wiring one without
+producing and verifying an artifact would leave a config claiming a capability nobody exercised), no
+R8 pass, **no Play Console action of any kind**, and no screenshots (they need B-4). Listing copy,
+data-safety and privacy work were deliberately **not** duplicated — they exist on `claude/p5-store`,
+a sibling branch, and re-creating them here would manufacture a conflict on top of the two-lineage
+hazard.
+
+### S7.3 / S8.3 Boundary
+
+No deploys. The production relay was not contacted. No Console, account, purchase, Gmail, or
+cert-store action; no secrets printed; no force-push or history rewrite; nothing merged in the
+android repo. The keystore and its password file live outside every repository and are not tracked.

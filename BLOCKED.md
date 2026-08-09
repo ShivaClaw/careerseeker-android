@@ -276,3 +276,50 @@ emulator -avd careerseeker-test -no-window -no-audio
 
 (Alternatively: authorize an agent to install the command-line tools package itself, and the whole
 lane becomes unattended.)
+
+---
+
+## B-5 — Room 2.8.4 cannot open a file-backed database under Robolectric
+
+**Milestone:** S8 (migration coverage). Closes off the gap `ReplicaDb` documents against itself.
+
+**Symptom.** Every attempt to open a **file-backed** Room database in a Robolectric unit test fails:
+
+```
+java.lang.IllegalArgumentException: This driver is configured to open a database named
+'replica-migration-test.db' but 'C:\...\robolectric-...\app.careerseeker.dashboard-dataDir\
+databases\replica-migration-test.db' was requested.
+    at androidx.sqlite.driver.SupportSQLiteDriver.open(SupportSQLiteDriver.android.kt:48)
+    at androidx.room.BaseRoomConnectionManager$DriverWrapper.openLocked(RoomConnectionManager.kt:68)
+```
+
+`SupportSQLiteDriver.open()` compares the requested path against the configured database *name* and
+throws when Robolectric supplies its absolute temp path.
+
+**Why it bites here specifically.** In-memory databases are unaffected — which is why the existing
+16 replica tests pass and why this was never noticed. A migration test **cannot** use in-memory: it
+has to create a v1 file, close it, and reopen it at v3. The file path is the whole point.
+
+**Attempts (four, all the same failure):**
+
+1. `MigrationTestHelper.runMigrationsAndValidate(...)` — the documented path.
+2. Exporting the schemas to the **test** source set's assets — wrong asset path under Robolectric;
+   fixed by moving them to `debug` (that part now works, and `helper.createDatabase` succeeds).
+3. Opening via `Room.databaseBuilder(...).addMigrations(...)` and letting Room validate on open.
+4. Forcing the legacy path with `.openHelperFactory(FrameworkSQLiteOpenHelperFactory())` — Room 2.8
+   still wraps the support factory in a `SupportSQLiteDriver`, so the comparison still runs.
+
+**What was kept.** The test is written and left in place under `@Ignore` carrying this diagnosis,
+rather than deleted: the assertions are the valuable part and they are believed correct. It asserts
+what the migrations must guarantee — `snapshotSeen` arriving as **0** (a 1 would claim a snapshot
+this replica never received, which is the fabrication the column exists to prevent) and `outcome`
+arriving **NULL** ("not recorded" is not "known"). `helper.createDatabase` genuinely builds the old
+version from the committed schema export, so only the reopen is blocked.
+
+Gate is unaffected and green: **102 tests, 0 failures, 0 errors, 3 skipped.**
+
+**Smallest unblock:** move the class to `app/src/androidTest` and drop the `@Ignore` — as an
+instrumented test it runs on a real Android runtime and never sees Robolectric's path handling. That
+needs an emulator, so this is **downstream of B-4**. Failing that, the alternative is upstream: a
+Room/Robolectric fix for `SupportSQLiteDriver` path handling. Downgrading Room to dodge it would
+trade a test for a runtime dependency regression and is not recommended.

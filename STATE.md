@@ -2,82 +2,74 @@
 
 Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full derivation lives in
 [`docs/S-Ladder.md`](docs/S-Ladder.md); evidence in [`LOG.md`](LOG.md); re-verification commands in
-[`AUDIT-REQUEST.md`](AUDIT-REQUEST.md).
+[`AUDIT-REQUEST.md`](AUDIT-REQUEST.md); blockers in [`BLOCKED.md`](BLOCKED.md).
 
 | | |
 | --- | --- |
 | **Heartbeat** | 2026-08-09 (session handoff) |
-| **Rung** | **S0 DONE · S1 DONE · S2 PARTIAL.** S3–S8 **not started** (capacity, not a blocker) |
-| **S1 result** | PRs #27–#30 merged; pin **591**; sync-track paths on main **0 → 54**; vector drift **0** every check |
-| **S2 result** | PR #31 merged; `main` = `00b3705`; pin **598**; engine ↔ **local** relay **30/30**, no deploy |
+| **Android branch** | `claude/android-a0-probe` — pushed, draft [PR #6](https://github.com/ShivaClaw/careerseeker-android/pull/6) with self-audit |
+| **Android health** | **green** — 102 tests, 0 failures, 0 errors, 3 skipped (B-5); debug APK builds; lint clean under `warningsAsErrors`; 62/62 tasks executed |
+| **Main-repo base of record** | `origin/main` = `00b3705` (gate `P0-BASE` superseded — S-Ladder §2.3) |
+| **Main-repo PRs merged** | #27 `7f3e61e` · #28 `f0b9bd5` · #29 `160b317` · #30 `a8ef552` · #31 `00b3705` |
+| **Offline pin** | **598** (was 418 at session start; measured at every step, never carried) |
+| **Coordination bus** | `autonomy/claude-state` @ `e59ad6b` — pinch point released, nothing in flight |
+| **Terra (Codex)** | R6(b) BLOCKED, PR #26 draft, files claimed: none — no collision all session |
 
 ## Ladder
 
-| Rung | Status | Why |
+| Rung | Status | Evidence / reason |
 | --- | --- | --- |
-| **S0** re-entry + derivation | **DONE** | `docs/S-Ladder.md`; `LOG.md` §S0; C-S0-1…9 |
-| **S1** land the engine sync track | **DONE** | PRs #27–#30 merged; sync paths on main 0→54; pin 591 |
-| **S2** engine publishes for real | **PARTIAL** | PR #31 merged; E2E 30/30 vs local relay. B-2 open: no `/pair` page |
-| **S3** pairing screen | **BLOCKED — B-4** | `sdkmanager`/`avdmanager` absent; Keystore cannot be honestly verified without an AVD |
-| **S4** transport loop | **BLOCKED — B-4** | needs S3's device key + an emulator for the E2E claim |
+| **S0** re-entry + derivation | **DONE** | `docs/S-Ladder.md`; `LOG.md` §S0; `AUDIT-REQUEST.md` C-S0-1…9 |
+| **S1** land the engine sync track | **DONE** | PRs #27–#30 merged; sync-track paths on main **0 → 54**; vector drift **0** in every check; C-S1-1…6 |
+| **S2** engine publishes for real | **PARTIAL** | PR #31; engine ↔ **local** relay **30/30**, no deploy. **B-2 open:** no `/pair` page |
+| **S3** pairing screen | **BLOCKED — B-4** | `sdkmanager`/`avdmanager` are not installed anywhere on this machine; Keystore cannot be honestly verified without an AVD |
+| **S4** transport loop | **BLOCKED — B-4** | needs S3's device key + an emulator for the claim to be E2E |
+| **S5** entitlement ack | **NOT STARTED** | capacity. **Genuinely not blocked** — PQ-A6-1 is answered and the engine half needs no device |
 | **S6** outcome marking (phone) | **BLOCKED — B-4** | needs S3 + S4 |
-| **S5** entitlement ack | **NOT STARTED** | capacity; not blocked — engine half needs no device |
-| **S7** Play-readiness pack | **NOT STARTED** | capacity; screenshots additionally need B-4 resolved |
-| **S8** hardening | **NOT STARTED** | capacity; mechanical, no device needed |
+| **S7** Play-readiness pack | **PARTIAL** | upload keystore generated (§3b); Play floor **re-verified live**; `versionCode` scheme recorded → `docs/S7-Release-Signing.md`. No `.aab`, no Console action; screenshots need B-4 |
+| **S8** hardening | **PARTIAL / BLOCKED — B-5** | migration test written; Room 2.8.4 cannot open a file-backed DB under Robolectric. Lint hold, full gate, bundle refresh **done** |
 
-**S3/S4/S6 are blocked on one checkbox** — Android Studio → SDK Tools → *Android SDK Command-line
-Tools (latest)*. Mission §3a authorized *using* `sdkmanager`; it does not exist on this machine, and
-installing the toolchain that provides it was not authorized. Full detail and the exact probe output
-are in [`BLOCKED.md`](BLOCKED.md) B-4. Full handoff at the end of [`LOG.md`](LOG.md).
-| **Android branch** | `claude/android-a0-probe` @ `d839e48` |
-| **Android health** | green — **CI run `31278769047` success** (vectors, `:core`, `:app`, APK, lint, no-analytics). Not re-run locally this rung; no source touched. |
-| **Draft PR** | [#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) — `a0-probe` → base `claude/p2-replica`, with self-audit |
-| **Coordination bus** | `autonomy/claude-state` created @ `01ade62` |
-| **Main-repo base of record** | `origin/main` = `3a89fb5` (gate `P0-BASE` superseded — see S-Ladder §2.3) |
-| **Terra (Codex)** | R6(b) BLOCKED, PR #26 draft, **files claimed: none** — no collision |
+**S3, S4 and S6 are blocked on one checkbox** — Android Studio → SDK Tools → *Android SDK
+Command-line Tools (latest)*. Mission §3a authorized *using* `sdkmanager`; it does not exist here,
+and installing the toolchain that provides it was not authorized. B-5 is downstream of the same
+thing (the migration test runs fine as an instrumented test).
 
-## Files claimed this iteration
-
-Android tree only, documentation surface only:
-
-- `STATE.md` (this file)
-- `docs/S-Ladder.md`
-- `docs/CLAUDE-ANDROID-MISSION.md`
-- `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`
-
-**No source file claimed.** Nothing claimed in the main repo this iteration.
-
-## Next intent (in order)
-
-1. **Finish S2 — the `/pair` route.** This is all that stands between B-2 and closed. The vault
-   (`SyncPairingVault`) and the publisher wiring landed in PR #31; the handshake is vector-proven.
-   Needed: create a `PairingManager`, render the invite (`PairingInvite.ToQrJson()` is the exact
-   payload, so a **QR encoder is the only genuinely new dependency**), poll
-   `RelayClient.TakeCompletionAsync`, show the confirm code for the human to compare, write
-   `SyncPairing` to the vault.
-2. **S3 — set up the emulator lane first** (`sdkmanager` + AVD, explicitly permitted §3a). Keystore
-   cannot be modelled by Robolectric and compile-only claims are forbidden, so the lane is a
-   prerequisite, not an optimisation.
-3. **S4** then has a real rig: engine ↔ local relay ↔ emulator on `10.0.2.2`. The local-relay half
-   is already proven (30/30).
-
-`--sync` stays default OFF (opt-in, privacy-load-bearing per `docs/Sync-Consent-Copy.md`).
-
-**Deliberately not done:** `SyncLiveSmoke` against the **production** relay — embargoed all window.
-Note the live Worker's `phase:"p1"` is **not** evidence it is stale: that string is hard-coded at
-`relay/src/index.ts:47`.
+**S5 is the one rung that is neither done nor blocked**, and it is labelled that way deliberately:
+calling it BLOCKED would send the next session hunting for an obstacle that does not exist.
 
 ## Open blockers
 
 | ID | Status |
 | --- | --- |
-| B-1 pairing UI | gate `P2-KEYSTORE-FALLBACK` **answered**; device half open → S3 sets up the emulator lane |
-| B-2 no live E2E | unchanged; root cause now precisely scoped — the publisher seam lives on unmerged PR #7 |
-| ~~B-3 vector drift check~~ | **CLOSED** — local 26/26 byte-identical vs pin `679a317`, then CI's own step confirmed it (run `31278769047`) |
+| **B-1** pairing UI | gate answered; device half **still blocked** — see B-4 (the earlier "scheduled at S3" note was written before anyone checked `sdkmanager` existed) |
+| **B-2** live E2E | **most of the way closed** — engine ↔ local relay proven 30/30; remaining gap is exactly the `/pair` page |
+| ~~**B-3** vector drift~~ | **CLOSED** — 26/26 byte-identical to pin `679a317`, confirmed by CI's own step (run `31278769047`) |
+| **B-4** emulator lane | `sdkmanager`/`avdmanager` absent; blocks S3/S4/S6 and B-1's device half |
+| **B-5** migration test | Room 2.8.4 + Robolectric cannot open a file-backed DB; test kept under `@Ignore` with the diagnosis |
+
+## Next intent (in order)
+
+1. **Finish S2 — the `/pair` route.** All that stands between B-2 and closed. The vault and publisher
+   wiring landed in PR #31 and the handshake is vector-proven. Needed: create a `PairingManager`,
+   render the invite (`PairingInvite.ToQrJson()` is the exact payload — **a QR encoder is the only
+   genuinely new dependency**), poll `RelayClient.TakeCompletionAsync`, show the confirm code for the
+   human to compare, write `SyncPairing` to the vault.
+2. **Tick the SDK Command-line Tools checkbox**, then the whole emulator lane is unattended and
+   S3 → S4 → S6 unblock in order, along with B-5.
+3. **S5 needs neither** and can proceed immediately — the engine half is device-free.
+
+`--sync` stays default OFF (opt-in, privacy-load-bearing per `docs/Sync-Consent-Copy.md`).
+
+**Deliberately not done:** `SyncLiveSmoke` against the **production** relay — embargoed all window.
+The live Worker's `phase:"p1"` is **not** evidence it is stale: that string is hard-coded at
+`relay/src/index.ts:47`.
 
 ## Standing pins (verify at decision time, never copy from spec)
 
-AGP 9.3.0 (built-in Kotlin — never apply `org.jetbrains.kotlin.android`) · Gradle 9.6.1 · Kotlin 2.4.10 · JDK 17 · compile/target SDK 37 · minSdk 26 · **Ktor 3.1.3** (3.2.0 breaks D8 below DEX 040) · vendored-vector pin `679a317`
+AGP 9.3.0 (built-in Kotlin — never apply `org.jetbrains.kotlin.android`) · Gradle 9.6.1 · Kotlin
+2.4.10 · JDK 17 · compile/target SDK 37 (live Play floor is 36 from 2026-08-31 — **verified
+2026-08-09**) · minSdk 26 · **Ktor 3.1.3** (3.2.0 breaks D8 below DEX 040) · Room 2.8.4 ·
+vendored-vector pin `679a317`
 
 Verification command of record:
 
