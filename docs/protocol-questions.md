@@ -58,6 +58,54 @@ a receiver rejects on size, so there is no gap, and the original worry ("a recei
 something the relay would not have carried") is inverted from the real relationship. §3.1 now states
 all three limits rather than implying one number.
 
+### RE-OPENED AND RE-CLOSED 2026-08-09 (S2/S5, sixth iteration) — "so there is no gap" was wrong
+
+The paragraph directly above contains a true implication and a false conclusion, and the false one
+is mine. *"An envelope the relay agrees to carry can never be one a receiver rejects on size"* is
+correct. **"So there is no gap" does not follow from it** — it checks one direction of a
+two-directional relationship and declares the other direction closed by silence.
+
+The other direction is the one that matters. **An envelope both receivers accept can be one the
+relay refuses to carry**, and it was **256 KiB** wide. Measured against a local relay under
+miniflare rather than reasoned about:
+
+```
+MAX_ENVELOPE_BYTES         = 1048576          (§3.1: decoded ciphertext)
+b64u chars for 1 MiB       = 1398102          (ceil(4/3 × cap) — what a legal envelope weighs)
+relay accepted b64u chars <= 1048576          (a CHARACTER count tested against a BYTE budget)
+=> max decoded bytes the relay would carry = 786432
+
+push, ciphertext = 1,398,102 chars (exactly 1 MiB decoded, legal by §3.1)
+  -> 413 {"error":"too_large"}
+push, ciphertext = 1,048,576 chars (786,432 decoded)
+  -> 201
+```
+
+**Why it was latent and not live.** Nothing sends envelopes near either number today: §4.4 chunking
+is unimplemented in both codebases, and snapshots are orders of magnitude smaller. So no field
+incident was ever possible from this. What makes it worth fixing before it is reachable is that
+**§4.4 instructs a future chunker to split against "the envelope limit"** — §3.1's number — which is
+precisely the value that does not fit. The first correctly-implemented chunker would have produced
+maximum-size chunks and met a 413, with the relay, the spec and both receivers each individually
+defensible.
+
+**Closed by:** `MAX_CIPHERTEXT_B64U_CHARS` derived from `MAX_ENVELOPE_BYTES` in
+`relay/src/protocol.ts`, applied at both guards in `relay/src/channel.ts`, and §3.1 amended to make
+the conversion **normative** — the relay MUST carry every envelope §3.1 declares legal.
+`relay/test/relay.test.ts` grew four cases pinning the derivation, the maximum legal envelope
+surviving a push/pull round trip, and the first character past the cap; the case that asserted
+`1 MiB + 1 chars → 413` was **pinning the bug** and is gone. Both guards moved strictly *looser*, so
+no envelope the relay accepted before is rejected now.
+
+**Nothing on the phone changes.** `EnvelopeReceiver.kt` measures decoded bytes against
+`Protocol.MAX_ENVELOPE_BYTES` and was correct throughout; so was the engine's. This was only ever
+wrong in the one component that cannot decode.
+
+**Severity of the original miss:** low in effect, higher in kind. The defect was latent; the
+*reasoning error* — checking an implication in one direction and reporting the question closed — is
+the sort that closes a question while leaving it open, and it survived a PR body and two iterations
+of these records before anyone ran the other direction.
+
 ---
 
 ## PQ-A2-2 — §7.2 has no error code for a structurally malformed envelope

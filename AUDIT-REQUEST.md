@@ -1676,3 +1676,143 @@ gh run list --repo ShivaClaw/careerseeker-android --branch claude/android-a0-pro
 *Expected once CI has run on this push:* job *Build and test*, `conclusion: success`. **If it is
 red, C-S6A-2's counts stand but every "the slice is green" reading of this section does not.**
 `get_check_runs` reports the PR's *current* head, so check the commit it names before believing it.
+
+---
+
+## S2/S5 relay half — the size cap (C-S2R-1 … C-S2R-7)
+
+All commands run from a clone of `ShivaClaw/careerseeker` at
+`claude/s5-entitlement-ack-spec` (draft PR #32), with `cd relay && npm ci` done once.
+
+### C-S2R-1 — The relay refused envelopes the protocol declares legal (the finding)
+
+> **Claim.** Before this slice, the relay 413'd a ciphertext of exactly `MAX_ENVELOPE_BYTES`
+> decoded — legal by §3.1 — and the largest it would carry decoded to **786,432** bytes, leaving a
+> **256 KiB** band of the declared range untransmittable.
+
+This is a claim about the code *before* the fix, so it re-verifies against the parent commit:
+
+```bash
+git stash list >/dev/null; git worktree add /tmp/pre 22b028e && cd /tmp/pre/relay && npm ci
+cat > test/probe.test.ts <<'EOF'
+import { env } from 'cloudflare:workers';
+import { describe, expect, it } from 'vitest';
+import worker from '../src/index';
+import { MAX_ENVELOPE_BYTES } from '../src/protocol';
+const call = (p: string, i?: RequestInit) => worker.fetch(new Request(`https://r.example${p}`, i), env as never);
+const bearer = { authorization: 'Bearer tok' };
+describe('probe', () => {
+  it('413s a legal maximum', async () => {
+    const id = 'p_000001ProbeVbN3W';
+    expect((await call(`/v1/${id}/create`, { method: 'POST', headers: bearer })).status).toBe(201);
+    const body = JSON.stringify({ v: 1, pairing: 'p_x', dir: 'e2p', seq: 1, ts: '2026-06-11T14:02:11Z',
+      key_id: 'k-1', nonce: 'AAAAAAAAAAAAAAAA', ciphertext: 'A'.repeat(Math.ceil(MAX_ENVELOPE_BYTES * 4 / 3)) });
+    const res = await call(`/v1/${id}/push`, { method: 'POST', headers: bearer, body });
+    console.log('status', res.status, await res.text());
+    expect(res.status).toBe(413);
+  });
+});
+EOF
+npx vitest run test/probe.test.ts --reporter=verbose
+```
+
+*Expected on `22b028e` (pre-fix):* the test **passes**, printing `status 413 {"error":"too_large"}` —
+i.e. the bug reproduces. *Expected on the fix commit `a564c0c` or later:* the same test **fails**,
+because the push now returns 201. **A green probe here is the defect, and a red one is the fix.**
+Remove the worktree afterwards: `git worktree remove /tmp/pre --force`.
+
+### C-S2R-2 — The character cap is derived, never re-spelled
+
+> **Claim.** `MAX_CIPHERTEXT_B64U_CHARS` is computed from `MAX_ENVELOPE_BYTES` and equals 1,398,102;
+> the old guard's ceiling was 786,432 decoded, a 256 KiB shortfall.
+
+```bash
+grep -n "MAX_CIPHERTEXT_B64U_CHARS\|MAX_PUSH_BODY_CHARS" relay/src/protocol.ts relay/src/channel.ts
+grep -rn "1048576\|1398102\|1024 \* 1024" relay/src/
+```
+
+*Expected:* `MAX_CIPHERTEXT_B64U_CHARS` defined **once**, as `Math.ceil((MAX_ENVELOPE_BYTES * 4) / 3)`,
+and `1024 * 1024` appearing **only** on `MAX_ENVELOPE_BYTES`. **A literal `1398102` anywhere in
+`relay/src/` is the regression this constant exists to prevent** — the guard would then be a second
+round number that can drift from the first.
+
+### C-S2R-3 — The suite, and the number it moved from
+
+> **Claim.** `36 passed`, up from a measured `32`, the delta being five new cases minus the one that
+> pinned the bug.
+
+```bash
+cd relay && npx vitest run
+git show 22b028e:relay/test/relay.test.ts | grep -c "  it("   # pre-fix case count
+```
+
+*Expected:* `Test Files 1 passed (1)`, `Tests 36 passed (36)`. The baseline `32 passed` is
+re-derivable by running the same command in the C-S2R-1 worktree.
+
+### C-S2R-4 — The old case pinned the bug, and is gone
+
+> **Claim.** The suite previously asserted `1 MiB + 1 characters → 413`, which locked the character/byte
+> confusion in place.
+
+```bash
+git show 22b028e:relay/test/relay.test.ts | grep -n -A3 "rejects an oversized ciphertext"
+grep -n "1024 \* 1024 + 1" relay/test/relay.test.ts
+```
+
+*Expected:* the first prints the old case asserting 413 on `'A'.repeat(1024 * 1024 + 1)`; the second
+returns **no matches, `exit=1`**. If that string comes back, someone has re-pinned the bug.
+
+### C-S2R-5 — The change is strictly loosening, so no proven path can regress
+
+> **Claim.** Both guards moved *looser*, therefore nothing the relay accepted before is rejected now,
+> therefore PR #31's engine↔relay 30/30 proof cannot regress on this change.
+
+```bash
+git diff 22b028e..HEAD -- relay/src/ | grep -E "^[-+].*(MAX_|4096)"
+```
+
+*Expected:* the body guard goes `MAX_ENVELOPE_BYTES + 4096` (1,052,672) → `MAX_PUSH_BODY_CHARS`
+(1,402,198) and the ciphertext guard `MAX_ENVELOPE_BYTES` (1,048,576) → `MAX_CIPHERTEXT_B64U_CHARS`
+(1,398,102). **Both larger.** This is an arithmetic argument, not a test run: the 30/30 smoke needs
+.NET and was **not** re-run in this session.
+
+### C-S2R-6 — No vector byte moved, and no .NET surface was touched
+
+> **Claim.** This slice cannot affect `$ExpectedOfflineTotal` (598) or any shared vector.
+
+```bash
+node docs/sync-vectors/generate.mjs --check
+git diff --name-only 22b028e..HEAD
+```
+
+*Expected:* `OK: 28 vector files match the generator.` and a changed-file list of exactly
+`docs/Sync-Protocol.md`, `relay/src/channel.ts`, `relay/src/protocol.ts`, `relay/test/relay.test.ts`
+— **no `.cs`, no `docs/sync-vectors/v1/*`, no `scripts/Verify-Alpha.ps1`.**
+
+### C-S2R-7 — CI is the gate, and this claim is open until it reports
+
+> **Claim.** *Open at the time of writing.* The vitest run above is `npx vitest` on Node 22 in a
+> sandbox. The authoritative result is CI's **Blind relay (Worker)** job, and the offline pin is
+> confirmed only by CI's **Build and offline harnesses** job on `windows-latest`. Neither was run by
+> me; `Verify-Alpha.ps1` cannot run here (no .NET).
+
+```bash
+# MCP: pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker pullNumber=32
+gh run list --repo ShivaClaw/careerseeker --branch claude/s5-entitlement-ack-spec --limit 4
+```
+
+*Expected:* both jobs `success`, and `Offline total: 598 passed, 0 failed` unchanged in the second.
+**If the relay job is red, every number in C-S2R-3 stands but the slice does not.**
+
+### C-S6A-9 — CLOSED GREEN 2026-08-09 (superseding the open claim above)
+
+The previous iteration left C-S6A-9 open: the android gate had not reported on the S6 push. It has.
+
+```bash
+# MCP: pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker-android pullNumber=6
+```
+
+*Measured:* run [31325873134](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31325873134),
+job *Build and test*, **`conclusion: success`**, 17:14:21 → 17:22:00 UTC, on head `9f73226` — the
+commit carrying `OutcomeMarkPolicy`. S6's marking decision is now **gate-verified**, not
+probe-verified. The `115 / 0 / 0` count remains a probe measurement; CI proves green, not the number.

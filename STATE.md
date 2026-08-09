@@ -6,16 +6,17 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 
 | | |
 | --- | --- |
-| **Heartbeat** | 2026-08-09 (S6 outcome-marking decision — cloud iteration, Linux sandbox; **fifth** run of the day) |
-| **Android branch** | `claude/android-a0-probe` — pushed at `fe91959`, draft [PR #6](https://github.com/ShivaClaw/careerseeker-android/pull/6) with self-audit. **CI has NOT reported on this push** at the time of writing (C-S6A-9 is an open claim, not a passing one). **10 behind `main`** (docs-only commits, no overlap with this branch's files); left as found |
+| **Heartbeat** | 2026-08-09 (S2/S5 relay size-cap — cloud iteration, Linux sandbox; **sixth** run of the day) |
+| **Android branch** | `claude/android-a0-probe` — draft [PR #6](https://github.com/ShivaClaw/careerseeker-android/pull/6) with self-audit. **CI GREEN on the S6 push**: run [31325873134](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31325873134), job *Build and test*, `success`, on head `9f73226` — **C-S6A-9 is closed green** and S6's marking decision is gate-verified, not probe-verified. **10 behind `main`** (docs-only commits, no overlap with this branch's files); left as found |
 | **Merge topology** | **measured, not predicted** — [`docs/Merge-Topology.md`](docs/Merge-Topology.md). The whole stack merges into `main` **clean**; exactly **one** conflicting file repo-wide (`docs/Monetization-Decision.md`, add/add, a naming *decision*). `p4-pro` == `p2-replica` (`d9f95fd`) — no separate P4 branch exists. Re-verify: `AUDIT-REQUEST.md` C-MT-1…7 |
 | **`:core` health** | **115 tests / 0 failures / 0 skipped — measured here**, up from a measured 93 baseline (+22, `OutcomeMarkPolicyTest`, green on the first run). Counts come from a reduced probe (`:core` alone, JDK 21 — and note Gradle 9 removed `-c`, so the probe is now a separate root; recipe in C-S6A-1). The **gate** is CI. CI proves green, not the number |
-| **CI on this push** | **not yet reported.** The previous push (`044d829`) was green — run [`31315292165`](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31315292165), job *Build and test*, success. That result does **not** cover this iteration's two new files; re-check before treating S6 as green |
+| **CI on this push** | **this iteration wrote no Kotlin**, so the android gate result that matters is the one above, on `9f73226`, and it is `success`. The main-repo gate ran on the relay change: run [`31336035033`](https://github.com/ShivaClaw/careerseeker/actions/runs/31336035033) on head `9c05ef7`, **both jobs `success`** — *Blind relay (Worker)* (Node 24: `wrangler types`, `tsc --noEmit`, `vitest run`, deploy **dry-run only**, blindness grep, `OK: 28 vector files match the generator.`) and *Build and offline harnesses* (`windows-latest`, `Verify-Alpha.ps1`) |
 | **Android health** | **green on CI at `53710a6`** — [run 31292342258](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31292342258), success: vendored-vector step, `:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug` all `BUILD SUCCESSFUL`, plus *"OK: no analytics or tracking SDKs on the release classpath."* **Not run by me** — no Android SDK/JBR/Gradle on this machine. The **102 / 0 / 0 / 3** test *counts* remain carried from the S8 local run: Gradle does not print counts, so CI proves green, not the number |
 | **Main-repo base of record** | `origin/main` = `00b3705` (gate `P0-BASE` superseded — S-Ladder §2.3) |
 | **Main-repo PRs merged** | #27 `7f3e61e` · #28 `f0b9bd5` · #29 `160b317` · #30 `a8ef552` · #31 `00b3705` |
-| **Main-repo PR open** | **#32 draft** — `claude/s5-entitlement-ack-spec`, S5 spec + vectors. **Not merged** (merging needs a full local gate this machine cannot run) |
-| **Offline pin** | **598, unchanged** — verified by CI run [`31292158471`](https://github.com/ShivaClaw/careerseeker/actions/runs/31292158471) on `windows-latest`: SyncHarness `130 passed`, `Offline total: 598 passed, 0 failed` |
+| **Main-repo PR open** | **#32 draft** — `claude/s5-entitlement-ack-spec`, now S5 spec + vectors **+ the relay size-cap fix** (head `9c05ef7`, CI green). **Not merged** (merging needs a full local gate this machine cannot run) |
+| **Offline pin** | **598, unchanged** — and unchangeable by this iteration, which touched no `.cs`, no harness and no vector byte. CI's `Verify-Alpha.ps1` run on `9c05ef7` exited 0, and the script *throws* on drift, so success is the confirmation. **I did not read the `Offline total:` line myself** — the earlier direct sighting is run [`31292158471`](https://github.com/ShivaClaw/careerseeker/actions/runs/31292158471): SyncHarness `130 passed`, `Offline total: 598 passed, 0 failed` |
+| **Relay suite** | **36 passed / 0 failed** (was 32) — measured here with `npx vitest run`, and green again on CI's *Blind relay (Worker)* job. `npx tsc --noEmit` clean after `wrangler types` |
 | **Shared vectors** | **28** (was 26) — two added, **25 pre-existing files byte-identical**, `index.json` appended-only |
 | **Coordination bus** | `autonomy/claude-state` — updated this iteration; files claimed named there |
 | **Terra (Codex)** | R6(b) BLOCKED, PR #26 draft, files claimed: **none** — read at iteration start, no collision |
@@ -26,10 +27,10 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 | --- | --- | --- |
 | **S0** re-entry + derivation | **DONE** | `docs/S-Ladder.md`; `LOG.md` §S0; `AUDIT-REQUEST.md` C-S0-1…9 |
 | **S1** land the engine sync track | **DONE** | PRs #27–#30 merged; sync-track paths on main **0 → 54**; vector drift **0** in every check; C-S1-1…6 |
-| **S2** engine publishes for real | **PARTIAL** | PR #31; engine ↔ **local** relay **30/30**, no deploy. **B-2 open:** no `/pair` page |
+| **S2** engine publishes for real | **PARTIAL** | PR #31; engine ↔ **local** relay **30/30**, no deploy. **B-2 open:** no `/pair` page. **Transport half hardened 2026-08-09** (PR #32, CI green): the relay was 413ing envelopes §3.1 declares legal — a base64url **character** count tested against a **byte** budget capped the decoded payload at 786,432 and left a **256 KiB** band untransmittable. Latent, not live (§4.4 chunking is unimplemented in both codebases), but §4.4 tells a future chunker to size against exactly the number that did not fit. Cap now derived; suite 32 → **36**. Re-verify: C-S2R-1…7 |
 | **S3** pairing screen | **BLOCKED — B-4** | `sdkmanager`/`avdmanager` are not installed anywhere on this machine; Keystore cannot be honestly verified without an AVD |
 | **S4** transport loop | **PARTIAL** (was BLOCKED — a mislabel, corrected 2026-08-09) | **The pull decision is DONE** — `PullPolicy`, 17 tests, run here (C-S4A-1/-2): pull-on-open, `AwaitingSnapshot` → ask, §6.2 large-gap → ask, latched, `since_seq` pinned to 0. **`pull_request` is not state-changing (§5.4), so this half never needed S3's device key** — verified on both sides (C-S4A-4). **Not** E2E: no production caller (C-S4A-7), `:app` wiring + Ktor engine + WSS still unwritten, and the E2E proof needs B-4 + B-7 |
-| **S5** entitlement ack | **PARTIAL** | **spec + vectors DONE** (PR #32 draft): §4.3.3 body, PQ-A2-1 + PQ-A2-2 closed, 2 vectors. **Phone applier DONE 2026-08-09** — `EntitlementAckApplier`, 9 tests, run here (C-S5B-2/-3). **C# applier NOT written** — no .NET here; unblocked, merely unwritten. PQ-A2-3 → **B-6** |
+| **S5** entitlement ack | **PARTIAL** | **spec + vectors DONE** (PR #32 draft): §4.3.3 body, PQ-A2-1 (**re-opened and re-closed 2026-08-09** — its first close checked one direction of a two-directional claim; see the S2 row) + PQ-A2-2 closed, 2 vectors. **Phone applier DONE 2026-08-09** — `EntitlementAckApplier`, 9 tests, run here (C-S5B-2/-3). **C# applier NOT written** — no .NET here; unblocked, merely unwritten. PQ-A2-3 → **B-6** |
 | **S6** outcome marking (phone) | **PARTIAL** (was BLOCKED — a mislabel, corrected 2026-08-09) | **The marking decision is DONE** — `OutcomeMarkPolicy`, 22 tests, run here (C-S6A-2/-6): Pro-gated (and `AwaitingEngine` is not Pro enough), `no_reply` renderable but never offerable, a pending mark shadows the engine's value, retired by **value convergence** and bounded by disagreeing reports. **The blocked half is the send path**: `outcome` is state-changing, so §5.4 needs S3's Keystore key (B-4), and the `:app` wiring needs a toolchain this sandbox cannot fetch (B-7). No production caller (C-S6A-8). Finding → **PQ-S6-1**: `outcome` is the one state-changing kind nothing ever acks |
 | **S7** Play-readiness pack | **PARTIAL** | upload keystore generated (§3b); Play floor **re-verified live**; `versionCode` scheme recorded → `docs/S7-Release-Signing.md`. Listing copy, data-safety dossier, privacy delta, account-day checklist and assets **already exist on `claude/p5-store`**; pricing rewrite on `claude/todos-pq1-pricing` — *not* duplicated here. No `.aab`, no Console action; screenshots need B-4 |
 | **S8** hardening | **PARTIAL / BLOCKED — B-5** | migration test written; Room 2.8.4 cannot open a file-backed DB under Robolectric. Lint hold, full gate, bundle refresh **done** |
@@ -88,6 +89,21 @@ in `:core`. A rung's blocker applies to the claims that actually depend on it; c
 are looking at before believing a one-line label. The same question is worth asking of S6, whose
 display half is already done and whose blocked half is the device-signed send.
 
+**Third correction 2026-08-09 (sixth iteration), and it is about the records rather than the code.**
+The previous two corrections were about *rung labels* being broader than their blockers. This one is
+about a **closed question that was not closed**. PQ-A2-1's close reasoned: the relay's cap is
+stricter than the receivers' ⟹ nothing the relay carries can be rejected on size ⟹ *"so there is no
+gap"*. The first implication is true and the conclusion does not follow — it never checked the other
+direction, where an envelope both receivers accept is refused by the relay. Running that direction
+took one command and found a 256 KiB band. **When a closure argument is an implication, check both
+directions before writing "closed".** The relay had been green on CI the whole time, because its own
+test suite asserted the buggy number.
+
+**A fourth thing worth carrying forward: `relay/` is a first-class verifiable lane here.** Node +
+vitest + miniflare, no egress denial, and CI runs the same suite. Alongside `:core`, that is the
+second module a cloud iteration can actually gate. Iterations 3–5 all landed in `:core`; nobody had
+re-read `relay/` since P1.
+
 0. **S4's remaining half, and it is the first thing a machine with an SDK should do.** The pull
    *decision* landed 2026-08-09 (`PullPolicy`, 17 tests). What is left is `:app` work that needs
    the Android toolchain, in this order: map `ApplyResult` → `ApplyDisposition` (one `when`), call
@@ -116,7 +132,8 @@ display half is already done and whose blocked half is the device-signed send.
    (B-4), so unlike S4/S5 this cannot be done by adding a toolchain alone. Verify with C-S6A-8 —
    written to fail while the policy has no caller.
 
-3. **Finish S2 — the `/pair` route.** All that stands between B-2 and closed. The vault and publisher
+3. **Finish S2 — the `/pair` route.** All that stands between B-2 and closed. The relay half of S2
+   is now hardened (the size-cap fix above); this is the C# half and needs .NET. The vault and publisher
    wiring landed in PR #31 and the handshake is vector-proven. Needed: create a `PairingManager`,
    render the invite (`PairingInvite.ToQrJson()` is the exact payload — **a QR encoder is the only
    genuinely new dependency**), poll `RelayClient.TakeCompletionAsync`, show the confirm code for the

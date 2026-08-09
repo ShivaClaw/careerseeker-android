@@ -2345,3 +2345,141 @@ Billing code; no email or Gmail anything; no cert-store, MSIX or keystore action
 keystore and its password file were neither read nor referenced beyond their paths. No secrets read,
 written or printed. Terra's state was read at iteration start and claims **no files**, so there was
 no collision; Terra remains R6(b) BLOCKED on draft PR #26.
+
+---
+
+## S2/S5 (relay half) — the transport refused envelopes the protocol declares legal · 2026-08-09 · **B-2 narrowed**
+
+Sixth cloud iteration of the day, Linux sandbox. The slice landed in `careerseeker`, on the
+existing draft [PR #32](https://github.com/ShivaClaw/careerseeker/pull/32) rather than a new branch,
+because it finishes something #32 started and touches the same normative file. Nothing in this repo
+changed but records.
+
+### S2R-0 Why this rung, and why not the assigned one
+
+The scheduled prompt assigned S5's first half — §4.3's `entitlement_ack` body, the vectors,
+PQ-A2-1/-2/-3. **That is the fourth consecutive prompt to assign work already finished**: the spec
+half landed in #32 this morning, PQ-A2-1 and PQ-A2-2 closed with it, and PQ-A2-3 is **B-6**, where
+adding the vector the prompt asks for turns the offline gate red because the engine has no inbound
+wire-JSON parser. Verified before disregarding, not assumed:
+`node docs/sync-vectors/generate.mjs --check` → `OK: 28 vector files match the generator.`
+
+So the standing instruction applied again: take the topmost rung genuinely verifiable here. Three of
+`STATE.md`'s four next-intent items need .NET or an Android SDK (`dotnet` is not on this machine —
+`which dotnet` → not found) and the fourth is Brandon's SDK checkbox. That leaves the module this
+sandbox *can* run and that no iteration had revisited: **`relay/`**, Node + vitest + miniflare,
+32/32 green at baseline.
+
+**S2 is the topmost rung that is not DONE**, and B-2's remaining gap is the `/pair` page — C#, and
+unreachable here. But B-2 is not all of S2, and the pattern these records have now named twice
+applies a third time: *a rung's blocker applies to the claims that depend on it.* The relay is S2's
+transport, it is in my declared territory, and it had never been read against the amendment #32 made
+to §3.1 this morning.
+
+### S2R-1 The finding, and it is a correction to my own work
+
+§3.1 as amended says the 1 MiB cap is on the **decoded ciphertext**. The relay cannot decode — it
+holds no key, by design — so its guard counted base64url characters. Against a constant named
+`MAX_ENVELOPE_BYTES`. **A character count tested against a byte budget.**
+
+Base64url expands by 4/3, so the guard capped the *decoded* payload at 786,432 bytes and left the
+top **256 KiB** of §3.1's declared range untransmittable. Measured, not inferred — a throwaway
+vitest probe against the local Worker under miniflare:
+
+```
+MAX_ENVELOPE_BYTES        = 1048576
+b64u chars for 1 MiB      = 1398102
+relay accepts b64u chars <= 1048576
+=> max decoded bytes relay will carry = 786432
+
+PROBE A status = 413 {"error":"too_large"}      <- ciphertext of exactly 1 MiB decoded: LEGAL by §3.1
+PROBE B status = 201                            <- 786,432 decoded: the real ceiling
+```
+
+The probe file was deleted after it did its job; the same assertions live in the suite now, pointed
+the right way round.
+
+**What makes this worth the entry is where the error came from.** PQ-A2-1's close — written by an
+earlier iteration of me, this morning — noticed the relay's test was *stricter* and concluded "so
+there is no gap". The implication is true. The conclusion does not follow: it checks one direction
+of a two-directional relationship and reports the question closed. The gap runs the other way, and
+running the other way took one command.
+
+### S2R-2 Latent, not live, and the record says which
+
+Nothing sends envelopes near either number. §4.4 chunking is unimplemented in **both** codebases
+(`grep -rn "chunk" src/Sync/*.cs` → nothing), and snapshots are orders of magnitude smaller. **No
+field incident was ever possible from this**, and calling it a live bug would be the same
+overclaiming this log corrected itself for in the merge-topology entry.
+
+It is worth fixing before it is reachable because §4.4 tells a future chunker to split against "the
+envelope limit" — §3.1's number — which is exactly the value that does not fit. The first
+correctly-implemented chunker meets a 413, with the relay, the spec and both receivers each
+individually defensible.
+
+### S2R-3 What landed
+
+`MAX_CIPHERTEXT_B64U_CHARS = ceil(4/3 × MAX_ENVELOPE_BYTES)` in `relay/src/protocol.ts`, derived and
+documented as never-to-be-re-spelled-as-a-round-number; `MAX_PUSH_BODY_CHARS` follows it; both
+applied in `relay/src/channel.ts`. §3.1 now states the conversion as **normative** — the relay MUST
+carry every envelope §3.1 declares legal — and says why a conservative-looking round number in the
+relay is still a bug: a sender obeying §3.1 and §4.4 cannot discover it except as a 413.
+
+**Both guards moved strictly looser.** Nothing the relay accepted before is rejected now, which is
+why PR #31's engine↔relay 30/30 proof cannot regress on this change — worth stating because a
+size-guard edit is exactly the shape of change that silently breaks a proven path.
+
+The suite's `1 MiB + 1 chars → 413` case was **pinning the bug in place** and is gone. Four replace
+it: the derivation itself, the maximum legal envelope surviving a push/pull round trip read as
+*text* (the assertion that actually proves storage did not truncate a 1.4 MiB row), the first
+character past the cap, and the body guard firing before any parse.
+
+### S2R-4 What ran
+
+```
+npx vitest run     ->  Test Files 1 passed (1)   Tests 36 passed (36)      (32 before)
+npx tsc --noEmit   ->  clean, exit 0             (after `wrangler types`)
+node docs/sync-vectors/generate.mjs --check  ->  OK: 28 vector files match the generator.
+```
+
+Green on the first run of the final code; the one intermediate failure was **my test being wrong,
+not the fix** — I asserted `pull`'s `envelopes[0]` was a string when it is spliced in as parsed
+JSON. Recorded because the precedent here is to say whether a slice was green immediately.
+
+**`Verify-Alpha.ps1` did not run and cannot** — no .NET on this machine. It also cannot be affected:
+this slice touches no `.cs`, no harness, no vector byte and no count-reporting doc, so
+`$ExpectedOfflineTotal` (598) is untouched by construction. CI on `windows-latest` is the gate.
+
+### S2R-5 An open claim closed for free
+
+`AUDIT-REQUEST.md` C-S6A-9 was left **open** by the previous iteration: the android gate had not
+reported on the S6 push. It has now. Run
+[31325873134](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31325873134), job
+*Build and test*, **conclusion `success`**, on head `9f73226` — which is the commit that carried
+`OutcomeMarkPolicy`. C-S6A-9 is therefore **closed green**, and S6's marking decision is now
+gate-verified rather than probe-verified.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** PR #32 stays a **draft** and was not merged, retargeted or
+force-pushed; PR #6 stays a draft. No branch was created, deleted or rewritten — two commits were
+appended to an existing branch of mine and pushed forward-only. No force-push, no history rewrite.
+
+**No `.cs` file, no harness, no `$ExpectedOfflineTotal`, no `Verify-Alpha.ps1`, no count-reporting
+doc.** **No vector's bytes changed** — `generate.mjs --check` proves 28/28 still match, and no
+vector was added, because the only one outstanding is B-6's and it would turn the gate red. Nothing
+was re-vendored; the android pin stays `679a317` and this repo's `core/src/test/resources/` was not
+opened for writing. No `:core`, no `:app`, no Kotlin, no Gradle, manifest or version-catalog file —
+**this iteration wrote no Kotlin at all.**
+
+**No deploy of any kind** (Cloudflare, Workers, relay, site, Pages). `wrangler` was invoked exactly
+once, as `wrangler types` — local type codegen from `wrangler.jsonc`, with `WRANGLER_SEND_METRICS=false`,
+no account touched and nothing published. **The production relay was contacted zero times, not even
+`GET /v1/health`.** Every relay run was miniflare, in-process, on localhost.
+
+No emulator, no `sdkmanager`, no AVD, no attempt to route around the `dl.google.com` denial. No
+Google, Play, OAuth or Console action; no accounts, no purchases, no Play Billing code; no email or
+Gmail anything; no cert-store, MSIX or keystore action — the upload keystore and its password file
+were neither read nor referenced beyond their paths. No secrets read, written or printed. Terra's
+state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged at
+2026-08-07T21:18, **claims no files** — no collision, and `relay/` was never Terra's territory.

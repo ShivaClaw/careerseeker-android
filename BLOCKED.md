@@ -123,6 +123,14 @@ seam constructs a `RelayClient`-backed publisher resuming above the persisted ma
 no product path to being populated, so `--sync` publishes nothing for a real user. A harness
 creating a pairing is not a person pairing a phone, and this entry will not claim otherwise.
 
+**B-2 status 2026-08-09 (sixth iteration) — unchanged, and deliberately so.** The relay's size cap
+was fixed this iteration (PR #32, C-S2R-1…7) and that is **not** progress against B-2: the transport
+was never what B-2 was about. Recorded here only so the next session does not read the S2 row's
+"transport half hardened" and infer the blocker moved. **It did not.** The `/pair` page still does
+not exist, still needs .NET, and is still the whole of the gap. **No new blocker arose this
+iteration** — the relay slice was verifiable end to end on this machine and on CI, so filing one
+would be inventing a phantom.
+
 **Smallest unblock:** a `/pair` route on the local dashboard that (1) creates a `PairingManager`,
 (2) renders the invite — `PairingInvite.ToQrJson()` is the exact payload, so a QR encoder is the
 only genuinely new dependency — (3) polls `RelayClient.TakeCompletionAsync`, (4) shows the confirm
