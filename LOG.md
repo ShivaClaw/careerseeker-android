@@ -1970,3 +1970,32 @@ MSIX or keystore action — the upload keystore and its password file were neith
 beyond their paths. No secrets read, written or printed. Terra's worktree is on a machine this
 session cannot reach; Terra's state was read at start and claims **no files**, so there was no
 collision.
+
+### S5.B-7 The gate result, which arrived after the records were written
+
+CI run [31305289509](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31305289509) on
+`a37c185` — job *Build and test*, **`success`**, 09:10:54 → 09:18:25 UTC. That is the
+**authoritative** result for this slice and it supersedes the reduced probe as evidence: it ran on
+`ubuntu-latest` with **JDK 17** (not the probe's 21) and a real Android SDK, so it executed the
+things the probe structurally could not — `checkCoreIsAndroidFree`, the vendored-vector drift step
+against pin `679a317`, `:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug`, and the
+release-classpath tracker check. A green job means every one of those steps passed.
+
+Two things it settles, and one it does not:
+
+- **The applier compiles and passes on the pinned toolchain**, not just on the substituted one. The
+  17 → 21 gap named in S5.B-0 is closed by this run, and the probe's role drops back to what it was
+  worth: a fast local signal.
+- **The vendored pin is intact under CI's own check**, which is a different check from mine — it
+  re-fetches each vector from the main repo at `679a317` through the contents API and diffs. My
+  `git status` evidence and CI's fetch-and-diff agree.
+- **It does not produce test counts.** Gradle does not print them and this workflow does not collect
+  them, so the measured **76 / 0 / 0** for `:core` remains the probe's number, and `STATE.md`'s
+  combined `:core` + `:app` figure stays **carried**. CI proves green; it does not prove the count.
+
+An honest note on process: the two poll loops I first armed to watch this run were querying the
+Actions API with a token that lacks `actions:read` and were returning `403 Resource not accessible
+by integration` on every iteration — silently, because the loop only tested for `completed`. They
+would have run to timeout reporting nothing. The result above was read through the GitHub MCP
+check-runs endpoint instead. A watcher whose failure mode is silence is indistinguishable from a
+watcher seeing nothing happen, which is the same class of error as a grep that only matches success.

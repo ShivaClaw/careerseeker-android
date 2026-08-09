@@ -1276,3 +1276,24 @@ node docs/sync-vectors/generate.mjs --check
 ```
 
 *Expected:* two commits, and `OK: 28 vector files match the generator.`
+
+### C-S5B-7 — CI is the gate that ran, and it passed
+
+> **Claim.** CI run `31305289509` on `a37c185`, job *Build and test*, concluded **`success`** —
+> `ubuntu-latest`, **JDK 17**, real Android SDK. It ran `checkCoreIsAndroidFree`, the vendored-vector
+> drift step against `679a317`, `:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug`
+> and the release-classpath tracker check. This supersedes the reduced probe (C-S5B-1) as evidence.
+
+```bash
+# The Actions REST API needs actions:read; a token without it returns
+# 403 "Resource not accessible by integration" -- which is what silently
+# defeated two poll loops during this iteration. Read check runs instead:
+#   MCP: pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker-android pullNumber=6
+# or, with a suitably scoped token:
+gh run view 31305289509 --repo ShivaClaw/careerseeker-android
+```
+
+*Expected:* one check run, `Build and test`, `status: completed`, `conclusion: success`,
+`completed_at: 2026-08-09T09:18:25Z`. **The run does not report test counts** — Gradle does not
+print them and the workflow does not collect them, so the `76 / 0 / 0` of C-S5B-2 stays a
+probe measurement and is not corroborated by CI. Green means every step passed, nothing more.
