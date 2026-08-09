@@ -6,11 +6,11 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 
 | | |
 | --- | --- |
-| **Heartbeat** | 2026-08-09 (S4 pull decision — cloud iteration, Linux sandbox; **fourth** run of the day) |
-| **Android branch** | `claude/android-a0-probe` — pushed at `044d829`, **CI green** ([run 31315292165](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31315292165)), draft [PR #6](https://github.com/ShivaClaw/careerseeker-android/pull/6) with self-audit. **10 behind `main`** (docs-only commits, no overlap with this branch's files); left as found — merging `main` in would reshape PR #6's diff and is not this slice |
+| **Heartbeat** | 2026-08-09 (S6 outcome-marking decision — cloud iteration, Linux sandbox; **fifth** run of the day) |
+| **Android branch** | `claude/android-a0-probe` — pushed at `<HEAD>`, draft [PR #6](https://github.com/ShivaClaw/careerseeker-android/pull/6) with self-audit. **CI has NOT reported on this push** at the time of writing (C-S6A-9 is an open claim, not a passing one). **10 behind `main`** (docs-only commits, no overlap with this branch's files); left as found |
 | **Merge topology** | **measured, not predicted** — [`docs/Merge-Topology.md`](docs/Merge-Topology.md). The whole stack merges into `main` **clean**; exactly **one** conflicting file repo-wide (`docs/Monetization-Decision.md`, add/add, a naming *decision*). `p4-pro` == `p2-replica` (`d9f95fd`) — no separate P4 branch exists. Re-verify: `AUDIT-REQUEST.md` C-MT-1…7 |
-| **`:core` health** | **93 tests / 0 failures / 0 skipped — measured here**, up from a measured 76 baseline (+17, `PullPolicyTest`). Counts come from a reduced probe (`:core` alone, JDK 21); the **gate** is the CI run in the row below. CI proves green, not the number |
-| **CI on this push** | **green** — run [`31315292165`](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31315292165) on `044d829`, job *Build and test*, **success**, 13:14:40 → 13:21:05 UTC. JDK 17 + real SDK; `checkCoreIsAndroidFree`, vendored-vector drift, `:core:test`, `:app:test`, `assembleDebug`, `lintDebug` and the tracker check all passed (C-S4A-8). Run `31315093971` on `3e1e51a` was retired mid-flight when the records commit moved the head |
+| **`:core` health** | **115 tests / 0 failures / 0 skipped — measured here**, up from a measured 93 baseline (+22, `OutcomeMarkPolicyTest`, green on the first run). Counts come from a reduced probe (`:core` alone, JDK 21 — and note Gradle 9 removed `-c`, so the probe is now a separate root; recipe in C-S6A-1). The **gate** is CI. CI proves green, not the number |
+| **CI on this push** | **not yet reported.** The previous push (`044d829`) was green — run [`31315292165`](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31315292165), job *Build and test*, success. That result does **not** cover this iteration's two new files; re-check before treating S6 as green |
 | **Android health** | **green on CI at `53710a6`** — [run 31292342258](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31292342258), success: vendored-vector step, `:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug` all `BUILD SUCCESSFUL`, plus *"OK: no analytics or tracking SDKs on the release classpath."* **Not run by me** — no Android SDK/JBR/Gradle on this machine. The **102 / 0 / 0 / 3** test *counts* remain carried from the S8 local run: Gradle does not print counts, so CI proves green, not the number |
 | **Main-repo base of record** | `origin/main` = `00b3705` (gate `P0-BASE` superseded — S-Ladder §2.3) |
 | **Main-repo PRs merged** | #27 `7f3e61e` · #28 `f0b9bd5` · #29 `160b317` · #30 `a8ef552` · #31 `00b3705` |
@@ -30,11 +30,11 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 | **S3** pairing screen | **BLOCKED — B-4** | `sdkmanager`/`avdmanager` are not installed anywhere on this machine; Keystore cannot be honestly verified without an AVD |
 | **S4** transport loop | **PARTIAL** (was BLOCKED — a mislabel, corrected 2026-08-09) | **The pull decision is DONE** — `PullPolicy`, 17 tests, run here (C-S4A-1/-2): pull-on-open, `AwaitingSnapshot` → ask, §6.2 large-gap → ask, latched, `since_seq` pinned to 0. **`pull_request` is not state-changing (§5.4), so this half never needed S3's device key** — verified on both sides (C-S4A-4). **Not** E2E: no production caller (C-S4A-7), `:app` wiring + Ktor engine + WSS still unwritten, and the E2E proof needs B-4 + B-7 |
 | **S5** entitlement ack | **PARTIAL** | **spec + vectors DONE** (PR #32 draft): §4.3.3 body, PQ-A2-1 + PQ-A2-2 closed, 2 vectors. **Phone applier DONE 2026-08-09** — `EntitlementAckApplier`, 9 tests, run here (C-S5B-2/-3). **C# applier NOT written** — no .NET here; unblocked, merely unwritten. PQ-A2-3 → **B-6** |
-| **S6** outcome marking (phone) | **BLOCKED — B-4** | needs S3 + S4 |
+| **S6** outcome marking (phone) | **PARTIAL** (was BLOCKED — a mislabel, corrected 2026-08-09) | **The marking decision is DONE** — `OutcomeMarkPolicy`, 22 tests, run here (C-S6A-2/-6): Pro-gated (and `AwaitingEngine` is not Pro enough), `no_reply` renderable but never offerable, a pending mark shadows the engine's value, retired by **value convergence** and bounded by disagreeing reports. **The blocked half is the send path**: `outcome` is state-changing, so §5.4 needs S3's Keystore key (B-4), and the `:app` wiring needs a toolchain this sandbox cannot fetch (B-7). No production caller (C-S6A-8). Finding → **PQ-S6-1**: `outcome` is the one state-changing kind nothing ever acks |
 | **S7** Play-readiness pack | **PARTIAL** | upload keystore generated (§3b); Play floor **re-verified live**; `versionCode` scheme recorded → `docs/S7-Release-Signing.md`. Listing copy, data-safety dossier, privacy delta, account-day checklist and assets **already exist on `claude/p5-store`**; pricing rewrite on `claude/todos-pq1-pricing` — *not* duplicated here. No `.aab`, no Console action; screenshots need B-4 |
 | **S8** hardening | **PARTIAL / BLOCKED — B-5** | migration test written; Room 2.8.4 cannot open a file-backed DB under Robolectric. Lint hold, full gate, bundle refresh **done** |
 
-**S3 and S6, plus S4's E2E proof, are blocked on one checkbox** — Android Studio → SDK Tools →
+**S3, S6's send path, and S4's E2E proof are blocked on one checkbox** — Android Studio → SDK Tools →
 *Android SDK Command-line Tools (latest)*. Mission §3a authorized *using* `sdkmanager`; it does not
 exist here, and installing the toolchain that provides it was not authorized. B-5 is downstream of
 the same thing (the migration test runs fine as an instrumented test).
@@ -46,12 +46,17 @@ check which half of the rung the blocker actually touches. **S6 is the next cand
 re-read** — its `OutcomeBadge` display half is already done, and only the device-signed send needs
 S3's key.
 
-**S5 and S4 are the two rungs now sitting at PARTIAL for the same reason: a half that needs a
-compiler this program's cloud sessions do not have.** S5 has its spec, vectors and *phone* applier;
-the **C# applier** is unwritten. S4 has its pull *decision*; the `:app` wiring is unwritten. Neither
-is **blocked** — do not let the `PARTIAL` label send the next session hunting for an obstacle. Both
-are waiting on a machine with .NET and an Android SDK respectively, which is a scheduling fact, not
-a technical one.
+**S4, S5 and S6 now all sit at PARTIAL, and the reason is the same three times over: each has a
+decision half that runs anywhere and an execution half that needs a machine this program's cloud
+sessions are not.** S5 has its spec, vectors and *phone* applier; the **C# applier** is unwritten.
+S4 has its pull *decision*; the `:app` wiring is unwritten. S6 has its *marking decision*; the
+signed send is unwritten.
+
+Read the difference carefully, because it is not the same in all three. **S4's and S5's remaining
+halves are unblocked and merely unwritten** — give them a machine with an Android SDK and .NET
+respectively and they can be done today. **S6's remaining half is genuinely blocked**: it needs a
+device-signed envelope (§5.4), which needs S3's Android Keystore key, which needs an AVD that does
+not exist (B-4). A machine with an SDK is necessary but not sufficient there.
 
 ## Open blockers
 
@@ -60,7 +65,7 @@ a technical one.
 | **B-1** pairing UI | gate answered; device half **still blocked** — see B-4 (the earlier "scheduled at S3" note was written before anyone checked `sdkmanager` existed) |
 | **B-2** live E2E | **most of the way closed** — engine ↔ local relay proven 30/30; remaining gap is exactly the `/pair` page |
 | ~~**B-3** vector drift~~ | **CLOSED** — 26/26 byte-identical to pin `679a317`, confirmed by CI's own step (run `31278769047`) |
-| **B-4** emulator lane | `sdkmanager`/`avdmanager` absent; blocks S3/S6, S4's **E2E proof** (not its decision layer — see the S4 row) and B-1's device half |
+| **B-4** emulator lane | `sdkmanager`/`avdmanager` absent; blocks S3, **S6's send path** (not its marking decision — see the S6 row), S4's **E2E proof** (not its decision layer) and B-1's device half |
 | **B-5** migration test | Room 2.8.4 + Robolectric cannot open a file-backed DB; test kept under `@Ignore` with the diagnosis |
 | **B-6** unknown-field vector | PQ-A2-3 cannot be closed by adding a vector: the engine has no inbound wire-JSON parser, so it would *accept* the envelope and turn the gate red. **Re-verified 2026-08-09** to two lines — `EnvelopeReceiver.cs:33` takes a parsed record, `SyncHarness/Program.cs:696` cherry-picks keys (C-S5B-5). Parser first, vector second |
 | **B-7** cloud sandbox egress | **new 2026-08-09.** `dl.google.com` and `api.foojay.io` are **403 policy denials**, so AGP/`androidx`/JDK-17 are unfetchable in a cloud session — the android gate is unrunnable here for a reason *independent* of B-4. CI is the unblock, not a checkbox |
@@ -102,14 +107,23 @@ display half is already done and whose blocked half is the device-signed send.
    `ProtocolVectorsTest` beside the others. That moves assertion counts, so expect the full
    drift-trap sweep. Until then §10.2 holds — no consumer asserts against those vectors — and the
    app stays honestly Free, because `:app` has no caller for the applier yet.
-2. **Finish S2 — the `/pair` route.** All that stands between B-2 and closed. The vault and publisher
+2. **S6's remaining half — the signed send — and it is the one item here that is truly blocked.**
+   The marking decision landed 2026-08-09 (`OutcomeMarkPolicy`, 22 tests). What is left: a screen
+   that renders `offerFor` as controls and `DisplayedOutcome.pending` as a visibly-unconfirmed
+   badge, a `DeviceSigner` backed by a real Android Keystore key, and a transport that pushes
+   `OutboundEnvelopeFactory.outcome(...)` and reports back through `onSent`/`onSendFailed`, feeding
+   every applied payload's carried outcome to `onEngineOutcome`. The key is S3's and needs an AVD
+   (B-4), so unlike S4/S5 this cannot be done by adding a toolchain alone. Verify with C-S6A-8 —
+   written to fail while the policy has no caller.
+
+3. **Finish S2 — the `/pair` route.** All that stands between B-2 and closed. The vault and publisher
    wiring landed in PR #31 and the handshake is vector-proven. Needed: create a `PairingManager`,
    render the invite (`PairingInvite.ToQrJson()` is the exact payload — **a QR encoder is the only
    genuinely new dependency**), poll `RelayClient.TakeCompletionAsync`, show the confirm code for the
    human to compare, write `SyncPairing` to the vault.
-3. **Tick the SDK Command-line Tools checkbox**, then the whole emulator lane is unattended and
+4. **Tick the SDK Command-line Tools checkbox**, then the whole emulator lane is unattended and
    S3 → S4 → S6 unblock in order, along with B-5.
-4. **B-6**, whenever the engine is being touched anyway: the inbound wire-JSON parser, then the
+5. **B-6**, whenever the engine is being touched anyway: the inbound wire-JSON parser, then the
    `invalid-unknown-field` vector. In that order — the reverse turns CI red.
 
 **Do not re-vendor the shared vectors casually.** Upstream is now 28 files, this repo is pinned at
