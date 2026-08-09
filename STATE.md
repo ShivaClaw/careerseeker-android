@@ -8,7 +8,7 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 | --- | --- |
 | **Heartbeat** | 2026-08-09 (S5 first half — cloud iteration, Linux sandbox) |
 | **Android branch** | `claude/android-a0-probe` — pushed, draft [PR #6](https://github.com/ShivaClaw/careerseeker-android/pull/6) with self-audit. **10 behind `main`** (docs-only commits, no overlap with this branch's files); left as found — merging `main` in would reshape PR #6's diff and is not this slice |
-| **Android health** | **last measured 2026-08-09 (S8):** 102 tests, 0 failures, 0 errors, 3 skipped (B-5); debug APK builds; lint clean under `warningsAsErrors`; 62/62 tasks executed. **Not re-measured this iteration** — no Android SDK, no JBR, no Gradle on this machine; this iteration changed no Kotlin |
+| **Android health** | **green on CI at `53710a6`** — [run 31292342258](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31292342258), success: vendored-vector step, `:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug` all `BUILD SUCCESSFUL`, plus *"OK: no analytics or tracking SDKs on the release classpath."* **Not run by me** — no Android SDK/JBR/Gradle on this machine. The **102 / 0 / 0 / 3** test *counts* remain carried from the S8 local run: Gradle does not print counts, so CI proves green, not the number |
 | **Main-repo base of record** | `origin/main` = `00b3705` (gate `P0-BASE` superseded — S-Ladder §2.3) |
 | **Main-repo PRs merged** | #27 `7f3e61e` · #28 `f0b9bd5` · #29 `160b317` · #30 `a8ef552` · #31 `00b3705` |
 | **Main-repo PR open** | **#32 draft** — `claude/s5-entitlement-ack-spec`, S5 spec + vectors. **Not merged** (merging needs a full local gate this machine cannot run) |

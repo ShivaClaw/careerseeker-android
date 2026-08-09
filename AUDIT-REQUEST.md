@@ -983,3 +983,26 @@ else that acts on it. On the phone, `ProState.afterEngineAck` is defined and **c
 own unit test** — no applier branch calls it. `Sync-Protocol.md` §10.2 states this in the spec
 itself. If a future session finds a caller without a corresponding gate run, that is the drift this
 entry exists to catch.
+
+### C-S5-7 — The android gate is green at this commit, and the counts are not
+
+> **Claim.** This repo's full CI gate passed at `53710a6`. Separately: the 102/0/0/3 test counts in
+> `STATE.md` are **carried from the S8 local run**, not re-measured, because Gradle does not print
+> them. Two claims, deliberately separated.
+
+```bash
+gh run view 31292342258 --repo ShivaClaw/careerseeker-android --log \
+  | rg 'BUILD SUCCESSFUL|no analytics|vendored'
+```
+
+*Expected, and measured:* `:app:test`, `:app:assembleDebug` and `:app:lintDebug` each
+`BUILD SUCCESSFUL`, and `OK: no analytics or tracking SDKs on the release classpath.` Job conclusion
+**success**.
+
+Check the vendored-vector step **individually**, not via the overall green — a skipped step also lets
+a run go green, which is the lesson B-3 was closed on. That step has no `if:` condition in
+`.github/workflows/ci.yml`, so it cannot skip; confirm that is still true if the workflow changes.
+
+*Expected NOT to be found:* a test count. `./gradlew ... :app:test` prints none, so anyone wanting to
+re-verify 102/0/0/3 must run the verification command of record locally with `--rerun-tasks` and read
+the XML reports. Until someone does, that number is inherited and this entry says so.

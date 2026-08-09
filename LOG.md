@@ -1655,3 +1655,29 @@ PR #6 was not touched, taken out of draft, or merged. No force-push, no history 
 deleted. No existing vector's bytes were changed. No C# or Kotlin source file was modified in either
 repo — this slice is spec, generated vectors, and records. `Documents\CareerSeeker` and Terra's
 `CareerSeeker-r6-sbom` worktree are on a machine this session cannot reach at all.
+
+### S5.9 The android gate did run — on CI, after the records were pushed
+
+Added after the fact, because the evidence arrived after the entry above was written and the honest
+thing is to record it rather than leave a weaker claim standing.
+
+Pushing the records triggered this repo's own CI at `53710a6`
+([run 31292342258](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31292342258)),
+conclusion **success**. Checking the steps individually rather than trusting the overall green — the
+B-3 lesson, that a skipped step also lets a run go green — the vendored-vector step has no `if:`
+condition and therefore cannot skip, and the gate steps each reported:
+
+```
+> Task :app:test            BUILD SUCCESSFUL in 1m 42s
+> Task :app:assembleDebug   BUILD SUCCESSFUL in 1m 53s
+> Task :app:lintDebug       BUILD SUCCESSFUL in 51s
+OK: no analytics or tracking SDKs on the release classpath.
+```
+
+So `STATE.md`'s "android health" is now **green at this commit**, not carried. Two honest limits on
+that: I did not run it — no Android SDK, no JBR, no Gradle here — and Gradle does not print test
+*counts*, so **102 / 0 / 0 / 3 remains carried from the S8 local run**. CI proves the build and the
+suite are green; it does not re-prove the number, and the number is not upgraded here.
+
+Nothing in this iteration touched Kotlin, so a green result was expected. It is recorded because
+"expected" is not evidence, which is the whole point of the house rule.
