@@ -1836,3 +1836,137 @@ purchases, no Play Billing code; no email or Gmail anything; no cert-store, MSIX
 the upload keystore and its password file were neither read nor referenced beyond their paths. No
 secrets read, written or printed. Terra's worktree and `Documents\CareerSeeker` are on a machine
 this session cannot reach at all.
+
+## S5 (second half, phone side) — the ack has a consumer, and `:core` turns out to be runnable here · 2026-08-09 · **PARTIAL**
+
+Third cloud iteration of the day, Linux sandbox. The assigned slice was S5's first half — §4.3.3,
+PQ-A2-1/-2/-3, the vectors. **That was already done** by this morning's iteration and sits in the
+main repo's draft PR #32; re-verified here rather than assumed:
+`node docs/sync-vectors/generate.mjs --check` → `OK: 28 vector files match the generator.` So this
+iteration took the rung's *second* half instead, on the side that turned out to be verifiable.
+
+### S5.B-0 The environment finding that decided the slice
+
+`STATE.md` said the cloud sandbox has "Node and git and nothing else". That is **wrong in one
+direction and worse in another**, and both halves matter.
+
+**Wrong:** there is a JDK (21) and a Gradle (8.14.3 system, plus the repo's pinned 9.6.1 once the
+wrapper fetched it). `:core` is a pure Kotlin/JVM module whose every dependency —
+kotlinx-serialization, Ktor, kotlin-test, coroutines-test — resolves from **Maven Central**, which
+is reachable. So `:core` compiles and tests **here**, which no previous session had established.
+
+**Worse:** `dl.google.com` is **egress-denied by policy**, not merely absent —
+`curl` → `CONNECT tunnel failed, response 403`, and the proxy's own status endpoint names it:
+`{"kind":"connect_rejected","detail":"gateway answered 403 to CONNECT","host":"dl.google.com:443"}`.
+So the android gate is unrunnable here for a **second, independent reason** on top of the missing
+SDK: AGP 9.3.0 and every `androidx` artifact are unreachable. `api.foojay.io` is denied too, which
+is why the JDK-17 toolchain cannot be provisioned. Recorded as **B-7**.
+
+The probe harness is therefore a **reduced** one and is labelled as such everywhere it is cited: a
+throwaway `settings.gradle.kts` in the scratchpad including only `:core`, with the toolchain
+overridden 17 → 21 because 17 cannot be obtained here. It is **not** the verification command of
+record, it did not run `checkCoreIsAndroidFree`, `:app:test`, `assembleDebug` or `lintDebug`, and
+nothing below claims otherwise. CI on `ubuntu-latest` — JDK 17, real SDK — remains the gate.
+
+### S5.B-1 Baseline first, so the delta is a measurement and not a story
+
+Before writing a line: `:core:test` on the untouched branch → **67 tests, 0 failures, 0 skipped**,
+`BUILD SUCCESSFUL`. Worth stating plainly: `STATE.md`'s carried **102 / 0 / 0 / 3** is `:core` +
+`:app` together, and `:app` cannot run here at all. 67 is the `:core` share, now measured rather
+than carried.
+
+### S5.B-2 The applier
+
+`core/.../EntitlementAck.kt` — `EntitlementAck` plus `EntitlementAckApplier(knownProductIds)`.
+`ProState.afterEngineAck(productId, acknowledgedAt)` already existed, already took exactly §4.3.3's
+two fields, and **had no caller**. That was the whole gap: the ack had a spec and a destination and
+nothing in between.
+
+Five spec rules are enforced, and each is a test rather than a comment:
+
+| §4.3.3 rule | What the applier does |
+| --- | --- |
+| unknown `product_id` → ignore, don't unlock | returns `current` unchanged — **not** `Rejected` |
+| `acknowledged_at` advisory (§6.3) | a 1999 timestamp still grants; nothing expires or re-locks |
+| `order_id` optional | both vector bodies apply to an identical `Unlocked` |
+| no negative form | `"revoked":true` in the body is inert |
+| ack means granted, full stop | `apply()` has no downward path at all |
+
+The last two are the ones worth the reviewer's time. §4.3.3 says a kind whose meaning depends on a
+field inside its body is the parser hazard §4.2 exists to avoid — and here that hazard would sit on
+the single path that turns a paid feature on. So the test asserts a decoy `"granted":false,
+"revoked":true` body **still unlocks**, which reads wrong until you notice that the alternative is a
+wire format where an attacker who can add a body field can un-grant a purchase.
+
+One deliberate asymmetry, called out in the source: unknown **body** fields are *ignored* while §3
+requires unknown top-level **envelope** fields to be *rejected*. The envelope is framing an attacker
+reshapes; the body's guarantee is that nothing inside it can change what the kind means. Ignoring is
+what makes that guarantee real.
+
+The kind is also **re-checked** inside `parse()` rather than trusted from the receiver's return
+value — a caller that dispatched on the wrong branch must not be able to unlock Pro with a
+`heartbeat` that happens to carry a `product_id`. That is a test too.
+
+### S5.B-3 What ran
+
+Reduced `:core` harness, `--rerun-tasks`: **76 tests, 0 failures, 0 skipped**, `BUILD SUCCESSFUL`
+— 67 + the 9 new. All nine `EntitlementAckTest` cases named `PASSED` in the output. The first run
+did **not** pass: `e: EntitlementAckTest.kt:128 Argument type mismatch: actual type is
+'Serializable', but 'ByteArray' was expected` — `"a" + "b".toByteArray()` binds as string
+concatenation. Recorded because a green suite whose first run was red is a different artifact from
+one that was green immediately.
+
+### S5.B-4 The vectors are transcribed, not vendored, and that was the point
+
+`entitlement-ack.json` and `entitlement-ack-no-order-id.json` postdate the vendored pin `679a317`
+and live on the **unmerged** PR #32. Consuming them from `core/src/test/resources/` would mean
+moving the pin to an unmerged branch commit — precisely the cross-repo drift `VECTORS.lock` exists
+to prevent. So the two grant bodies are transcribed **verbatim** from `generate.mjs`'s
+`plaintext_json`, with the reason written at the top of the test file.
+
+`git status --porcelain` after the code commit: exactly two `??` lines, both new. **No vendored
+vector's bytes were touched**, the pin is still `679a317`, and the repo still holds 26 of upstream's
+28 — the gap being the two unmerged files, which is the pin working.
+
+The formal vector-driven assertion — the `type`-filtered section in `ProtocolVectorsTest` beside
+the others — is deferred to the re-vendor slice that follows #32 merging. `Sync-Protocol.md` §10.2
+already states no consumer asserts against these vectors yet; **this entry does not change that and
+does not claim to.**
+
+### S5.B-5 B-6 re-verified, and it holds
+
+The prompt asked for PQ-A2-3's `invalid-unknown-field` vector. It is still blocked, and the
+diagnosis is now backed by two specific lines rather than a summary: `EnvelopeReceiver.Receive`
+takes an already-parsed `ReceivedEnvelope` **record** (`src/Sync/EnvelopeReceiver.cs:33`), and the
+harness builds that record by **cherry-picking named keys** out of the vector JSON
+(`tests/SyncHarness/Program.cs:696`, `ToReceived`). An extra top-level field is therefore dropped on
+the floor before any check runs — the envelope would be **accepted**, and a vector expecting
+`decrypt_failed` would turn the gate red. Parser first, vector second. B-6 stands, unchanged.
+
+### S5.B-6 What this iteration did not establish
+
+The android verification command of record was **not run** — no SDK, and Google's Maven is
+egress-denied. `Verify-Alpha.ps1` was **not run** — no .NET, no PowerShell. The **C# applier does
+not exist**; S5 stays `PARTIAL` on the engine side and is still *unblocked, merely unwritten*. `:app`
+was not touched, so nothing in the UI surfaces Pro yet — the applier has tests and no production
+caller, which is honest for a `:core` unit and is not a shipped feature. The 17→21 toolchain
+substitution means even the `:core` result is one JDK away from CI's; treat CI's run on this push as
+the authoritative one.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo** — the android repo is never-self-merge and the main-repo
+merge policy is conditional on a full local gate this machine cannot run. PR #32 stays a **draft**
+and was not merged, retargeted or rebased. No force-push, no history rewrite, no branch deleted or
+created beyond pushing this one. No existing vector's bytes changed and **nothing was re-vendored**;
+`VECTORS.lock` was not edited. No `.cs`, `.ts`, Gradle, manifest or version-catalog file was
+modified — this slice is two new Kotlin files plus records. No `:app` source, no screens, no Room
+schema. No deploys of any kind (Cloudflare, Workers, relay, site, Pages); **the production relay was
+contacted zero times, not even `GET /v1/health`**. No emulator, no `sdkmanager`, no AVD; no attempt
+to route around the `dl.google.com` denial, which the proxy's own README says to report rather than
+work around. No Google, Play, OAuth or Console action; no accounts, no purchases, no Play Billing
+code beyond the signed test vectors already in the repo; no email or Gmail anything; no cert-store,
+MSIX or keystore action — the upload keystore and its password file were neither read nor referenced
+beyond their paths. No secrets read, written or printed. Terra's worktree is on a machine this
+session cannot reach; Terra's state was read at start and claims **no files**, so there was no
+collision.

@@ -385,3 +385,53 @@ Steps 1–2 are the actual work; step 3 is two lines. Doing 3 first is the trap.
 
 **Not blocking anything else.** S5's other three questions (PQ-A6-1, PQ-A2-1, PQ-A2-2) all closed
 without it, and the `entitlement_ack` vectors landed. This is a standalone hardening item.
+
+---
+
+## B-7 — The cloud sandbox cannot resolve Google-hosted artifacts (egress policy)
+
+**Milestone:** S5 second half, 2026-08-09.
+
+**Symptom.** Even with a JDK and Gradle present, the android gate cannot run in the Linux cloud
+sandbox, because AGP and every `androidx` artifact live on `dl.google.com`, which the session's
+egress policy **denies**:
+
+```
+$ curl https://dl.google.com/dl/android/maven2/.../com.android.application.gradle.plugin-9.3.0.pom
+curl: (56) CONNECT tunnel failed, response 403
+
+$ curl -sS "$HTTPS_PROXY/__agentproxy/status"
+"recentRelayFailures":[{"kind":"connect_rejected",
+  "detail":"gateway answered 403 to CONNECT (policy denial or upstream failure)",
+  "host":"dl.google.com:443"}]
+```
+
+`./gradlew :core:test` in the real repo fails during **plugin resolution**, before any compilation:
+`Plugin [id: 'com.android.application', version: '9.3.0'] was not found`. The root
+`build.gradle.kts` declares it `apply false`, but Gradle still resolves it.
+
+`api.foojay.io` is denied by the same policy, so the `foojay-resolver-convention` in
+`settings.gradle.kts` cannot provision the JDK 17 that `:core`'s `jvmToolchain(17)` pins. Only
+JDK 21 exists here.
+
+**Attempts.** Two, then stopped per the two-attempt rule. (1) `./gradlew :core:test` in the repo —
+failed on AGP resolution as above. (2) A reduced scratchpad harness including only `:core`, whose
+dependencies are all on Maven Central (reachable, `HTTP 200`) — this **works**, with the toolchain
+overridden 17 → 21. That is how S5.B was verified, and it is labelled a probe everywhere it is
+cited.
+
+**Deliberately not worked around.** `/root/.ccr/README.md` is explicit: a 403 from the proxy is an
+organization policy denial — "do not retry or route around it — report the blocked host". No mirror,
+no vendored AGP, no `ANDROID_HOME` fabrication was attempted.
+
+**Consequence.** This is **not** the same blocker as B-4. B-4 is "the owner's Windows machine has no
+`sdkmanager`". B-7 is "the cloud sandbox cannot fetch the Android toolchain at all". Ticking B-4's
+checkbox does nothing for cloud iterations, and vice versa. What a cloud iteration **can** do is now
+known and worth stating positively: `:core` (pure Kotlin/JVM, Maven Central only), `relay/`
+(Node + vitest + miniflare), `docs/sync-vectors/generate.mjs`, and every doc.
+
+**Smallest human unblock:** none needed for the program — **CI already is the unblock**. Pushing to
+`claude/**` runs the real gate on `ubuntu-latest` with JDK 17 and a real SDK, which is why this
+slice's authoritative evidence is the CI run on its push rather than the local probe. Only if
+someone wants the full gate to run *inside* a cloud session would `dl.google.com` need adding to the
+session's egress allowlist.

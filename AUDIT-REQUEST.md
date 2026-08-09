@@ -1132,3 +1132,147 @@ cd ../careerseeker/relay && npm ci && npx vitest run
 *Expected to remain unavailable here:* `dotnet`, `pwsh`, `sdkmanager`, `ANDROID_HOME` — all absent
 (`which` returns nothing). Any claim in this repo that depends on those is carried from another
 machine and must say so.
+
+---
+
+## S5 second half — the `entitlement_ack` applier (2026-08-09)
+
+Every command below was run in a Linux cloud sandbox with **no Android SDK** and with
+`dl.google.com` egress-denied. The harness is a **reduced, probe-only** `:core` build, not the
+verification command of record. Reproducing C-S5B-2/-3 needs that harness rebuilt (C-S5B-1) or,
+better, CI — which runs the real gate on `ubuntu-latest` with JDK 17 and a real SDK.
+
+### C-S5B-1 — The reduced `:core` harness, and why it is reduced
+
+> **Claim.** `:core` compiles and tests in this sandbox because every one of its dependencies is on
+> **Maven Central**. The full gate cannot run here for two independent reasons: no Android SDK, and
+> `dl.google.com` (AGP + all `androidx`) is denied by egress policy. `api.foojay.io` is denied too,
+> so the pinned JDK 17 toolchain cannot be provisioned and the probe substitutes 21.
+
+```bash
+curl -sS -o /dev/null -w "google=%{http_code}\n" \
+  https://dl.google.com/dl/android/maven2/com/android/application/com.android.application.gradle.plugin/9.3.0/com.android.application.gradle.plugin-9.3.0.pom
+curl -sS -o /dev/null -w "central=%{http_code}\n" \
+  https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.10/kotlin-stdlib-2.4.10.pom
+curl -sS "$HTTPS_PROXY/__agentproxy/status" | grep -A3 recentRelayFailures
+ls /usr/lib/jvm/            # 21 only
+which dotnet pwsh sdkmanager || echo "absent, as recorded"
+```
+
+*Expected:* the Google URL fails with `curl: (56) CONNECT tunnel failed, response 403` (so
+`google=000`), `central=200`, the proxy status naming `dl.google.com:443` /
+`gateway answered 403 to CONNECT`, only JDK 21 present, and no `dotnet`/`pwsh`/`sdkmanager`.
+**Do not route around the 403** — `/root/.ccr/README.md` says report it, not work around it.
+
+To rebuild the probe harness itself (throwaway; committed nowhere):
+
+```bash
+mkdir -p /tmp/coreprobe && cd /tmp/coreprobe
+cat > settings.gradle.kts <<'EOF'
+pluginManagement { repositories { mavenCentral(); gradlePluginPortal() } }
+dependencyResolutionManagement {
+  repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
+  repositories { mavenCentral() }
+  versionCatalogs { create("libs") { from(files("<REPO>/gradle/libs.versions.toml")) } }
+}
+rootProject.name = "coreprobe"
+include(":core")
+project(":core").projectDir = file("<REPO>/core")
+EOF
+cat > build.gradle.kts <<'EOF'
+subprojects { afterEvaluate {
+  extensions.findByType(JavaPluginExtension::class.java)?.toolchain {
+    languageVersion.set(JavaLanguageVersion.of(21))
+  }
+} }
+EOF
+gradle --no-daemon -Dorg.gradle.java.installations.auto-download=false :core:test --rerun-tasks
+```
+
+*Expected:* `BUILD SUCCESSFUL`. **This is not the gate.** It never runs `checkCoreIsAndroidFree`,
+`:app:test`, `:app:assembleDebug` or `:app:lintDebug`, and it runs on JDK 21 where CI runs 17.
+
+### C-S5B-2 — `:core` was 67 tests before this slice and is 76 after, 0 failures, 0 skipped
+
+> **Claim.** Baseline **67 / 0 / 0** measured on the branch before the change; **76 / 0 / 0** after,
+> the delta being exactly the 9 new `EntitlementAckTest` cases. `STATE.md`'s carried
+> **102 / 0 / 0 / 3** is `:core` **plus** `:app`; `:app` cannot run in this environment at all.
+
+```bash
+# after a :core:test run (C-S5B-1)
+python3 - <<'EOF'
+import glob, xml.etree.ElementTree as ET
+t=f=s=0
+for p in glob.glob('<REPO>/core/build/test-results/test/*.xml'):
+    r=ET.parse(p).getroot()
+    t+=int(r.get('tests')); f+=int(r.get('failures'))+int(r.get('errors')); s+=int(r.get('skipped'))
+print(t, f, s)
+EOF
+git stash && <rerun :core:test> && <rerun the python> && git stash pop   # for the 67 baseline
+```
+
+*Expected:* `76 0 0` at the tip; `67 0 0` with the two new files stashed.
+
+### C-S5B-3 — Each §4.3.3 rule is pinned by a named test, not by a comment
+
+> **Claim.** Nine tests pass, covering: the grant, `order_id`'s optionality, unknown `product_id`
+> ignored rather than rejected, `acknowledged_at` advisory, no negative form, malformed bodies
+> ignored, a foreign `kind` refused, no downgrade path, and the local-verdict boundary (PQ-A2-4).
+
+```bash
+gradle --no-daemon :core:test --rerun-tasks --tests 'app.careerseeker.core.EntitlementAckTest'
+```
+
+*Expected:* nine `PASSED` lines and `BUILD SUCCESSFUL`. The names are the assertions; read them
+rather than the count. Note the decoy-flag case asserts a body carrying `"revoked":true` **still
+unlocks** — that is §4.3.3's "no negative form", not a bug.
+
+### C-S5B-4 — The vendored vector pin is untouched; the ack bodies are transcribed, not vendored
+
+> **Claim.** This slice added **no** vector and re-vendored **nothing**. The pin stays `679a317`,
+> the repo still holds 26 files against upstream's 28, and the two grant bodies in the test file are
+> transcribed verbatim from `generate.mjs`'s `plaintext_json`.
+
+```bash
+git diff --stat HEAD~1 HEAD -- core/src/test/resources/ VECTORS.lock   # expect: no output
+S=../careerseeker
+diff <(git show HEAD:core/src/test/kotlin/app/careerseeker/core/EntitlementAckTest.kt |
+       grep -o '"product_id":"pro_unlock"' | head -1) <(echo '"product_id":"pro_unlock"')
+python3 -c "
+import json;b=json.load(open('$S/docs/sync-vectors/v1/entitlement-ack.json'))['plaintext_json']['body']
+print(b)"
+```
+
+*Expected:* no diff output for the first command (nothing under `resources/` or `VECTORS.lock`
+changed), and the upstream body printing
+`{'product_id': 'pro_unlock', 'acknowledged_at': '2026-06-11T14:02:11Z', 'order_id': 'GPA.3390-8461-2039-11123'}`
+— the same triple the test transcribes.
+
+### C-S5B-5 — B-6 stands: the engine would *accept* an unknown-field envelope
+
+> **Claim.** PQ-A2-3's `invalid-unknown-field` vector cannot be added yet. The C# receiver takes an
+> already-parsed record, and the harness builds that record by cherry-picking named keys, so an
+> extra top-level field is dropped before any check runs — the envelope is accepted and a vector
+> expecting `decrypt_failed` turns the gate red.
+
+```bash
+S=../careerseeker
+sed -n '33,40p'   $S/src/Sync/EnvelopeReceiver.cs     # Receive(ReceivedEnvelope env, ...)
+sed -n '694,700p' $S/tests/SyncHarness/Program.cs     # static ReceivedEnvelope ToReceived(JsonObject env) => new(
+```
+
+*Expected:* `Receive` takes a `ReceivedEnvelope` record (no wire-JSON parsing), and `ToReceived`
+constructs it from named lookups only — no unknown-key check anywhere in the path.
+
+### C-S5B-6 — The S5 spec half was already landed, and was re-verified rather than assumed
+
+> **Claim.** §4.3.3 + PQ-A2-1/-2 + the two vectors were already on the main repo's
+> `claude/s5-entitlement-ack-spec` (draft PR #32) before this iteration started.
+
+```bash
+cd ../careerseeker && git fetch --all --prune
+git log --oneline origin/main..origin/claude/s5-entitlement-ack-spec
+node docs/sync-vectors/generate.mjs --check
+```
+
+*Expected:* two commits, and `OK: 28 vector files match the generator.`

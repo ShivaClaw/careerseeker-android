@@ -6,9 +6,10 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 
 | | |
 | --- | --- |
-| **Heartbeat** | 2026-08-09 (merge topology measured — cloud iteration, Linux sandbox; second run of the day) |
+| **Heartbeat** | 2026-08-09 (S5 phone applier — cloud iteration, Linux sandbox; **third** run of the day) |
 | **Android branch** | `claude/android-a0-probe` — pushed, draft [PR #6](https://github.com/ShivaClaw/careerseeker-android/pull/6) with self-audit. **10 behind `main`** (docs-only commits, no overlap with this branch's files); left as found — merging `main` in would reshape PR #6's diff and is not this slice |
 | **Merge topology** | **measured, not predicted** — [`docs/Merge-Topology.md`](docs/Merge-Topology.md). The whole stack merges into `main` **clean**; exactly **one** conflicting file repo-wide (`docs/Monetization-Decision.md`, add/add, a naming *decision*). `p4-pro` == `p2-replica` (`d9f95fd`) — no separate P4 branch exists. Re-verify: `AUDIT-REQUEST.md` C-MT-1…7 |
+| **`:core` health** | **76 tests / 0 failures / 0 skipped — measured here**, up from a measured 67 baseline. Reduced probe harness only (`:core` alone, JDK 21 not 17); **not** the gate. See B-7 |
 | **Android health** | **green on CI at `53710a6`** — [run 31292342258](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31292342258), success: vendored-vector step, `:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug` all `BUILD SUCCESSFUL`, plus *"OK: no analytics or tracking SDKs on the release classpath."* **Not run by me** — no Android SDK/JBR/Gradle on this machine. The **102 / 0 / 0 / 3** test *counts* remain carried from the S8 local run: Gradle does not print counts, so CI proves green, not the number |
 | **Main-repo base of record** | `origin/main` = `00b3705` (gate `P0-BASE` superseded — S-Ladder §2.3) |
 | **Main-repo PRs merged** | #27 `7f3e61e` · #28 `f0b9bd5` · #29 `160b317` · #30 `a8ef552` · #31 `00b3705` |
@@ -27,7 +28,7 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 | **S2** engine publishes for real | **PARTIAL** | PR #31; engine ↔ **local** relay **30/30**, no deploy. **B-2 open:** no `/pair` page |
 | **S3** pairing screen | **BLOCKED — B-4** | `sdkmanager`/`avdmanager` are not installed anywhere on this machine; Keystore cannot be honestly verified without an AVD |
 | **S4** transport loop | **BLOCKED — B-4** | needs S3's device key + an emulator for the claim to be E2E |
-| **S5** entitlement ack | **PARTIAL** | **spec + vectors DONE** (PR #32 draft): §4.3.3 body, PQ-A2-1 + PQ-A2-2 closed, 2 vectors, CI green. **Appliers NOT written** — no .NET, no Android SDK here. PQ-A2-3 → **B-6** |
+| **S5** entitlement ack | **PARTIAL** | **spec + vectors DONE** (PR #32 draft): §4.3.3 body, PQ-A2-1 + PQ-A2-2 closed, 2 vectors. **Phone applier DONE 2026-08-09** — `EntitlementAckApplier`, 9 tests, run here (C-S5B-2/-3). **C# applier NOT written** — no .NET here; unblocked, merely unwritten. PQ-A2-3 → **B-6** |
 | **S6** outcome marking (phone) | **BLOCKED — B-4** | needs S3 + S4 |
 | **S7** Play-readiness pack | **PARTIAL** | upload keystore generated (§3b); Play floor **re-verified live**; `versionCode` scheme recorded → `docs/S7-Release-Signing.md`. Listing copy, data-safety dossier, privacy delta, account-day checklist and assets **already exist on `claude/p5-store`**; pricing rewrite on `claude/todos-pq1-pricing` — *not* duplicated here. No `.aab`, no Console action; screenshots need B-4 |
 | **S8** hardening | **PARTIAL / BLOCKED — B-5** | migration test written; Room 2.8.4 cannot open a file-backed DB under Robolectric. Lint hold, full gate, bundle refresh **done** |
@@ -52,23 +53,29 @@ hunting for an obstacle: the obstacle was the missing spec, and the spec now exi
 | ~~**B-3** vector drift~~ | **CLOSED** — 26/26 byte-identical to pin `679a317`, confirmed by CI's own step (run `31278769047`) |
 | **B-4** emulator lane | `sdkmanager`/`avdmanager` absent; blocks S3/S4/S6 and B-1's device half |
 | **B-5** migration test | Room 2.8.4 + Robolectric cannot open a file-backed DB; test kept under `@Ignore` with the diagnosis |
-| **B-6** unknown-field vector | **new 2026-08-09.** PQ-A2-3 cannot be closed by adding a vector: the engine has no inbound wire-JSON parser, so it would *accept* the envelope and turn the gate red. Parser first, vector second |
+| **B-6** unknown-field vector | PQ-A2-3 cannot be closed by adding a vector: the engine has no inbound wire-JSON parser, so it would *accept* the envelope and turn the gate red. **Re-verified 2026-08-09** to two lines — `EnvelopeReceiver.cs:33` takes a parsed record, `SyncHarness/Program.cs:696` cherry-picks keys (C-S5B-5). Parser first, vector second |
+| **B-7** cloud sandbox egress | **new 2026-08-09.** `dl.google.com` and `api.foojay.io` are **403 policy denials**, so AGP/`androidx`/JDK-17 are unfetchable in a cloud session — the android gate is unrunnable here for a reason *independent* of B-4. CI is the unblock, not a checkbox |
 
 ## Next intent (in order)
 
-**Everything below needs a machine this iteration did not have.** The Linux cloud sandbox has Node
-and git and nothing else: no Android SDK, no JBR, no Gradle, no .NET, no PowerShell, no emulator, no
-Windows. That is why this iteration took the half of S5 that is spec and generator work, and why the
-next three items are all local-session work.
+**Correction 2026-08-09 (third iteration).** The line that stood here — "the Linux cloud sandbox has
+Node and git and nothing else" — was **wrong**, and acting on it would have skipped work that is
+genuinely doable. A cloud session **can** run: `:core` (pure Kotlin/JVM, every dependency on Maven
+Central), `relay/` (Node + vitest + miniflare), `generate.mjs`, and every doc. It **cannot** run
+`:app`, the android gate, or `Verify-Alpha.ps1` — no SDK, no .NET, and `dl.google.com` is an egress
+**policy denial** (B-7), which is a firmer wall than "not installed". Judge a rung by which module
+it lands in, not by the machine's label.
 
-1. **S5's second half — the two appliers.** Now genuinely unblocked by §4.3.3, and the natural next
-   slice for any session with a compiler. Engine: answer `entitlement_ack` after
-   `GoogleSignedPayloadVerifier` accepts. Phone: an applier branch calling
-   `ProState.afterEngineAck(product_id, acknowledged_at)` — which already takes exactly those two
-   fields. Both consume `entitlement-ack` + `entitlement-ack-no-order-id`, which will move the
-   assertion counts, so expect the full drift-trap sweep. Until then **no consumer asserts against
-   those vectors** (`Sync-Protocol.md` §10.2 says so in the spec itself) and the app stays honestly
-   Free.
+1. **S5's remaining half — the C# applier.** The **phone applier landed 2026-08-09**
+   (`EntitlementAckApplier`, 9 tests, measured here): parse §4.3.3's body, refuse every way it can
+   fail, hand two fields to `ProState.afterEngineAck`. What is left is engine-side and needs .NET:
+   answer `entitlement_ack` after `GoogleSignedPayloadVerifier` accepts. Still **unblocked, merely
+   unwritten**.
+   Then, once PR #32 merges, a **re-vendor slice**: bump the pin off `679a317`, pull the two ack
+   vectors in, and move `EntitlementAckTest`'s transcribed bodies onto a `type`-filtered section in
+   `ProtocolVectorsTest` beside the others. That moves assertion counts, so expect the full
+   drift-trap sweep. Until then §10.2 holds — no consumer asserts against those vectors — and the
+   app stays honestly Free, because `:app` has no caller for the applier yet.
 2. **Finish S2 — the `/pair` route.** All that stands between B-2 and closed. The vault and publisher
    wiring landed in PR #31 and the handshake is vector-proven. Needed: create a `PairingManager`,
    render the invite (`PairingInvite.ToQrJson()` is the exact payload — **a QR encoder is the only
