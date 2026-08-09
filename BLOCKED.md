@@ -435,3 +435,47 @@ known and worth stating positively: `:core` (pure Kotlin/JVM, Maven Central only
 slice's authoritative evidence is the CI run on its push rather than the local probe. Only if
 someone wants the full gate to run *inside* a cloud session would `dl.google.com` need adding to the
 session's egress allowlist.
+
+---
+
+### B-4 / B-7 status 2026-08-09 (fifth iteration, S6) — the send path is the blocked half, and it is now the *only* blocked half
+
+**No new blocker.** Recorded here so the next session does not re-derive it, and because S6's row
+in `STATE.md` changes label this iteration without anything about B-4 or B-7 changing.
+
+**Symptom.** S6 (outcome marking) cannot be proven end to end. `OutcomeMarkPolicy` decides what may
+be marked and what is displayed while a mark is unconfirmed, and it is tested here — but nothing
+sends. `outcome` is state-changing, so §5.4 requires the envelope to carry `sig`, ECDSA-P256 from a
+non-exportable **Android Keystore** key. That key is S3's deliverable, S3 needs an AVD, and the AVD
+needs `sdkmanager` (**B-4**). The `:app` wiring that would call the policy additionally cannot even
+be compiled in a cloud session (**B-7**: `dl.google.com` is an egress policy denial, so AGP and
+every `androidx` artifact are unfetchable).
+
+**Attempts this iteration.** None against the blocker itself — deliberately. The mission does not
+authorize installing the SDK toolchain, and the proxy's README says to report an egress denial
+rather than work around it. What was done instead was to establish, by reading both sides, that the
+*decision* layer needs neither: `mark`, `display`, `offerFor` and the reconciliation rule touch no
+key and no Android type, which is why 22 tests for them run here at all.
+
+**Smallest human unblock.** Unchanged, and it is still one checkbox: Android Studio → SDK Tools →
+*Android SDK Command-line Tools (latest)*. That gives `sdkmanager`/`avdmanager` → an AVD → S3's
+Keystore key → S6's send path, in that order. Nothing about S6 needs anything else.
+
+**What is deliberately not claimed.** That the policy is correct against a real engine. It is
+correct against the protocol as read and against the engine's source as read; with no `outcome_ack`
+in v1 (**PQ-S6-1**) there is no round trip that could confirm it, and there will not be until either
+that PQ closes as option (a) or a live pairing exists to observe convergence against.
+
+---
+
+### B-6 status 2026-08-09 (fifth iteration) — unchanged, and it was re-read rather than assumed
+
+The iteration prompt asked for PQ-A2-3's `invalid-unknown-field` vector. **It still cannot be
+added**, for the reason already recorded: `EnvelopeReceiver.Receive` takes an *already-parsed*
+`ReceivedEnvelope` and the harness's `ToReceived` cherry-picks named keys, so an unknown top-level
+field is discarded before any rejection check runs. The engine would **accept** the envelope, and a
+vector asserting rejection would turn the offline gate red.
+
+Parser first, vector second. The parser is C# and no cloud session has .NET, so this stays queued
+for a local session — and a session that is handed "add the unknown-field vector" as a task should
+read this entry before starting, not after.
