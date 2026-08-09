@@ -1297,3 +1297,149 @@ gh run view 31305289509 --repo ShivaClaw/careerseeker-android
 `completed_at: 2026-08-09T09:18:25Z`. **The run does not report test counts** — Gradle does not
 print them and the workflow does not collect them, so the `76 / 0 / 0` of C-S5B-2 stays a
 probe measurement and is not corroborated by CI. Green means every step passed, nothing more.
+
+---
+
+## S4 (phone half) — the pull decision · 2026-08-09 (fourth cloud iteration)
+
+### C-S4A-1 — The baseline was measured before anything was written
+
+> **Claim.** `:core` stood at **76 tests / 0 failures / 0 skipped** on `db4ec49` before this
+> slice, so the delta below is a measurement rather than a story.
+
+The probe is **reduced** and is not the verification command of record: `:app`, `lintDebug`,
+`assembleDebug` and `checkCoreIsAndroidFree` are all absent from it, and the toolchain is
+substituted 17 → 21 because `api.foojay.io` is egress-denied here (B-7).
+
+```bash
+mkdir -p /tmp/coreprobe && cd /tmp/coreprobe
+cat > settings.gradle.kts <<'EOF'
+pluginManagement { repositories { mavenCentral(); gradlePluginPortal() } }
+dependencyResolutionManagement {
+    repositoriesMode = RepositoriesMode.PREFER_SETTINGS
+    repositories { mavenCentral() }
+    versionCatalogs { create("libs") { from(files("<repo>/gradle/libs.versions.toml")) } }
+}
+rootProject.name = "coreprobe"
+include(":core")
+project(":core").projectDir = file("<repo>/core")
+EOF
+cat > build.gradle.kts <<'EOF'
+subprojects {
+    afterEvaluate {
+        extensions.findByType(JavaPluginExtension::class.java)?.toolchain {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
+    }
+}
+EOF
+git -C <repo> stash list >/dev/null && git -C <repo> checkout db4ec49 -- core
+gradle --no-daemon :core:test --rerun-tasks
+python3 - <<'EOF'
+import glob, xml.etree.ElementTree as ET
+t=f=s=0
+for p in glob.glob('<repo>/core/build/test-results/test/*.xml'):
+    r=ET.parse(p).getroot()
+    t+=int(r.get('tests')); f+=int(r.get('failures'))+int(r.get('errors')); s+=int(r.get('skipped'))
+print(t,f,s)
+EOF
+```
+
+*Expected:* `76 0 0`.
+
+### C-S4A-2 — The slice adds 17 tests and they pass
+
+> **Claim.** After `PullPolicy` + `PullPolicyTest`, the same reduced probe measures **93 tests /
+> 0 failures / 0 skipped**, of which `PullPolicyTest` contributes **17 / 0 / 0**. Unlike the
+> previous iteration's applier, this one **passed on its first run** — no red-then-green.
+
+```bash
+cd /tmp/coreprobe && gradle --no-daemon :core:test --rerun-tasks 2>&1 | grep -c "PullPolicyTest.*PASSED"
+python3 -c "
+import xml.etree.ElementTree as ET
+r=ET.parse('<repo>/core/build/test-results/test/TEST-app.careerseeker.core.PullPolicyTest.xml').getroot()
+print(r.get('tests'), r.get('failures'), r.get('errors'), r.get('skipped'))"
+```
+
+*Expected:* `17`, then `17 0 0 0`.
+
+### C-S4A-3 — The engine really does ignore `since_seq` (the basis for PQ-S4-1)
+
+> **Claim.** `InboundDispatcher` parses `since_seq` and hands it to `ISnapshotRepublisher`, and
+> **every** implementation of that interface discards it and publishes a full snapshot. This is
+> the whole reason the phone sends `0`.
+
+```bash
+S=../careerseeker            # on origin/claude/s5-entitlement-ack-spec or origin/main
+sed -n '105,111p' $S/src/Sync/InboundDispatcher.cs      # case "pull_request": ReadSinceSeq -> RepublishSnapshotAsync
+grep -rn "RepublishSnapshotAsync" --include=*.cs $S | grep -v InboundDispatcher.cs
+sed -n '308,313p' $S/tests/SyncLiveSmoke/Program.cs     # LiveRepublisher
+sed -n '753,759p' $S/tests/SyncHarness/Program.cs       # RecordingRepublisher
+```
+
+*Expected:* exactly **two** implementations, both in `tests/`. `LiveRepublisher.RepublishSnapshotAsync`
+calls `publisher.PublishSnapshotAsync(counters, apps, jobs, ct)` — the `sinceSeq` parameter is
+unreferenced in the body. `RecordingRepublisher` only assigns `LastSince`. No shipping code path
+lets `since_seq` change what is sent.
+
+### C-S4A-4 — `pull_request` needs no device signature, so the loop predates S3
+
+> **Claim.** `pull_request` is absent from `Protocol.STATE_CHANGING_KINDS` on both sides, so
+> `OutboundEnvelopeFactory.build` emits it with `signer = null` and no `sig` field. This is why
+> an S4 pull loop is **not** downstream of S3's Keystore key, and it is asserted, not asserted-in-prose.
+
+```bash
+grep -n "STATE_CHANGING_KINDS" -A1 core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+grep -n "StateChangingKinds" -A3 ../careerseeker/src/Sync/Protocol.cs
+cd /tmp/coreprobe && gradle --no-daemon :core:test --tests '*PullPolicyTest' --rerun-tasks 2>&1 \
+  | grep "needs no device signature"
+```
+
+*Expected:* both sets are `doc_edit, outcome, entitlement` — `pull_request` in neither — and the
+test `a pull_request needs no device signature() PASSED`.
+
+*One trap worth naming, because a careless grep hits it.* `src/Sync/Protocol.cs:34` lists
+`"doc_edit", "outcome", "entitlement", "pull_request", "error"` on a single line, which looks like
+the state-changing set and is not: that is `ShippingKinds` (every v1 kind, §4.3).
+`StateChangingKinds` is a separate set at line 52. Grep for the identifier, not for the kind names.
+
+### C-S4A-5 — Nothing was re-vendored and no existing vector's bytes moved
+
+> **Claim.** This slice touched no vector. The vendored pin stays `679a317` and the repo still
+> holds 26 of upstream's 28.
+
+```bash
+git diff --stat db4ec49..HEAD -- core/src/test/resources/sync-vectors VECTORS.lock
+ls core/src/test/resources/sync-vectors/v1/*.json | wc -l
+git diff --stat db4ec49..HEAD --name-only
+```
+
+*Expected:* the first two commands report **no changes** and `26`; the name-only diff lists exactly
+`core/src/main/kotlin/app/careerseeker/core/PullPolicy.kt`,
+`core/src/test/kotlin/app/careerseeker/core/PullPolicyTest.kt`,
+`docs/protocol-questions.md`, plus this iteration's record files.
+
+### C-S4A-6 — `:core` stayed Android-free
+
+> **Claim.** No Android or `androidx` import entered `:core`, so `checkCoreIsAndroidFree` is
+> unaffected. The probe cannot run that task; CI does.
+
+```bash
+grep -rn "^import android" core/src/ ; echo "exit=$?"
+```
+
+*Expected:* no matches, `exit=1`.
+
+### C-S4A-7 — What this slice did NOT verify
+
+> **Claim.** The end-to-end loop is **not** proven. `PullPolicy` has no production caller: the
+> mapping from `:app`'s `ApplyResult` onto `ApplyDisposition`, the relay push of the resulting
+> envelope, and the `:app` Ktor engine dependency are all unwritten, and the E2E claim needs an
+> emulator (B-4) and a toolchain this sandbox cannot fetch (B-7).
+
+```bash
+grep -rn "PullPolicy\|ApplyDisposition" app/src/ ; echo "exit=$?"
+```
+
+*Expected:* no matches, `exit=1` — the policy is a tested `:core` unit and nothing more. Any
+future claim that S4 is DONE must first make this command return hits.

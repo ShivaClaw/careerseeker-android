@@ -1999,3 +1999,136 @@ by integration` on every iteration — silently, because the loop only tested fo
 would have run to timeout reporting nothing. The result above was read through the GitHub MCP
 check-runs endpoint instead. A watcher whose failure mode is silence is indistinguishable from a
 watcher seeing nothing happen, which is the same class of error as a grep that only matches success.
+
+## S4 (first half, phone side) — the pull decision, and a spec/engine mismatch it surfaced · 2026-08-09 · **PARTIAL**
+
+Fourth cloud iteration of the day, Linux sandbox. The assigned slice was S5's first half
+(§4.3.3, PQ-A2-1/-2/-3, the vectors). **That was already done** — twice over: the spec half landed
+this morning in the main repo's draft PR #32, and the phone applier landed at midday on this
+branch. Re-verified rather than assumed (C-S5B-6), and the prompt's own instruction to pick a
+different rung if a better one fits was taken.
+
+### S4.A-0 Why S4 and not the next line of the "next intent" list
+
+`STATE.md`'s next-intent list had four items and **three of them cannot be started here**: the C#
+`entitlement_ack` applier and the `/pair` route need .NET; B-6's inbound parser needs .NET; the
+SDK checkbox is Brandon's. The re-vendor slice is gated on PR #32 merging, which this session may
+not do.
+
+S4 was labelled `BLOCKED — B-4` on the strength of "needs S3's device key + an emulator for the
+claim to be E2E". That is true of the *E2E claim* and false of the rung's first two items, and the
+difference is checkable rather than arguable:
+
+- `pull_request` is **not** in `Protocol.STATE_CHANGING_KINDS` — on either side
+  (`Protocol.kt:52`, `src/Sync/Protocol.cs:52-55`). §5.4 therefore requires no envelope signature,
+  `OutboundEnvelopeFactory.build` emits it with `signer = null`, and the pull loop is **not**
+  downstream of S3's Keystore key at all.
+- Both halves it needs already exist in `:core`: `EnvelopeReceiver.receiveWire` and
+  `OutboundEnvelopeFactory.pullRequest`.
+
+So the decision layer between them is pure Kotlin/JVM, and `:core` is the module a cloud session
+*can* run (B-7's positive half). The E2E proof stays blocked; the decision does not.
+
+### S4.A-1 Baseline first
+
+`:core:test` on the untouched branch `db4ec49`, reduced probe: **76 tests, 0 failures, 0 skipped**,
+`BUILD SUCCESSFUL`. Same probe shape as S5.B and labelled the same way — `:core` only, toolchain
+substituted 17 → 21 because `api.foojay.io` is egress-denied (B-7). It is **not** the verification
+command of record: no `checkCoreIsAndroidFree`, no `:app:test`, no `assembleDebug`, no `lintDebug`.
+
+### S4.A-2 What was actually missing
+
+Two rules, both normative, both with **no implementation and no test in either codebase**:
+
+1. `ApplyResult.AwaitingSnapshot` was produced by `EnvelopeApplier` (`:app`) and **dropped by every
+   caller**. Its own doc comment says "the caller should ask the engine to re-publish"; no caller
+   did. S4's mission text names this exactly: "*currently returned and ignored*".
+2. §6.2's "treat a large gap as a signal to request a fresh `snapshot`, not as an error" had
+   nothing behind it anywhere — not in `:core`, not in `:app`, not in the engine, not in a vector.
+
+`PullPolicy` is the missing decision: pull-on-open, ask when a delta is refused for want of a
+snapshot, ask on a large gap, stay quiet otherwise.
+
+### S4.A-3 The finding: `since_seq` is specified as resumable and implemented as "send everything"
+
+This is the part worth an auditor's time, and it changed the design.
+
+§4.3 describes `pull_request` as "ask the engine to re-publish **from a sequence point**". The
+engine parses the field and then discards its meaning: `InboundDispatcher.cs:105-111` reads
+`since_seq` and passes it to `ISnapshotRepublisher.RepublishSnapshotAsync(since, ct)` — and
+**every implementation of that interface ignores the argument**. `LiveRepublisher`
+(`tests/SyncLiveSmoke/Program.cs:311-312`) calls `PublishSnapshotAsync(...)` unconditionally;
+`RecordingRepublisher` (`tests/SyncHarness/Program.cs:756-759`) only records the value. There is
+no shipping code path in which `since_seq` changes what is sent (C-S4A-3).
+
+So in v1 `pull_request` means exactly one thing — *send me a snapshot*.
+
+The phone therefore sends `since_seq: 0`, always, for every reason. The alternative — report the
+real high-water mark, which **looks** more honest — is the trap: it encodes a request the current
+engine ignores but a future one might honour, and if honoured the §6.2 gap case would come back as
+*deltas resuming after N* when §6.2 explicitly wants a snapshot. Zero is the only value that means
+"I hold nothing usable" to both the engine that exists and the engine that might. This is the
+mission's interpretation rule applied literally: match the engine, record the question. Recorded as
+**PQ-S4-1**, with both ways to close it and a recommendation.
+
+A test pins the zero, so a later "improvement" has to argue with a failing test rather than a
+comment.
+
+### S4.A-4 The second thing two fields prevent
+
+`ReplicaPosition` carries `snapshotSeen` **separately** from `highestAppliedSeq` because the two
+genuinely disagree: `EnvelopeApplier` gates only `delta` on `snapshotSeen`, so a `heartbeat` or
+`evidence` payload applies on a phone whose dashboard is empty and advances the mark. A policy
+keyed off the sequence number alone would reason "I am at seq 5, I must have state", stay silent
+forever, and leave the phone showing demo data indefinitely — nothing forces a delta to arrive from
+an idle engine. It is the same shape as the `snapshotSeen`-arrives-as-0 assertion B-5's migration
+test was written for: a number that implies state the replica never received.
+
+Two other decisions carry tests rather than comments. The policy **latches** — one gap produces one
+ask, not one per envelope, because a stalled sync answered with a burst of traffic is a worse
+failure than a slow one — and `MALFORMED` deliberately asks **nothing**, because a re-publish would
+reproduce the same bytes and convert a parse defect into an unbounded request loop.
+
+### S4.A-5 What ran
+
+Reduced `:core` probe, `--rerun-tasks`: **93 tests, 0 failures, 0 skipped**, `BUILD SUCCESSFUL` —
+76 + 17 new, all 17 `PullPolicyTest` cases named `PASSED`. Unlike S5.B's applier, this one **passed
+on its first run**; recorded because "green immediately" and "green after a fix" are different
+artifacts and the previous entry set the precedent of saying which.
+
+`git status --porcelain` after the code commit: exactly two `??` lines, both new. **No vendored
+vector's bytes were touched**, `VECTORS.lock` was not edited, the pin is still `679a317`, and the
+repo still holds 26 of upstream's 28 (C-S4A-5).
+
+### S4.A-6 What this does NOT establish, stated before anyone infers it
+
+`PullPolicy` has **no production caller**. `grep -rn "PullPolicy\|ApplyDisposition" app/src/`
+returns nothing, and that is the honest status: the mapping from `:app`'s `ApplyResult` onto
+`ApplyDisposition`, the relay push of the resulting envelope, the `:app` Ktor engine dependency
+(3.1.3) and the WSS route are all unwritten, and the E2E proof needs an emulator (**B-4**) plus a
+toolchain this sandbox cannot fetch (**B-7**). C-S4A-7 is written as the command that must start
+returning hits before anyone may call S4 `DONE`.
+
+S4 therefore moves **BLOCKED → PARTIAL**, which is a correction to a label rather than progress
+against the blocker: B-4 and B-7 are untouched and still block everything S4 needs to *prove*. The
+label was wrong in the direction that costs work — it told the next session there was an obstacle
+in front of a decision layer that had none.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo** — the android repo is never-self-merge and the main-repo
+merge policy is conditional on a full local gate this machine cannot run. PR #6 stays a **draft**;
+careerseeker PR #32 stays a draft and was not merged, retargeted, rebased or even checked out for
+writing. No force-push, no history rewrite, no branch created, moved or deleted beyond pushing this
+one. No existing vector's bytes changed, **nothing was re-vendored**, `VECTORS.lock` untouched. No
+`.cs`, `.ts`, Gradle, manifest or version-catalog file was modified — this slice is two new Kotlin
+files plus records. **No `:app` source, no screens, no Room schema, no `docs/Sync-Protocol.md`**
+(normative; this repo never edits it). No deploys of any kind (Cloudflare, Workers, relay, site,
+Pages); **the production relay was contacted zero times, not even `GET /v1/health`**; no relay code
+ran at all this iteration. No emulator, no `sdkmanager`, no AVD, and no attempt to route around the
+`dl.google.com` denial, which the proxy's own README says to report rather than work around. No
+Google, Play, OAuth or Console action; no accounts, no purchases, no Play Billing code; no email or
+Gmail anything; no cert-store, MSIX or keystore action — the upload keystore and its password file
+were neither read nor referenced beyond their paths. No secrets read, written or printed. Terra's
+state was read at iteration start and claims **no files**, so there was no collision; Terra's
+worktree is on a machine this session cannot reach.
