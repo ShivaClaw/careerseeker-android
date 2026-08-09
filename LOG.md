@@ -1089,3 +1089,137 @@ CI's result, not a local re-run, and S0.8's "tests not re-run" stands as written
 record: my sync clone had **no git identity**, so commits there are made with a per-invocation
 `git -c user.name/user.email` matching the android repo's existing identity. Nothing was written
 to global git config, and no persistent repo config was altered.
+
+---
+
+## S1 — The engine sync track lands in `main` · 2026-08-09 · **COMPLETE**
+
+S1 ran in the main repo (`careerseeker`), not here. It is logged in this file because S0 measured
+that it gates this repo's entire remaining roadmap: **S2, S4, S5 and S6 all edit files that did not
+exist on any branch anyone would build from.** Re-verification commands are in `AUDIT-REQUEST.md`
+§S1.
+
+### S1.1 Four PRs, re-cut rather than force-pushed
+
+The stack (#5 ⊂ #6 ⊂ #7 ⊂ #8) was **85 commits behind** `main`. Updating a live PR branch by rebase
+requires a force-push, which is embargoed this window — so each was **re-cut** onto fresh `main` as
+a new branch and PR, and the original closed with a comment naming its successor. No branch was
+deleted, which also keeps the android's vendored pin `679a317` reachable.
+
+| Was | Now | Merged as | Pin after |
+| --- | --- | --- | --- |
+| #5 P0 protocol + relay | **#27** | `7f3e61e` | 457 |
+| #6 P1 pairing | **#28** | `f0b9bd5` | 486 |
+| #7 P2 publisher | **#29** | `160b317` | 528 |
+| #8 P4 entitlement + outcomes | **#30** | (below) | 591 |
+
+Each: rebase → full local gate (`-IncludePublish -IncludePackage`, exit code read from a file, never
+off a pipe) → CI green → merge. `origin/main` was re-checked immediately before every merge to
+confirm it had not moved underneath the gate.
+
+### S1.2 Every pin measured, and why that was not pedantry
+
+The offline total moved **418 → 457 → 486 → 528 → 591**. Not one of those was computed on paper.
+The first run of each rung was left deliberately mismatched so the drift trap would report the real
+figure.
+
+That paid for itself at P1. The commit subject reads *"harness 39->60"*, which implies 457 + 21 =
+**478**. The measured answer was **486** — later commits on that branch carried SyncHarness to 68.
+A number derived from the commit message would have been wrong, and would have looked entirely
+reasonable in review.
+
+### S1.3 The conflicts were almost all one thing, until they weren't
+
+Nearly every conflict was a count-reporting doc — the drift trap working as designed. Those were
+resolved by taking `main`'s current text and re-applying only each branch's genuine contribution;
+the branches' stale snapshots of whole doc sections were discarded, because they described a repo
+that no longer exists (EngineHarness 89 vs 210, the pre-MSIX README).
+
+To keep that mechanical resolution honest, the loop that applied it **refused to touch any file
+outside a known doc set** and stopped for manual review otherwise. It stopped three times, and each
+was a real merge:
+
+- **`src/Engine/Host.cs`** (twice — a declared pinch point). `main` had grown
+  `pauseRequested`/`maximumBackoff` and live scheduler-state reporting; the branch wrapped the tick
+  to publish after each cycle; P4 added the Pro seam. All three survive: the sync publish is
+  composed into the tick handed to the backoff-aware scheduler, so a flaky relay still cannot stall
+  the engine, and `main`'s dashboard accessibility work (`role=region`, `scope=col`, `sr-only`
+  caption) now coexists with P4's funnel panel and Outcome column instead of one overwriting the other.
+- **`tests/EngineHarness/Program.cs`** — `main` had fixed a bug where a hard-coded port silently
+  skipped 19 assertions. That fix survives *alongside* P4's Pro seam.
+
+### S1.4 Three breakages the gate caught that reading the diff would not have
+
+1. **`CS1503`, twice.** A constructor argument passed positionally that is no longer that
+   parameter, because `main` grew parameters ahead of it. After the second occurrence all **11**
+   `LocalDashboard`/`EngineHost` construction sites were audited rather than fixing only what the
+   compiler named; every other site already used named arguments.
+2. **An unhandled `TaskCanceledException` that killed a whole harness.** P4's Pro assertions request
+   `http://localhost:7777`; `main` had moved that section to a free port because HTTP.sys keeps 7777
+   reserved after a real dashboard run. **The compiler cannot see this.** The symptom was not a
+   failed assertion but the harness dying on a 3-second timeout. `main`'s own fix exists because the
+   same hazard had previously left *"19 assertions quietly not running"* — P4 predates the fix and
+   reintroduced the assumption.
+3. **A stale instruction in `docs/Scoring-Calibration.md`**, which told readers EngineHarness "must
+   report 170 passed". The verifier only asserts the doc *contains* that string, so it would have
+   kept passing while misleading every reader who followed it. Moved with the measurements.
+
+(2) is the one worth remembering: **a green build proves nothing about it.** Only running the
+harnesses does.
+
+### S1.5 The hard stop, and the cross-repo check that matters to this repo
+
+S1's standing rule is that a rebase moves commits, not bytes; changed vector *content* is a
+cross-repo drift event and a full stop. Measured per rung — 16, 22, 22, 27 vector files compared
+against each pre-rebase branch — **0 drift, every time.**
+
+The check that matters here is the other one:
+
+```
+this repo's pin 679a317  vs  the landing branch
+  26 vector files compared, 0 differences
+```
+
+`main` now carries vectors **byte-identical** to what `:core` already vendors. C-S0-1 flagged that
+the pin was reachable only through an unmerged branch; that is no longer true of the *content*. The
+pin still names a non-`main` commit, so re-pinning is queued as tidy-up — to be done by comparing
+content, never by assuming.
+
+### S1.6 What is now unblocked, and what is not
+
+`relay/`, `src/Sync/`, `docs/Sync-Protocol.md`, `docs/sync-vectors/` and `tests/SyncHarness` are in
+`main` for the first time. **B-2 is not closed** — `--sync` is still honored-but-no-op without a
+pairing vault, exactly as `Program.cs::BuildSyncBridge` documents in place. That seam now specifies
+precisely what S2 must build: a DPAPI pairing vault persisting **both** `last_e2p_seq` and
+`last_p2e_seq` (§6.1 applies in both directions), publisher construction, the `/pair` page, and the
+inbound pull loop.
+
+### S1.7 What was not touched
+
+No deploys. `SyncLiveSmoke` was **not run** — it is a live smoke against the relay, and contacting
+the relay beyond `GET /v1/health` is embargoed; the live Worker still predates P2/P4 regardless.
+The relay was not contacted at all during S1. `docs/P1-Evidence.md` and `docs/P2-Evidence.md`
+describe July live runs: those were carried across the rebase as historical evidence and are **not
+re-asserted** here. `Documents\CareerSeeker` and Terra's `CareerSeeker-r6-sbom` worktree were never
+read or written. No Google/Play/OAuth console, no accounts, no purchases, no Play Billing code, no
+Gmail, no secrets, no `.appdata` originals, no `Desktop\site-v2`. No force-push, no history rewrite,
+no branch deletion. Nothing in the android repo was merged, and no android PR left draft.
+
+### S1.8 Final state, measured against merged `main`
+
+All four merged. Final `main` = **`a8ef552`**. Re-run against the merged result, not the branches:
+
+```
+sync-track paths on origin/main        0  (at S0)  ->  54
+$ExpectedOfflineTotal on origin/main                    591
+android pin 679a317 vs origin/main     26 vector files compared, 0 differences
+```
+
+The S0 finding is fully reversed. The protocol spec, the 26 shared vectors, the blind relay and the
+C# sync sources are in `main`, and the phone's vendored vectors are byte-identical to them.
+
+| Rung | Status |
+| --- | --- |
+| S0 re-entry + derivation | **DONE** |
+| S1 land the engine sync track | **DONE** — 4 PRs merged, 0 vector drift |
+| S2 engine publishes for real | **NEXT** — B-2 still open, seam now specified |

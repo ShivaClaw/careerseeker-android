@@ -744,3 +744,111 @@ content was "this specific step has never executed here" — so an overall-green
 have closed it. This run also exercised the full gate on a clean Linux checkout (`:core` tests,
 `:app` Robolectric tests, debug APK, lint, no-analytics assertion), which is **CI's** result and
 not a local re-run; S0 touched no source and the gate was deliberately not re-run on this machine.
+
+---
+
+## S1 — the engine sync track lands in the main repo (2026-08-09)
+
+S1 ran in `careerseeker`, not here, but it is what unblocks this repo's roadmap, and the
+cross-repo vector check below is the one an android auditor should care about most.
+`$S` is the main-repo clone.
+
+### C-S1-1 — The four PRs were re-cut, not force-pushed, and the originals are closed as superseded
+
+```powershell
+gh pr list --repo ShivaClaw/careerseeker --state all --limit 12 `
+  --json number,title,state,headRefName --jq '.[] | "\(.number) \(.state) \(.headRefName)"'
+```
+
+*Expected:* #27/#28/#29/#30 `MERGED` on `claude/s1-*` branches, and #5/#6/#7/#8 `CLOSED`.
+Force-push and history rewrite are embargoed this window, so a rebase of a live PR branch was not
+available; each PR was re-cut onto fresh `main` and the original closed with a comment saying what
+superseded it. **No branch was deleted** — which also keeps pin `679a317` reachable (see C-S1-3).
+
+### C-S1-2 — Every pin was measured, never carried over
+
+> **Claim.** The offline total moved 418 → 457 → 486 → 528 → 591, each figure produced by running
+> the verifier rather than by arithmetic on a commit message.
+
+```powershell
+git -C $S log --oneline -30 -- scripts/Verify-Alpha.ps1
+git -C $S show origin/main:scripts/Verify-Alpha.ps1 | Select-String 'ExpectedOfflineTotal = '
+```
+
+*Expected:* final pin **591**. The per-rung deltas are recorded in the pin's own comment block.
+
+**Why this is worth checking rather than trusting:** at P1 the commit subject said
+*"harness 39->60"*, which implies 478. The real total was **486** — the branch's later commits took
+SyncHarness to 68. A plausible-looking number computed from a commit message would have been wrong
+and would still have looked right in review.
+
+### C-S1-3 — Cross-repo: `main` now carries vectors byte-identical to this repo's pin
+
+> **Claim.** The vendored vectors here (`VECTORS.lock` pin `679a317`) are byte-identical to what
+> now sits in the main repo's `main`. Landing the stack did not desynchronise the two repos.
+
+```powershell
+$pin='679a3175590dcd021b21c85af9daf12114e131fd'
+$n=0; $m=0
+foreach ($f in (git -C $S ls-tree -r --name-only $pin -- docs/sync-vectors/v1)) {
+  $a = git -C $S rev-parse "${pin}:$f"
+  $b = git -C $S rev-parse "origin/main:$f"
+  $n++; if ($a -ne $b) { $m++; "DIFFERS: $f" }
+}
+"compared=$n differences=$m"
+```
+
+*Expected:* `compared=26 differences=0`.
+
+**The state this changes.** Before S1, pin `679a317` was reachable **only through an unmerged
+branch** — C-S0-1 recorded that as a caveat. It is now content-identical to `main`. The pin itself
+still names a non-`main` commit, so re-pinning to a `main` commit is queued as follow-up work; it
+is a tidiness fix, not a correctness one, and it must be done by comparing content, not by assuming.
+
+### C-S1-4 — The rebase moved commits, not bytes
+
+```powershell
+# per rung, comparing each re-cut branch against its pre-rebase original
+git -C $S diff --stat origin/claude/p4-entitlement origin/claude/s1-p4-entitlement -- docs/sync-vectors
+```
+
+*Expected:* no differences under `docs/sync-vectors`. Measured per rung: 16, 22, 22, 27 files
+compared, **0 drift** every time. This was S1's hard stop — changed vector *content* would have been
+a cross-repo drift event and a full stop, not a merge conflict to resolve.
+
+### C-S1-5 — The three breakages the gate caught that reading would not have
+
+> **Claim.** Rebasing an 85-commit-stale stack broke three things, and each was caught by running
+> the gate rather than by inspecting the diff.
+
+```powershell
+git -C $S show origin/main --stat | Select-String 'Host.cs|Program.cs|EngineHarness'
+git -C $S log origin/main --oneline --grep='Re-derive the offline pin'
+```
+
+*Expected:* four "Re-derive the offline pin" commits, whose messages record:
+
+1. **`CS1503` in `src/Engine/Program.cs`** (twice, P2 and P4) — a constructor argument passed
+   positionally that is no longer that parameter, because `main` grew parameters ahead of it. After
+   the second occurrence all 11 `LocalDashboard`/`EngineHost` call sites were audited, not just the
+   one the compiler named.
+2. **An unhandled `TaskCanceledException` in `EngineHarness`** — P4's Pro assertions hit a
+   hard-coded `localhost:7777`, but `main` had moved that section to a free port because HTTP.sys
+   keeps 7777 reserved. **The compiler cannot see this**, and the symptom was the whole harness
+   dying on a 3-second timeout, not a failed assertion. `main`'s own fix exists because the same
+   hazard had previously left *"19 assertions quietly not running"*.
+3. **A stale instruction in `docs/Scoring-Calibration.md`** — it told readers EngineHarness "must
+   report 170 passed". The verifier only asserts the doc *contains* that string, so it would have
+   kept passing while misleading every reader. Moved 170 → 186 → 210 with the measurements.
+
+*Expected conclusion:* a green build proves nothing about (2). Only running the harnesses does.
+
+### C-S1-6 — The load-bearing invariant survived verbatim
+
+```powershell
+git -C $S show origin/main:src/Engine/EngineSyncBridge.cs | Select-String -Context 3 '_snapshotSent, 1'
+```
+
+*Expected:* the flag flips **only** after a successful push (`if (ok) Volatile.Write(...)`), with the
+2026-07-24 audit-finding comment intact. A failed first snapshot is retried and never demoted to a
+delta — which is what stops a fresh phone merging deltas into demo fixture rows.

@@ -6,8 +6,9 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 
 | | |
 | --- | --- |
-| **Heartbeat** | 2026-08-08T15:07:57-06:00 |
-| **Rung** | **S0 — DONE.** Next: S1 (rebase/land engine stack, main repo) |
+| **Heartbeat** | 2026-08-09 (S1 close-out) |
+| **Rung** | **S0 DONE · S1 DONE.** Next: S2 (engine publishes for real — closes B-2) |
+| **S1 result** | PRs #27/#28/#29/#30 merged; `main` = `a8ef552`; pin **591**; sync-track paths on main **0 → 54**; vector drift **0** in every check |
 | **Android branch** | `claude/android-a0-probe` @ `d839e48` |
 | **Android health** | green — **CI run `31278769047` success** (vectors, `:core`, `:app`, APK, lint, no-analytics). Not re-run locally this rung; no source touched. |
 | **Draft PR** | [#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) — `a0-probe` → base `claude/p2-replica`, with self-audit |
@@ -28,16 +29,21 @@ Android tree only, documentation surface only:
 
 ## Next intent
 
-S1 — rebase the engine sync stack onto `origin/main` `3a89fb5`, in order:
+**S2 — close B-2: make the engine publish for real.** `Program.cs::BuildSyncBridge` now specifies
+exactly what is needed, and S1 put the code it extends into `main`:
 
-1. PR #5 `claude/android-apk-build-setup-90d9d5` (3 commits)
-2. PR #6 `claude/p1-sync` (6)
-3. PR #7 `claude/p2-publisher` (13) — *"failed first snapshot is retried, never demoted to delta"* must survive verbatim
-4. PR #8 `claude/p4-entitlement` (21)
+1. A **DPAPI pairing vault** persisting `last_e2p_seq` **and** `last_p2e_seq` — §6.1 applies in both
+   directions. An engine resuming e2p at 1 would have every envelope rejected as a replay; one
+   resuming p2e at 0 would re-accept an already-applied entitlement.
+2. Construct the publisher at the seam (`SyncPublisher` with `startSeq = max(vault, relay latest)`)
+   and the inbound pull loop feeding `InboundDispatcher`.
+3. The desktop **`/pair` page** (pairing code + QR) feeding `PairingManager`.
+4. **E2E against a LOCAL relay** under miniflare/vitest. **Never a deploy.**
 
-All four are 85 behind. Each: rebase → full local gate (`Verify-Alpha.ps1 -IncludePublish -IncludePackage`) → CI green → merge sequentially (main-repo merge is permitted this window; android is never-self-merge). `$ExpectedOfflineTotal` must be re-derived — Terra last measured **412** — with the full drift-trap sweep across every count-reporting doc.
+`--sync` stays default OFF (opt-in, privacy-load-bearing per `docs/Sync-Consent-Copy.md`).
 
-**Stop condition for S1:** if rebasing changes vendored-vector *content*, that is a cross-repo drift event → BLOCKED, human unblock. Rebases move commits, not bytes; content change means something else happened.
+**Not doing:** `SyncLiveSmoke` against the production relay — embargoed, and the live Worker still
+predates P2/P4. Its redeploy is a return-day human item.
 
 ## Open blockers
 
