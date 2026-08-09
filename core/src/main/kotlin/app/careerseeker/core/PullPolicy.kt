@@ -1,0 +1,221 @@
+package app.careerseeker.core
+
+/**
+ * The replica's position **as of before** the envelope under consideration was applied.
+ *
+ * Two fields rather than one because they answer different questions and can disagree. A phone
+ * that has applied a `heartbeat` at seq 5 but has never received a `snapshot` has
+ * `highestAppliedSeq = 5` and `snapshotSeen = false`: it is *ahead* in the stream and *empty* in
+ * the dashboard at the same time. Collapsing these into one number is how a receiver ends up
+ * believing it holds state it has never been sent.
+ *
+ * @property snapshotSeen whether a full `snapshot` (§4.3.1) has ever been applied. The replica's
+ *   persisted flag, not an in-memory guess — it must survive a process restart.
+ * @property highestAppliedSeq the persisted e2p high-water mark. Note this is the highest
+ *   **applied** seq, not the highest *accepted* one: [EnvelopeReceiver] commits a seq the moment
+ *   an envelope is authentic, which happens even for a `delta` the replica then refuses.
+ */
+data class ReplicaPosition(
+    val snapshotSeen: Boolean,
+    val highestAppliedSeq: Long,
+)
+
+/**
+ * What the replica did with one decrypted envelope, reduced to the cases the pull decision turns
+ * on.
+ *
+ * This is deliberately a `:core` type mirroring `:app`'s `ApplyResult` rather than that type
+ * itself. `ApplyResult` lives in `:app` because it is produced by Room-backed code, and `:core`
+ * must stay Android-free (`checkCoreIsAndroidFree`). The mapping is one `when` in the transport
+ * layer, and the narrowing is the point: the pull decision must not be able to depend on which
+ * *kind* was applied beyond the snapshot/not-snapshot distinction it genuinely needs.
+ */
+enum class ApplyDisposition {
+    /** A full `snapshot` landed. The only disposition that can satisfy an outstanding request. */
+    APPLIED_SNAPSHOT,
+
+    /** Some other payload changed the replica (`delta`, `heartbeat`, `evidence`). */
+    APPLIED,
+
+    /** A `delta` arrived before any snapshot; nothing changed (`ApplyResult.AwaitingSnapshot`). */
+    AWAITING_SNAPSHOT,
+
+    /** At or below the persisted high-water mark — already applied. */
+    STALE,
+
+    /** A valid kind the replica does not project yet (`doc`, `conflict`…). */
+    IGNORED,
+
+    /** The plaintext did not parse as the expected payload shape. Nothing changed. */
+    MALFORMED,
+}
+
+/** Why the phone is asking the engine to re-publish. Diagnostic; it never rides the wire. */
+enum class PullReason {
+    /** Opened with no snapshot ever applied — §6.2's "arrived mid-stream". */
+    COLD_START,
+
+    /** A `delta` was refused for want of a snapshot (§4.3.1). */
+    AWAITING_SNAPSHOT,
+
+    /** The seq gap exceeded [PullPolicy.gapThreshold] — §6.2's "large gap". */
+    SEQUENCE_GAP,
+}
+
+/** Whether the transport should emit a `pull_request` (§4.3) after handling an envelope. */
+sealed interface PullDecision {
+    /** Ask nothing. */
+    data object None : PullDecision
+
+    /**
+     * Emit `pull_request` with this body. Build it with
+     * [OutboundEnvelopeFactory.pullRequest] — it is not a state-changing kind (§5.4), so it
+     * needs no device signature and therefore works before a Keystore key exists.
+     */
+    data class Request(val sinceSeq: Long, val reason: PullReason) : PullDecision
+}
+
+/**
+ * Decides when the phone asks the engine to re-publish (§4.3 `pull_request`, §6.2).
+ *
+ * The transport loop this serves is: pull envelopes from the relay → [EnvelopeReceiver.receiveWire]
+ * → hand accepted plaintext to the replica's applier → ask this policy what to do about the
+ * result → if it says [PullDecision.Request], build one envelope and push it. Everything except
+ * the applier step is `:core`, which is why this type can be tested without Room, an emulator, or
+ * a device key.
+ *
+ * ## `since_seq` is always zero, and that is the interesting decision
+ *
+ * §4.3 describes `pull_request` as "ask the engine to re-publish **from a sequence point**",
+ * which reads like resumption. The engine does not implement resumption: `InboundDispatcher`
+ * parses `since_seq`, hands it to `ISnapshotRepublisher.RepublishSnapshotAsync(sinceSeq)`, and
+ * every implementation of that interface ignores the argument and publishes a **full snapshot**
+ * (`LiveRepublisher` calls `PublishSnapshotAsync` unconditionally). So in v1 `pull_request` means
+ * exactly one thing: *send me a snapshot*.
+ *
+ * Given that, the phone sends `0`. The tempting alternative — report the honest high-water mark,
+ * `since_seq = highestAppliedSeq` — is *worse*, and worse in a way that would not show up until
+ * later. It encodes a request the current engine ignores but a future one might honour, and if it
+ * were honoured the gap case would come back as **deltas resuming after N** when §6.2 explicitly
+ * requires a fresh snapshot. Zero is the only value that means "I hold nothing usable, send
+ * everything" under both the engine that exists and the engine that might.
+ *
+ * The mission's interpretation rule is the tie-breaker: where the protocol is ambiguous, match the
+ * engine and record the question. Recorded as PQ-S4-1 in `docs/protocol-questions.md`.
+ * [PullPolicyTest] pins the zero so a later "improvement" has to argue with a failing test.
+ *
+ * ## One request at a time
+ *
+ * A phone awaiting a snapshot may be handed many deltas in one pull page, and a large gap is
+ * usually followed by more envelopes on the far side of it. Emitting one `pull_request` per
+ * envelope would answer a stalled sync with a burst of traffic. The policy therefore latches:
+ * once it has asked, it returns [PullDecision.None] until an [ApplyDisposition.APPLIED_SNAPSHOT]
+ * satisfies the request, or the caller reports the push failed via [onRequestFailed].
+ *
+ * Not thread-safe: drive it from the single coroutine that owns the transport loop.
+ *
+ * @param gapThreshold how large a seq gap must be before it counts as §6.2's "large gap". The
+ *   protocol says a large gap is a signal to request a snapshot but pins **no number**, and the
+ *   engine has no opinion because the engine never sends `pull_request` — it only answers one. So
+ *   this is phone-side policy, not protocol, which is why it is a parameter with a stated default
+ *   rather than a constant in [Protocol]. Also recorded as PQ-S4-1.
+ */
+class PullPolicy(val gapThreshold: Long = DEFAULT_GAP_THRESHOLD) {
+
+    init {
+        require(gapThreshold >= 1) { "gapThreshold must be at least 1, was $gapThreshold" }
+    }
+
+    private var pending = false
+
+    /** True once a request has been issued and not yet satisfied or released. */
+    val hasPendingRequest: Boolean get() = pending
+
+    /**
+     * Called when the transport opens (app start, resume, reconnect) — S4's "pull on open".
+     *
+     * A phone that has never applied a snapshot asks for one immediately rather than waiting for
+     * a `delta` to be refused. Waiting would mean an idle engine leaves the phone showing demo
+     * data indefinitely, since nothing forces a delta to arrive.
+     */
+    fun onOpen(position: ReplicaPosition): PullDecision =
+        if (position.snapshotSeen) PullDecision.None else request(PullReason.COLD_START)
+
+    /**
+     * Called once per envelope, after the replica has applied it.
+     *
+     * @param envelopeSeq the e2p seq of the envelope just handled.
+     * @param disposition what the replica did with it.
+     * @param positionBefore the replica's position **before** this envelope was applied. Reading
+     *   it after would fold this envelope's own seq into the high-water mark and hide every gap.
+     */
+    fun onEnvelope(
+        envelopeSeq: Long,
+        disposition: ApplyDisposition,
+        positionBefore: ReplicaPosition,
+    ): PullDecision = when (disposition) {
+        // The request is satisfied by the snapshot itself, not by having sent the ask. Clearing
+        // here (rather than when the push succeeds) is what makes the latch self-healing: a
+        // snapshot the engine sent for its own reasons also releases it.
+        ApplyDisposition.APPLIED_SNAPSHOT -> {
+            pending = false
+            PullDecision.None
+        }
+
+        ApplyDisposition.AWAITING_SNAPSHOT -> request(PullReason.AWAITING_SNAPSHOT)
+
+        ApplyDisposition.APPLIED ->
+            when {
+                // Applied something without ever holding a snapshot -- a heartbeat or evidence
+                // payload on a fresh phone. The stream is moving but the dashboard is empty, so
+                // ask. This also makes the policy correct for a caller that never called onOpen.
+                !positionBefore.snapshotSeen -> request(PullReason.COLD_START)
+
+                envelopeSeq - positionBefore.highestAppliedSeq > gapThreshold ->
+                    request(PullReason.SEQUENCE_GAP)
+
+                else -> PullDecision.None
+            }
+
+        // None of these justify traffic. STALE means re-delivery, which is normal. IGNORED means
+        // a kind this build does not project -- re-sending it would produce the same result.
+        // MALFORMED is the one worth stating: a re-publish would very likely reproduce the same
+        // bytes, so asking again turns a parse bug into a request loop. A malformed payload is a
+        // defect to report, not a gap to fill.
+        ApplyDisposition.STALE, ApplyDisposition.IGNORED, ApplyDisposition.MALFORMED ->
+            PullDecision.None
+    }
+
+    /**
+     * Release the latch after a `pull_request` failed to reach the relay.
+     *
+     * Without this a single failed push would silence the policy for the life of the process:
+     * it would believe a request was outstanding that the engine never received.
+     */
+    fun onRequestFailed() {
+        pending = false
+    }
+
+    private fun request(reason: PullReason): PullDecision {
+        if (pending) return PullDecision.None
+        pending = true
+        return PullDecision.Request(SINCE_SEQ_FULL_REPUBLISH, reason)
+    }
+
+    companion object {
+        /**
+         * The only `since_seq` v1 sends. See the class doc — `pull_request` means "send me a
+         * snapshot", and zero is the value that says so to any engine.
+         */
+        const val SINCE_SEQ_FULL_REPUBLISH = 0L
+
+        /**
+         * Default for [gapThreshold]. Chosen, not derived: the engine publishes roughly one
+         * envelope per cycle plus heartbeats, so a gap this size means the phone was away long
+         * enough that the relay's TTL has plausibly purged what it missed — the situation §6.2
+         * describes. Tune it with evidence from a real deployment; there is none yet, and a
+         * number presented as measured when it was picked would be worse than an honest default.
+         */
+        const val DEFAULT_GAP_THRESHOLD = 32L
+    }
+}
