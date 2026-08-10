@@ -1816,3 +1816,131 @@ The previous iteration left C-S6A-9 open: the android gate had not reported on t
 job *Build and test*, **`conclusion: success`**, 17:14:21 → 17:22:00 UTC, on head `9f73226` — the
 commit carrying `OutcomeMarkPolicy`. S6's marking decision is now **gate-verified**, not
 probe-verified. The `115 / 0 / 0` count remains a probe measurement; CI proves green, not the number.
+
+---
+
+## S4 spec half — `pull_request` semantics, PQ-S4-1 closed · 2026-08-10 (seventh cloud iteration)
+
+The slice is **one documentation commit in the main repo** (`9399d11` on
+`claude/s4-pull-request-semantics`, stacked on PR #32) plus these records. It changes no code in
+either repo, and that is the claim an auditor should test hardest: option (a) was chosen precisely
+*because* both implementations already conform, so if either does not, the amendment is wrong.
+
+### C-S4S-1 — The amendment says what this section says it says
+
+> **Claim.** §4.3's `pull_request` row no longer promises resumption; a new §4.3.4 pins the body
+> with three MUSTs (send `0`, ignore the value, do not reject a non-zero); §6.2 states the gap
+> threshold is receiver policy; §9's amendments table records both changes.
+
+```bash
+cd careerseeker && git fetch origin claude/s4-pull-request-semantics
+git show origin/claude/s4-pull-request-semantics:docs/Sync-Protocol.md \
+  | grep -n "sequence point\|4.3.4\|RESERVED in v1\|receiver policy"
+```
+
+*Expected:* **no match for "sequence point"** — its removal is the point of the change — and matches
+for the other three. The diff is `git diff origin/claude/s5-entitlement-ack-spec..origin/claude/s4-pull-request-semantics`:
+one file, `docs/Sync-Protocol.md`, 74 insertions / 2 deletions.
+
+### C-S4S-2 — The engine conforms to the amendment already, unchanged
+
+> **Claim.** The engine parses `since_seq`, hands it to `ISnapshotRepublisher`, and **every**
+> implementation ignores the argument — so "ignore the value, answer a full snapshot" describes
+> shipping behaviour rather than requesting new behaviour. No rejection path reads the field.
+
+```bash
+cd careerseeker && grep -n "pull_request" -A 7 src/Sync/InboundDispatcher.cs
+grep -rn "RepublishSnapshotAsync" --include=*.cs .
+grep -rn "since_seq\|SinceSeq" --include=*.cs src/Sync/ | grep -i "reject\|error\|throw"
+```
+
+*Expected:* `InboundDispatcher.cs:105-111` reads `ReadSinceSeq` and passes it on; exactly two
+implementations, `tests/SyncLiveSmoke/Program.cs:311-312` (calls `PublishSnapshotAsync`
+unconditionally — the argument is unused) and `tests/SyncHarness/Program.cs:756-758` (assigns it to
+`LastSince` and returns). The third command returns **nothing**: no rejection path reads the field.
+
+### C-S4S-3 — The phone conforms to the amendment already, unchanged
+
+> **Claim.** `PullPolicy` sends `0` for every reason it asks, pinned by a test, and the §6.2
+> threshold is a constructor parameter defaulting to 32 and labelled chosen-not-measured.
+
+```bash
+cd careerseeker-android && grep -n "SINCE_SEQ_FULL_REPUBLISH\|gapThreshold" \
+  core/src/main/kotlin/app/careerseeker/core/PullPolicy.kt
+grep -rn "since_seq zero" core/src/test/kotlin/app/careerseeker/core/PullPolicyTest.kt
+```
+
+*Expected:* `const val SINCE_SEQ_FULL_REPUBLISH = 0L`, a `gapThreshold` parameter defaulting to 32,
+and the test `every reason sends since_seq zero`. **No Kotlin was written this slice** — this
+command documents that the code the amendment describes already existed and was not edited:
+`git diff origin/claude/android-a0-probe -- core/ app/` is empty.
+
+### C-S4S-4 — `:core` is green, and it is a probe rather than the gate
+
+> **Claim.** `:core` measured **115 tests / 0 failures / 0 skipped**, `BUILD SUCCESSFUL` — unchanged
+> from the S6 slice's count, as expected for a documentation-only iteration.
+
+Recipe: **C-S6A-1** (reduced probe, `:core` only, Maven Central only, toolchain 17 → 21). Measured
+here `BUILD SUCCESSFUL in 1m 32s`, then counted from the JUnit XML rather than read off the console,
+because Gradle does not print totals:
+
+```bash
+python3 -c "
+import glob,xml.etree.ElementTree as ET
+t=f=s=0
+for p in glob.glob('core/build/test-results/test/*.xml'):
+    r=ET.parse(p).getroot()
+    t+=int(r.get('tests',0)); f+=int(r.get('failures',0))+int(r.get('errors',0)); s+=int(r.get('skipped',0))
+print(t,f,s)"
+```
+
+*Expected:* `115 0 0`. **This is not the gate** — the gate is CI (C-S6A-8/-9); `:app`, AGP and every
+`androidx` artifact come from `dl.google.com`, a policy denial here (B-7).
+
+### C-S4S-5 — The new finding: `pull_request` over-reports exactly as `outcome` does
+
+> **Claim.** `InboundDispatcher` returns `SnapshotRepublished` **outside** its null check, so an
+> engine with no republisher configured reports a snapshot it never sent — the same shape PQ-S6-1
+> records for `outcome`, on a second kind. Found while verifying C-S4S-2. **Not fixed: C#, and this
+> sandbox has no .NET.**
+
+```bash
+cd careerseeker && sed -n '96,112p' src/Sync/InboundDispatcher.cs
+```
+
+*Expected:* both `case "outcome"` and `case "pull_request"` guard their applier/republisher call
+with `is not null` and then `return new InboundResult(...Applied/Republished...)` unconditionally.
+An auditor wanting the consequence should note the two differ in severity — a dropped `outcome`
+loses a user's mark, a dropped `pull_request` loses only a request the phone will re-issue on the
+next open (`PullPolicy`'s latch).
+
+### C-S4S-6 — No vector moved, none was added, and the cross-repo pin is untouched
+
+> **Claim.** Zero vector drift. The generator still reports **28** files, the same count as before
+> this slice, so the android repo's vendored pin `679a317` (26 files) and `$ExpectedOfflineTotal`
+> (598) are untouched **by construction** — no `.cs`, no harness, no vector byte, no count-reporting
+> doc.
+
+```bash
+cd careerseeker && node docs/sync-vectors/generate.mjs --check ; echo "exit=$?"
+git diff origin/claude/s5-entitlement-ack-spec..origin/claude/s4-pull-request-semantics --stat
+```
+
+*Expected:* `OK: 28 vector files match the generator.`, `exit=0`, and a one-file diffstat naming
+only `docs/Sync-Protocol.md`. **Measured here, both.**
+
+### C-S4S-7 — What this slice did NOT verify
+
+> **Claim.** No gate ran on the amendment. `Verify-Alpha.ps1` was **not** run and cannot be here (no
+> .NET); the android gate was **not** run and cannot be here (no SDK/JBR, and B-7). The amendment is
+> documentation, so the honest statement is that CI on the main repo is the gate and it has not yet
+> reported on this branch at the time of writing.
+
+```bash
+# MCP: pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker pullNumber=<this PR>
+```
+
+*Expected:* both jobs `success`, and `Offline total: 598 passed, 0 failed` unchanged. **If the
+offline total is anything other than 598, this slice's central claim — that a documentation change
+cannot move the pin — is false and the entry above is wrong.** That is the cheapest possible test of
+it, and it is the reason the number is repeated here rather than referenced.

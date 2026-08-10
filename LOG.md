@@ -2483,3 +2483,139 @@ Gmail anything; no cert-store, MSIX or keystore action — the upload keystore a
 were neither read nor referenced beyond their paths. No secrets read, written or printed. Terra's
 state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged at
 2026-08-07T21:18, **claims no files** — no collision, and `relay/` was never Terra's territory.
+
+---
+
+## S4 spec half — `pull_request` is a snapshot request · 2026-08-10 (seventh cloud iteration, Linux sandbox)
+
+**The slice the schedule proposed was already done.** The standing prompt nominated S5's spec half —
+amend §4.3 for `entitlement_ack`, add the vector, close PQ-A2-1/-2/-3 — and named S5 as "NOT
+STARTED". Fetching first and reading the records showed otherwise: §4.3.3 and the two ack vectors
+landed on 2026-08-09 (PR #32, still an unmerged draft), PQ-A2-1 was closed, re-opened and re-closed
+the same day, PQ-A2-2 was closed, and the *phone* applier landed with 9 tests. Redoing it would have
+produced either a no-op or a duplicate section. **PQ-A2-3 remains open on purpose** — it is B-6, and
+the reason is engine-side (below).
+
+So the rung actually available was the topmost one with a half that runs on this machine, and the
+records already named it: **PQ-S4-1**, S4's open spec question, whose recommended answer is pure
+documentation of behaviour that both codebases already ship.
+
+### S4S-1 What the question was, and why option (a) is not a compromise
+
+§4.3 promised `pull_request` would "ask the engine to re-publish **from a sequence point**." No
+implementation has ever done that. The engine parses `since_seq` and hands it to
+`ISnapshotRepublisher.RepublishSnapshotAsync(sinceSeq)`; **both** implementations of that interface
+ignore the argument — `LiveRepublisher` republishes unconditionally, `RecordingRepublisher` only
+records the value so the harness can assert it round-tripped. The phone always sends `0`.
+
+The tempting reading is that the spec describes a feature and the code has not caught up. It does
+not. **Resumption contradicts §6.2**, which defines a large gap as a signal to request *a fresh
+`snapshot`* — and a resumable pull has no way to express "start over". The two features want the
+same kind to mean opposite things, so implementing the spec as written would have made §6.2
+unsatisfiable, not completed it. Documenting what ships is the correct direction here, and the fact
+that **neither side needed a line changed** is the evidence.
+
+### S4S-2 What landed
+
+Main repo, `claude/s4-pull-request-semantics` (stacked on PR #32), commit `9399d11`, **74 insertions
+/ 2 deletions in one file**:
+
+- §4.3's row: a whole-snapshot request; `since_seq` **reserved**, MUST be `0`, MUST be ignored.
+- New **§4.3.4** with the body, the three MUSTs, the measured engine/phone behaviour at file:line,
+  why a v2 wanting resumption needs a new shape rather than a widened field, and the field-name
+  collision with §4.3.1's `delta.since_seq` — same name, different field, and *that* one is live.
+- §6.2: the "large gap" threshold is **receiver policy**, v1 pins no number, and a receiver SHOULD
+  say whether its value was measured or chosen.
+- §9's amendments table: two rows, so the change is auditable rather than silent.
+
+**One rule was added beyond what PQ-S4-1's option (a) asked for**: a receiver MUST NOT *reject* a
+non-zero `since_seq`. "Reserved" invites validation, and this is a reserved **field**, not one of
+§4.3's reserved **kinds**, which MUST be rejected as `unknown_kind`. Rejecting an unknown kind
+refuses traffic v1 cannot understand; rejecting this field would refuse a request v1 understands
+perfectly and stall the stream on a forward-compatible sender. §4.3.4 states the asymmetry rather
+than leaving a reader to derive it, because deriving it wrong is silent.
+
+### S4S-3 The vector that was deliberately not added
+
+A `pull_request` vector was considered and rejected, and the reasoning is worth keeping because it
+is the second time this iteration series has had to reason about the drift trap.
+
+§4.3.4's content is three **behavioural** MUSTs. A static vector cannot observe that a receiver
+answered with a snapshot, nor that it declined to reject — so the vector would have pinned a body
+shape (`{since_seq: 0}`) that nothing disputes while testing none of the rules that matter.
+
+And it would not have been free. `SyncHarness` **enumerates** every `type: "envelope"` vector on
+disk (`tests/SyncHarness/Program.cs:59-62`, then the "classifies every vector correctly" loop), so
+an envelope-typed addition adds assertions and moves `$ExpectedOfflineTotal` — **a number this
+sandbox cannot measure, having no .NET.** That is exactly the CLAUDE.md trap: the next session's
+gate goes red on a count nobody could compute. The S5 ack vectors escaped it only by carrying a new
+`type` the enumeration skips, which is a mechanism, not a general licence.
+
+Zero cost, zero value, non-zero risk. Not added — and recorded as a decision rather than an
+omission, so the next session does not "finish" it.
+
+### S4S-4 A finding, on a path being verified rather than written
+
+Checking that the engine really ignores `since_seq` surfaced something else at the same lines.
+`InboundDispatcher.cs:105-111` returns `SnapshotRepublished` **outside** its `if (_republisher is
+not null)` guard — the same shape PQ-S6-1 records for `case "outcome"`, now on a second kind. An
+engine with the documented-inert seam accepts a `pull_request`, republishes nothing, and reports a
+snapshot it never sent.
+
+**It is milder than the `outcome` case, and a future fix should not flatten the two.** A dropped
+`outcome` loses a user's mark and the phone shows it as truth — which is why `OutcomeMarkPolicy`
+bounds its shadow. A dropped `pull_request` loses only a request the phone re-issues on the next
+open. What they share is the defect: an `InboundOutcome` that reports *reaching a case* rather than
+*completing an action*. Recorded as an extension to PQ-S6-1, not as a new question, because it is
+the same fix twice. **Not fixed — C#, no .NET here.** Unblocked, merely unwritten.
+
+### S4S-5 What ran
+
+```
+node docs/sync-vectors/generate.mjs --check   ->  OK: 28 vector files match the generator.   (exit 0)
+:core reduced probe (C-S6A-1 recipe)          ->  BUILD SUCCESSFUL in 1m 32s
+JUnit XML totals                              ->  115 tests, 0 failures, 0 skipped
+git diff --stat (vs the S5 branch)            ->  docs/Sync-Protocol.md | 74 ++++--, 1 file changed
+```
+
+`:core` is **unchanged at 115** — correct for a documentation slice, and run anyway because the
+amendment's central claim is that the phone already conforms; a claim about code deserves the code
+being executed, even when the prediction is "nothing moved".
+
+**`Verify-Alpha.ps1` did not run and cannot** — no .NET on this machine. It also cannot be affected:
+no `.cs`, no harness, no vector byte, no count-reporting doc, so `$ExpectedOfflineTotal` (598) is
+untouched by construction. **The android gate did not run and cannot** — no SDK, no JBR, and
+`dl.google.com` is a policy denial (B-7). CI is the gate for both; at the time of writing it has not
+yet reported on this branch, and C-S4S-7 is written to be checked rather than assumed.
+
+### S4S-6 Ladder effect, stated narrowly
+
+**S4 does not become DONE.** Its remaining half is `:app` transport wiring that needs a toolchain
+this sandbox cannot fetch, and the E2E proof additionally needs B-4. What closed is **PQ-S4-1**, an
+open cross-implementation ambiguity attached to S4 — the risk that a third implementation reads
+§4.3, implements resumption, and finds the phone's `0` asking for full history on every reconnect
+while the engine never depended on the field. That risk is now gone from the document. The rung
+stays **PARTIAL**.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** PR #32 stays a draft and was neither merged, retargeted nor
+force-pushed; PR #6 stays a draft. The new branch was created and pushed **forward-only** — no
+force-push, no history rewrite, no branch deleted.
+
+**No `.cs` file, no harness, no `$ExpectedOfflineTotal`, no `Verify-Alpha.ps1`, no count-reporting
+doc.** **No vector's bytes changed and no vector was added** — `generate.mjs --check` proves 28/28
+still match. Nothing was re-vendored; the android pin stays `679a317` and
+`core/src/test/resources/` was not opened for writing. **No Kotlin, no `:app`, no Gradle, manifest
+or version-catalog file** — `:core` was compiled and tested, never edited. No `relay/` file: the
+relay is blind to payload kinds, so `pull_request` semantics do not reach it, and `npm`, `vitest`,
+`wrangler` and miniflare were not invoked at all this iteration.
+
+**No deploy of any kind** (Cloudflare, Workers, relay, site, Pages). **The production relay was
+contacted zero times, not even `GET /v1/health`.** No emulator, no `sdkmanager`, no AVD, no attempt
+to route around the `dl.google.com` denial. No Google, Play, OAuth or Console action; no accounts,
+no purchases, no Play Billing code; no email or Gmail anything; no cert-store, MSIX or keystore
+action — the upload keystore and its password file were neither read nor referenced beyond their
+paths. No secrets read, written or printed. Terra's state was read at iteration start: still R6(b)
+BLOCKED on draft PR #26, heartbeat unchanged at 2026-08-07T21:18, **claims no files** — no
+collision, and `docs/Sync-Protocol.md` has been my territory since S1.

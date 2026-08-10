@@ -487,3 +487,33 @@ vector asserting rejection would turn the offline gate red.
 Parser first, vector second. The parser is C# and no cloud session has .NET, so this stays queued
 for a local session — and a session that is handed "add the unknown-field vector" as a task should
 read this entry before starting, not after.
+
+---
+
+## No new blocker arose 2026-08-10 (S4 spec half, seventh cloud iteration)
+
+Recorded as an entry because its absence is otherwise indistinguishable from an omission, and
+because this iteration made a decision that *looks* like a blocker and is not.
+
+**The S4 spec slice completed end to end on this machine.** PQ-S4-1 is closed (§4.3.4 in the main
+repo, PR #33 draft), and nothing in it was left unfinished — option (a) required no code on either
+side, which is why a sandbox with no .NET and no Android SDK could finish the whole of it.
+
+**The one thing deliberately not done is not blocked: no `pull_request` vector was added.** That was
+a judgement, not an obstacle — a static vector cannot test any of §4.3.4's three behavioural MUSTs
+(answer a snapshot, ignore the value, do not reject a non-zero), and an `envelope`-typed addition
+would enter `SyncHarness`'s enumeration and move `$ExpectedOfflineTotal`, which no .NET-less machine
+can measure. Zero value, non-zero risk. Reasoning in `LOG.md` §S4S-3. **Do not file this as a
+blocker and do not "finish" it** — there is nothing here for a local session to pick up.
+
+**Not to be confused with B-6**, which is a genuinely blocked vector and a different one:
+PQ-A2-3's `invalid-unknown-field` is blocked because the engine has no inbound wire-JSON parser to
+reject the field in, so the vector would turn the gate red. B-6 needs a C# parser written first.
+This entry needs nothing.
+
+**B-6 and B-7 are unchanged and were not re-tested this iteration** — nothing in the slice touched
+either, and re-asserting an untested blocker as current would be the same overclaiming these records
+correct elsewhere. **A new engine-side defect was found** (`pull_request` reports
+`SnapshotRepublished` with no republisher configured, the same shape as PQ-S6-1's `outcome` case) —
+it is recorded as an extension to PQ-S6-1 and as C-S4S-5, **not** here, because it blocks nothing:
+it is unwritten C#, not obstructed C#.

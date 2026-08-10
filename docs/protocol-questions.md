@@ -323,6 +323,52 @@ because the field is inert. The risk is a third implementation reading §4.3, im
 resumption, and finding that the phone's `0` asks for the full history on every reconnect while the
 engine's answer never depended on the field at all.
 
+### CLOSED 2026-08-10 (S4 spec half, seventh cloud iteration) — option (a), and it cost no code
+
+Amended in the main repo on `claude/s4-pull-request-semantics` (stacked on PR #32), commit
+`9399d11`. §4.3's row now reads "re-publish the whole dashboard as a fresh `snapshot`", a new
+**§4.3.4** pins the body, and §6.2 states that the gap threshold is receiver policy.
+
+The three rules §4.3.4 adds:
+
+- a sender MUST set `since_seq` to `0`;
+- a receiver MUST ignore it and answer with a full `snapshot`, never a `delta`;
+- a receiver **MUST NOT reject** a non-zero `since_seq`.
+
+The third is the one that was not in the question's option (a) and is worth the extra line.
+"Reserved" invites a reader to validate it, and this is a **reserved field**, not one of §4.3's
+reserved **kinds** — those MUST be rejected as `unknown_kind`. Rejecting an unknown kind refuses
+traffic v1 cannot understand; rejecting this field would refuse a request v1 understands perfectly,
+and would stall the stream on a forward-compatible sender. §4.3.4 states the asymmetry so a third
+implementation does not read one rule and apply the other.
+
+**Neither implementation had to change, and that is the evidence the option was right.** Checked
+against both, this session, before the spec was written rather than after:
+
+| §4.3.4 rule | Engine | Phone |
+| --- | --- | --- |
+| sender sends `0` | never sends `pull_request` — n/a | `PullPolicy.SINCE_SEQ_FULL_REPUBLISH = 0L` |
+| receiver ignores the value | `ReadSinceSeq` → `ISnapshotRepublisher`; **every** impl ignores the argument | n/a |
+| answers a full snapshot | `LiveRepublisher` calls `PublishSnapshotAsync` unconditionally | n/a |
+| non-zero is not a rejection | no rejection path reads the field | n/a |
+
+Re-verification commands: `AUDIT-REQUEST.md` **C-S4S-1 … C-S4S-5**.
+
+**Deliberately no vector.** A `pull_request` vector was considered and rejected, for a reason that
+generalises: §4.3.4's content is three *behavioural* MUSTs, and a static vector cannot test any of
+them — it cannot observe that a receiver answered a snapshot, nor that it declined to reject. Worse,
+`SyncHarness` enumerates every `type: "envelope"` vector on disk
+(`tests/SyncHarness/Program.cs:59-62`, and the "classifies every vector correctly" loop), so an
+envelope-typed addition would move `$ExpectedOfflineTotal` — a number this sandbox cannot measure,
+having no .NET. That is the CLAUDE.md drift trap, and the S5 ack vectors escaped it only by carrying
+a new `type` the enumeration skips. A vector here would have bought nothing and risked a red gate
+for the next session.
+
+### A finding this slice turned up, recorded against PQ-S6-1 rather than here
+
+Verifying the engine's `pull_request` path surfaced the **same over-reporting shape** PQ-S6-1
+describes for `outcome`, on a second kind. See the note appended to PQ-S6-1 below.
+
 ---
 
 ## PQ-S6-1 — An `outcome` is never acknowledged, and the engine reports it applied either way
@@ -390,3 +436,38 @@ right:
 `:app` wiring is unwritten and the send path needs S3's device key. It becomes a user-visible
 correctness problem the moment the first mark is sent, and a third implementation reading §4.3
 today has no way to know reconciliation is even required.
+
+### Extension 2026-08-10 (S4 spec half) — the over-reporting is not unique to `outcome`
+
+Found while verifying the engine's `pull_request` path for PQ-S4-1, so it is measured rather than
+inferred. `InboundDispatcher` has the **same shape on a second kind**:
+
+```
+src/Sync/InboundDispatcher.cs:105-111
+    case "pull_request":
+        var since = ReadSinceSeq(received.Plaintext!);
+        if (_republisher is not null)
+            await _republisher.RepublishSnapshotAsync(since, ct);
+        return new InboundResult(InboundOutcome.SnapshotRepublished, null, received.Kind);
+```
+
+The `return` is outside the null check, exactly as `case "outcome"` returns `OutcomeApplied`
+outside its own. So an engine with `_republisher == null` — the documented inert seam, "null means
+the seam is inert (no vault yet)" — accepts a `pull_request`, republishes **nothing**, and reports
+`SnapshotRepublished`.
+
+**This one is milder than the `outcome` case and the difference is worth stating**, because a
+future fix should not treat them as one bug. A dropped `outcome` loses a user's mark and the phone
+displays it as truth (which is why `OutcomeMarkPolicy` bounds the shadow). A dropped
+`pull_request` loses nothing: the phone asked for a snapshot, none arrives, and `PullPolicy`'s
+latch means it will ask again on the next open. The consequence is a silently unanswered request,
+not a false display.
+
+What they share is the defect: **an `InboundOutcome` that reports reaching a `case` rather than
+completing an action.** PQ-S6-1's option (a) proposes fixing this for `outcome` by deriving the
+result from the applier; the same derivation is available here — return a disposition that
+distinguishes "republished" from "no republisher configured". Worth doing in the same commit as
+PQ-S6-1's fix, since it is the same three lines of reasoning twice.
+
+**Not fixed here: it is C#, and this sandbox has no .NET.** Unblocked, merely unwritten — a local
+session can do it. Re-verify the symptom with `AUDIT-REQUEST.md` **C-S4S-5**.
