@@ -2416,3 +2416,236 @@ grep -o "() PASSED" <log> | wc -l                         # expect 154
 > still prints nothing, so the third item of C-S3A-8 stands exactly as written, and **a green gate on
 > an uncalled class is not a pairing screen**. Nor does any of this touch B-4's claims — no CI runner
 > has an Android Keystore either.
+
+---
+
+## S6 send path — the outbound decision layer (2026-08-10, tenth cloud iteration)
+
+Every number below comes from the reduced `:core` probe (C-S6A-1 recipe), run in this session on
+this machine. Where a claim needs a gate this sandbox cannot run, it says so and says why.
+
+### C-S6S-1 — The suite, and the delta
+
+> **Claim.** `:core` is **177 tests / 0 failures / 0 skipped across 14 classes**, up from a
+> **154 / 0 / 0 across 13** baseline re-measured on the same probe in the same session before the
+> slice. The +23 is `OutboundQueueTest` (**20**, new) and three new cases in `RelayClientTest`
+> (**14 → 17**). No existing test was deleted or renamed; two existing assertions changed only
+> because `RelayResult.Conflict` gained a field (see C-S6S-2).
+
+```bash
+# C-S6A-1 recipe, then:
+python3 - <<'PY'
+import glob, xml.etree.ElementTree as ET
+t=f=s=0; per={}
+for p in sorted(glob.glob('<repo>/core/build/test-results/test/TEST-*.xml')):
+    r=ET.parse(p).getroot(); n=int(r.get('tests')); per[r.get('name').split('.')[-1]]=n
+    t+=n; f+=int(r.get('failures'))+int(r.get('errors')); s+=int(r.get('skipped'))
+print(t,f,s,len(per)); print(per)
+PY
+```
+
+*Expected:* `177 0 0 14`, with `OutboundQueueTest: 20` and `RelayClientTest: 17`. For the baseline,
+`git stash` the slice or check out `b95ea8a` and repeat: `154 0 0 13`.
+
+### C-S6S-2 — The relay reports its high-water mark on a refused push, and the client kept throwing it away
+
+> **Claim.** `POST /v1/{pairing}/push` refuses `seq <= last` with **409 and a body carrying
+> `latest`** — `relay/src/channel.ts:167` in the main repo:
+>
+> ```ts
+> if (last !== null && seq <= last) return this.json({ error: 'replay_rejected', latest: last }, 409);
+> ```
+>
+> `RelayClient.request` mapped every 409 to a bare `RelayResult.Conflict` and returned before
+> reading the body, so that number was unreachable to any caller. It is now parsed into
+> `RelayResult.Conflict.latest`. **This is the input §6.1's reconciliation needs**: the spec's own
+> recipe for a lagging counter is to resume above the relay's `latest` for the direction, and
+> without the number a sender can only retry an envelope the relay refuses forever.
+
+```bash
+# in the careerseeker (main) checkout, at origin/main:
+grep -n "replay_rejected" relay/src/channel.ts
+# in the android checkout:
+grep -n "conflictLatest\|data class Conflict" core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+```
+
+> **Not verified — the relay's own suite does not assert this field.** `grep -n latest
+> relay/test/relay.test.ts` on `origin/main` returns only the two `pull` assertions (lines 156,
+> 158); nothing there covers the 409 body. **The relay suite was not run this iteration** (no `npm`,
+> no vitest, no miniflare). The claim above rests on reading `channel.ts` and on the three android
+> unit tests in C-S6S-3, which drive a `MockEngine`, not the relay.
+
+### C-S6S-3 — `latest` is present for a replay rejection and absent for a pairing conflict
+
+> **Claim.** Three `RelayClientTest` cases, all run here. A 409 carrying
+> `{"error":"replay_rejected","latest":41}` parses to `Conflict(latest = 41)`. A pairing 409
+> carrying `{"error":"exists"}` — what §5.2.1/§5.2.2 answer — parses to `Conflict(latest = null)`,
+> which is correct rather than a gap: "already done" is not "your counter is behind", and there is
+> nothing to reconcile against. A 409 whose body is not JSON also yields `Conflict(latest = null)`
+> rather than throwing, because converting a relay *decision* into a transport failure would make
+> the caller retry something the relay has already refused.
+>
+> **`PairingFlow`'s reading of a 409 is unchanged by this.** It still treats the pairing conflict as
+> ambiguous and routes it to the human's confirm-code comparison (C-S3A-3); the new field is null on
+> exactly that path, so there was no number for it to start trusting.
+
+```bash
+# C-S6A-1 recipe, then read the three case names from the log:
+grep -E "RelayClientTest > (a replay_rejected|a pairing 409|a 409 whose body)" <probe-log>
+```
+
+*Expected:* three lines, each ending `PASSED`.
+
+### C-S6S-4 — The envelope is built once, and a retry re-sends the identical bytes
+
+> **Claim.** `OutboundEnvelopeFactory.build` consumes a sequence number on **every** call, so
+> "retry" and "rebuild" are different operations that are indistinguishable at the call site.
+> `OutboundQueue` freezes the wire at the first `next()` that reaches an entry and returns the same
+> string until the head is resolved. The test counts the `SeqSource`'s calls directly, so "a second
+> sequence number was burned" is observable rather than argued: after an `Unavailable` and a second
+> `next()`, `issued == 1` and the two wires are `assertEquals`-identical.
+>
+> **The failure this prevents is silent.** A rebuild burns a second p2e seq, and if the first
+> attempt landed and merely lost its response, the engine receives one intention twice under two
+> sequence numbers with two audit rows.
+
+```bash
+grep -E "OutboundQueueTest > (the envelope is built once|an accepted envelope|only one envelope)" <probe-log>
+```
+
+### C-S6S-5 — A 409 on a push is read as neither success nor failure, and single-flight is what makes that checkable
+
+> **Claim, and it is the finding of the slice.** Attempt count **cannot** disambiguate a push
+> conflict. `RelayClient.request` retries transport failures *inside* one `push` call
+> (`RelayClient.kt`, 4 attempts by default), so an attempt that reaches the relay, stores the
+> envelope and loses its response is followed by an attempt that sees the relay's own 409 — and the
+> queue sees that on what it believes is its **first** attempt. This is the same ambiguity
+> `PairingFlow` recorded on `POST /pair` (C-S3A-3), arriving on the push path.
+>
+> `OutboundQueue` therefore does not guess. A 409 retires the frozen bytes, halts on
+> `SendHalt.COUNTER_BEHIND`, and hands `latest` to the caller that owns the persisted counter.
+> Whether the mark actually landed is answered **only** by `OutcomeMarkPolicy`'s value convergence,
+> because with no `outcome_ack` that is the only evidence v1 offers (PQ-S6-1). The test asserts the
+> outcome is **not** `Accepted`.
+>
+> **The cost is a possible duplicate, and it is the right way to be wrong.** If the original did
+> land, the rebuilt envelope re-states the same mark; §4.3.1's carried outcome is latest-wins state
+> rather than an event log, so a duplicate is idempotent in effect, whereas guessing "delivered"
+> loses the user's mark silently.
+>
+> **Single-flight is load-bearing for the above, not a style choice.** §6.2 would permit pipelining
+> (gaps are legal and MUST NOT stall the stream), but a queue with several unresolved sequence
+> numbers outstanding cannot attribute a 409 to any of them. `next()` refuses to build a second
+> envelope while the head is unresolved, and the test asserts `issued == 1` after three `next()`
+> calls on a two-item queue.
+
+```bash
+grep -E "OutboundQueueTest > (a conflict halts|a conflict is never|the queue stays stopped|reconciling rebuilds|a conflict with no reported)" <probe-log>
+```
+
+### C-S6S-6 — Poison is dropped; every other failure keeps the user's data
+
+> **Claim.** Asserted case by case. `TooLarge` drops **only** that envelope and the queue continues
+> with the next id — retrying it would wedge every later mark behind an envelope that can never
+> fit, and the drop is safe because the relay never stored it (so its `last` is unmoved) and §6.2
+> makes the resulting p2e gap legal for the receiver. `Unavailable` keeps the bytes and the depth
+> (offline is not a data-loss event). `Unauthorised` halts, keeps the bytes, and is cleared **only**
+> by `reauthorised()` — `reconciled()` does not clear it, which is asserted. `PairingUnknown` is
+> terminal and neither clearing call revives it.
+
+```bash
+grep -E "OutboundQueueTest > (a 413 drops|pairing_unknown is terminal|unauthorised halts|a failed push keeps)" <probe-log>
+```
+
+### C-S6S-7 — A missing device key halts the queue and destroys nothing, and the halt is no broader than §5.4
+
+> **Claim.** `outcome` is state-changing, so `OutboundEnvelopeFactory` refuses to build it without a
+> `DeviceSigner` (§5.4). `OutboundQueue` catches that refusal and **halts** on
+> `SendHalt.NO_DEVICE_KEY` with the queue depth unchanged — dropping the user's marks to report a
+> missing key would delete data in order to describe a condition the UI should be showing instead.
+> The companion case guards the halt from over-reaching: `pull_request` changes no engine state, so
+> it needs no key, and it is asserted to build and flow normally on a queue with `signer = null`.
+
+```bash
+grep -E "OutboundQueueTest > (no device key halts|a kind that needs no signature)" <probe-log>
+```
+
+### C-S6S-8 — The suite found a defect in the implementation before this file described it
+
+> **Claim.** The first full run of the new suite was **not** green: `177 tests completed, 1 failed`.
+> `reconciling rebuilds above the reported mark` failed with
+> `AssertionFailedError: fresh bytes are a fresh attempt ==> expected: <0> but was: <1>`. Retiring
+> the dead bytes after a 409 had cleared the wire but not the per-wire attempt counter, so a freshly
+> rebuilt envelope reported itself as already-tried — a lie about bytes the relay has never seen,
+> and the only signal a future backoff or telemetry caller would have. Fixed by resetting
+> `attempts` in the same branch that retires the wire; the re-run is green.
+>
+> Recorded because this file's precedent is to say whether a slice was green immediately. **This one
+> was not**, and the assertion that caught it is one an implementation-shaped test would not have
+> made.
+
+```bash
+git log --oneline -3          # the fix is inside the OutboundQueue commit, not a follow-up
+grep -n "per-wire, not per-item" core/src/main/kotlin/app/careerseeker/core/OutboundQueue.kt
+```
+
+### C-S6S-9 — `:core` stays Android-free and no shared vector byte moved
+
+> **Claim.** `OutboundQueue.kt` has **zero** `import` lines, so the `checkCoreIsAndroidFree` claim
+> is structural rather than a promise. Independently, the task's own predicate
+> (`build.gradle.kts:39` — a line starting `import android.` or `import androidx.`) matches nothing
+> anywhere under `core/src`.
+>
+> **All 26 vendored vectors are byte-identical to pin `679a317`**, verified here against the main-repo
+> checkout rather than assumed: nothing under `core/src/test/resources/` was opened for writing, no
+> vector was added or edited in either repo, and the pin is unchanged.
+
+```bash
+grep -c '^import' core/src/main/kotlin/app/careerseeker/core/OutboundQueue.kt        # expect 0
+grep -rn -E '^\s*import\s+(android|androidx)\.' core/src --include=*.kt ; echo $?    # expect exit 1
+git status --porcelain core/src/test/resources/ | wc -l                             # expect 0
+# byte-for-byte against the pin, from a careerseeker checkout:
+for f in <android>/core/src/test/resources/sync-vectors/v1/*.json; do
+  git show 679a3175590dcd021b21c85af9daf12114e131fd:docs/sync-vectors/v1/$(basename "$f") \
+    | diff -q - "$f" || echo "DRIFT $(basename "$f")"
+done
+node docs/sync-vectors/generate.mjs --check     # in careerseeker @ origin/main
+```
+
+*Expected:* `0`; exit `1`; `0`; no `DRIFT` line across 26 files; and
+`OK: 26 vector files match the generator.` (exit 0) — the **`main`** figure. See C-S3A-6: the "28"
+in these records is the `claude/s5-entitlement-ack-spec` figure and is not a `main` number.
+
+### C-S6S-10 — `OutboundQueue` has no production caller, and this file will not pretend otherwise
+
+> **Claim.** `grep -rn "OutboundQueue" app/src` prints nothing. **S6 does not become DONE.** A green
+> suite on an uncalled class is not an outcome-marking feature: nothing on any screen builds an
+> envelope, nothing pushes one, and no `:app` code references this type.
+
+```bash
+grep -rn "OutboundQueue" app/src ; echo "exit=$?"
+```
+
+*Expected:* nothing, `exit=1` — written to fail the day `:app` wires this up, which is the point.
+
+### C-S6S-11 — What did NOT run, and cannot here
+
+> **Not verified — the android gate.** `./gradlew … :app:assembleDebug :app:lintDebug` did **not**
+> run and cannot on this machine: no Android SDK, no JBR, and `dl.google.com` / `api.foojay.io` are
+> egress policy denials (B-7). Every number above is the reduced `:core` probe. **CI is the gate**;
+> at the time of writing it has not reported on this push. Per C-S3A-9, read the count from the
+> job log by counting `() PASSED` lines — expect **177** — rather than caveating that CI prints no
+> totals.
+>
+> **Not verified — `Verify-Alpha.ps1`.** No .NET here. It also **cannot** be affected: this slice
+> wrote **no file in the main repo at all** — no `.cs`, no harness, no vector byte, no
+> count-reporting doc, no `docs/Sync-Protocol.md` change — so `$ExpectedOfflineTotal` (**598**) is
+> untouched by construction.
+>
+> **Not verified — the relay.** No `npm`, no vitest, no miniflare, no `wrangler`, no deploy. **The
+> production relay was contacted zero times, not even `GET /v1/health`.** Every relay in this slice
+> is a Ktor `MockEngine` inside the test JVM.
+>
+> **Not verified — anything about hardware-backed keys.** The signer here is a stub returning fixed
+> bytes; the slice asserts only *whether a signature could be produced at all*, never that one
+> verifies against a real device key. **B-4 owns every hardware claim in full.**

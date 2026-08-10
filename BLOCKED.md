@@ -567,3 +567,64 @@ that a local session can do it today; it is not something to mark done from here
 
 **Smallest human unblock: unchanged — none needed.** CI is the unblock, and it runs the real gate
 on the push.
+
+---
+
+## B-4 / B-7 status 2026-08-10 (S6 send path, tenth iteration) — the cost shrank again, and one stated reason was wrong
+
+**Neither blocker is closed, and neither is weakened.** What changed is the size of what sits behind
+them, and one sentence in `STATE.md` that described S6's remainder incorrectly.
+
+**The sentence that was wrong.** `STATE.md` recorded S6's remaining half as *"genuinely blocked: it
+needs a device-signed envelope (§5.4), which needs S3's Android Keystore key, which needs an AVD that
+does not exist (B-4)"*, and singled it out as the one remainder a toolchain could not unblock. **The
+repo already contradicted it:** `OutboundEnvelopeFactory` takes the signer as an injected
+`fun interface DeviceSigner`, and `OutboundEnvelopesTest` has been building and asserting *signed*
+envelopes in this sandbox since A6. "Needs a device signature" and "needs a device" are not the same
+statement. The send *decisions* are now `OutboundQueue`, 20 tests, run here.
+
+**What is still B-4's, in full, and is not weakened by any of the above:**
+
+- The Android Keystore key itself, and therefore gate `P2-KEYSTORE-FALLBACK`'s StrongBox → TEE →
+  software chain with its persistent indicator and audit-trail entry.
+- **Any claim that a signature came from a hardware-backed key.** The signer in this slice is a stub
+  returning fixed bytes; the tests assert only *whether a signature could be produced at all*.
+- CameraX / ML Kit, every screen, and the E2E proof.
+
+**What is still B-7's:** the `:app` wiring for S6 — the detail-screen controls, the transport loop
+that would drive `OutboundQueue`, and the **persisted p2e counter** that `reconciled()` assumes some
+caller owns. `grep -rn "OutboundQueue" app/src` prints nothing.
+
+**Smallest unblock, unchanged:** for B-4, one checkbox — Android Studio → SDK Tools → *Android SDK
+Command-line Tools (latest)* — then a system image and an AVD. For B-7, a machine that is not this
+sandbox; `dl.google.com` and `api.foojay.io` are egress **policy denials** here, which is firmer than
+"not installed". CI is the gate, not a checkbox.
+
+---
+
+## B-8 — The persisted p2e counter has no owner, and `OutboundQueue.reconciled()` assumes one
+
+**Milestone:** S6 send path (2026-08-10, tenth iteration).
+
+**Symptom.** §6.1 requires the sender to persist its sequence counter across restarts.
+`OutboundEnvelopeFactory` takes a `SeqSource` and documents that requirement; **nothing in the repo
+implements one that survives a process restart.** Every construction of it in `:core` and in every
+test is an in-memory counter. `OutboundQueue.reconciled()` is written to be called after the caller
+has lifted that persisted counter above the relay's reported `latest` — a caller that does not exist
+yet.
+
+**Why it is not fixed here.** The counter belongs in Room, which is `:app`, which needs the Android
+SDK this sandbox cannot fetch (**B-7**). Writing it as a `:core` interface with no implementation
+would add a type without adding a guarantee, and the guarantee is the whole point: an in-memory
+counter that resets to 1 on restart produces envelopes the relay refuses at the door, forever.
+
+**What was done instead.** The failure mode is now *detected and reported* rather than silent:
+a refused push halts the queue on `SendHalt.COUNTER_BEHIND` and surfaces the relay's `latest`, which
+is exactly the number the persisted counter must be lifted above (`AUDIT-REQUEST.md` C-S6S-2,
+C-S6S-5). A phone with a resetting counter now stalls visibly instead of dropping marks quietly.
+
+**Smallest unblock:** a machine with an Android SDK. Then: a Room-backed `SeqSource` that persists
+**before** the envelope is handed to the transport (persisting after a successful push reintroduces
+the same lag on a lost response), and a startup reconciliation against
+`GET /pull?dir=p2e&since=0`'s `latest`, per §6.1's own recipe for the engine side. See **PQ-S6-2**
+for the spec half — §6.1 states that recipe for the engine's counter only.

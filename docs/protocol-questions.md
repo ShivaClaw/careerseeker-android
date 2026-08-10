@@ -471,3 +471,55 @@ PQ-S6-1's fix, since it is the same three lines of reasoning twice.
 
 **Not fixed here: it is C#, and this sandbox has no .NET.** Unblocked, merely unwritten — a local
 session can do it. Re-verify the symptom with `AUDIT-REQUEST.md` **C-S4S-5**.
+
+---
+
+## PQ-S6-2 — §6.1 spells out counter reconciliation for the engine only, and the relay enforces it symmetrically
+
+**Opened 2026-08-10 (S6 send path, tenth cloud iteration).** Not a blocker; the phone-side
+behaviour is already correct. Recorded because the spec asks one sender for something it does not
+ask the other, and the omission is the kind a second implementer will read as permission.
+
+**Spec (§6.1).** One sentence covers both directions — each has "an independent counter starting at
+1, incremented per envelope, and **persisted by the sender across restarts**". The paragraph then
+spells out the *recovery* rule for exactly one side:
+
+> The engine MUST therefore resume its e2p counter above `max(persisted_seq, relay_latest_e2p_seq)`
+> — the value from its pairing store, reconciled on startup against the relay's current `latest`
+> for the direction (`GET /pull?dir=e2p&since=0` returns it) as a belt-and-suspenders should the
+> store lag.
+
+**The phone owes the identical obligation on `p2e`, and §6.1 never says so.** The relay does not
+care who is sending: `POST /push` refuses `seq <= last` **per direction**
+(`relay/src/channel.ts:167`) and answers 409 `replay_rejected` with its `latest`. A phone whose
+persisted p2e counter has fallen behind — a restore, a rolled-back store, a counter persisted only
+after a successful push whose response was lost — therefore builds envelopes the relay refuses at
+the door, forever, with no rule in the spec telling it what to do about that.
+
+**Why the asymmetry is easy to write and easy to misread.** §6.1's engine paragraph justifies itself
+with a consequence that is genuinely one-sided ("a silent, total, one-sided sync death" when the
+recovery `snapshot` itself is rejected). The p2e consequence is smaller — marks and entitlements
+stall rather than the dashboard dying — so it never got written down. But "smaller" is not "absent",
+and a reader implementing a second phone client has no rule to follow.
+
+**Chosen here, and it needed no amendment to be correct.** `OutboundQueue` (`core/.../OutboundQueue.kt`)
+implements the symmetric rule: a 409 retires the envelope's frozen bytes, halts on
+`SendHalt.COUNTER_BEHIND`, and surfaces the relay's `latest` to the caller that owns the persisted
+counter; `reconciled()` then rebuilds above it. `RelayClient` had to be changed to make the number
+reachable at all — it was mapping every 409 to a bare `Conflict` and returning before reading the
+body (see `LOG.md` §S6S-3, `AUDIT-REQUEST.md` C-S6S-2).
+
+**To close.** A §6.1 amendment stating the rule for both senders — the cheapest form is to
+generalise the existing sentence to "the sender MUST resume its counter above
+`max(persisted_seq, relay_latest_<dir>_seq)`" and keep the engine's e2p consequence as the worked
+example. Optionally note that `POST /push`'s 409 body carries `latest`, which lets a sender
+reconcile without the extra `GET /pull?since=0` round trip; that field is currently documented
+nowhere in `Sync-Protocol.md` despite being implemented and relied upon.
+
+**Deliberately not amended in this iteration.** `docs/Sync-Protocol.md` lives in the main repo and
+is already claimed by draft PRs **#32** and **#33** (#33 stacked on #32); a third stacked spec edit,
+made from a sandbox that cannot run `Verify-Alpha.ps1`, is a poor trade for a paragraph that changes
+no behaviour. Engine-compatible interpretation rule applies: match the engine, ship it, record the
+question.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S6S-2** and **C-S6S-5**.

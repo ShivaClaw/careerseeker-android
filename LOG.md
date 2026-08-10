@@ -2964,3 +2964,210 @@ this code only as a public point supplied by the caller.
 Terra's state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged
 at 2026-08-07T21:18, **claims no files** — no collision, and `:core` has never been Terra's
 territory.
+
+---
+
+## S6S — the send path, 2026-08-10 (tenth cloud iteration, Linux sandbox)
+
+### S6S-1 The slice, and why it is not the one the schedule proposed
+
+The standing prompt again nominates S5's spec half — §4.3 `entitlement_ack`, the ack vector,
+PQ-A2-1/-2/-3 — and again describes S5 as "NOT STARTED and genuinely NOT blocked". **That landed
+2026-08-09 as PR #32**, and `STATE.md`'s fourth correction already records the drift. Verified again
+this iteration rather than taken on trust: `origin/claude/s5-entitlement-ack-spec` (`9c05ef7`)
+carries §4.3.3, the two ack vectors, `generate.mjs`'s entries and the relay cap fix; `origin/main`
+(`00b3705`) does not yet. **Nothing was redone.** PQ-A2-3 remains what B-6 says it is — not closable
+by adding a vector, because the engine has no inbound wire-JSON parser and the vector would turn CI
+red. Parser first, and the parser is C#.
+
+So the ladder's own next-intent list was read in order, and the question `STATE.md`'s **fifth
+correction** asks was put to the one rung whose remainder is described with a mechanical-sounding
+word:
+
+> when a rung's remainder is described with a word that sounds mechanical, enumerate it before
+> believing the word. The same question is worth asking of S2's `/pair` page and S6's `signed send`.
+
+**Asked of S6, the answer is that "the signed send" is not an I/O call.** `STATE.md` called S6's
+remaining half *genuinely* blocked — "it needs a device-signed envelope (§5.4), which needs S3's
+Android Keystore key, which needs an AVD that does not exist" — and singled it out as the one
+remainder a toolchain could not unblock. **That was too strong, and the codebase already showed
+why:** `OutboundEnvelopeFactory` takes the signer as an injected `fun interface DeviceSigner`, and
+`OutboundEnvelopesTest` has been building and asserting *signed* envelopes in this sandbox since A6.
+What needs a Keystore is the claim that a key is hardware-backed. What does not is everything that
+decides **when** an envelope is built, **which** bytes go back on a retry, and **what** each relay
+answer means for the mark in flight.
+
+That is the fourth time this shape has appeared (S4 2026-08-09, S6's marking half 2026-08-09, S3
+2026-08-10, S6's send half today), and it is now worth stating as a rule with a caveat attached:
+**a rung's blocker applies to the claims that depend on it — and a blocker that is real for one half
+of a rung tends to get written down as if it covered the rung.** The label was not wrong about the
+Keystore. It was wrong about the reach.
+
+### S6S-2 What landed
+
+Two commits, six files, of which **two are new** and four are edits confined to one type change.
+
+`OutboundQueue.kt` (new) + `OutboundQueueTest.kt` (new): the layer between `OutcomeMarkPolicy`
+(which decides *what* to mark) and `RelayClient.push` (which is the call). Six rules, each with a
+version that compiles, renders correctly and reports nothing wrong.
+
+1. **The bytes are built once; every retry re-sends them verbatim.** `build()` consumes a sequence
+   number on every call, so *retry* and *rebuild* are different operations that look identical at
+   the call site. A rebuild burns a second p2e seq, and if the first attempt landed and merely lost
+   its response, the engine receives one intention twice under two seqs with two audit rows. The
+   test counts the `SeqSource`'s calls, so this is observed rather than argued (C-S6S-4).
+2. **A re-mark collapses onto an unbuilt entry and never onto a built one.** Two taps before
+   anything leaves the phone are one intention — the same reasoning `OutcomeMarkPolicy.mark` gives
+   for collapsing in its own map, and collapse moves the entry to the end for the same stated
+   reason. Bytes already on the wire cannot be un-sent, so a re-mark against a built entry
+   legitimately becomes a second envelope, which §4.3.1 resolves by latest-wins.
+3. **A 409 is read as neither success nor failure.** See S6S-3 — this is the finding.
+4. **Poison is dropped, not retried forever.** A 413 on a body of a few dozen bytes is a defect in
+   whatever built it; retrying would wedge every later mark behind an envelope that can never fit.
+   Dropping is safe twice over: the relay never stored it, so its `last` is unmoved, and §6.2 makes
+   the resulting p2e gap legal for the receiver ("a gap MUST NOT stall the stream").
+5. **Nothing is destroyed to report a condition.** `Unavailable` and `Unauthorised` keep the bytes;
+   a missing device key **halts** rather than dropping the user's marks. Deleting data to describe a
+   state the UI should be surfacing is the failure that rule exists to prevent.
+6. **Exactly one envelope is in flight.** §6.2 would permit pipelining, but a queue with several
+   unresolved sequence numbers cannot attribute a 409 to any of them, and rule 3's rebuild would
+   then have to reason about which frozen envelopes are dead. Single-flight is what makes rule 3
+   checkable at all — it is load-bearing, not a style choice.
+
+Built with a **stub** signer and **no Keystore**, which is the assertion that this half needed
+neither.
+
+Alongside it, the four edits: `RelayResult.Conflict` becomes a data class carrying `latest`
+(`RelayClient.kt`), with the two `when` branches that matched it as an object updated to type checks
+(`SyncPump.kt`, `PairingFlow.kt`) and two existing assertions updated to construct it. **No existing
+test was deleted or renamed, and no behaviour of `SyncPump` or `PairingFlow` changed** — both map a
+conflict exactly as before.
+
+### S6S-3 The finding: a 409 cannot be disambiguated by attempt count, and the relay was already sending the fix
+
+The obvious code reads a push conflict by position: *first attempt → our counter is behind; retry →
+our earlier attempt landed.* **That is wrong, and it is wrong for a reason that is invisible at the
+call site.** `RelayClient.request` retries transport failures *inside* one `push` call (four
+attempts). An attempt that reaches the relay, stores the envelope and loses its response is followed
+by an attempt that sees the relay's own 409 — so **the queue sees a conflict on what it believes is
+its first attempt.** It is the same ambiguity `PairingFlow` recorded on `POST /pair` (S3A-3),
+arriving on the push path, and the attempt counter cannot separate the cases.
+
+The resolution is that the queue does not need to. **Whether the mark landed is already answered
+elsewhere and only elsewhere:** `OutcomeMarkPolicy` holds a mark pending until the engine's value
+converges, because with no `outcome_ack` that is the only evidence v1 offers (PQ-S6-1). What the
+queue must do is get *unstuck* — and for that the relay has been sending the necessary number all
+along:
+
+```ts
+// relay/src/channel.ts:167  (careerseeker @ origin/main)
+if (last !== null && seq <= last) return this.json({ error: 'replay_rejected', latest: last }, 409);
+```
+
+`RelayClient` mapped every 409 to a bare `Conflict` and returned **before reading the body**, so
+`latest` was unreachable to any caller. It is now parsed. That value is precisely the input §6.1's
+counter reconciliation asks for, and without it a sender whose persisted counter has fallen behind
+can only retry an envelope the relay will refuse forever.
+
+So a 409 retires the frozen bytes, halts on `COUNTER_BEHIND`, and hands `latest` to the caller that
+owns the persisted counter. **The cost is a possible duplicate** — if the original did land, the
+rebuild re-states the same mark — **and that is the right way to be wrong**: §4.3.1's carried
+outcome is latest-wins state rather than an event log, so a duplicate is idempotent in effect,
+whereas guessing "delivered" loses the user's mark silently.
+
+**`PairingFlow` is untouched by this.** The pairing 409s answer `{"error":"exists"}` and carry no
+number, so `latest` is null on exactly that path — there was never a number there for it to start
+trusting, and the human's confirm-code comparison remains the tiebreak.
+
+### S6S-4 A second finding, smaller, and it is a spec asymmetry — PQ-S6-2
+
+§6.1 states the counter rule for both directions in one sentence ("persisted by the sender across
+restarts") and then spells out the *reconciliation* obligation for **one** side only: the engine
+MUST resume its e2p counter above `max(persisted_seq, relay_latest_e2p_seq)`. **The phone owes the
+identical obligation on p2e and the spec never says so** — while the relay enforces it
+symmetrically, refusing `seq <= last` per direction with no regard for who is sending.
+
+Recorded as **PQ-S6-2** in `docs/protocol-questions.md` rather than fixed. The spec lives in the
+main repo, `docs/Sync-Protocol.md` is already claimed by draft PRs #32 and #33, and a third stacked
+spec edit made from a sandbox that cannot run `Verify-Alpha.ps1` is a poor trade for a paragraph.
+The phone-side behaviour needed no amendment to be correct — `OutboundQueue` implements the
+symmetric rule today.
+
+### S6S-5 What ran
+
+```
+:core reduced probe (C-S6A-1 recipe)              ->  BUILD SUCCESSFUL
+JUnit XML totals                                  ->  177 tests, 0 failures, 0 skipped, 14 classes
+baseline, same probe, before the slice            ->  154 tests, 0 failures, 0 skipped, 13 classes
+  OutboundQueueTest                               ->  20 (new)
+  RelayClientTest                                 ->  17 (was 14)
+grep -c '^import' OutboundQueue.kt                ->  0
+grep -rnE '^\s*import\s+(android|androidx)\.' core/src  ->  (nothing), exit=1
+grep -rn 'OutboundQueue' app/src                  ->  (nothing), exit=1
+vendored vectors vs pin 679a317 (26 files)        ->  drift=0
+node generate.mjs --check  (careerseeker main)    ->  OK: 26 vector files match the generator. (exit 0)
+```
+
+**The first full run was not green, and the precedent in this file is to say so.**
+`177 tests completed, 1 failed` — `reconciling rebuilds above the reported mark` failed with
+`expected: <0> but was: <1>`. Retiring the dead bytes after a 409 cleared the wire but not the
+per-wire attempt counter, so a freshly rebuilt envelope reported itself as already-tried: a lie
+about bytes the relay has never seen, and the only signal a future backoff caller would have. Fixed
+in the same commit; re-run green (C-S6S-8).
+
+One earlier run also failed for a reason worth recording because it is a **house convention, not a
+bug**: an em-dash in a test *name* made Gradle's HTML report writer fail on the filename
+(`Malformed input or input contains unmappable characters`). Every existing test name in this repo
+is ASCII. Ours are now too.
+
+**`Verify-Alpha.ps1` did not run and cannot** — no .NET. It also cannot be affected: **no file in
+the main repo was written at all**, so `$ExpectedOfflineTotal` (598) is untouched by construction.
+**The android gate did not run and cannot** — no SDK, no JBR (B-7). CI is the gate, and C-S6S-11 is
+written to be checked rather than assumed.
+
+### S6S-6 Ladder effect, stated narrowly
+
+**S6 stays PARTIAL. It does not become DONE**, and the correction is to the *reason*, not the label:
+S6's remaining half was recorded as genuinely blocked by B-4, and the send *decisions* were never
+behind B-4 at all. What is still B-4's, in full: the Android Keystore key itself and therefore gate
+P2-KEYSTORE-FALLBACK's StrongBox → TEE → software chain with its indicator and audit entry, and any
+claim that a signature came from a hardware-backed key. What is still B-7's: the `:app` wiring — the
+detail screen's controls, the transport loop that would drive this queue, and the persisted p2e
+counter that `reconciled()` assumes a caller owns.
+
+**`OutboundQueue` has no production caller, and this entry will not pretend otherwise.**
+`grep -rn OutboundQueue app/src` prints nothing. A green suite on an uncalled class is not an
+outcome-marking feature.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** Main-repo PRs #32 and #33 stay drafts and were neither
+merged, retargeted nor force-pushed; android PR #6 stays a draft. Commits were appended to an
+existing branch of mine and pushed **forward-only** — no force-push, no history rewrite, no branch
+created or deleted, in either repo.
+
+**No file in the main repo was written at all** — no `.cs`, no harness, no `$ExpectedOfflineTotal`,
+no `Verify-Alpha.ps1`, no count-reporting doc, and **no `docs/Sync-Protocol.md` change**: the
+asymmetry S6S-4 found was recorded as a question in the android repo, not amended into the spec.
+`generate.mjs --check` was run once, read-only. **No vector's bytes changed and no vector was
+added**; nothing was re-vendored, the android pin stays `679a317`, and all 26 vendored files were
+verified byte-identical to it rather than assumed.
+
+**No `relay/` file was touched**, and `npm`, `vitest`, `wrangler` and miniflare were not invoked —
+the finding in S6S-3 is about a number the *relay already sends correctly* and the *client* was
+discarding, so the relay needs no change. **No `:app` file of any kind** — not a screen, not the
+manifest, not a Gradle or version-catalog file. `core/build.gradle.kts` was not touched: the slice
+adds no dependency, and `OutboundQueue.kt` adds no import.
+
+**No deploy of any kind** (Cloudflare, Workers, relay, site, Pages). **The production relay was
+contacted zero times, not even `GET /v1/health`** — every relay here is a Ktor `MockEngine` inside
+the test JVM. No emulator, no `sdkmanager`, no AVD, and no attempt to route around the
+`dl.google.com` denial. No Google, Play, OAuth or Console action; no accounts, no purchases, no Play
+Billing code; no email or Gmail anything; no cert-store, MSIX or keystore action — the upload
+keystore and its password file were neither read nor referenced beyond their paths. **No secrets
+read, written or printed**, and no Android Keystore was created, faked or simulated: the device
+signing key enters this code only as a stub function supplied by the caller.
+
+Terra's state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged
+at 2026-08-07T21:18, **claims no files** — no collision, and `:core` has never been Terra's
+territory.
