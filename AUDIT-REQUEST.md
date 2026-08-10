@@ -2371,3 +2371,48 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://dl.google.com/ ; echo "exit=$?
 
 *Expected:* the first prints **nothing** (`exit=1`) — written to fail the day `:app` wires this up,
 which is the point. The second is a CONNECT tunnel failure / 403, not a 200.
+
+### C-S3A-9 — CI reported, and it closes C-S3A-7 and the first item of C-S3A-8
+
+> **Claim.** The android gate ran on this slice and is **green**. Run
+> [31374085226](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31374085226), job
+> *Build and test* (`93409378480`), conclusion **`success`**, **`head_sha` `d361fa3`** — verified
+> against the run's own `head_sha` field rather than inferred from the PR's check list, because a
+> check-runs listing follows the PR head and would have answered for whatever was newest. Read from
+> the job log, not from the tick:
+>
+> ```
+> > Task :checkCoreIsAndroidFree
+> OK: all vendored vectors match 679a3175590dcd021b21c85af9daf12114e131fd
+> > Task :core:test          BUILD SUCCESSFUL in 46s
+> > Task :app:test           BUILD SUCCESSFUL in 1m 28s
+> > Task :app:assembleDebug  BUILD SUCCESSFUL in 1m 50s
+> > Task :app:lintDebug      BUILD SUCCESSFUL in 48s
+> OK: no analytics or tracking SDKs on the release classpath.
+> ```
+>
+> **All 21 `PairingFlowTest` cases appear individually as `PASSED`** and the log contains **zero**
+> occurrences of `FAILED`. Two claims the probe could not make are now made by the gate rather than
+> by argument: `checkCoreIsAndroidFree` **executed** (C-S3A-7 argued the rule could not break; CI
+> shows it did not), and the vendored-vector pin is confirmed against `679a317` by CI's own blob
+> comparison — so this slice added no drift to the file the two repos share.
+
+```bash
+# MCP: actions_get method=get_workflow_run resource_id=31374085226   -> check head_sha is d361fa3
+# MCP: get_job_logs job_id=93409378480 return_content=true tail_lines=1050
+grep -c "FAILED" <log>                                    # expect 0
+grep -o "PairingFlowTest" <log> | wc -l                   # expect 21
+grep -o "() PASSED" <log> | wc -l                         # expect 154
+```
+
+> **A methodological correction, and it is worth carrying forward.** Every previous entry in this
+> file says *"CI prints no totals, so the count stays a probe number."* That is true of a summary
+> line and **false of the log**: `:core:test` prints one `PASSED` line per case, and counting them
+> gives **154** — exactly the probe's figure, on `ubuntu-latest` with JDK 17 and a real SDK. The
+> count is therefore no longer probe-only, and the same command would have corroborated `133` and
+> `115` in earlier iterations had anyone counted. Use it in future slices instead of caveating.
+
+> **What is still NOT closed by this.** CI cannot invent a caller: `grep -rn "PairingFlow" app/src`
+> still prints nothing, so the third item of C-S3A-8 stands exactly as written, and **a green gate on
+> an uncalled class is not a pairing screen**. Nor does any of this touch B-4's claims — no CI runner
+> has an Android Keystore either.
