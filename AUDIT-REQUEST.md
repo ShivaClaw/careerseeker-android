@@ -2875,20 +2875,44 @@ git diff --stat 9c05ef7..claude/s2-relay-retention -- docs/ src/ tests/ scripts/
 second prints `OK: 28 vector files match the generator.` and exits 0; the **third prints nothing**.
 The offline pin therefore cannot have moved — no file it measures was written.
 
-### C-S2R-15 — CI is the gate, and this claim is open until it reports
+### C-S2R-15 — CI is the gate, and it has now reported: GREEN
 
-> **Claim.** `Verify-Alpha.ps1` did not run and cannot here (no .NET). The relay job on
-> `ubuntu-latest` is the real gate, and it runs two steps this session did **not**:
-> `npx wrangler deploy --dry-run` and the vendored-vector drift check.
+> **Claim.** Both CI jobs passed on this branch's tip, including the two checks this session could
+> not run: `Verify-Alpha.ps1` (no .NET here) and `npx wrangler deploy --dry-run` (skipped under the
+> deploy embargo).
 
 ```bash
-gh run list --repo ShivaClaw/careerseeker --branch claude/s2-relay-retention --limit 3
-gh run view <id> --repo ShivaClaw/careerseeker --log | grep -E 'Typecheck|Test|dry-run|OK:'
+gh run view 31412922819 --repo ShivaClaw/careerseeker
 ```
 
-*Expected:* the *Blind relay (Worker)* job green. **`wrangler deploy --dry-run` was deliberately not
-run in this session** — the standing embargo is "no deploys of any kind", and while `--dry-run`
-does not deploy, declining to run any `wrangler deploy` variant from an unattended sandbox is the
-conservative reading. The step is unaffected by this diff on its face (`wrangler.jsonc` was not
-touched — `git diff 9c05ef7..HEAD -- relay/wrangler.jsonc` is empty), but that is an argument, not
-a measurement, and CI is what settles it.
+*Measured 2026-08-10, run [`31412922819`](https://github.com/ShivaClaw/careerseeker/actions/runs/31412922819),
+event `push`, **`head_sha` `310406a`** read from the run's own field and matched against this
+branch's tip — not inferred from the PR's check list, which follows the head.*
+
+| job | runner | conclusion |
+| --- | --- | --- |
+| **Blind relay (Worker)** (`93535031632`) | `ubuntu-latest` | **success** |
+| **Build and offline harnesses** (`93535031353`) | `windows-latest` | **success** |
+
+Per-step, both jobs are single-job-per-conclusion so `success` means every step passed. The steps
+that matter to this slice's open claims:
+
+- *Blind relay*: `Install dependencies` · `Generate runtime types` · **`Typecheck`** · **`Test`** ·
+  **`Validate config (no deploy)`** · `Assert the relay has no decryption path` ·
+  **`Assert sync vectors match their generator`** — all `success`.
+- *Build and offline harnesses*: `Build Release with warnings as errors` ·
+  **`Run offline alpha verification`** — both `success`. That second step is `Verify-Alpha.ps1`,
+  which **throws** on offline-total drift, so its success is the confirmation that
+  `$ExpectedOfflineTotal` (598) is intact. This slice could not have moved it — it wrote no file
+  outside `relay/` (C-S2R-14) — but that was an argument until this run, and now it is a measurement.
+
+**`npx wrangler deploy --dry-run` ran on CI and passed.** It was deliberately skipped in the
+session (see the boundary paragraph in `LOG.md` §S2R-7: declining every `wrangler deploy` variant
+from an unattended sandbox is the conservative reading of the standing no-deploy embargo). The
+argument offered there — that `relay/wrangler.jsonc` is untouched so the step is unaffected — is now
+confirmed rather than asserted.
+
+**What CI still does not prove.** It ran no engine↔relay smoke against a live or local relay
+(`SyncLiveSmoke` is not in the offline set), so the `latest` semantics change flagged as self-audit
+item 1 on PR #34 remains **unverified against the C# resume path**. Green CI is not evidence for
+that claim, and this entry does not offer it as such.
