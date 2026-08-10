@@ -2156,3 +2156,41 @@ git show HEAD -- <repo>/core/src/main/kotlin/app/careerseeker/core/OutboundEnvel
 
 *Expected:* a comment-only diff. **Measured here** — and the `:core` suite was re-run after it
 (133 / 0 / 0), which is the only way to say "comment-only" and mean it.
+
+### C-S4T-10 — CI reported, and it closes C-S4T-7 and the first item of C-S4T-8
+
+> **Claim.** The android gate ran on this push and is **green**. Run
+> [31358052519](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31358052519), job
+> *Build and test* (`93361342042`), conclusion **`success`**, on head `540a489` — `ubuntu-latest`,
+> **JDK 17** (`Java_Temurin-Hotspot_jdk/17.0.19-10`), real SDK at `/usr/local/lib/android/sdk`. Read
+> from the job log directly, not inferred from the green tick:
+>
+> ```
+> > Task :checkCoreIsAndroidFree            BUILD SUCCESSFUL in 1m 34s
+> OK: all vendored vectors match 679a3175590dcd021b21c85af9daf12114e131fd
+> > Task :core:test                         BUILD SUCCESSFUL in 49s
+> > Task :app:test                          BUILD SUCCESSFUL in 1m 34s
+> > Task :app:assembleDebug                 BUILD SUCCESSFUL in 1m 56s
+> > Task :app:lintDebug                     BUILD SUCCESSFUL in 49s
+> OK: no analytics or tracking SDKs on the release classpath.
+> ```
+>
+> **All 18 `SyncPumpTest` cases appear individually as `PASSED` in that log**, so the suite is green
+> on the gate and not only on the reduced probe. Two claims that the probe could **not** make are now
+> made by the gate rather than by argument: `checkCoreIsAndroidFree` **executed** (C-S4T-7 argued the
+> rule could not break; CI shows it did not), and the vendored-vector pin is confirmed against
+> `679a317` by CI's own blob comparison.
+
+```bash
+# MCP: pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker-android pullNumber=6
+# MCP: get_job_logs job_id=93361342042 return_content=true
+#   grep for: checkCoreIsAndroidFree | all vendored vectors match | SyncPumpTest | BUILD
+```
+
+*Expected:* `conclusion: success` on head `540a489`, and the six lines above.
+
+> **What is still NOT closed by this.** CI proves the gate is green; it does **not** print test
+> totals, so `133 / 0 / 0` stays a probe measurement (C-S4T-1). And CI cannot invent a caller —
+> `grep -rn SyncPump app/src` still prints nothing, so the third item of C-S4T-8 stands exactly as
+> written. **A green gate on an uncalled class is not a working transport loop**, and this entry
+> says so rather than letting the tick imply otherwise.
