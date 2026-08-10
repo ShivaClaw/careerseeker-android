@@ -2649,3 +2649,34 @@ grep -rn "OutboundQueue" app/src ; echo "exit=$?"
 > **Not verified — anything about hardware-backed keys.** The signer here is a stub returning fixed
 > bytes; the slice asserts only *whether a signature could be produced at all*, never that one
 > verifies against a real device key. **B-4 owns every hardware claim in full.**
+
+### C-S6S-12 — CI reported green on this exact head, and what that does and does not prove
+
+> **Claim.** The android gate ran on this slice and is **green**. Run
+> [31392794765](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31392794765) (run
+> #69, event `push`), job *Build and test* (`93468326913`), conclusion **`success`**,
+> 13:25:17 → 13:32:38 UTC, **`head_sha` `88b1d19497ebe0c49b559704aff9fc90fb89e4b9`** — read from the
+> run's own `head_sha` field and compared against this branch's tip, because a check-runs listing
+> follows the PR head and would answer for whatever is newest.
+>
+> `.github/workflows/ci.yml` runs everything in a **single job**, so a `success` conclusion means no
+> step failed — including the six the reduced `:core` probe structurally cannot run:
+> `checkCoreIsAndroidFree`, the vendored-vector diff against `679a317`, `:app:test`,
+> `:app:assembleDebug`, `:app:lintDebug`, and the release-classpath tracker check. In particular
+> **the vendored-vector step is CI's own blob comparison against the pinned main-repo commit**, which
+> independently confirms C-S6S-9's local diff: this slice added no cross-repo vector drift.
+>
+> **What this does NOT prove, stated because the previous iteration established the stronger method
+> and this one did not use it.** C-S3A-9 showed that the job log prints one `PASSED` line per test
+> case and that counting them corroborates the probe's total. **I did not count them here.** The
+> **177** figure in these records is therefore the probe's number, and CI corroborates it only as
+> *green*, not as a *count*. A future iteration should run the count — it is one command — rather
+> than inheriting this gap.
+
+```bash
+# MCP: actions_get method=get_workflow_run resource_id=31392794765   -> head_sha, conclusion
+# MCP: get_job_logs job_id=93468326913 return_content=true tail_lines=2500
+grep -c "FAILED" <log>                    # expect 0
+grep -o "() PASSED" <log> | wc -l         # expect 177  -- NOT yet run; this is the gap above
+git rev-parse HEAD                        # must equal the run's head_sha
+```
