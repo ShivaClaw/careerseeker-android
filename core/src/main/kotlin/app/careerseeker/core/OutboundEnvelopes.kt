@@ -132,7 +132,16 @@ class OutboundEnvelopeFactory(
             timestamp,
         )
 
-    /** `pull_request` (§4.3): ask the engine to re-publish from a sequence point. Not signed. */
+    /**
+     * `pull_request` (§4.3.4): ask the engine to re-publish the whole dashboard as a fresh
+     * `snapshot`. Not signed — it changes no engine state (§5.4), so it needs no device key.
+     *
+     * This KDoc used to say "re-publish from a sequence point", copied from §4.3's old row.
+     * §4.3.4 has since made `since_seq` **reserved**: a sender MUST set `0`, a receiver MUST
+     * ignore it and answer with a full snapshot, and a receiver MUST NOT reject a non-zero value.
+     * The parameter stays on the signature because the field is still on the wire; the only value
+     * v1 sends is [PullPolicy.SINCE_SEQ_FULL_REPUBLISH]. See PQ-S4-1 in `docs/protocol-questions.md`.
+     */
     fun pullRequest(sinceSeq: Long, timestamp: String): String =
         build("pull_request", """{"since_seq":$sinceSeq}""", timestamp)
 
