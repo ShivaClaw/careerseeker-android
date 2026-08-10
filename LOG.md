@@ -3571,3 +3571,26 @@ file were neither read nor referenced beyond their paths. **No secrets read, wri
 Terra's state was read at iteration start and again before writing this: still R6(b) BLOCKED on
 draft PR #26, heartbeat unchanged at 2026-08-07T21:18, **claims no files** — no collision. This
 slice took no main-repo territory at all.
+
+### S4P-8 CI reported green on this head, and it counts
+
+The gate ran and passed on `1867d0c`, this branch's tip — check run `93600690593`, job
+*Build and test*, `success`, 21:15:55 → 21:23:37 UTC
+([run 31433025825](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31433025825)).
+The head was confirmed equal to `git rev-parse HEAD` rather than inferred from the PR's check list,
+which follows the head. Single-job workflow, so green covers `checkCoreIsAndroidFree`, the
+vendored-vector diff against `679a317`, `:core:test`, `:app:test`, `:app:assembleDebug`,
+`:app:lintDebug` and the release-classpath tracker check — **every one of which the reduced probe
+structurally cannot run**, and two of which (`assembleDebug`, `lintDebug`) are the only check that
+the `.flatMap` change compiles under the real toolchain rather than the substituted one.
+
+**It does not corroborate the number.** CI prints no totals and I did not count the per-case
+`PASSED` lines, so **185** stays the probe's figure, gate-confirmed as *green* only (C-S4P-11).
+
+**And a process failure worth writing down, because it is this entry's own defect in miniature.**
+Two poll loops were spent on `curl` against the Actions REST API before I noticed it answers
+**403** to this session's token — as does the Checks endpoint. Only the MCP `get_check_runs` path
+reaches them. **`AUDIT-REQUEST.md` C-S6A-1 already recorded this**, from an earlier iteration that
+lost the same time the same way, and I read past it. That is precisely the shape of the bug this
+slice fixed: *an invariant written down in one place and not applied where it was needed.* Repeated
+at C-S4P-12 rather than left where being written once demonstrably did not work.

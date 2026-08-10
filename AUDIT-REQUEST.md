@@ -3100,3 +3100,48 @@ git -C <SYNC> status --porcelain             # clean
 `docs/protocol-questions.md`; the second prints nothing. **`Verify-Alpha.ps1` was not run** (no
 .NET), so 598 is confirmed by the no-files-written argument here, and by CI on the main repo — not
 by a measurement taken in this session.
+
+### C-S4P-11 — CI reported green on this head, so the gate ran what the probe could not
+
+> **Claim.** The android gate is **GREEN on `1867d0c`**, this branch's tip — check run
+> `93600690593`, job *Build and test*, `status: completed`, `conclusion: success`,
+> 21:15:55 → 21:23:37 UTC, run
+> [31433025825](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31433025825).
+> The workflow is a **single job**, so `success` means every step passed: `checkCoreIsAndroidFree`,
+> the vendored-vector diff against `679a317`, `:core:test`, `:app:test`, `:app:assembleDebug`,
+> `:app:lintDebug` and the release-classpath tracker check — **all of which the reduced probe
+> structurally cannot run**. This supersedes C-S4P-4's probe as evidence of *green*.
+
+```
+MCP: pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker-android pullNumber=6
+MCP: pull_request_read method=get         owner=ShivaClaw repo=careerseeker-android pullNumber=6
+```
+
+*Expected:* one check run, `Build and test`, `completed` / `success`; and `head.sha` =
+`1867d0ca0058848fe12f8189f4a178be44bace15`, matching `git rev-parse HEAD`. **The second call is
+not optional** — `get_check_runs` reports runs for the PR's *current* head, so after any further
+push it describes a later run. Both were run here and matched.
+
+**What this does not prove.** CI reports **no test counts** — Gradle does not print them and the
+workflow does not collect them — and **I did not count the log's per-case `PASSED` lines** (the
+method C-S3A-9 established). So **185** remains the probe's number, gate-corroborated only as
+"green", never as a count. It also runs no emulator, so nothing here is an E2E claim.
+
+### C-S4P-12 — The Actions REST API is 403 from this sandbox, and the records had already said so
+
+> **Claim.** `GET /repos/…/actions/runs/{id}` and `GET /repos/…/commits/{sha}/check-runs` both
+> answer **403** to `curl` with this session's token. Only the MCP path reaches them. Two poll
+> loops were defeated by this before I stopped using `curl` — **and C-S6A-1 already warned about
+> it in this very file**, from an iteration that lost the same time the same way.
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $GH_TOKEN" \
+  https://api.github.com/repos/ShivaClaw/careerseeker-android/actions/runs/31433025825
+curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $GH_TOKEN" \
+  https://api.github.com/repos/ShivaClaw/careerseeker-android/commits/1867d0c.../check-runs
+```
+
+*Expected:* `403`, twice. **Poll CI with the MCP `get_check_runs` method, never with `curl`.** The
+note is repeated here rather than left at C-S6A-1 because being written down once demonstrably did
+not stop it — which is the same failure mode as the defect this slice fixed, one level up: an
+invariant recorded in one place and not applied where it was needed.
