@@ -2619,3 +2619,153 @@ action — the upload keystore and its password file were neither read nor refer
 paths. No secrets read, written or printed. Terra's state was read at iteration start: still R6(b)
 BLOCKED on draft PR #26, heartbeat unchanged at 2026-08-07T21:18, **claims no files** — no
 collision, and `docs/Sync-Protocol.md` has been my territory since S1.
+
+---
+
+## S4 transport half — the loop's decisions, moved where they can be tested · 2026-08-10 (eighth cloud iteration, Linux sandbox)
+
+**The environment was probed before the rung was picked, because the records' own next-intent list
+is entirely out of reach here.** Every item on it needs .NET (S5's C# applier, S2's `/pair` page,
+B-6's parser), an Android SDK (S4's `:app` wiring), or an AVD (S6's signed send). Measured this
+session rather than carried:
+
+```
+dotnet, adb, sdkmanager, pwsh                 ->  absent
+java 21, node 22.22.2, gradle 9.6.1           ->  present
+https://repo.maven.apache.org/... (Kotlin)    ->  200
+https://dl.google.com/... (AGP 9.3.0)         ->  curl: (56) CONNECT tunnel failed, response 403
+https://api.foojay.io/...  (JDK provisioning) ->  curl: (56) CONNECT tunnel failed, response 403
+```
+
+So B-7 holds, re-measured, and the lanes that work here are the ones the records already name:
+`:core`, `relay/`, `generate.mjs`, docs.
+
+### S4T-1 The slice, and why it is not the one the schedule proposed
+
+The standing prompt again nominates S5's spec half. That landed 2026-08-09 (PR #32) and the
+seventh iteration already recorded the correction — the prompt is a stored snapshot and does not
+re-read itself. Nothing was redone.
+
+The rung actually available was **S4's remaining half**, and the records described it as "`:app`
+wiring". Reading the four steps they list makes clear that only one of them is wiring:
+
+> map `ApplyResult` → `ApplyDisposition`; call `PullPolicy.onOpen` when the transport opens and
+> `onEnvelope` per envelope; push the resulting `pullRequest(0, ts)` through `RelayClient`; call
+> `onRequestFailed()` when that push fails.
+
+Those are **ordering rules**. Each one has a wrong version that compiles, renders correctly, and
+reports nothing — and written in `:app` they can only be exercised by a machine with an Android
+SDK, which no session in this window has had. `SyncPump` moves them into `:core`, which leaves
+`:app` holding a Ktor engine, a Room-backed applier, and a coroutine.
+
+### S4T-2 What landed
+
+`core/src/main/kotlin/app/careerseeker/core/SyncPump.kt` (new) and its test (new), plus a
+comment-only fix to `OutboundEnvelopes.kt`. **Zero `:app` files touched** — deliberately: nothing
+here can be compiled against `:app` on this machine, so nothing here was allowed to depend on it.
+`SyncPump.kt` has **no `import` lines at all**, which is what makes the `checkCoreIsAndroidFree`
+claim structural rather than a promise (C-S4T-7).
+
+Four rules, and the failure each one prevents. All four are silent failures; that is the whole
+reason they are worth a test rather than a comment.
+
+1. **The cursor advances on every envelope *seen*, not every envelope *applied*.** A `delta` before
+   any snapshot is *accepted* by `EnvelopeReceiver` and *refused* by the replica, so the persisted
+   applied mark does not move. A cursor read from that mark re-fetches the same envelope next
+   cycle — where the receiver's in-process replay window now rejects it. The phone pulls the same
+   page forever, applies nothing, and reports no error at all. Re-seeding from the persisted mark
+   on restart is the other half of the rule and is correct for the same reason in reverse: after a
+   restart the replay window is empty, so anything accepted-but-not-applied gets a clean retry.
+2. **The position is read once per envelope, before that envelope is applied.** `PullPolicy`
+   measures `envelopeSeq - positionBefore.highestAppliedSeq`. Reading after the apply hides every
+   gap; reading once per *page* invents one — 39 contiguous envelopes measured against the position
+   at the top of the page look 39 apart, so a page longer than the threshold asks for a snapshot on
+   every sync, forever, for a stream with nothing wrong with it.
+3. **A `pull_request` the relay refused releases the latch.** Otherwise one dropped push silences
+   the policy for the life of the process: it believes a request is outstanding that the engine
+   never received.
+4. **Sequence numbers come from inside the envelope, never from the relay's page wrapper.** This
+   one was found while writing the tests rather than planned, and it is the finding of the slice —
+   see S4T-3.
+
+### S4T-3 A finding, in `:core`, on a path that was being wired rather than reviewed
+
+`RelayClient.parsePullPage` accepts **two** page shapes. In the second — `{"seq":N,"envelope":…}` —
+the relay's reported sequence number and the envelope's own are separate values that **can
+disagree**. The envelope's `seq` is in the AAD, so the AEAD tag covers it. The relay's is covered
+by nothing.
+
+A transport cursor driven by the relay's number would let a blind relay **truncate the stream
+without decrypting anything**: report `seq: 999` on an envelope carrying `5`, and the phone never
+asks for `6..999` again. The relay cannot read a byte of what it carries — and would not need to.
+
+**This is not a report that the deployed relay lies.** It splices envelopes back verbatim, so the
+two numbers agree today, and no test here asserts otherwise. What changed is that the phone no
+longer *depends* on that. The rule is cheap, and the property it protects — that a compromised or
+substituted relay cannot silently drop history — is one of the two the whole blind-relay design
+exists for.
+
+Left open, deliberately: whether `parsePullPage` should accept the wrapper shape at all. Removing
+it is a `:core` change with a `RelayClientTest` assertion behind it and possible engine-side
+expectations; that is a separate slice, not a drive-by.
+
+### S4T-4 What ran
+
+```
+:core reduced probe (C-S6A-1 recipe)   ->  BUILD SUCCESSFUL in 28s
+JUnit XML totals                       ->  133 tests, 0 failures, 0 skipped, 12 classes
+baseline, same probe, before the slice ->  115 tests, 0 failures, 0 skipped, 11 classes
+node docs/sync-vectors/generate.mjs --check  ->  OK: 28 vector files match the generator.  (exit 0)
+```
+
+**Not green on the first run**, and the failure was mine rather than the code's: the contiguous-page
+test asserted 39 position reads where the correct number is 40 — `pump()` seeds the cursor lazily
+when `open()` was never called, which is one extra read. The assertion was wrong, the behaviour was
+right, and the test now says so explicitly. Recorded because the precedent in this file is to state
+whether a slice was green immediately.
+
+**`Verify-Alpha.ps1` did not run and cannot** — no .NET. It also cannot be affected: no `.cs`, no
+harness, no vector byte, no count-reporting doc, so `$ExpectedOfflineTotal` (598) is untouched by
+construction. **The android gate did not run and cannot** — no SDK, no JBR, B-7 re-measured above.
+CI is the gate for both, and C-S4T-8 is written to be checked rather than assumed.
+
+### S4T-5 Ladder effect, stated narrowly
+
+**S4 does not become DONE, and the honest description of what is left changed shape.** Before this
+slice, S4's remainder was "`:app` wiring" — a phrase that hid four correctness decisions inside a
+word that sounds mechanical. After it, the remainder really is wiring: construct a `SyncPump` with
+a Ktor engine, an `EnvelopeApplier` adapter (the one `when`, whose exact body is in
+`ReplicaApplier`'s KDoc), and a Room-backed position source; then call `open()` and `pump()` from a
+coroutine. **Only the E2E claim still needs B-4.**
+
+**`SyncPump` has no production caller and this file will not pretend otherwise.** `grep -rn SyncPump
+app/src` prints nothing. The rung stays **PARTIAL**.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** PRs #32 and #33 stay drafts in the main repo and were
+neither merged, retargeted nor force-pushed; android PR #6 stays a draft. Two commits were appended
+to an existing branch of mine and pushed **forward-only** — no force-push, no history rewrite, no
+branch created or deleted.
+
+**No `:app` file, of any kind** — not a screen, not the applier, not the manifest, not a Gradle or
+version-catalog file. `core/build.gradle.kts` was not touched either: the slice adds no dependency,
+and `SyncPump.kt` adds no `import`. **No `.cs` file, no harness, no `$ExpectedOfflineTotal`, no
+`Verify-Alpha.ps1`, no count-reporting doc.** **No vector's bytes changed and no vector was added** —
+`generate.mjs --check` proves 28/28 still match. Nothing was re-vendored; the android pin stays
+`679a317` and `core/src/test/resources/` was not opened for writing. **No `docs/Sync-Protocol.md`
+change** — this slice implements the amendment PR #33 already made; it does not extend it, and no
+protocol question was closed or opened in the spec.
+
+**No `relay/` file.** `npm`, `vitest`, `wrangler` and miniflare were not invoked at all this
+iteration. **No deploy of any kind** (Cloudflare, Workers, relay, site, Pages). **The production
+relay was contacted zero times, not even `GET /v1/health`** — every relay in this slice is a Ktor
+`MockEngine` inside the test JVM.
+
+No emulator, no `sdkmanager`, no AVD, and no attempt to route around the `dl.google.com` denial —
+it was probed once, as a client, to confirm B-7 still holds, and then respected. No Google, Play,
+OAuth or Console action; no accounts, no purchases, no Play Billing code; no email or Gmail
+anything; no cert-store, MSIX or keystore action — the upload keystore and its password file were
+neither read nor referenced beyond their paths. No secrets read, written or printed. Terra's state
+was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged at
+2026-08-07T21:18, **claims no files** — no collision, and `:core` has never been Terra's territory.

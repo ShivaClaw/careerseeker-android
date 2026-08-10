@@ -517,3 +517,41 @@ correct elsewhere. **A new engine-side defect was found** (`pull_request` report
 `SnapshotRepublished` with no republisher configured, the same shape as PQ-S6-1's `outcome` case) —
 it is recorded as an extension to PQ-S6-1 and as C-S4S-5, **not** here, because it blocks nothing:
 it is unwritten C#, not obstructed C#.
+
+---
+
+### B-7 status 2026-08-10 (eighth iteration, S4 transport half) — re-measured, unchanged, and its cost is now smaller
+
+**No new blocker.** Recorded because B-7 was re-measured this session rather than carried forward,
+and because the slice deliberately reduced what B-7 actually costs.
+
+**Re-measured, this session:**
+
+```
+https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/9.3.0/gradle-9.3.0.pom
+  -> curl: (56) CONNECT tunnel failed, response 403
+https://api.foojay.io/disco/v3.0/packages
+  -> curl: (56) CONNECT tunnel failed, response 403
+https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.10/kotlin-stdlib-2.4.10.pom
+  -> 200
+dotnet, adb, sdkmanager, pwsh  -> absent      java 21, node 22.22.2  -> present
+```
+
+Unchanged from 2026-08-09. Probed once, as a client, and then respected — no mirror, no vendored
+AGP, no `ANDROID_HOME` fabrication, per `/root/.ccr/README.md`.
+
+**What changed is the size of the blocked surface, not the blocker.** S4's remainder used to be
+described as "`:app` wiring", which put four ordering decisions — the transport cursor, when the
+replica position is read, latch release on a failed push, and which `seq` is authenticated — inside
+a module no cloud session can compile. Those now live in `:core` as `SyncPump`, tested here
+(C-S4T-1…7). What B-7 still blocks in S4 is genuinely mechanical: constructing a `SyncPump` with a
+Ktor engine, an `EnvelopeApplier` → `ReplicaApplier` adapter, and a Room-backed
+`ReplicaPositionSource`.
+
+**Still true and worth not losing:** `SyncPump` has **no production caller**. `grep -rn SyncPump
+app/src` prints nothing, and will keep printing nothing until a machine that can compile `:app`
+writes the adapter. That is unblocked-and-unwritten in a cloud session's hands only in the sense
+that a local session can do it today; it is not something to mark done from here.
+
+**Smallest human unblock: unchanged — none needed.** CI is the unblock, and it runs the real gate
+on the push.

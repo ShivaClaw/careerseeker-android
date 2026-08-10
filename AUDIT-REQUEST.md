@@ -1979,3 +1979,180 @@ cd careerseeker && grep -rn "since_seq=7\|SinceSeq" tests/SyncHarness/Program.cs
 §4.3.4 arguably invites removing `sinceSeq` from `ISnapshotRepublisher` entirely, since no
 implementation reads it. That is a **C# cleanup this sandbox cannot make or verify**, and it would
 rewrite this test. Recorded so whoever does it knows the test is deliberate rather than incidental.
+
+---
+
+## S4 transport half — `SyncPump`, the loop's decisions in `:core` · 2026-08-10 (eighth cloud iteration)
+
+Every claim below was **measured on this machine** with the reduced `:core` probe (C-S6A-1 recipe,
+re-run here — `BUILD SUCCESSFUL in 28s`). The gate is CI (C-S4T-8). Where a claim is unverified, it
+says so and says why.
+
+### C-S4T-1 — The measured `:core` total moved 115 → 133, and `SyncPumpTest` is the whole delta
+
+> **Claim.** `:core` is **133 tests / 0 failures / 0 skipped across 12 classes**, up from the
+> measured 115 / 11 baseline. The +18 is `SyncPumpTest` and nothing else: no existing test was
+> edited, renamed, or deleted.
+
+```bash
+# C-S6A-1's probe recipe, then:
+python3 - <<'PY'
+import glob, xml.etree.ElementTree as ET
+t=f=s=n=0
+for p in sorted(glob.glob('<repo>/core/build/test-results/test/TEST-*.xml')):
+    r=ET.parse(p).getroot(); n+=1
+    t+=int(r.get('tests')); f+=int(r.get('failures'))+int(r.get('errors')); s+=int(r.get('skipped'))
+print(t,f,s,n)
+PY
+git diff --stat HEAD~2..HEAD
+```
+
+*Expected:* `133 0 0 12`, and a three-file diffstat: `SyncPump.kt` (new), `SyncPumpTest.kt` (new),
+`OutboundEnvelopes.kt` (comment only). **Measured here.**
+
+### C-S4T-2 — Rule 1: the cursor advances on envelopes *seen*, not envelopes *applied*
+
+> **Claim.** This is the bug the class exists to prevent, and it is silent in every direction. A
+> `delta` arriving before any snapshot is **accepted** by `EnvelopeReceiver` and **refused** by the
+> replica (`AWAITING_SNAPSHOT`), so the persisted applied mark does not move. A cursor read from
+> that mark re-requests the same envelope next cycle, where the receiver's in-process replay window
+> now rejects it — the phone pulls the same page forever, applies nothing, and reports no error.
+> Two tests pin it: one for the refused-by-replica path, one for the rejected-by-receiver path.
+
+```bash
+# after the C-S6A-1 recipe:
+grep -n "the cursor advances past" -A 20 \
+  <repo>/core/src/test/kotlin/app/careerseeker/core/SyncPumpTest.kt
+```
+
+*Expected:* both tests assert the **second** pull's `since=` equals the refused envelope's seq
+(`4` and `3` respectively), not the unchanged applied mark (`0` and `1`). **Measured here, both
+green.** An auditor wanting to see the failure should invert the guard at `SyncPump.kt`'s
+`if (seq > cursorValue)` to key off `position.current().highestAppliedSeq`; both tests go red.
+
+### C-S4T-3 — Rule 2: the replica position is read per envelope, before the apply
+
+> **Claim.** `PullPolicy` measures a gap as `envelopeSeq - positionBefore.highestAppliedSeq`. Read
+> the position *after* the apply and the envelope's own seq folds into the mark, hiding every gap.
+> Read it once per *page* and the opposite happens: 39 contiguous envelopes measured against the
+> position at the top of the page report a 39-wide gap on the last one and fire a `pull_request`
+> for a stream with nothing wrong with it — answered by a full snapshot, on every sync.
+
+```bash
+grep -n "a long contiguous page reports no gap" -A 14 \
+  <repo>/core/src/test/kotlin/app/careerseeker/core/SyncPumpTest.kt
+```
+
+*Expected:* a page of 39 contiguous envelopes against `PullPolicy(gapThreshold = 5)` sends **zero**
+pushes, and `positionReads.size == 40` (39 envelopes + one lazy seeding read). The count is the
+load-bearing assertion — a page-scoped implementation reads **once**. **Measured here.**
+
+### C-S4T-4 — Rule 4: the seq that drives the cursor is the authenticated one
+
+> **Claim, and it is the one an auditor should attack first.** `RelayClient.parsePullPage` accepts
+> two page shapes, and in the `{seq, envelope}` shape the relay's reported sequence number and the
+> envelope's own **can disagree**. The envelope's is in the AAD and the AEAD tag covers it; the
+> relay's is authenticated by nothing. A cursor driven by the relay's number lets a blind relay
+> truncate the stream — report `seq: 999` on an envelope carrying `5` and the phone never asks for
+> `6..999` again — **without decrypting a single byte it is unable to read**.
+
+```bash
+grep -n "the cursor follows the envelope's authenticated seq" -A 18 \
+  <repo>/core/src/test/kotlin/app/careerseeker/core/SyncPumpTest.kt
+grep -n "o\[\"envelope\"\]" -B 4 <repo>/core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+```
+
+*Expected:* the test's second pull sends `since=5`, not `since=999`, and `RelayClient` really does
+accept the wrapper shape (so the divergence is reachable, not hypothetical). **Measured here.**
+
+> **What this claim does NOT say.** It is not a report of a relay that lies — the deployed relay
+> splices the envelope back verbatim, so the two numbers agree today. The claim is that the phone
+> no longer *depends* on that being true. Whether the wrapper shape should exist in `parsePullPage`
+> at all is a separate question this slice did not answer.
+
+### C-S4T-5 — Rule 3: a `pull_request` that never landed is not an outstanding request
+
+> **Claim.** `PullPolicy` latches to stop one stalled sync producing a burst of traffic. The pump
+> holds the other end of that contract: a push the relay refused calls `PullPolicy.onRequestFailed`,
+> so the latch does not silence the policy for the life of the process over one dropped packet.
+
+```bash
+grep -n "releases the latch instead of latching forever" -A 10 \
+  <repo>/core/src/test/kotlin/app/careerseeker/core/SyncPumpTest.kt
+```
+
+*Expected:* `requestFailed == COLD_START`, `requestSent == null`, `hasPendingRequest == false`.
+**Measured here.**
+
+### C-S4T-6 — The pull half still needs no device key, and that is asserted rather than assumed
+
+> **Claim.** `pull_request` is not state-changing (§5.4), so `SyncPump` works with an
+> `OutboundEnvelopeFactory` built with **no `DeviceSigner` at all**. This is why S4's pull half was
+> never blocked on S3's Android Keystore key (B-4). The test builds exactly that pump and asserts
+> the pushed envelope carries no `sig`; were the kind ever moved into
+> `Protocol.STATE_CHANGING_KINDS`, the factory would throw `UnsignableEnvelope` and this test is
+> where it surfaces.
+
+```bash
+grep -n "unsigned pull_request for seq zero" -A 22 \
+  <repo>/core/src/test/kotlin/app/careerseeker/core/SyncPumpTest.kt
+```
+
+*Expected:* the decrypted push body is exactly `{"kind":"pull_request","body":{"since_seq":0}}` and
+`"sig"` is absent from the envelope's keys. **Measured here** — and note the body is read by
+actually opening the AEAD, not by string-matching the wire.
+
+### C-S4T-7 — `checkCoreIsAndroidFree` cannot have been affected, structurally
+
+> **Claim.** `SyncPump.kt` contains **zero `import` lines**. It references only types already in
+> `app.careerseeker.core` and adds no dependency to `core/build.gradle.kts`. The Android-free rule
+> therefore cannot have been broken by this slice — not "was checked and passed", but "has no
+> mechanism by which it could fail".
+
+```bash
+grep -c "^import" <repo>/core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+git diff HEAD~2..HEAD -- <repo>/core/build.gradle.kts
+```
+
+*Expected:* `0`, and an empty diff. **Measured here.** The task itself needs AGP and was **not**
+run — see C-S4T-8.
+
+### C-S4T-8 — What this slice did NOT verify, and why
+
+> **Claim.** Three things are unverified and one of them matters.
+>
+> 1. **The android gate did not run and cannot here** — no SDK, no JBR, and `dl.google.com` is an
+>    egress policy denial (B-7, re-measured this session). So `:app:assembleDebug`, `:app:lintDebug`,
+>    `:app:test` and `checkCoreIsAndroidFree` have **not** been executed by me. CI is the gate.
+> 2. **`Verify-Alpha.ps1` did not run and cannot** — no .NET. It also cannot be affected: this slice
+>    touched no `.cs`, no harness, no vector byte and no count-reporting doc, so
+>    `$ExpectedOfflineTotal` (598) is untouched by construction.
+> 3. **`SyncPump` has no production caller.** Nothing in `:app` constructs one. The loop is proven
+>    against a MockEngine relay and a fake replica, which is exactly as far as this machine can take
+>    it; the real replica is Room-backed and the real transport needs a Ktor engine in `:app`.
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" --max-time 25 \
+  https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/9.3.0/gradle-9.3.0.pom
+grep -rn "SyncPump" <repo>/app/src   # must print nothing
+# MCP: pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker-android pullNumber=6
+```
+
+*Expected:* the curl fails with `curl: (56) CONNECT tunnel failed, response 403` (**measured this
+session**; `repo.maven.apache.org` answers `200` on the same run, which is why `:core` is
+buildable and `:app` is not); the grep prints nothing, **which is the honest statement of what is
+left**; and CI reports on the push. **The CI claim is written to be checked, not assumed** — at the
+time of writing it had not reported.
+
+### C-S4T-9 — The `pull_request` KDoc no longer contradicts §4.3.4
+
+> **Claim.** `OutboundEnvelopeFactory.pullRequest` described the semantics PQ-S4-1 removed ("from a
+> sequence point"). Comment-only fix; no behaviour, and the parameter stays because the field is
+> still on the wire.
+
+```bash
+git show HEAD -- <repo>/core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+```
+
+*Expected:* a comment-only diff. **Measured here** — and the `:core` suite was re-run after it
+(133 / 0 / 0), which is the only way to say "comment-only" and mean it.
