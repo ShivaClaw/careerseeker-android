@@ -6,19 +6,19 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 
 | | |
 | --- | --- |
-| **Heartbeat** | 2026-08-10 (S4 **transport half** — `SyncPump`, the loop's four ordering decisions moved into `:core` where they can be tested; cloud iteration, Linux sandbox, **eighth** run). `:core` only: **two new files + one comment-only fix, zero `:app` files, zero main-repo files.** `:core` 115 → **133 / 0 / 0**, measured here |
+| **Heartbeat** | 2026-08-10 (S3 **decision half** — `PairingFlow` + `RelayTokenLadder`, the pairing attempt's four ordering decisions moved into `:core` where they can be tested; cloud iteration, Linux sandbox, **ninth** run). `:core` only: **two new files, zero edits to any existing file, zero `:app` files, zero main-repo files.** `:core` 133 → **154 / 0 / 0**, measured here. **S3 BLOCKED → PARTIAL** |
 | **Android branch** | `claude/android-a0-probe` — draft [PR #6](https://github.com/ShivaClaw/careerseeker-android/pull/6) with self-audit. **CI GREEN on the S6 push**: run [31325873134](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31325873134), job *Build and test*, `success`, on head `9f73226` — **C-S6A-9 is closed green** and S6's marking decision is gate-verified, not probe-verified. **10 behind `main`** (docs-only commits, no overlap with this branch's files); left as found |
 | **Merge topology** | **measured, not predicted** — [`docs/Merge-Topology.md`](docs/Merge-Topology.md). The whole stack merges into `main` **clean**; exactly **one** conflicting file repo-wide (`docs/Monetization-Decision.md`, add/add, a naming *decision*). `p4-pro` == `p2-replica` (`d9f95fd`) — no separate P4 branch exists. Re-verify: `AUDIT-REQUEST.md` C-MT-1…7 |
-| **`:core` health** | **133 tests / 0 failures / 0 skipped across 12 classes — measured here 2026-08-10** (`BUILD SUCCESSFUL in 28s`), up from a **115 / 11** baseline re-measured on the same probe in the same session. The +18 is `SyncPumpTest` and nothing else: no existing test was edited, renamed or deleted. Counts come from a reduced probe (`:core` alone, JDK 21 — Gradle 9 removed `-c`, so the probe is a separate root; recipe in C-S6A-1). The **gate** is CI. CI proves green, not the number |
-| **CI on this push** | **GREEN, checked rather than predicted** — run [31358052519](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31358052519), job *Build and test*, `success`, on head `540a489`. Read from the job log, not from the tick: `:checkCoreIsAndroidFree` ✓ · `OK: all vendored vectors match 679a317…` · `:core:test` ✓ · `:app:test` ✓ · `:app:assembleDebug` ✓ · `:app:lintDebug` ✓ · `OK: no analytics or tracking SDKs on the release classpath.` **All 18 `SyncPumpTest` cases appear individually as `PASSED`**, so the suite is green on the gate and not only on the probe (C-S4T-10). CI prints no totals, so `133 / 0 / 0` stays a probe number — and **a green gate on an uncalled class is not a working transport loop**. The android gate cannot run on this machine (no SDK/JBR, B-7 re-measured — `dl.google.com` and `api.foojay.io` both `CONNECT tunnel failed, response 403`, while `repo.maven.apache.org` answers `200`, which is exactly why `:core` builds here and `:app` does not). Last **known-green** android run stays [31325873134](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31325873134) on `9f73226`. The main-repo gate last ran on `9399d11`: run [`31346147785`](https://github.com/ShivaClaw/careerseeker/actions/runs/31346147785), **both jobs `success`** |
+| **`:core` health** | **154 tests / 0 failures / 0 skipped across 13 classes — measured here 2026-08-10, ninth run** (`BUILD SUCCESSFUL in 13s`), up from a **133 / 12** baseline re-measured on the same probe in the same session. The +21 is `PairingFlowTest` and nothing else: no existing test was edited, renamed or deleted, and **no existing file of any kind was touched** — the slice is two new files. Green on the first run. Counts come from a reduced probe (`:core` alone, JDK 21 — Gradle 9 removed `-c`, so the probe is a separate root; recipe in C-S6A-1). The **gate** is CI. CI proves green, not the number |
+| **CI on this push** | **NOT YET REPORTED at the time of writing** — the ninth run's commits were pushed and CI had not reported on them. Do not read the previous run's green as covering this one. Last **known-green** android run stays [31358052519](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31358052519), job *Build and test*, `success`, on head `540a489` — read from the job log, not the tick: `:checkCoreIsAndroidFree` ✓ · `OK: all vendored vectors match 679a317…` · `:core:test` ✓ · `:app:test` ✓ · `:app:assembleDebug` ✓ · `:app:lintDebug` ✓ · `OK: no analytics or tracking SDKs on the release classpath.` CI prints no totals, so `154 / 0 / 0` is a probe number — and **a green gate on an uncalled class is not a pairing screen**. The android gate cannot run on this machine (no SDK/JBR, B-7 re-measured — `dl.google.com` `CONNECT tunnel failed, response 403`). The main-repo gate last ran on `9399d11`: run [`31346147785`](https://github.com/ShivaClaw/careerseeker/actions/runs/31346147785), **both jobs `success`** |
 | **Android health** | **green on CI at `53710a6`** — [run 31292342258](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31292342258), success: vendored-vector step, `:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug` all `BUILD SUCCESSFUL`, plus *"OK: no analytics or tracking SDKs on the release classpath."* **Not run by me** — no Android SDK/JBR/Gradle on this machine. The **102 / 0 / 0 / 3** test *counts* remain carried from the S8 local run: Gradle does not print counts, so CI proves green, not the number |
 | **Main-repo base of record** | `origin/main` = `00b3705` (gate `P0-BASE` superseded — S-Ladder §2.3) |
 | **Main-repo PRs merged** | #27 `7f3e61e` · #28 `f0b9bd5` · #29 `160b317` · #30 `a8ef552` · #31 `00b3705` |
 | **Main-repo PR open** | **#32 draft** — `claude/s5-entitlement-ack-spec`, S5 spec + vectors **+ the relay size-cap fix** (head `9c05ef7`, CI green). **Not merged** (merging needs a full local gate this machine cannot run) · **#33 draft** — `claude/s4-pull-request-semantics`, **stacked on #32**, S4's spec half (head `9399d11`). Docs-only, one file. Whether it should be retargeted at `main` once #32 lands is on the return-day list |
-| **Offline pin** | **598, unchanged** — and unchangeable by this iteration too (2026-08-10, eighth run): no `.cs`, no harness, no vector byte, no count-reporting doc, and no main-repo file at all. Previously (seventh run): unchangeable for the same reasons. CI's `Verify-Alpha.ps1` run on `9c05ef7` exited 0, and the script *throws* on drift, so success is the confirmation. **I did not read the `Offline total:` line myself** — the earlier direct sighting is run [`31292158471`](https://github.com/ShivaClaw/careerseeker/actions/runs/31292158471): SyncHarness `130 passed`, `Offline total: 598 passed, 0 failed` |
+| **Offline pin** | **598, unchanged** — and unchangeable by this iteration too (2026-08-10, **ninth** run): **no file in the main repo was written at all**, so no `.cs`, no harness, no vector byte and no count-reporting doc. Previously (eighth run): unchangeable for the same reasons. CI's `Verify-Alpha.ps1` run on `9c05ef7` exited 0, and the script *throws* on drift, so success is the confirmation. **I did not read the `Offline total:` line myself** — the earlier direct sighting is run [`31292158471`](https://github.com/ShivaClaw/careerseeker/actions/runs/31292158471): SyncHarness `130 passed`, `Offline total: 598 passed, 0 failed` |
 | **Relay suite** | **36 passed / 0 failed** (was 32) — measured here with `npx vitest run`, and green again on CI's *Blind relay (Worker)* job. `npx tsc --noEmit` clean after `wrangler types` |
-| **Shared vectors** | **28, unchanged again 2026-08-10 (eighth run)** — none added, none edited; `generate.mjs --check` re-measured here: `OK: 28 vector files match the generator.` (exit 0). A `pull_request` vector was **deliberately not added** (LOG §S4S-3): it would pin a body nobody disputes, test none of §4.3.4's three behavioural MUSTs, and — being `type: "envelope"` — would enter `SyncHarness`'s enumeration and move `$ExpectedOfflineTotal`, a number no .NET-less machine can measure |
-| **Coordination bus** | `autonomy/claude-state` — updated this iteration; files claimed named there |
+| **Shared vectors** | **unchanged again 2026-08-10 (ninth run)** — none added, none edited. **The count depends on the ref, and both were measured here:** `OK: **26** vector files match the generator.` on `origin/main` (`00b3705`), `OK: **28** …` on `claude/s5-entitlement-ack-spec` (`9c05ef7`), both exit 0. The standing "28" in these records is the **branch** figure — PR #32's two ack vectors are not on `main` until it merges — and reading it as a `main` figure is the doc-drift trap one repo over. A `pull_request` vector was **deliberately not added** (LOG §S4S-3): it would pin a body nobody disputes, test none of §4.3.4's three behavioural MUSTs, and — being `type: "envelope"` — would enter `SyncHarness`'s enumeration and move `$ExpectedOfflineTotal`, a number no .NET-less machine can measure |
+| **Coordination bus** | `autonomy/claude-state` — updated this iteration; files claimed named there. **This iteration claimed nothing new in the main repo** — it wrote no file there |
 | **Terra (Codex)** | R6(b) BLOCKED, PR #26 draft, files claimed: **none** — read at iteration start, no collision |
 
 ## Ladder
@@ -28,7 +28,7 @@ Single-glance state for the unattended window (2026-08-07 → 2026-08-18). Full 
 | **S0** re-entry + derivation | **DONE** | `docs/S-Ladder.md`; `LOG.md` §S0; `AUDIT-REQUEST.md` C-S0-1…9 |
 | **S1** land the engine sync track | **DONE** | PRs #27–#30 merged; sync-track paths on main **0 → 54**; vector drift **0** in every check; C-S1-1…6 |
 | **S2** engine publishes for real | **PARTIAL** | PR #31; engine ↔ **local** relay **30/30**, no deploy. **B-2 open:** no `/pair` page. **Transport half hardened 2026-08-09** (PR #32, CI green): the relay was 413ing envelopes §3.1 declares legal — a base64url **character** count tested against a **byte** budget capped the decoded payload at 786,432 and left a **256 KiB** band untransmittable. Latent, not live (§4.4 chunking is unimplemented in both codebases), but §4.4 tells a future chunker to size against exactly the number that did not fit. Cap now derived; suite 32 → **36**. Re-verify: C-S2R-1…7 |
-| **S3** pairing screen | **BLOCKED — B-4** | `sdkmanager`/`avdmanager` are not installed anywhere on this machine; Keystore cannot be honestly verified without an AVD |
+| **S3** pairing screen | **PARTIAL** (was BLOCKED — a mislabel, corrected 2026-08-10, ninth run) | **The attempt's decisions are DONE** — `PairingFlow` + `RelayTokenLadder`, 21 tests, run here (C-S3A-1…7): the completion is built **once** per invite and retried verbatim; a **409 is ambiguous by construction** and goes to the human flagged rather than being read as either success or hijack (C-S3A-3 — `RelayClient`'s own transport retry can turn this phone's success into the relay's conflict); a code mismatch is terminal and is **not** a cancel; and **the phone never rotates the relay token** (§5.2.3 gives that to the engine — one `create(rotate_to)` call locks the engine out of `GET /pair` with the completion already stored, one-shot and unreadable). Built with **no Keystore and no camera**, which is the assertion that this half needed neither. **Still B-4's, in full:** the Keystore key and gate P2-KEYSTORE-FALLBACK's StrongBox → TEE → software chain, CameraX + ML Kit, every screen, and any hardware-backed claim. **No production caller** — `grep -rn PairingFlow app/src` prints nothing |
 | **S4** transport loop | **PARTIAL** (was BLOCKED — a mislabel, corrected 2026-08-09) | **The pull decision is DONE** — `PullPolicy`, 17 tests, run here (C-S4A-1/-2). **Spec half DONE 2026-08-10 — PQ-S4-1 closed** (PR #33 draft): §4.3.4 pins the body, `since_seq` reserved. **Transport half DONE 2026-08-10** — `SyncPump`, 18 tests, run here (C-S4T-1…7): the cursor advances on envelopes *seen* not *applied*; the replica position is read per envelope, before the apply; a refused push releases the latch; **the seq that drives the cursor is the envelope's authenticated one, never the relay's page wrapper** (C-S4T-4 — a blind relay could otherwise truncate the stream without decrypting anything). Built with **no `DeviceSigner` at all**, which is the assertion that this half never needed S3's key. **Still not E2E, and `SyncPump` has no production caller** — `grep -rn SyncPump app/src` prints nothing. What is left really is wiring now (Ktor engine, `ApplyResult`→`ReplicaApplier` adapter, Room position source); only the E2E claim needs B-4 |
 | **S5** entitlement ack | **PARTIAL** | **spec + vectors DONE** (PR #32 draft): §4.3.3 body, PQ-A2-1 (**re-opened and re-closed 2026-08-09** — its first close checked one direction of a two-directional claim; see the S2 row) + PQ-A2-2 closed, 2 vectors. **Phone applier DONE 2026-08-09** — `EntitlementAckApplier`, 9 tests, run here (C-S5B-2/-3). **C# applier NOT written** — no .NET here; unblocked, merely unwritten. PQ-A2-3 → **B-6** |
 | **S6** outcome marking (phone) | **PARTIAL** (was BLOCKED — a mislabel, corrected 2026-08-09) | **The marking decision is DONE** — `OutcomeMarkPolicy`, 22 tests, run here (C-S6A-2/-6): Pro-gated (and `AwaitingEngine` is not Pro enough), `no_reply` renderable but never offerable, a pending mark shadows the engine's value, retired by **value convergence** and bounded by disagreeing reports. **The blocked half is the send path**: `outcome` is state-changing, so §5.4 needs S3's Keystore key (B-4), and the `:app` wiring needs a toolchain this sandbox cannot fetch (B-7). No production caller (C-S6A-8). Finding → **PQ-S6-1**: `outcome` is the one state-changing kind nothing ever acks |
@@ -47,9 +47,10 @@ check which half of the rung the blocker actually touches. **S6 is the next cand
 re-read** — its `OutcomeBadge` display half is already done, and only the device-signed send needs
 S3's key.
 
-**S4, S5 and S6 now all sit at PARTIAL, and the reason is the same three times over: each has a
+**S3, S4, S5 and S6 now all sit at PARTIAL, and the reason is the same four times over: each has a
 decision half that runs anywhere and an execution half that needs a machine this program's cloud
-sessions are not.** S5 has its spec, vectors and *phone* applier; the **C# applier** is unwritten.
+sessions are not.** S3 has its attempt ordering; the Keystore key, the camera and the screens are
+still B-4's, and unlike S4's and S5's remainders that one cannot be unblocked by adding a toolchain. S5 has its spec, vectors and *phone* applier; the **C# applier** is unwritten.
 S4 has its pull *decision*; the `:app` wiring is unwritten. S6 has its *marking decision*; the
 signed send is unwritten.
 
@@ -66,7 +67,7 @@ not exist (B-4). A machine with an SDK is necessary but not sufficient there.
 | **B-1** pairing UI | gate answered; device half **still blocked** — see B-4 (the earlier "scheduled at S3" note was written before anyone checked `sdkmanager` existed) |
 | **B-2** live E2E | **most of the way closed** — engine ↔ local relay proven 30/30; remaining gap is exactly the `/pair` page |
 | ~~**B-3** vector drift~~ | **CLOSED** — 26/26 byte-identical to pin `679a317`, confirmed by CI's own step (run `31278769047`) |
-| **B-4** emulator lane | `sdkmanager`/`avdmanager` absent; blocks S3, **S6's send path** (not its marking decision — see the S6 row), S4's **E2E proof** (not its decision layer) and B-1's device half |
+| **B-4** emulator lane | `sdkmanager`/`avdmanager` absent; blocks **S3's device and screen halves** (not its attempt ordering — see the S3 row), **S6's send path** (not its marking decision), S4's **E2E proof** (not its decision layer) and B-1's device half. **Cost shrunk a third time 2026-08-10** (ninth run) |
 | **B-5** migration test | Room 2.8.4 + Robolectric cannot open a file-backed DB; test kept under `@Ignore` with the diagnosis |
 | **B-6** unknown-field vector | PQ-A2-3 cannot be closed by adding a vector: the engine has no inbound wire-JSON parser, so it would *accept* the envelope and turn the gate red. **Re-verified 2026-08-09** to two lines — `EnvelopeReceiver.cs:33` takes a parsed record, `SyncHarness/Program.cs:696` cherry-picks keys (C-S5B-5). Parser first, vector second |
 | **B-7** cloud sandbox egress | **new 2026-08-09, re-measured 2026-08-10** (`dl.google.com`, `api.foojay.io` → `CONNECT tunnel failed, response 403`; `repo.maven.apache.org` → `200`). AGP/`androidx`/JDK-17 are unfetchable in a cloud session — the android gate is unrunnable here for a reason *independent* of B-4. CI is the unblock, not a checkbox. **Its cost shrank 2026-08-10**: S4's ordering decisions no longer sit behind it |
@@ -138,6 +139,34 @@ vitest + miniflare, no egress denial, and CI runs the same suite. Alongside `:co
 second module a cloud iteration can actually gate. Iterations 3–5 all landed in `:core`; nobody had
 re-read `relay/` since P1.
 
+**Sixth correction 2026-08-10 (ninth iteration), and it is the third instance of one pattern, so
+it is written here as a rule rather than as another anecdote.** S3 carried a blanket `BLOCKED — B-4`
+label. The label was right about the camera, the Keystore key and the screens, and wrong about the
+rung: the pairing *attempt* — which body is sent, once or twice, what a 409 means, when the human's
+answer is asked for, who rotates the relay token — needed neither a device nor an emulator, and it
+was sitting unwritten in `:app` where no session in this window can compile it. That is now
+`PairingFlow`, 21 assertions, run here.
+
+Three rungs have now been found this way (S4 and S6 on 2026-08-09, S3 today), so:
+**a rung's blocker applies to the claims that depend on it, and "needs a device" almost never covers
+a rung's ordering rules.** Before believing any one-line label in this file, ask which half it
+touches. **S2's `/pair` page is the remaining candidate** — but note the asymmetry that makes it
+different from the three above: its decision layer is C#, so moving it somewhere testable needs
+.NET, not merely a different module. That is a real constraint, not a mislabel.
+
+**A finding this slice turned up, and it is about a status code.** `POST /v1/{pairing}/pair`
+answering **409 cannot be read as "somebody else beat us"**, because `RelayClient` retries transport
+failures internally (`RelayClient.kt:186`): an attempt that stores the completion and loses its
+response is followed by one that sees the relay's own conflict. **This phone's success can therefore
+arrive as `RelayResult.Conflict`**, and nothing available to the phone separates that from a
+stranger's completion. Both obvious readings are wrong — abort, and a network hiccup kills a good
+pairing; accept, and a real race hides behind a screen identical to the happy path. `PairingFlow`
+resolves it the way §5.2 already intended: the confirm code matches the desktop **iff** the stored
+completion is ours, so the flow flags the race and lets the human arbitrate. **The effect is that
+the confirm code is load-bearing rather than decorative, and a UI that auto-confirms would delete
+the only thing that distinguishes the two cases.** Neither the relay nor the client is wrong here;
+the phone simply no longer needs 409 to mean one thing.
+
 0. **S4's remaining half, and it is now genuinely mechanical — which it was not before 2026-08-10.**
    The four ordering *decisions* that used to hide inside the phrase "`:app` wiring" landed as
    `SyncPump` in `:core` (18 tests, C-S4T-1…7). What is left needs the Android toolchain and is
@@ -174,6 +203,16 @@ re-read `relay/` since P1.
    render the invite (`PairingInvite.ToQrJson()` is the exact payload — **a QR encoder is the only
    genuinely new dependency**), poll `RelayClient.TakeCompletionAsync`, show the confirm code for the
    human to compare, write `SyncPairing` to the vault.
+3b. **S3's remaining half — the device and the screens, and it is genuinely blocked.** The attempt
+   ordering landed 2026-08-10 (`PairingFlow` + `RelayTokenLadder`, 21 tests). What is left: a
+   CameraX preview with an ML Kit QR decode feeding `PairingFlow.begin`, an Android Keystore ECDSA
+   P-256 key supplying `deviceSigPublic` with gate P2-KEYSTORE-FALLBACK's StrongBox → TEE →
+   software chain (**persistent indicator + audit-trail entry** on a downgrade), a confirm screen
+   rendering `AwaitingConfirmation.confirmCode` — which **must not auto-confirm**, per the 409
+   finding above — and persistence of `PairedPairing` on `confirm(true)` only. Needs B-4: whether a
+   key is hardware-backed is a claim only a device or an emulator can settle. Verify with
+   C-S3A-8's `grep -rn PairingFlow app/src`, written to print nothing until the screen exists.
+
 4. **Tick the SDK Command-line Tools checkbox**, then the whole emulator lane is unattended and
    S3 → S4 → S6 unblock in order, along with B-5.
 5. **B-6**, whenever the engine is being touched anyway: the inbound wire-JSON parser, then the

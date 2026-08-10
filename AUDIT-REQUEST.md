@@ -2194,3 +2194,180 @@ git show HEAD -- <repo>/core/src/main/kotlin/app/careerseeker/core/OutboundEnvel
 > `grep -rn SyncPump app/src` still prints nothing, so the third item of C-S4T-8 stands exactly as
 > written. **A green gate on an uncalled class is not a working transport loop**, and this entry
 > says so rather than letting the tick imply otherwise.
+
+---
+
+## S3 — the pairing attempt's decision layer (`PairingFlow`), 2026-08-10, ninth cloud iteration
+
+Same reduced probe as C-S6A-1 (`:core` only, Maven Central only, toolchain 17 → 21); the gate is
+still CI. Where a claim is unverified, it says so and says why.
+
+### C-S3A-1 — The measured `:core` total moved 133 → 154, and `PairingFlowTest` is the whole delta
+
+> **Claim.** Baseline re-measured on the untouched branch at `ebfaf81` **before** anything was
+> written: **133 / 0 / 0** across 12 classes, which matches the figure `STATE.md` already carried.
+> After the slice: **154 / 0 / 0** across 13 classes — `+21`, all of them `PairingFlowTest`. **No
+> existing test was edited, renamed or deleted**, and no existing source file was touched: the
+> slice is two new files and nothing else. They passed on the **first** run.
+
+```bash
+# after the C-S6A-1 recipe, in the careerseeker-android checkout:
+python3 - <<'PY'
+import glob, xml.etree.ElementTree as ET
+t=f=s=0; c=0
+for p in sorted(glob.glob('<repo>/core/build/test-results/test/TEST-*.xml')):
+    r=ET.parse(p).getroot(); c+=1
+    t+=int(r.get('tests')); f+=int(r.get('failures'))+int(r.get('errors')); s+=int(r.get('skipped'))
+print(t, f, s, c)
+PY
+git show --stat HEAD   # expect: 2 files changed, both new
+```
+
+*Expected:* `154 0 0 13`. For the baseline, `git checkout ebfaf81` and repeat: `133 0 0 12`.
+
+### C-S3A-2 — Rule 1: the completion is built once per invite and retried verbatim
+
+> **Claim.** After a relay outage that exhausts `RelayClient`'s retries, `PairingFlow.retry()`
+> re-sends the **same bytes** and does not re-derive. `completionBuilds` stays `1`, the set of
+> distinct request bodies across all five HTTP attempts has size `1`, and the ephemeral keypair
+> supplier is invoked exactly once.
+>
+> The failure this pins is silent in both directions. If the first body landed and is still stored,
+> the retry gets 409 and the engine later collects **body #1**, deriving against a `phone_pub` this
+> device has thrown away — both screens then show confirm codes that cannot match, with nothing
+> explaining why. If the first body landed and was already collected, the engine burned the
+> one-time secret against body #1, so body #2 is refused and the phone waits for a confirmation
+> that will never appear.
+
+```bash
+# C-S6A-1 recipe, then:
+grep -n "does not rebuild the completion\|keeps the ephemeral key" -A 25 \
+  core/src/test/kotlin/app/careerseeker/core/PairingFlowTest.kt
+```
+
+*Expected:* both cases `PASSED` in the probe output.
+
+### C-S3A-3 — Rule 2: a 409 on submit is ambiguous *by construction*, and the class refuses to guess
+
+> **Claim.** `RelayClient.request` retries transport failures internally (4 attempts,
+> `RelayClient.kt:186-215`). An attempt that stores the completion and loses its response is
+> therefore followed by an attempt that sees the relay's own 409 — so **this phone's success can
+> reach it as `RelayResult.Conflict`**, and no information available to the phone separates that
+> from a stranger's completion. `PairingFlow` neither aborts (which would kill a good pairing on
+> every network hiccup) nor treats it as success (which would hide a real race): it returns
+> `AwaitingConfirmation(raced = true)` and lets the confirm code arbitrate, which is the job §5.2
+> assigns it — *"the confirmation step catches a raced completion"*.
+
+```bash
+grep -n "ambiguous by construction" -A 12 core/src/main/kotlin/app/careerseeker/core/PairingFlow.kt
+grep -n "neither success nor failure\|raced attempt still confirms" -A 18 \
+  core/src/test/kotlin/app/careerseeker/core/PairingFlowTest.kt
+sed -n '/private suspend fun request(/,/^    }/p' core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+```
+
+*Expected:* the retry loop in `RelayClient` (which is what makes the ambiguity structural rather
+than hypothetical), and both 409 cases `PASSED`.
+
+### C-S3A-4 — Rule 4: the phone issues exactly one relay call, and it is never `/create`
+
+> **Claim.** A complete successful attempt — `begin()` through `confirm(true)` — makes **one** HTTP
+> call: `POST /v1/{pairing}/pair`, carrying the **provisional** bearer (§5.2.1), never the final
+> one. `PairingFlow` never calls `RelayClient.create`, which is the phone-reachable rotation path
+> (`RelayClient.kt:94`, `rotateToSha256Hex`).
+>
+> §5.2.3 assigns rotation to the engine. A phone that rotates while the engine still holds the
+> provisional bearer locks it out of `GET /v1/{pairing}/pair` with a 401 it cannot read as "the
+> phone jumped the gun" — and by then the completion is stored, one-shot and unreadable, and the
+> secret is spent. Unrecoverable, and silent in code.
+
+```bash
+grep -n "never rotates the relay token" -A 14 core/src/test/kotlin/app/careerseeker/core/PairingFlowTest.kt
+grep -n "create(" core/src/main/kotlin/app/careerseeker/core/PairingFlow.kt ; echo "exit=$?"
+```
+
+*Expected:* the test `PASSED`; the `grep` for `create(` in `PairingFlow.kt` prints **nothing**
+(`exit=1`).
+
+### C-S3A-5 — Rule 3 and the ladder: the human gate, and a promotion that is one-way
+
+> **Claim (gate).** Key material is reachable only through `PairingStep.Paired`, which only
+> `confirm(true)` produces. `confirm(false)` is `PairingAbort.CODE_MISMATCH` — reported distinctly
+> from `CANCELLED` because the two mean opposite things about whether an attacker is present — and
+> is terminal: a second `confirm` throws.
+>
+> **Claim (ladder).** `RelayTokenLadder` opens on the provisional token, answers a 401 on it with
+> the final one, and **once a call carrying the final token is accepted, never falls back**
+> (`unauthorised("final")` returns `null`). Rotation is one-way and idempotent (§5.2.3), so after
+> it there is no state in which the provisional token is right again; a ladder that kept falling
+> back would turn a revoked pairing — a 401 the user needs to see — into an auth blip retrying
+> forever against a token derived from a secret the engine already burned.
+
+```bash
+grep -n "code mismatch is terminal\|promotes, and promotion is one-way\|does not promote\|opens on the provisional" -A 14 \
+  core/src/test/kotlin/app/careerseeker/core/PairingFlowTest.kt
+```
+
+*Expected:* all four cases `PASSED`.
+
+### C-S3A-6 — The confirm code is the desktop's, not this code's own opinion
+
+> **Claim.** The six digits `PairingFlow` puts on screen equal `pairing-basic`'s
+> `expected.confirm`, and the pairing `confirm(true)` yields carries the vector's `k_p2e` and
+> `relay_token`. The completion is built from the vector's own phone key, so agreement here is
+> agreement with the engine that the same vector proves — not a stub agreeing with itself.
+
+```bash
+grep -n "six digits shown are the ones the desktop derives" -A 10 \
+  core/src/test/kotlin/app/careerseeker/core/PairingFlowTest.kt
+cd <careerseeker> && git checkout main                       && node docs/sync-vectors/generate.mjs --check
+cd <careerseeker> && git checkout claude/s5-entitlement-ack-spec && node docs/sync-vectors/generate.mjs --check
+```
+
+*Expected:* the case `PASSED`, and — **the count depends on the ref, and this entry says which** —
+`OK: 26 vector files match the generator.` on `main` (`00b3705`), `OK: 28 …` on
+`claude/s5-entitlement-ack-spec` (`9c05ef7`), both exit 0. **Both measured here.** The two ack
+vectors PR #32 adds are not on `main` until it merges; `STATE.md`'s standing "28" is the branch
+figure, and reading it as a `main` figure is the mistake this line exists to prevent. Either way
+**this slice added and edited nothing** — it wrote no file in the main repo at all.
+
+### C-S3A-7 — `checkCoreIsAndroidFree` cannot have been affected, structurally
+
+> **Claim.** `PairingFlow.kt` contains **zero `import` lines**, so it cannot import `android.*` or
+> `androidx.*` — the rule the task enforces (`build.gradle.kts:39`). The test file imports Ktor,
+> kotlinx and `kotlin.test` only, exactly as `SyncPumpTest` and `RelayClientTest` already do, and
+> the task walks `core/src` including tests.
+
+```bash
+grep -c "^import" core/src/main/kotlin/app/careerseeker/core/PairingFlow.kt          # expect 0
+grep -rn "^import android\.\|^import androidx\." core/src/ ; echo "exit=$?"          # expect exit=1
+```
+
+*Expected:* `0`, and no matches.
+
+### C-S3A-8 — What this slice did NOT verify, and why
+
+> **Not verified — the android gate.** `./gradlew … :app:assembleDebug :app:lintDebug` did **not**
+> run and cannot on this machine: no Android SDK, no JBR, and `dl.google.com` / `api.foojay.io` are
+> egress policy denials (B-7). Everything above comes from the reduced `:core` probe. **CI is the
+> gate**; at the time of writing it has not yet reported on this push.
+>
+> **Not verified — `Verify-Alpha.ps1`.** No .NET here. It also **cannot** be affected: this slice
+> wrote no `.cs` file, no harness, no vector byte and no count-reporting doc, and no file at all in
+> the main repo, so `$ExpectedOfflineTotal` (598) is untouched by construction.
+>
+> **Not verified — anything about hardware-backed keys.** `deviceSigPublic` is supplied by the test
+> as a public point, exactly as `:app` will supply it from a Keystore key. Whether that key is
+> really StrongBox-, TEE- or software-backed — and therefore whether the fallback indicator and the
+> audit entry that gate P2-KEYSTORE-FALLBACK requires are correct — is a claim only an emulator or a
+> device can settle. **B-4 still owns that claim in full.**
+>
+> **`PairingFlow` has no production caller, and this file will not pretend otherwise.** S3 does not
+> become DONE. A green suite on an uncalled class is not a pairing screen.
+
+```bash
+grep -rn "PairingFlow\|RelayTokenLadder" app/src ; echo "exit=$?"
+curl -sS -o /dev/null -w '%{http_code}\n' https://dl.google.com/ ; echo "exit=$?"
+```
+
+*Expected:* the first prints **nothing** (`exit=1`) — written to fail the day `:app` wires this up,
+which is the point. The second is a CONNECT tunnel failure / 403, not a 200.

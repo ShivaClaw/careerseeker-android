@@ -271,6 +271,18 @@ precisely the unverifiable artifact B-1 already refused to produce once.
 **Cascade.** S4 (transport loop) needs S3's device key and an emulator to be an end-to-end claim;
 S6 (outcome marking) needs both. All three are blocked on the same one-time setup.
 
+**Its cost has shrunk three times, and the scope statement above is broader than the blocker.**
+2026-08-09 found S4's and S6's *decision* layers behind this label needing neither key nor emulator
+(`PullPolicy`, `OutcomeMarkPolicy`); 2026-08-10 (eighth run) moved S4's four transport ordering
+rules out as `SyncPump`; 2026-08-10 (ninth run) moved **S3's own** attempt ordering out as
+`PairingFlow` + `RelayTokenLadder`, 21 assertions, built with no Keystore and no camera.
+
+**What B-4 still owns, in full, and it is not reduced by any of that:** the Android Keystore ECDSA
+key and therefore gate P2-KEYSTORE-FALLBACK's StrongBox → TEE → software chain with its persistent
+indicator and audit-trail entry; CameraX and the ML Kit QR decode; every screen; S6's device-signed
+send; S4's and S2's end-to-end proofs; and **any claim that a key is hardware-backed**. Read the
+milestone line above as "S3's device and screen halves", not "S3".
+
 **Smallest unblock — one checkbox, ~2 minutes.** In Android Studio: *Settings → Languages &
 Frameworks → Android SDK → SDK Tools →* tick **"Android SDK Command-line Tools (latest)"** → Apply.
 That creates `cmdline-tools\latest\bin\sdkmanager.bat`, after which §3a applies exactly as written

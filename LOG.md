@@ -2769,3 +2769,198 @@ anything; no cert-store, MSIX or keystore action — the upload keystore and its
 neither read nor referenced beyond their paths. No secrets read, written or printed. Terra's state
 was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged at
 2026-08-07T21:18, **claims no files** — no collision, and `:core` has never been Terra's territory.
+
+---
+
+## S3 decision half — the pairing attempt, moved where it can be tested · 2026-08-10 (ninth cloud iteration, Linux sandbox)
+
+**Environment probed before the rung was picked**, as the eighth iteration's entry recommends.
+Unchanged, and re-measured rather than carried:
+
+```
+dotnet, adb, sdkmanager, pwsh                 ->  absent
+java 21, node 22.22.2, gradle 9.6.1           ->  present
+https://dl.google.com/  (AGP, androidx)       ->  curl: (56) CONNECT tunnel failed, response 403
+```
+
+So B-7 holds and the lanes are the ones the records name: `:core`, `relay/`, `generate.mjs`, docs.
+
+### S3A-1 The slice, and why it is not the one the schedule proposed — nor the one the ladder's own next-intent list proposed
+
+The standing prompt again nominates S5's spec half (§4.3.3, the ack vector, PQ-A2-1/-2/-3). That
+landed 2026-08-09 as PR #32, and the seventh iteration already recorded the correction. **Nothing
+was redone**, and PQ-A2-3 remains what B-6 says it is: not closable by adding a vector, because the
+engine has no inbound wire-JSON parser and the vector would turn CI red. Parser first — and the
+parser is C#.
+
+The ladder's own next-intent list was then read in order, and **every item on it is out of reach in
+this sandbox**: S4's remaining `:app` wiring needs an Android SDK; S5's C# applier and S2's `/pair`
+page need .NET; S6's signed send needs an AVD. Taking any of them would have meant writing code
+that cannot be compiled here, which this program's records forbid claiming and which the eighth
+iteration's boundary paragraph explicitly avoided.
+
+What was available is the question `STATE.md`'s **fifth correction** asks out loud:
+
+> when a rung's remainder is described with a word that sounds mechanical, enumerate it before
+> believing the word. The same question is worth asking of S2's `/pair` page and S6's `signed send`
+> — how much of each is a decision rather than an I/O call?
+
+Asked of **S3**, whose one-line label is `BLOCKED — B-4`, the answer is that the label covers part
+of the rung. S3 is "pairing screen": a CameraX preview, an ML Kit QR decode, a Keystore-backed
+ECDSA key with the StrongBox → TEE → software fallback chain, and three screens. Those need the
+emulator, and they stay blocked. **The pairing *attempt* needs none of them.** `PairingSession` is
+stateless — parse a QR, derive, seal one body — and everything that orders those steps was
+unwritten, in `:app`, where no session in this window can compile it.
+
+This is the third time the same shape has appeared (S4 2026-08-09, S6 2026-08-09, S3 today), and it
+is worth stating as a rule rather than a coincidence: **a rung's blocker applies to the claims that
+depend on it, and "needs a device" almost never covers a rung's ordering rules.**
+
+### S3A-2 What landed
+
+`core/src/main/kotlin/app/careerseeker/core/PairingFlow.kt` (new) and its test (new). **Two files,
+both new. No existing file was edited** — not a source file, not a test, not a Gradle or
+version-catalog file. `PairingFlow.kt` has **no `import` lines at all**, which is what makes the
+`checkCoreIsAndroidFree` claim structural rather than a promise (C-S3A-7).
+
+Four rules, and the failure each prevents. All four are silent; that is why they are assertions
+rather than comments.
+
+1. **The completion is derived once per invite, and a retry re-sends it verbatim.** The naive retry
+   regenerates the ephemeral keypair and the nonce, and it breaks pairing in two different ways
+   depending on what the relay did with the first body. If body #1 landed and is still stored, the
+   retry gets 409 and the engine eventually collects **body #1** — deriving `k_p2e` against a
+   `phone_pub` this device has already discarded. Both screens then show six digits that cannot
+   match, and neither screen can say why. If body #1 landed and was already collected, the engine
+   burned the one-time secret against it, so body #2 is refused (`pairing_unknown`) and the phone
+   waits for a confirmation that will never be displayed.
+2. **A 409 on submit is ambiguous *by construction*, and the class refuses to guess.** This is the
+   finding of the slice — see S3A-3.
+3. **Nothing leaves the class until the human confirms, and a mismatch is terminal and is not a
+   cancel.** Key material is reachable only through `PairingStep.Paired`, which only
+   `confirm(true)` produces. A mismatch cannot be retried: the engine burned the one-time secret on
+   whichever completion it accepted (§5.2.2), so the honest next step is a fresh invite on the
+   desktop, not a second attempt against a dead secret. And `CODE_MISMATCH` is reported separately
+   from `CANCELLED` because the two mean opposite things about whether an attacker is present —
+   folding them together would erase the only MITM signal the protocol gives a user.
+4. **The phone never rotates the relay token.** §5.2.3 assigns rotation to the engine. `RelayClient`
+   exposes `create(rotateToSha256Hex)` to the phone (`RelayClient.kt:94`) — one call, and while the
+   engine still holds the provisional bearer to collect the completion, it is locked out of
+   `GET /pair` by a 401 it has no way to read as "the phone jumped the gun". The completion is
+   stored, one-shot and unreadable; the secret is spent; nothing on either screen says so. The test
+   asserts the whole attempt is **one** relay call and that none of them is `/create`.
+
+Alongside it, `RelayTokenLadder` — the handover the phone *does* take part in. Open on the
+provisional token (§5.2.1 bootstrapped the channel with it), switch on a 401, and **once a call
+carrying the final token has been accepted, never fall back**. Rotation is one-way and idempotent,
+so after it there is no state in which the provisional token is right again; a ladder that kept
+falling back would turn a revoked pairing — a 401 the user needs to see — into an auth blip
+retrying forever against a token derived from a burned secret. Losing a pairing quietly is the
+failure that rule exists to prevent.
+
+Secret hygiene, stated because it is easy to get backwards: the invite's one-time secret and the
+ephemeral private scalar are zeroised **as soon as the completion is built**, before any network
+call, since `PairingKeys` and the provisional token are already in hand by then. The test asserts
+both that the scalar comes back blank *and* that the derived keys still equal the vector's — the
+second half is what proves the zeroisation happened after the derivation rather than before it.
+
+### S3A-3 A finding, on the path being written rather than reviewed
+
+**A 409 from `POST /pair` cannot be read as "somebody else beat us", and the obvious code that does
+so is wrong.**
+
+`RelayClient.request` retries transport failures internally — four attempts (`RelayClient.kt:186`).
+An attempt that reaches the relay, stores the completion, and then loses its response is followed
+by an attempt that sees the relay's own 409 (`channel.ts:118`, one completion per pairing). So
+**this phone's own success can arrive as `RelayResult.Conflict`**, and nothing available to the
+phone separates that from a stranger's completion sitting on the channel.
+
+Both plausible readings are wrong. Treating 409 as failure aborts a perfectly good pairing every
+time the network hiccups mid-post. Treating it as success hides a genuine race behind a screen that
+looks identical to the happy path.
+
+The resolution already exists in the protocol and did not need inventing: `confirm` is derived from
+`ikm`, so it matches the desktop **iff** the stored completion is this phone's. `PairingFlow`
+therefore returns `AwaitingConfirmation(raced = true)` and lets the human arbitrate — which is
+exactly the job §5.2 assigns the confirmation step ("catches a raced completion"). The effect is
+that the confirm code becomes **load-bearing rather than decorative**: it is the only thing that
+distinguishes the two cases, and a UI that auto-confirms would delete the distinction.
+
+**This is not a report that the relay or the client is broken.** Both behave as specified. What
+changed is that the phone no longer needs 409 to mean one thing.
+
+### S3A-4 What ran
+
+```
+:core reduced probe (C-S6A-1 recipe)          ->  BUILD SUCCESSFUL in 13s
+JUnit XML totals                              ->  154 tests, 0 failures, 0 skipped, 13 classes
+baseline, same probe, before the slice        ->  133 tests, 0 failures, 0 skipped, 12 classes
+grep -c '^import' PairingFlow.kt              ->  0
+grep -rn 'PairingFlow|RelayTokenLadder' app/src  ->  (nothing), exit=1
+node generate.mjs --check   (careerseeker main)  ->  OK: 26 vector files match the generator. (exit 0)
+node generate.mjs --check   (branch 9c05ef7)     ->  OK: 28 vector files match the generator. (exit 0)
+curl https://dl.google.com/                   ->  curl: (56) CONNECT tunnel failed, response 403
+```
+
+**All 21 new cases passed on the first run**, and no existing test was touched — the precedent in
+this file is to say whether a slice was green immediately, and this one was.
+
+**One number in `STATE.md` needed qualifying rather than correcting.** The standing "Shared vectors:
+**28**" is the figure on `claude/s5-entitlement-ack-spec` (PR #32, unmerged). On `origin/main` it is
+**26** — the two ack vectors are not there yet. Both were measured here and C-S3A-6 now names the
+ref alongside each count, because a count with no ref is the doc-drift trap the main repo's
+`CLAUDE.md` warns about, one repo over.
+
+**`Verify-Alpha.ps1` did not run and cannot** — no .NET. It also cannot be affected: **no file in
+the main repo was written at all**, so `$ExpectedOfflineTotal` (598) is untouched by construction.
+**The android gate did not run and cannot** — no SDK, no JBR, B-7 re-measured above. CI is the gate,
+and C-S3A-8 is written to be checked rather than assumed.
+
+### S3A-5 Ladder effect, stated narrowly
+
+**S3 does not become DONE, and its label changes from `BLOCKED` to `PARTIAL`** — the same correction
+S4 and S6 received on 2026-08-09, for the same reason and with the same care: the blocker was never
+wrong about the half it covers.
+
+What is still B-4's, in full: the Android Keystore key and therefore gate P2-KEYSTORE-FALLBACK's
+StrongBox → TEE → software chain with its persistent indicator and audit entry; CameraX and the ML
+Kit QR decode; the three screens; and any claim that a key is hardware-backed. **None of that is
+weakened by this slice and none of it is claimed.** What is no longer behind B-4 is the ordering,
+which is now 21 executed assertions instead of prose in a screen nobody can compile here.
+
+**`PairingFlow` has no production caller, and this entry will not pretend otherwise.**
+`grep -rn PairingFlow app/src` prints nothing. A green suite on an uncalled class is not a pairing
+screen.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** Main-repo PRs #32 and #33 stay drafts and were neither
+merged, retargeted nor force-pushed; android PR #6 stays a draft. Commits were appended to an
+existing branch of mine and pushed **forward-only** — no force-push, no history rewrite, no branch
+created or deleted.
+
+**No file in the main repo was written at all** — no `.cs`, no harness, no `$ExpectedOfflineTotal`,
+no `Verify-Alpha.ps1`, no count-reporting doc, no `docs/Sync-Protocol.md` change, and **no protocol
+question was opened or closed in the spec**. `generate.mjs --check` was run twice, read-only, on two
+refs. **No vector's bytes changed and no vector was added**; nothing was re-vendored, the android
+pin stays `679a317`, and `core/src/test/resources/` was not opened for writing.
+
+**No `:app` file of any kind** — not a screen, not the manifest, not a Gradle or version-catalog
+file. `core/build.gradle.kts` was not touched: the slice adds no dependency, and `PairingFlow.kt`
+adds no import. **No `relay/` file**, and `npm`, `vitest`, `wrangler` and miniflare were not invoked
+this iteration — the finding in S3A-3 is about how a *client* reads a 409 the relay is right to
+send, so the relay needs no change.
+
+**No deploy of any kind** (Cloudflare, Workers, relay, site, Pages). **The production relay was
+contacted zero times, not even `GET /v1/health`** — every relay in this slice is a Ktor `MockEngine`
+inside the test JVM. No emulator, no `sdkmanager`, no AVD, and no attempt to route around the
+`dl.google.com` denial: it was probed once, as a client, to confirm B-7 still holds, and then
+respected. No Google, Play, OAuth or Console action; no accounts, no purchases, no Play Billing
+code; no email or Gmail anything; no cert-store, MSIX or keystore action — the upload keystore and
+its password file were neither read nor referenced beyond their paths. **No secrets read, written or
+printed**, and no Android Keystore was created, faked or simulated: the device signing key enters
+this code only as a public point supplied by the caller.
+
+Terra's state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged
+at 2026-08-07T21:18, **claims no files** — no collision, and `:core` has never been Terra's
+territory.
