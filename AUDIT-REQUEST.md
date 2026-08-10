@@ -1944,3 +1944,38 @@ only `docs/Sync-Protocol.md`. **Measured here, both.**
 offline total is anything other than 598, this slice's central claim — that a documentation change
 cannot move the pin — is false and the entry above is wrong.** That is the cheapest possible test of
 it, and it is the reason the number is repeated here rather than referenced.
+
+### C-S4S-8 — CI reported, the pin held, and the one harness test worth a second look is green
+
+> **Claim.** C-S4S-7 has now been checked rather than predicted. Run
+> [31346147785](https://github.com/ShivaClaw/careerseeker/actions/runs/31346147785) on head
+> `9399d11`: **both jobs `success`** — *Blind relay (Worker)* and *Build and offline harnesses*
+> (`windows-latest`, `Verify-Alpha.ps1`). Read directly from the job log, not inferred from the
+> green tick: `SyncHarness === 130 passed, 0 failed ===` and
+> **`=== Offline total: 598 passed, 0 failed ===`**. The pin did not move, which is what a
+> documentation-only slice must show.
+
+```bash
+# MCP: pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker pullNumber=33
+# MCP: get_job_logs job_id=93328358926 return_content=true tail_lines=400   # grep "Offline total"
+```
+
+> **Second claim, and it is the one an auditor should press.** The harness contains
+> `dispatch: pull_request -> SnapshotRepublished(since_seq=7)` — a test that sends a **non-zero**
+> `since_seq`, which §4.3.4 now says senders MUST NOT do. It is green and it is **conformant**, for
+> two reasons worth stating rather than leaving to inference:
+>
+> 1. The harness is a test fixture, not a shipping sender. §4.3.4's "senders MUST send `0`" binds
+>    implementations that ask for a republish; no shipping engine sends `pull_request` at all.
+> 2. The test in fact **demonstrates** §4.3.4's third rule — a receiver handed a non-zero value
+>    MUST NOT reject it. A receiver that started validating the field would turn this test red,
+>    which is the behaviour the rule forbids.
+
+```bash
+cd careerseeker && grep -rn "since_seq=7\|SinceSeq" tests/SyncHarness/Program.cs | head
+```
+
+*Expected:* the dispatch test and `RecordingRepublisher.LastSince`. **What would make this stale:**
+§4.3.4 arguably invites removing `sinceSeq` from `ISnapshotRepublisher` entirely, since no
+implementation reads it. That is a **C# cleanup this sandbox cannot make or verify**, and it would
+rewrite this test. Recorded so whoever does it knows the test is deliberate rather than incidental.
