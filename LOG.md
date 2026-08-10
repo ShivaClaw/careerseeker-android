@@ -2926,7 +2926,7 @@ What is still B-4's, in full: the Android Keystore key and therefore gate P2-KEY
 StrongBox → TEE → software chain with its persistent indicator and audit entry; CameraX and the ML
 Kit QR decode; the three screens; and any claim that a key is hardware-backed. **None of that is
 weakened by this slice and none of it is claimed.** What is no longer behind B-4 is the ordering,
-which is now 21 executed assertions instead of prose in a screen nobody can compile here.
+which is now 21 executed test cases instead of prose in a screen nobody can compile here.
 
 **`PairingFlow` has no production caller, and this entry will not pretend otherwise.**
 `grep -rn PairingFlow app/src` prints nothing. A green suite on an uncalled class is not a pairing

@@ -145,7 +145,7 @@ label. The label was right about the camera, the Keystore key and the screens, a
 rung: the pairing *attempt* — which body is sent, once or twice, what a 409 means, when the human's
 answer is asked for, who rotates the relay token — needed neither a device nor an emulator, and it
 was sitting unwritten in `:app` where no session in this window can compile it. That is now
-`PairingFlow`, 21 assertions, run here.
+`PairingFlow`, 21 test cases, run here.
 
 Three rungs have now been found this way (S4 and S6 on 2026-08-09, S3 today), so:
 **a rung's blocker applies to the claims that depend on it, and "needs a device" almost never covers

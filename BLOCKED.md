@@ -275,7 +275,7 @@ S6 (outcome marking) needs both. All three are blocked on the same one-time setu
 2026-08-09 found S4's and S6's *decision* layers behind this label needing neither key nor emulator
 (`PullPolicy`, `OutcomeMarkPolicy`); 2026-08-10 (eighth run) moved S4's four transport ordering
 rules out as `SyncPump`; 2026-08-10 (ninth run) moved **S3's own** attempt ordering out as
-`PairingFlow` + `RelayTokenLadder`, 21 assertions, built with no Keystore and no camera.
+`PairingFlow` + `RelayTokenLadder`, 21 test cases, built with no Keystore and no camera.
 
 **What B-4 still owns, in full, and it is not reduced by any of that:** the Android Keystore ECDSA
 key and therefore gate P2-KEYSTORE-FALLBACK's StrongBox → TEE → software chain with its persistent
