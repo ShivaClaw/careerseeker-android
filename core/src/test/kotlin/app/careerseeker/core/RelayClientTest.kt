@@ -13,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * The relay client, exercised entirely against a MockEngine.
@@ -129,6 +130,114 @@ class RelayClientTest {
         val page = (result as RelayResult.Ok).value
         assertTrue(page.envelopes.isEmpty())
         assertEquals(9L, page.latest)
+    }
+
+    // ------------------------------------------------- the page body is untrusted input
+
+    // §2 makes the relay a blind pipe, which means it is also an untrusted one: it controls this
+    // body completely. Every test below feeds a 200 with a body the relay should never send, and
+    // asserts the client reports rather than throws. Before this slice all of them threw out of
+    // `pull` entirely -- `.map` runs outside `request`'s try/catch -- so the exception escaped the
+    // RelayResult contract and reached whatever coroutine called the pump.
+
+    @Test
+    fun `a page body that is not JSON is reported, never thrown`() = runTest {
+        // The realistic trigger needs no attacker at all: an intercepting proxy or a CDN serving
+        // its own error page with a 200 status.
+        val result = clientOver(json("<html>502 Bad Gateway</html>")).pull(Direction.ENGINE_TO_PHONE, 0)
+        assertTrue(result is RelayResult.Unavailable, "got $result")
+        assertTrue(result.detail.contains("malformed pull page"), result.detail)
+    }
+
+    @Test
+    fun `every structurally wrong page is an Unavailable, and none of them escapes as an exception`() = runTest {
+        // One assertion per shape, because "it throws somewhere" was the old behaviour for all of
+        // them and a single example would not have shown how wide the hole was.
+        val bodies = listOf(
+            "" to "empty body",
+            "[]" to "array at the root",
+            "\"page\"" to "string at the root",
+            """{"envelopes":{},"latest":3}""" to "envelopes is not an array",
+            """{"envelopes":["abc"],"latest":3}""" to "an element is not an object",
+            """{"envelopes":[],"latest":{}}""" to "latest is not a number",
+        )
+        for ((body, label) in bodies) {
+            // runCatching, not a bare call: the point of the assertion is that nothing throws,
+            // and a bare call would fail the test with a stack trace instead of a verdict.
+            val outcome = runCatching { clientOver(json(body)).pull(Direction.ENGINE_TO_PHONE, 0) }
+            val result = outcome.getOrElse { fail("$label threw ${it::class.simpleName}: ${it.message}") }
+            assertTrue(result is RelayResult.Unavailable, "$label produced $result")
+        }
+    }
+
+    @Test
+    fun `a page missing latest is rejected, because defaulting it to zero fakes being caught up`() = runTest {
+        // This is the one whose old behaviour was silent rather than loud, and it is the worst of
+        // the set. `latest` drives moreAvailable and §6.2's gap check, so a relay that simply
+        // omits the field used to convince the phone it had everything -- a stall with no error,
+        // caused by deleting one field. The engine has always refused this (GetProperty throws).
+        val result = clientOver(json("""{"envelopes":[]}""")).pull(Direction.ENGINE_TO_PHONE, 0)
+        assertTrue(result is RelayResult.Unavailable, "got $result")
+    }
+
+    @Test
+    fun `a page missing envelopes is rejected, not read as an empty queue`() = runTest {
+        // Silent again, and worse than it looks: it used to report a successful EMPTY page while
+        // carrying a latest above the cursor, so the caller saw "nothing to do" and "the relay is
+        // ahead of you" at the same time.
+        val result = clientOver(json("""{"latest":4}""")).pull(Direction.ENGINE_TO_PHONE, 0)
+        assertTrue(result is RelayResult.Unavailable, "got $result")
+    }
+
+    @Test
+    fun `a quoted latest is refused, because the engine's GetInt64 refuses it`() = runTest {
+        // Engine-compatible interpretation rule: src/Sync/RelayClient.cs reads
+        // GetProperty("latest").GetInt64(), which throws on a JSON string. A phone that accepted
+        // "9" would be more permissive than the engine, and a phone more correct than the engine
+        // is a field bug.
+        val result = clientOver(json("""{"envelopes":[],"latest":"9"}""")).pull(Direction.ENGINE_TO_PHONE, 0)
+        assertTrue(result is RelayResult.Unavailable, "got $result")
+    }
+
+    @Test
+    fun `one unusable element rejects the whole page, and never just itself`() = runTest {
+        // The skip-and-continue version of this function compiles, renders correctly, and loses
+        // envelopes silently: the cursor advances past everything SEEN, so dropping seq 47 and
+        // keeping 48 skips 47 forever. That is the truncation attack SyncPump already refuses in
+        // its other form (it reads the authenticated seq, never the relay's) -- a blind relay that
+        // wants an envelope skipped would only have to corrupt it.
+        val body = """{"latest":48,"envelopes":[
+            {"v":1,"dir":"e2p","seq":47},
+            "corrupted",
+            {"v":1,"dir":"e2p","seq":48}]}"""
+
+        val result = clientOver(json(body)).pull(Direction.ENGINE_TO_PHONE, 46)
+
+        assertTrue(result is RelayResult.Unavailable, "a partial page was accepted: $result")
+    }
+
+    @Test
+    fun `an unusable per-element seq does not reject the page, because nothing authenticated reads it`() = runTest {
+        // The deliberate asymmetry with the test above. SyncPump takes the seq out of the sealed
+        // bytes and ignores this one (it is covered by no tag), and the engine's reader does not
+        // look at a per-element seq at all -- so rejecting over it would be stricter than the
+        // engine on a field no trust decision consumes. It reads as 0 and the wire still flows.
+        val body = """{"latest":48,"envelopes":[{"seq":"47","envelope":{"v":1,"dir":"e2p"}}]}"""
+
+        val page = (clientOver(json(body)).pull(Direction.ENGINE_TO_PHONE, 46) as RelayResult.Ok).value
+
+        assertEquals(1, page.envelopes.size)
+        assertEquals(0L, page.envelopes[0].seq)
+        assertTrue(page.envelopes[0].wire.contains("\"dir\":\"e2p\""), page.envelopes[0].wire)
+    }
+
+    @Test
+    fun `the failure detail carries a diagnosis and no relay bytes`() = runTest {
+        // The detail can reach a log line. The body it describes is ciphertext plus routing
+        // metadata, so it must not be echoed into one.
+        val secretish = """{"envelopes":[],"latest":"k_2f8a1c-not-a-number"}"""
+        val result = clientOver(json(secretish)).pull(Direction.ENGINE_TO_PHONE, 0) as RelayResult.Unavailable
+        assertTrue(!result.detail.contains("k_2f8a1c"), "body echoed into the detail: ${result.detail}")
     }
 
     // ---------------------------------------------------------------- status mapping

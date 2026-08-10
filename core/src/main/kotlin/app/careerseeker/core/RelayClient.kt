@@ -13,7 +13,9 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
@@ -144,7 +146,7 @@ class RelayClient(
     suspend fun pull(dir: Direction, since: Long): RelayResult<PullPage> =
         request {
             http.get("$base/v1/$pairing/pull?since=$since&dir=${dir.wire}") { authorised() }
-        }.map { body -> parsePullPage(body) }
+        }.flatMap { body -> parsePullPage(body) }
 
     /** Unpair: purge the Durable Object and every queued envelope. */
     suspend fun unpair(): RelayResult<Unit> =
@@ -163,21 +165,83 @@ class RelayClient(
         header("Authorization", "Bearer $bearer")
     }
 
-    private fun parsePullPage(body: String): PullPage {
+    /**
+     * The page a `pull` answered with, or a failure — **never an exception**.
+     *
+     * The relay is the untrusted party here (§2: it is a blind pipe, and this client is written
+     * on the assumption that it may be hostile as well as merely broken). It controls this body
+     * completely, so every structural decision below is a decision about what an adversary can
+     * make the phone do.
+     *
+     * **1. Total, for the same reason [conflictLatest] is.** A 200 whose body is not JSON, or is
+     * JSON of the wrong shape, is a relay that did not answer usefully — which is a fact the
+     * caller can act on. It reaches the caller as [RelayResult.Unavailable]. Previously this
+     * function threw out of [pull] altogether: `.map` runs *outside* [request]'s try/catch, so a
+     * `JsonDecodingException` escaped the `RelayResult` contract entirely and took the pump's
+     * coroutine with it. An HTML error page served with a 200 — an intercepting proxy, a CDN
+     * having a bad day — was enough to trigger it, no malice required.
+     *
+     * **2. Both keys are required, and strictly typed, because the engine requires them.**
+     * `src/Sync/RelayClient.cs` reads `GetProperty("envelopes")` and
+     * `GetProperty("latest").GetInt64()` — absent keys and quoted numbers both throw there. The
+     * spec's §2 route table never defines this response body (PQ-S4-2), so the mission's
+     * interpretation rule applies: match the engine. Defaulting a missing `latest` to `0`, as
+     * this used to, is worse than a rejection — `latest` is what drives `moreAvailable` and §6.2's
+     * gap check, so a relay that simply *omits* the field silently convinces the phone that it is
+     * fully caught up. That is a stall the caller cannot see, produced by deleting one field.
+     *
+     * **3. One unusable element rejects the whole page.** Never skip-and-continue: the cursor
+     * advances past every envelope *seen*, so dropping element 7 and keeping 8 advances past 7
+     * permanently. That is the history-truncation attack `SyncPump` already refuses in its other
+     * form (it takes the authenticated `seq`, never the relay's) wearing a different hat — a blind
+     * relay that wants an envelope skipped would only have to corrupt it.
+     *
+     * **4. The per-element `seq` stays lenient, deliberately**, and is the one field here that
+     * does not reject anything. Nothing authenticated depends on it: [SyncPump] reads the
+     * envelope's own `seq` out of the sealed bytes and ignores this one, and the engine's reader
+     * does not look at a per-element `seq` at all. Rejecting a page over it would be *stricter*
+     * than the engine on a field no trust decision reads, which is the wrong direction under the
+     * interpretation rule.
+     */
+    private fun parsePullPage(body: String): RelayResult<PullPage> = runCatching {
         val root = json.parseToJsonElement(body).jsonObject
-        val envelopes = root["envelopes"]?.jsonArray.orEmpty().map { element ->
+        val latest = root["latest"].strictLong("latest")
+        val envelopes = root["envelopes"].requiredArray("envelopes").map { element ->
             val o = element.jsonObject
             PulledEnvelope(
-                seq = o["seq"]?.jsonPrimitive?.longOrNull ?: 0L,
+                // Lenient by design — see (4) above. Anything unusable reads as 0, which no
+                // trust decision consumes.
+                seq = (o["seq"] as? JsonPrimitive)?.takeIf { !it.isString }?.longOrNull ?: 0L,
                 // The relay may hand back the envelope as a nested object or as an opaque
                 // string; either way it is forwarded verbatim to the receiver's strict parser.
                 wire = o["envelope"]?.let {
-                    if (it is kotlinx.serialization.json.JsonPrimitive && it.isString) it.content else it.toString()
+                    if (it is JsonPrimitive && it.isString) it.content else it.toString()
                 } ?: o.toString(),
             )
         }
-        return PullPage(envelopes, root["latest"]?.jsonPrimitive?.longOrNull ?: 0L)
+        PullPage(envelopes, latest)
+    }.fold(
+        onSuccess = { RelayResult.Ok(it) },
+        // The detail is the diagnosis; it never carries relay bytes, because this string can
+        // reach a log line and the body it describes is ciphertext plus routing metadata.
+        onFailure = { RelayResult.Unavailable("malformed pull page: ${it::class.simpleName}") },
+    )
+
+    /**
+     * A required JSON **number**, matching `GetInt64()` engine-side: absent, quoted, fractional
+     * or non-numeric all fail. Quoted is included on purpose — `"9"` is a string, the engine
+     * refuses it, and a phone that accepted it would be the "more correct than the engine" field
+     * bug the mission's interpretation rule exists to prevent.
+     */
+    private fun JsonElement?.strictLong(field: String): Long {
+        val primitive = this as? JsonPrimitive ?: error("$field: expected a JSON number")
+        require(!primitive.isString) { "$field: expected a JSON number, got a string" }
+        return primitive.content.toLongOrNull() ?: error("$field: not an integer")
     }
+
+    /** A required JSON array. Absent is a rejection, not an empty page — see (2) above. */
+    private fun JsonElement?.requiredArray(field: String): JsonArray =
+        this as? JsonArray ?: error("$field: expected a JSON array")
 
     private suspend fun request(
         authorise: Boolean = true,
@@ -238,6 +302,23 @@ class RelayClient(
 
 private inline fun <T, R> RelayResult<T>.map(transform: (T) -> R): RelayResult<R> = when (this) {
     is RelayResult.Ok -> RelayResult.Ok(transform(value))
+    is RelayResult.PairingUnknown -> this
+    is RelayResult.Unauthorised -> this
+    is RelayResult.TooLarge -> this
+    is RelayResult.Conflict -> this
+    is RelayResult.Unavailable -> this
+}
+
+/**
+ * [map] for a transform that can itself fail.
+ *
+ * The distinction is the whole point of this slice: `map` forces the body-reading step to either
+ * succeed or throw, and throwing is exactly what escapes the `RelayResult` contract. A transform
+ * that returns a `RelayResult` can report "the relay answered, and I could not read it" in the
+ * same vocabulary as every other relay outcome.
+ */
+private inline fun <T, R> RelayResult<T>.flatMap(transform: (T) -> RelayResult<R>): RelayResult<R> = when (this) {
+    is RelayResult.Ok -> transform(value)
     is RelayResult.PairingUnknown -> this
     is RelayResult.Unauthorised -> this
     is RelayResult.TooLarge -> this
