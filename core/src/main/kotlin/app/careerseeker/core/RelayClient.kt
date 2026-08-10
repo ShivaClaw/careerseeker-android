@@ -34,8 +34,19 @@ sealed interface RelayResult<out T> {
     /** Transport or 5xx failure after the configured retries. */
     data class Unavailable(val detail: String) : RelayResult<Nothing>
 
-    /** A conflicting state the caller must interpret (409: pairing exists / already completed). */
-    data object Conflict : RelayResult<Nothing>
+    /**
+     * A conflicting state the caller must interpret (409: pairing exists / already completed /
+     * `replay_rejected`).
+     *
+     * @property latest the relay's high-water mark for the pushed direction, when it reported one.
+     *   A `push` refused for `seq <= last` answers `{"error":"replay_rejected","latest":N}`
+     *   (`relay/src/channel.ts`), and `N` is precisely the input §6.1's counter reconciliation
+     *   needs — without it a sender whose persisted counter has fallen behind can only retry an
+     *   envelope the relay will refuse forever. **Null for the pairing conflicts** (§5.2.1,
+     *   §5.2.2), which answer `{"error":"exists"}` and carry no number: those mean "already done",
+     *   not "your counter is behind", and there is nothing to reconcile against.
+     */
+    data class Conflict(val latest: Long? = null) : RelayResult<Nothing>
 }
 
 /** One envelope as the relay hands it back, still sealed. */
@@ -185,7 +196,7 @@ class RelayClient(
 
                     HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden -> return RelayResult.Unauthorised
                     HttpStatusCode.NotFound -> return RelayResult.PairingUnknown
-                    HttpStatusCode.Conflict -> return RelayResult.Conflict
+                    HttpStatusCode.Conflict -> return RelayResult.Conflict(conflictLatest(response.bodyAsText()))
                     HttpStatusCode.PayloadTooLarge -> return RelayResult.TooLarge
 
                     // 5xx and 429 are the only retryable answers: they say "not now", whereas
@@ -205,6 +216,18 @@ class RelayClient(
         }
         return RelayResult.Unavailable(last)
     }
+
+    /**
+     * The `latest` a 409 body carries, or null when it carries none.
+     *
+     * Deliberately total: a 409 whose body is absent, empty, not JSON, or JSON without the field
+     * is a conflict with no reconciliation input, which is a fact the caller can act on. Throwing
+     * here would turn a recoverable "your counter is behind" into a transport exception, and the
+     * one thing this client must never do is convert a relay decision into an unavailability.
+     */
+    private fun conflictLatest(body: String): Long? = runCatching {
+        json.parseToJsonElement(body).jsonObject["latest"]?.jsonPrimitive?.longOrNull
+    }.getOrNull()
 
     private suspend fun HttpResponse.bodyAsTextOrEmpty(): String =
         if (status == HttpStatusCode.NoContent) "" else bodyAsText()

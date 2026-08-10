@@ -490,7 +490,7 @@ class SyncPumpTest {
         assertEquals(RelayFailure.PAIRING_UNKNOWN, RelayFailure.fromRelayResult(RelayResult.PairingUnknown))
         assertEquals(RelayFailure.UNAUTHORISED, RelayFailure.fromRelayResult(RelayResult.Unauthorised))
         assertEquals(RelayFailure.TOO_LARGE, RelayFailure.fromRelayResult(RelayResult.TooLarge))
-        assertEquals(RelayFailure.CONFLICT, RelayFailure.fromRelayResult(RelayResult.Conflict))
+        assertEquals(RelayFailure.CONFLICT, RelayFailure.fromRelayResult(RelayResult.Conflict()))
         assertEquals(RelayFailure.UNAVAILABLE, RelayFailure.fromRelayResult(RelayResult.Unavailable("x")))
     }
 }

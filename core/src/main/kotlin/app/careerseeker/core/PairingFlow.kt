@@ -329,8 +329,10 @@ class PairingFlow(
         return when (relay!!.submitPairing(built.bodyJson)) {
             is RelayResult.Ok -> PairingStep.AwaitingConfirmation(built.confirmCode, raced)
 
-            // Rule 2. Not a verdict — a question the confirm code is about to answer.
-            RelayResult.Conflict -> {
+            // Rule 2. Not a verdict — a question the confirm code is about to answer. The relay's
+            // pairing 409 carries no `latest` (it is `{"error":"exists"}`), so unlike a push
+            // conflict there is no number here to reconcile against — the human is the tiebreak.
+            is RelayResult.Conflict -> {
                 raced = true
                 PairingStep.AwaitingConfirmation(built.confirmCode, raced = true)
             }

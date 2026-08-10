@@ -142,7 +142,31 @@ class RelayClientTest {
         assertEquals(RelayResult.Unauthorised, pushWith(HttpStatusCode.Unauthorized))
         assertEquals(RelayResult.Unauthorised, pushWith(HttpStatusCode.Forbidden))
         assertEquals(RelayResult.TooLarge, pushWith(HttpStatusCode.PayloadTooLarge))
-        assertEquals(RelayResult.Conflict, pushWith(HttpStatusCode.Conflict))
+        assertEquals(RelayResult.Conflict(), pushWith(HttpStatusCode.Conflict))
+    }
+
+    @Test
+    fun `a replay_rejected 409 carries the relay's high-water mark, which is the reconciliation input`() = runTest {
+        // Without this number a sender whose persisted p2e counter (§6.1) has fallen behind can
+        // only retry an envelope the relay refuses forever. The relay already sends it; this
+        // client used to throw it away with the rest of the body.
+        val engine = json("""{"error":"replay_rejected","latest":41}""", HttpStatusCode.Conflict)
+        assertEquals(RelayResult.Conflict(latest = 41L), clientOver(engine).push("{}"))
+    }
+
+    @Test
+    fun `a pairing 409 reports no mark, because there is nothing to reconcile against`() = runTest {
+        // §5.2.1 / §5.2.2 answer {"error":"exists"} — "already done", not "your counter is behind".
+        val engine = json("""{"error":"exists"}""", HttpStatusCode.Conflict)
+        assertEquals(RelayResult.Conflict(latest = null), clientOver(engine).submitPairing("{}"))
+    }
+
+    @Test
+    fun `a 409 whose body is not JSON is still a conflict, never an unavailability`() = runTest {
+        // Turning a relay decision into a transport exception would make the caller retry
+        // something the relay has already refused.
+        val engine = json("<html>gateway</html>", HttpStatusCode.Conflict)
+        assertEquals(RelayResult.Conflict(latest = null), clientOver(engine).push("{}"))
     }
 
     @Test

@@ -23,7 +23,7 @@ enum class RelayFailure {
             RelayResult.PairingUnknown -> PAIRING_UNKNOWN
             RelayResult.Unauthorised -> UNAUTHORISED
             RelayResult.TooLarge -> TOO_LARGE
-            RelayResult.Conflict -> CONFLICT
+            is RelayResult.Conflict -> CONFLICT
             is RelayResult.Unavailable -> UNAVAILABLE
         }
     }
