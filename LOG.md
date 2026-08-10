@@ -3370,3 +3370,204 @@ neither read nor referenced beyond their paths. **No secrets read, written or pr
 Terra's state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged
 at 2026-08-07T21:18, **claims no files** — no collision. `relay/` has never been Terra's territory,
 and it was already claimed by me through #32.
+
+---
+
+## S4P — The pull page was untrusted input parsed as if it were trusted (2026-08-10, twelfth cloud iteration)
+
+**Rung:** S4 (transport half). **Effect on the ladder: none — S4 stays PARTIAL.** Two files, both
+in `:core`. `:core` 177 → **185 / 0 / 0**, measured here both before and after.
+
+### S4P-1 Why this rung, and why not the one the prompt nominated
+
+The standing prompt nominates S5's spec half — §4.3's `entitlement_ack` body, the ack vector,
+PQ-A2-1/-2/-3 — and describes S5 as "NOT STARTED". **All of it except PQ-A2-3 landed 2026-08-09**
+(main-repo PR #32 draft), and the phone applier landed with it. `STATE.md` has carried that
+correction since the seventh iteration; this is the sixth iteration in a row to re-derive it. The
+prompt is a stored snapshot and does not re-read itself.
+
+Every rung's *forward* remainder needs a machine this session is not:
+
+| Rung | Remainder | Needs |
+| --- | --- | --- |
+| S2 | the desktop `/pair` page | .NET (absent — `dotnet` is not on PATH) |
+| S3 | Keystore key, camera, screens | a device/AVD (B-4) |
+| S4 | the `:app` adapter, Room source, Ktor engine | Android SDK (B-4/B-7) |
+| S5 | the **C# applier** | .NET |
+| S6 | the device key, the `:app` wiring | B-4 + B-7 |
+
+So the choice was among the queued `:core`/`relay/` items. `STATE.md` carried one from the eighth
+iteration — *"whether `parsePullPage` should accept the wrapper shape at all… a slice, not a
+drive-by"* — and reading that function to answer the wrapper question turned up something larger
+sitting next to it, which is what this entry is about. **The wrapper question itself is still open**
+and still deliberately not a drive-by (S4P-6).
+
+### S4P-2 The finding: one sibling was hardened and the other was not
+
+`RelayClient` has two functions that read a body the relay controls. One was written to be total,
+with the reasoning in its own KDoc:
+
+> *"Deliberately total: a 409 whose body is absent, empty, not JSON, or JSON without the field is a
+> conflict with no reconciliation input… **the one thing this client must never do is convert a
+> relay decision into an unavailability.**"* — `conflictLatest`
+
+The other, `parsePullPage`, was partial in four separate places (`parseToJsonElement`, `.jsonObject`,
+`.jsonArray`, `.jsonPrimitive` — each throws on the wrong shape), **and it is invoked outside the
+try/catch that would have caught it**: `pull` ended `.map { body -> parsePullPage(body) }`, and
+`map` runs on the *result* of `request`, after its error handling has finished. So a malformed 200
+body did not become a `RelayResult` at all — it threw out of `pull` entirely, past the sealed
+hierarchy that exists to describe exactly this.
+
+That matters because of who supplies the body. §2 makes the relay a **blind pipe**, and this
+client's own class KDoc is written on the assumption that it may be hostile as well as broken. It
+controls the page completely.
+
+**Measured before anything was changed** — twelve bodies through the shipped parser:
+
+```
+PROBE | non-JSON body               | THREW JsonDecodingException
+PROBE | HTML error page             | THREW JsonDecodingException
+PROBE | empty body                  | THREW JsonDecodingException
+PROBE | JSON array root             | THREW IllegalArgumentException
+PROBE | JSON string root            | THREW IllegalArgumentException
+PROBE | envelopes not an array      | THREW IllegalArgumentException
+PROBE | array element is a primitive| THREW IllegalArgumentException
+PROBE | seq is an object            | THREW IllegalArgumentException
+PROBE | latest is an object         | THREW IllegalArgumentException
+PROBE | latest is a numeric string  | OK -> PullPage(envelopes=[], latest=9)
+PROBE | envelopes key absent        | OK -> PullPage(envelopes=[], latest=4)
+PROBE | latest key absent           | OK -> PullPage(envelopes=[], latest=0)
+```
+
+**Nine of twelve escaped the `RelayResult` contract.** No attacker is required for the realistic
+one: an intercepting proxy or a CDN serving its own error page with a 200 status produces line 2.
+
+### S4P-3 The three that did *not* throw are the worse half
+
+The loud failures are a robustness bug. The three quiet ones are a correctness bug, and one of them
+is a silent stall an adversary can cause by **deleting a single field**.
+
+`latest` is what drives `moreAvailable` and §6.2's gap check. Omit it and the old parser read `0`,
+so `cursor < latest` is false, so the pump believes it is fully caught up — **a sync that stops with
+no error, reported as healthy**. `envelopes` absent was the mirror image: a successful *empty* page
+carrying a `latest` above the cursor, i.e. "nothing to do" and "the relay is ahead of you" asserted
+in the same breath.
+
+**The engine has always refused both.** `src/Sync/RelayClient.cs:72-73` reads
+`GetProperty("envelopes")` and `GetProperty("latest").GetInt64()` — absent keys throw, and so does a
+quoted number. The phone was the permissive one, which is the wrong direction: the mission's
+interpretation rule says match the engine, and *"a phone more correct than the engine is a field
+bug"* cuts both ways — more *lenient* is a field bug too. That reading is what this slice shipped,
+and the gap that allowed two readings is now **PQ-S4-2**: §2's route table defines the pull request
+and never defines its response body, so the relay, the engine and the phone had each invented one.
+
+### S4P-4 The decisions, stated, because each has a wrong version that compiles
+
+1. **Total, not throwing.** Any unreadable page is `RelayResult.Unavailable("malformed pull page:
+   <exception class>")`. `pull` now ends `.flatMap`, a new combinator for a transform that can
+   itself fail — `map` structurally cannot express "the relay answered and I could not read it".
+2. **Both keys required and strictly typed**, matching `GetProperty`/`GetInt64`. A quoted `"9"` is
+   refused because the engine refuses it.
+3. **One unusable element rejects the whole page — never skip-and-continue.** This is the decision
+   with the most dangerous wrong version, because skipping compiles, renders correctly, and loses
+   envelopes in silence: the cursor advances past everything *seen*, so dropping element 47 and
+   keeping 48 skips 47 permanently. That is the history-truncation attack `SyncPump` already refuses
+   in its other form (it reads the authenticated `seq`, never the relay's — C-S4T-4) wearing a
+   different hat. **A blind relay that wants an envelope skipped would only have to corrupt it.**
+4. **The per-element `seq` stays lenient**, and is the one field here that rejects nothing. Nothing
+   authenticated reads it: `SyncPump` takes the `seq` out of the sealed bytes and ignores this one,
+   and the engine reads no per-element `seq` at all. Rejecting over it would be *stricter* than the
+   engine on a field no trust decision consumes — the wrong direction again, in the other direction.
+5. **The failure detail carries a diagnosis and no relay bytes.** It can reach a log line; the body
+   it describes is ciphertext plus routing metadata.
+
+`Unavailable` was chosen over a new `RelayResult` variant deliberately, and it is the weakest point
+in this slice — see the self-audit in the PR and S4P-7.
+
+### S4P-5 Evidence, and the red run was deliberate
+
+Baseline, measured on the reduced `:core` probe (C-S6A-1's recipe, JDK 21) **before** any edit:
+**177 / 0 / 0 across 14 classes**, matching the figure `STATE.md` carried from the tenth iteration.
+After: **185 / 0 / 0 across 14 classes**, `RelayClientTest` 17 → **25**.
+
+**All 8 new tests were run against the pre-fix parser and all 8 failed**, with the 17 pre-existing
+`RelayClientTest` cases still passing — so the new tests pin the new behaviour, and the fix moved no
+existing assertion:
+
+```
+a page body that is not JSON is reported, never thrown                        FAILED
+every structurally wrong page is an Unavailable, and none of them escapes ...  FAILED
+a page missing latest is rejected, because defaulting it to zero fakes ...     FAILED
+a page missing envelopes is rejected, not read as an empty queue               FAILED
+a quoted latest is refused, because the engine's GetInt64 refuses it           FAILED
+one unusable element rejects the whole page, and never just itself             FAILED
+an unusable per-element seq does not reject the page, because nothing ...      FAILED
+the failure detail carries a diagnosis and no relay bytes                      FAILED
+(17 pre-existing cases: PASSED)                          -> BUILD FAILED
+```
+
+This is the reduced probe, **not** the verification command of record: `:app`, `lintDebug`,
+`assembleDebug` and `checkCoreIsAndroidFree` are all absent from it, and the toolchain is
+substituted 17 → 21 because `api.foojay.io` is egress-denied (B-7). **The gate is CI.**
+
+**The android gate did not run and cannot run here** (no SDK, no JBR, `dl.google.com` denied — B-7).
+**`Verify-Alpha.ps1` did not run and cannot** — `dotnet` is not on PATH; it is also unaffected, since
+no main-repo file was written, so `$ExpectedOfflineTotal` (598) is untouched by construction.
+
+**Vendored vectors: 26/26 byte-identical to pin `679a317`, drift 0** — verified here against the
+main-repo checkout, not asserted. No vector was added or edited.
+
+### S4P-6 What this deliberately did *not* do
+
+**The wrapper shape stays.** `{"seq":N,"envelope":…}` is accepted by this client and produced by
+nothing — not the relay (it splices bare envelope JSON), not the engine (no branch for it), not any
+shared vector, not the spec. The evidence for removing it is now much stronger than when the
+question was queued, **and it is still not a drive-by**: `RelayClientTest`'s
+`pull returns envelopes unparsed…` asserts that shape directly, so removal rewrites an existing
+assertion and belongs in a slice whose title says so. Recorded in **PQ-S4-2** with the evidence.
+
+**The engine's own reader is partial in the same way** and was not touched: `PullAsync` has no
+`try`, so a malformed page throws there too. It is a different failure posture (a desktop process,
+not a phone's sync coroutine) and it is `.cs`, which cannot be compiled or gated here. Recorded, not
+fixed.
+
+### S4P-7 Ladder effect, stated narrowly
+
+**S4 stays PARTIAL and this slice does not move it toward DONE.** Its remainder is the `:app`
+wiring — the `ApplyResult` adapter, the Room-backed position source, the Ktor engine — and none of
+that was touched. What changed is that S4's transport half stops trusting a party the threat model
+already called untrusted. **A rung does not advance because work happened in its neighbourhood** —
+the same sentence the eleventh iteration had to write about S2, and it is worth noticing that this
+is now two in a row.
+
+**`SyncPump` has no production caller** (`grep -rn SyncPump app/src` prints nothing), so the crash
+this prevents is prospective, not observed in the field. The stall of S4P-3 is likewise a property
+of the code as written, not an incident anyone reported. Saying otherwise would overstate it.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** Android PR #6 stays a draft; main-repo PRs #32 and #33 stay
+drafts and were neither merged, retargeted, rebased nor force-pushed. The branch was pushed
+**forward-only** — no force-push, no history rewrite, no branch deleted, in either repo.
+
+**Two code files changed, both `:core` Kotlin** (`RelayClient.kt`, `RelayClientTest.kt`), plus this
+repo's records. **No file in the main repo was written except the coordination bus** — no `.cs`, no
+`relay/` file, no harness, no `$ExpectedOfflineTotal`, no `Verify-Alpha.ps1`, no count-reporting
+doc, and **no `docs/Sync-Protocol.md` change**: the amendment PQ-S4-2 asks for is a spec decision,
+and taking it unilaterally is the size-cap mistake in reverse. **No vector byte changed and no
+vector was added**; nothing was re-vendored; the pin stays `679a317`. `generate.mjs` was not run and
+not needed — this slice adds no vector.
+
+**No `:app` file, no Gradle or version-catalog file**, no emulator, no `sdkmanager`, no AVD, and no
+attempt to route around the `dl.google.com` denial. **No deploy of any kind** (Cloudflare, Workers,
+relay, site, Pages), and no `wrangler` invocation at all. **The production relay was contacted zero
+times, not even `GET /v1/health`** — every relay in this slice is a Ktor `MockEngine` inside the
+test runner, and no test in it opens a socket.
+
+No Google, Play, OAuth or Console action; no accounts, no purchases, no Play Billing code; no email
+or Gmail anything; no cert-store, MSIX or keystore action — the upload keystore and its password
+file were neither read nor referenced beyond their paths. **No secrets read, written or printed.**
+
+Terra's state was read at iteration start and again before writing this: still R6(b) BLOCKED on
+draft PR #26, heartbeat unchanged at 2026-08-07T21:18, **claims no files** — no collision. This
+slice took no main-repo territory at all.

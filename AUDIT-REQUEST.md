@@ -2916,3 +2916,187 @@ confirmed rather than asserted.
 (`SyncLiveSmoke` is not in the offline set), so the `latest` semantics change flagged as self-audit
 item 1 on PR #34 remains **unverified against the C# resume path**. Green CI is not evidence for
 that claim, and this entry does not offer it as such.
+
+---
+
+## S4P — the pull page is untrusted input · 2026-08-10 (twelfth cloud iteration)
+
+Every claim below was produced by a command run in this session. The `:core` numbers come from the
+**reduced** probe (C-S6A-1's recipe: `:core` alone, separate root, JDK 21 substituted for 17 because
+`api.foojay.io` is egress-denied — B-7). The reduced probe runs **none** of `:app`, `lintDebug`,
+`assembleDebug` or `checkCoreIsAndroidFree`; **the gate is CI** (C-S4P-8). Where a claim is
+unverified, it says so.
+
+Set `REPO` to this checkout and `SYNC` to a `careerseeker` checkout for the commands below.
+
+### C-S4P-1 — The baseline was measured before anything was written
+
+> **Claim.** `:core` stood at **177 tests / 0 failures / 0 skipped across 14 classes** on
+> `20fe7e6` before this slice, matching the figure `STATE.md` carried from the tenth iteration —
+> so the delta below is a measurement, not a story.
+
+```bash
+cd "$PROBE" && gradle --no-daemon :core:test --rerun-tasks     # probe root per C-S6A-1
+python3 - <<'EOF'
+import glob, xml.etree.ElementTree as ET
+t=f=s=0; per={}
+for p in glob.glob('<REPO>/core/build/test-results/test/*.xml'):
+    r=ET.parse(p).getroot()
+    n=int(r.get('tests')); t+=n
+    f+=int(r.get('failures'))+int(r.get('errors')); s+=int(r.get('skipped'))
+    per[r.get('name').split('.')[-1]]=n
+print(t,f,s,len(per)); print(per['RelayClientTest'])
+EOF
+```
+
+*Expected on `20fe7e6`:* `177 0 0 14`, then `17`.
+
+### C-S4P-2 — The defect was measured on the shipped parser, not argued
+
+> **Claim.** Before this slice, **9 of 12** malformed page bodies threw out of `RelayClient.pull`
+> rather than returning a `RelayResult`, and 3 more returned a wrong value silently.
+
+The probe class was temporary and is not in the tree. To reproduce it, check out the parent commit
+and re-run the twelve bodies listed in `LOG.md` §S4P-2 through `pull`. The structural claim behind
+it needs no build at all:
+
+```bash
+git -C <REPO> show 20fe7e6:core/src/main/kotlin/app/careerseeker/core/RelayClient.kt \
+  | grep -n "parsePullPage\|\.map { body\|runCatching"
+```
+
+*Expected:* `pull` ends `.map { body -> parsePullPage(body) }`, and `parsePullPage` contains **no**
+`runCatching` — while `conflictLatest`, three functions below it, does. `map` is applied to the
+*result* of `request`, i.e. after its `try`/`catch` has already returned, which is why the throw
+escapes.
+
+### C-S4P-3 — The new tests fail against the pre-fix parser (the red run)
+
+> **Claim.** All **8** new `RelayClientTest` cases fail against the parent's `RelayClient.kt`, and
+> the **17** pre-existing cases in the same class still pass — so the new tests pin the new
+> behaviour and the fix moved no existing assertion. Run deliberately: a test that passes either
+> way pins nothing.
+
+```bash
+git -C <REPO> checkout 20fe7e6 -- core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+cd "$PROBE" && gradle --no-daemon :core:test --tests "app.careerseeker.core.RelayClientTest" --rerun-tasks
+git -C <REPO> checkout HEAD -- core/src/main/kotlin/app/careerseeker/core/RelayClient.kt   # restore
+```
+
+*Expected:* `BUILD FAILED`, with exactly these 8 `FAILED` and no others —
+`a page body that is not JSON is reported, never thrown` ·
+`every structurally wrong page is an Unavailable, and none of them escapes as an exception` ·
+`a page missing latest is rejected, because defaulting it to zero fakes being caught up` ·
+`a page missing envelopes is rejected, not read as an empty queue` ·
+`a quoted latest is refused, because the engine's GetInt64 refuses it` ·
+`one unusable element rejects the whole page, and never just itself` ·
+`an unusable per-element seq does not reject the page, because nothing authenticated reads it` ·
+`the failure detail carries a diagnosis and no relay bytes`.
+
+### C-S4P-4 — The slice adds 8 tests and the suite is green
+
+> **Claim.** After the change the same probe measures **185 / 0 / 0 across 14 classes**, of which
+> `RelayClientTest` contributes **25**. No class was added, deleted or renamed.
+
+Same commands as C-S4P-1, on this branch's head.
+
+*Expected:* `185 0 0 14`, then `25`.
+
+### C-S4P-5 — The engine requires both fields, which is what makes this the engine-compatible reading
+
+> **Claim.** `src/Sync/RelayClient.cs` reads `GetProperty("envelopes")` and
+> `GetProperty("latest").GetInt64()`. Both throw on an absent key; `GetInt64()` additionally throws
+> on a JSON string. The phone now refuses exactly what the engine refuses.
+
+```bash
+sed -n '62,76p' <SYNC>/src/Sync/RelayClient.cs
+```
+
+*Expected:* `PullAsync`, containing `doc.RootElement.GetProperty("envelopes").EnumerateArray()` and
+`doc.RootElement.GetProperty("latest").GetInt64()`.
+
+**Note what this same command shows and this slice did not fix:** `PullAsync` has no `try`, so the
+engine's reader is partial in the same way the phone's was. Not touched — it is `.cs` and cannot be
+compiled or gated here (`dotnet` is not on PATH). Recorded in `LOG.md` §S4P-6.
+
+### C-S4P-6 — Nothing produces the wrapper shape (the basis for PQ-S4-2's finding)
+
+> **Claim.** `{"seq":N,"envelope":…}` is accepted by the Kotlin client and emitted by **no**
+> implementation: not the relay, not the engine, not any shared vector, and it is not in the spec.
+
+```bash
+sed -n '196,211p' <SYNC>/relay/src/channel.ts          # pull(): rows.map(r => r.ciphertext).join(',')
+grep -rn '"envelope"' --include=*.cs --include=*.ts <SYNC>/src <SYNC>/tests <SYNC>/relay
+grep -rln 'envelopes' <SYNC>/docs/sync-vectors/v1/ | head
+grep -n 'latest' <SYNC>/docs/Sync-Protocol.md
+```
+
+*Expected:* the relay splices bare `ciphertext` rows; the second command prints **nothing** (the one
+`grep` hit repo-wide is `"type" == "envelope"` in `SyncHarness`, a vector-type filter, not a page
+shape); no vector file contains a page; and `latest` appears in the spec only at §6.1's counter
+reconciliation — **never in a response-body definition**, which is PQ-S4-2 itself.
+
+### C-S4P-7 — The wrapper shape is still accepted, deliberately
+
+> **Claim.** This slice did **not** remove it, because an existing assertion depends on it.
+
+```bash
+grep -n "pull returns envelopes unparsed" -A 16 <REPO>/core/src/test/kotlin/app/careerseeker/core/RelayClientTest.kt
+```
+
+*Expected:* the test body feeds `{"seq":47,"envelope":{…}}` elements and asserts
+`page.envelopes.map { it.seq } == [47, 48]`. Removing the wrapper shape rewrites this test, which is
+why it is queued (PQ-S4-2) rather than done here.
+
+### C-S4P-8 — The gate is CI, and the reduced probe is not it
+
+> **Claim.** The android gate — `./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:test
+> :app:assembleDebug :app:lintDebug --rerun-tasks` — **did not run in this session and cannot**:
+> no Android SDK, no JBR, and `dl.google.com` is an egress **policy denial** (B-7), not a missing
+> install. `Verify-Alpha.ps1` likewise did not run and cannot — `dotnet` is not on PATH.
+
+```bash
+which dotnet sdkmanager avdmanager adb; echo "exit=$?"
+curl -sS -o /dev/null -w '%{http_code}\n' https://dl.google.com/ || true
+```
+
+*Expected:* no paths printed; the `dl.google.com` request fails at the proxy
+(`CONNECT tunnel failed, response 403`). Read the CI check run for the gate itself:
+`MCP: pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker-android pullNumber=6`.
+**CI reports no test counts** — Gradle does not print them and the workflow does not collect them —
+so the `185` of C-S4P-4 stays a probe measurement, corroborated by CI only as "green", never as a
+number.
+
+### C-S4P-9 — No vector moved, and the cross-repo pin is intact
+
+> **Claim.** All **26** vendored vector files are byte-identical to pin `679a317`, **drift 0**,
+> verified here rather than asserted. None added, none edited.
+
+```bash
+cd <SYNC>
+drift=0
+for f in <REPO>/core/src/test/resources/sync-vectors/v1/*.json; do
+  b=$(basename "$f")
+  git show 679a317:docs/sync-vectors/v1/"$b" > /tmp/pin.json 2>/dev/null || { echo "MISSING: $b"; drift=$((drift+1)); continue; }
+  cmp -s /tmp/pin.json "$f" || { echo "DRIFT: $b"; drift=$((drift+1)); }
+done
+echo "drift=$drift  files=$(ls <REPO>/core/src/test/resources/sync-vectors/v1/ | wc -l)"
+```
+
+*Expected:* `drift=0  files=26`.
+
+### C-S4P-10 — This slice claimed no main-repo territory
+
+> **Claim.** No file in `careerseeker` was written except the coordination bus
+> (`autonomy/claude-state:STATE.md`), so `$ExpectedOfflineTotal` (**598**) cannot have moved.
+
+```bash
+git -C <REPO> diff --stat 20fe7e6..HEAD --   # every path is core/ or a record in this repo
+git -C <SYNC> status --porcelain             # clean
+```
+
+*Expected:* the first prints only `core/src/main/kotlin/.../RelayClient.kt`,
+`core/src/test/kotlin/.../RelayClientTest.kt`, `LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`,
+`docs/protocol-questions.md`; the second prints nothing. **`Verify-Alpha.ps1` was not run** (no
+.NET), so 598 is confirmed by the no-files-written argument here, and by CI on the main repo — not
+by a measurement taken in this session.

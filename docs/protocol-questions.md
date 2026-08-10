@@ -614,3 +614,62 @@ relay second — the reverse is the size-cap bug again, a relay refusing what th
 Worth deciding alongside whether the relay should expose any channel-level reset short of unpair.
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-S2R-9**.
+
+---
+
+## PQ-S4-2 — The `pull` response body is not defined anywhere, and the three implementations disagree about it
+
+**Opened 2026-08-10 (S4 pull-page hardening, twelfth cloud iteration).** The phone was moved to the
+engine-compatible reading in the same slice; this entry records the gap that made two readings
+possible.
+
+**Spec.** §2's route table defines `GET /v1/{pairing}/pull?since={seq}&dir={dir}` as "Fetch
+envelopes for direction `dir` with `seq > since`" — **and stops there**. No response body is
+specified: not the `envelopes` array, not `latest`, not their types, not whether either is
+required. `latest` appears in the normative text exactly once, in §6.1's counter reconciliation
+("reconciled on startup against the relay's current `latest` for the direction"), which uses the
+field without ever defining where it comes from. §3 pins the *envelope* framing precisely; the
+*page* that carries envelopes is pinned nowhere.
+
+**What the three implementations actually do.**
+
+| | `envelopes` | `latest` | element shape |
+| --- | --- | --- | --- |
+| Relay (`relay/src/channel.ts`, `pull`) | always emitted | always emitted, integer, `?? 0` | bare envelope JSON, spliced verbatim |
+| Engine (`src/Sync/RelayClient.cs`, `PullAsync`) | **required** — `GetProperty` throws if absent | **required, strict** — `GetProperty("latest").GetInt64()` throws on a string | bare envelope only; no per-element `seq` is read |
+| Phone, before this slice | optional, defaulted to `[]` | optional, defaulted to `0`, and a quoted `"9"` accepted | bare **or** a `{"seq":N,"envelope":…}` wrapper |
+
+Three readings of one undefined contract. The relay's is the strictest producer, the engine's is the
+strictest consumer, and the phone's was the most permissive of all — which is the wrong direction
+under the interpretation rule, and was not a deliberate choice so much as an absent one.
+
+**Why the phone's leniency was the dangerous end.** Defaulting an absent `latest` to `0` is not a
+tolerant reading, it is a **silent** one: `latest` is what drives `moreAvailable` and §6.2's gap
+check, so a relay that merely *omits* the field convinces the phone it is fully caught up. The
+phone then reports a healthy, empty sync forever. One deleted field, no error anywhere, and the
+blind relay is the party that controls the body. The engine has always refused this shape.
+
+**Chosen here (engine-compatible, per the mission's interpretation rule):** `envelopes` and `latest`
+are both **required and strictly typed**, matching `GetProperty`/`GetInt64` exactly — a quoted
+number is refused on the phone because it is refused on the engine. Anything else is
+`RelayResult.Unavailable`, never an exception and never a silently-empty page. The
+`{"seq":N,"envelope":…}` wrapper shape is **still accepted**, deliberately unchanged in this slice —
+see the finding below.
+
+**A finding worth carrying, and it is the reason the wrapper shape was left alone rather than
+removed.** Nothing produces it. The relay splices bare envelope JSON
+(`relay/src/channel.ts`: `rows.map((r) => r.ciphertext).join(',')`); the engine's reader has no
+branch for it; no shared vector contains a page at all; and the spec does not mention it. It is
+accepted by exactly one implementation and emitted by none — and the `seq` it carries is the
+relay's unauthenticated number, the one `SyncPump` already refuses to use (C-S4T-4). Removing it is
+the obvious next step and is still **deliberately not a drive-by**: `RelayClientTest`'s
+`pull returns envelopes unparsed…` asserts that shape directly, so removing it rewrites an existing
+assertion, and that belongs in a slice that says so.
+
+**To close.** A §2 (or a new §4.2) amendment defining the pull response body: both fields required,
+`latest` an integer, elements bare envelopes, and one sentence on whether a client may accept the
+wrapper shape — which, on the evidence above, should be *no*. Spec first, then the wrapper removal
+on both sides. Doing it in the other order is the size-cap mistake again: an implementation
+tightening ahead of the document it claims to implement.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S4P-6** and **C-S4P-7**.
