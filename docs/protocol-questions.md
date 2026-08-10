@@ -523,3 +523,94 @@ no behaviour. Engine-compatible interpretation rule applies: match the engine, s
 question.
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-S6S-2** and **C-S6S-5**.
+
+---
+
+## PQ-S2-1 — The relay declares a `pairing` field it never checks
+
+**Opened 2026-08-10 (S2 relay conformance, eleventh cloud iteration).** Not a blocker, and
+deliberately **not fixed** in the slice that found it — the reason is the interesting half.
+
+**Spec (§3).** `pairing` is a required envelope field: "Pairing id, `p_` + 16 base64url chars."
+`relay/src/protocol.ts` declares it in `EnvelopeHeader`, and §4.1 puts it in the AAD, so both
+receivers authenticate it.
+
+**What the relay actually does.** `POST /push` validates `v`, `dir`, `seq`, `ts`, `key_id`,
+`nonce`, `ciphertext` and the optional `sig` — and never looks at `pairing`. Measured in this
+sandbox against the real Worker under miniflare, all three accepted with **201**:
+
+| pushed to a channel with | `pairing` in the body | relay answered |
+| --- | --- | --- |
+| a valid bootstrapped channel | `"p_x"` (not 16 chars, not this channel) | 201 |
+| the same | field absent entirely | 201 |
+| the same | `"p_AAAAAAAAAAAAAAAA"` — a *different* valid pairing id | 201 |
+
+**Why this is small.** It is not a confidentiality hole. The key is derived per pairing, so an
+envelope sealed for pairing X does not decrypt at Y regardless of what its header claims, and
+`pairing` sits in the AAD so it cannot be edited in flight. Only a bearer holder can push at all,
+and the bearer *is* the pairing. The cost is that the relay stores junk and burns a `seq` slot —
+which is PQ-S2-2's problem, not this one's.
+
+**Why it is worth recording anyway.** §3's own words are "a permissive parser here is how a future
+version's field silently becomes an injection point", and this is a field the relay names in a
+typed interface, routes on, and then declines to check. The blast radius today is small because
+other mechanisms happen to cover it; that is a different statement from "the check is unnecessary".
+
+**Why it was not fixed here, and this is the load-bearing part.** Tightening what the relay refuses
+is the exact shape of the 2026-08-09 size-cap bug (§3.1's amendment: "the relay MUST carry every
+envelope this section declares legal"), and the harnesses that would catch an over-tightening are
+`SyncLiveSmoke` and `Verify-Alpha.ps1`, neither of which runs without .NET. Two callers in the repo
+already emit ids that would **fail** a shape check: `tests/EngineHarness/Program.cs:2268` constructs
+a publisher with `"p_bridge_test"` (11 chars after `p_`, not 16), and `relay/test/relay.test.ts`'s
+own envelope helper has been sending `"p_x"` into every channel for the life of the suite. Neither
+reaches a relay today — but they are evidence that the shape rule is not universally respected
+inside this codebase, which is precisely the thing to measure *before* a relay starts refusing on it.
+
+**To close.** On a machine with .NET: add `typeof env.pairing !== 'string' || env.pairing !== <the
+URL's pairing segment>` to `push`'s header check, fix the two non-conforming ids above, then run
+`Verify-Alpha.ps1` and the engine↔local-relay smoke. Equality with the URL segment is the stronger
+check and is free: the relay already routes by that segment, so a disagreement is malformed by
+construction.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S2R-8**.
+
+---
+
+## PQ-S2-2 — `seq` has no upper bound, and one out-of-range value wedges a direction permanently
+
+**Opened 2026-08-10 (S2 relay conformance, eleventh cloud iteration).** Recorded, not fixed:
+capping `seq` in the relay would refuse what §3 declares legal, which is the one thing §3.1's
+amendment forbids.
+
+**Spec (§3).** `seq` is "int, per-direction monotonic counter, starts at 1". **No maximum is
+stated**, anywhere.
+
+**What that costs.** The relay's guard is `seq <= MAX(seq)` → 409 `replay_rejected`. Measured here:
+
+```
+push seq = Number.MAX_SAFE_INTEGER (9007199254740991)  -> 201 accepted
+push seq = 1            (the next legitimate envelope)  -> 409
+   body: {"error":"replay_rejected","latest":9007199254740991}
+```
+
+Every subsequent envelope in that direction is refused for as long as the row lives. There is no
+recovery path short of `DELETE /v1/{pairing}` (unpair) or waiting out the TTL — and §6.1 tells a
+reconciling sender to resume *above* `latest`, which here is a number it can never usefully exceed.
+This is not an outsider attack (it needs the bearer), but it does not need malice either: one
+sender bug that emits a garbage counter bricks the channel, and the failure presents as "sync
+stopped working" with a 409 nobody can act on.
+
+**A second, smaller mismatch in the same field.** The two receivers type `seq` as a 64-bit integer
+(`src/Sync/EnvelopeCodec.cs:7` `long Seq`; the Kotlin header likewise), while the relay is
+JavaScript and reads it through `JSON.parse` into a double. Integers above 2⁵³ round silently there,
+so the relay's notion of `seq` and the receivers' diverge past that point. Unreachable in practice —
+2⁵³ envelopes is not a number this product produces — but the *cap* question and the *precision*
+question have the same answer, so they should be settled together.
+
+**To close.** A §3 amendment giving `seq` an explicit maximum, then the relay enforcing it as a
+`400`. `2^53 - 1` is the natural bound: it is the largest integer all three implementations agree
+on exactly, and stating it turns a silent precision divergence into a documented limit. Spec first,
+relay second — the reverse is the size-cap bug again, a relay refusing what the spec permits.
+Worth deciding alongside whether the relay should expose any channel-level reset short of unpair.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S2R-9**.

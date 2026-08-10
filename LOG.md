@@ -3171,3 +3171,202 @@ signing key enters this code only as a stub function supplied by the caller.
 Terra's state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged
 at 2026-08-07T21:18, **claims no files** — no collision, and `:core` has never been Terra's
 territory.
+
+---
+
+## S2R — The relay's read path forgot retention (2026-08-10, eleventh cloud iteration)
+
+Linux cloud sandbox. Main repo only: `relay/src/channel.ts` and `relay/test/relay.test.ts`, two
+commits on `claude/s2-relay-retention` (stacked on #32). **No android code was written this
+iteration** — the records below are the only android files touched.
+
+### S2R-1 Why this rung, when the prompt nominated S5
+
+The standing prompt nominates S5's spec half every iteration and describes S5 as "NOT STARTED".
+`STATE.md`'s fourth correction already answered that: the S5 spec, its two vectors and the phone
+applier landed 2026-08-09 (PR #32). The prompt is a stored snapshot and does not re-read itself.
+Verifying it took the mandatory fetch plus these records, in that order, and the fetch is also what
+found `claude/s5-entitlement-ack-spec` already pushed with four commits on it.
+
+What was actually available was named by the previous iteration, at the end of `STATE.md`: *"`relay/`
+(Node + vitest + miniflare, no egress denial, and nobody has re-read it since the size-cap fix)"*.
+S2 is the topmost `PARTIAL` rung, `relay/` is its transport half, and it is one of exactly two
+modules a cloud session can gate. S2's *other* remainder — the `/pair` page — is C#, so it is not
+merely in a different module but behind an absent runtime. This slice took the half that runs here.
+
+**The precedent that shaped the method.** The 2026-08-09 size-cap finding was a relay bug that had
+been green on CI the whole time *because the relay's own suite asserted the buggy number*. So the
+re-read was done adversarially and empirically: enumerate the spec's MUSTs that bind the relay, then
+probe each against the running Worker under miniflare rather than reading the code and reasoning.
+Five probes, five answers, four of them things the suite did not know.
+
+### S2R-2 The finding: retention was enforced by a background job and by nothing else
+
+§2 is unambiguous — *"The relay MUST purge any envelope older than the configured TTL"* — and it is
+the privacy promise the blind relay is sold on. Collection is driven by `alarm()`, which Cloudflare
+**schedules**; it does not fire the instant a row expires. `GET /pull` had no expiry predicate at
+all. Measured, by inserting a row with `expires_at = 1` (1970) and pulling:
+
+```
+pull -> {"envelopes":[ {…,"expired":true} ], "latest":1}      # served the expired envelope
+```
+
+Retention that holds only as fast as a background job happens to run is not the retention §2
+describes. The row is not merely stale — it is a row the relay has already promised is gone.
+
+**The second half is the one that bites, and it is not a privacy problem.** `latest` was
+`MAX(seq)` over *all* rows while the page filtered none, so once the fix filtered the page the two
+would have disagreed. `latest` is the client's loop bound — §2's own route table says pull returns
+envelopes `seq > since`, and the client pulls until it has seen `latest`. A `latest` that counts a
+row the page will never return is **a bound the client can never reach**: it re-pulls the same page
+until the alarm collects the row. So both queries had to take the predicate, and the test that pins
+it (`excludes expired rows from latest, so the page and its loop bound agree`) is the one that would
+catch a half-fix.
+
+**The opposite rule applies one function up, and that is deliberate.** `POST /push`'s replay guard
+still counts expired-but-uncollected rows. The two paths want opposite things from the same rows:
+serving one is a retention failure, forgetting one lowers the replay floor. Both are now pinned, so
+the pull fix cannot be "tidied" into push by someone who notices the asymmetry and assumes it is an
+oversight. `channel.ts` says so above the guard, not just in this log.
+
+### S2R-3 A thing the relay is not, now written down
+
+The same probe run answered a question nobody had asked: **the relay's monotonicity guard is not a
+durable replay authority.** It is `MAX(seq)` over live rows, so once the TTL purge empties a
+direction the floor is gone:
+
+```
+push seq=9 -> 201     purgeAll()     push seq=1 -> 201      # the floor came back to zero
+```
+
+That is not a defect and it is not being pinned as acceptable behaviour — §6.2 puts the
+authoritative check on the *receiver's* persisted high-water mark, and the relay guard is defence in
+depth with a TTL-shaped lifetime. It is written down because a reader who sees `replay_rejected` in
+`channel.ts` could easily conclude the relay owns replay protection and relax the receiver's rule,
+which is the same class of mistake as the four rung-label over-reaches this file has recorded.
+
+### S2R-4 Two guarantees pinned that the relay already made
+
+Neither is a behaviour change; both were measured against the relay as it stands.
+
+**The 409 body.** `{"error":"replay_rejected","latest":N}`. The suite asserted the status code and
+never the body. The android `:core` `RelayClient` began parsing `latest` into `RelayResult.Conflict`
+last iteration (S6S-3) — it is §6.1's counter-reconciliation input, and a sender whose persisted
+counter has fallen behind has no other way out of a channel that refuses it forever. **A tidy-up
+dropping that field would have been green in this repo and would have broken the phone.** That is a
+cross-repo contract with a test on neither side until now.
+
+**Unknown top-level fields survive `push` → `pull` verbatim.** §3's *"unknown top-level fields MUST
+be rejected"* binds the **receivers**, not the relay. A relay that stripped what it did not
+recognise would silently repair envelopes the receivers are required to reject, and the rule would
+stop being testable end to end. Pinned now because it is exactly the wire behaviour PQ-A2-3's
+`invalid-unknown-field` vector will depend on when B-6 is unblocked — the field has to survive the
+trip in order to be rejected at the far end.
+
+### S2R-5 Two findings recorded and deliberately NOT fixed
+
+Both are real; neither was fixed from here, and the reason is the same in both cases and is the
+lesson of the size-cap bug: **tightening what the relay refuses is a change whose blast radius is
+measured on machines this sandbox is not.**
+
+**PQ-S2-1 — the relay never checks the `pairing` field it declares.** `push` validates seven fields
+and skips the eighth. Measured: `"p_x"` → 201, field absent → 201, a *different* valid pairing id →
+201. Small today (the key is per-pairing, so a foreign envelope does not decrypt; `pairing` is in the
+AAD, so it cannot be edited in flight; only a bearer holder can push at all) — but §3's own words
+are "a permissive parser here is how a future version's field silently becomes an injection point",
+and this is a field the relay names in a typed interface and routes on. **What stopped the fix was
+evidence, not caution:** two callers already in the repo emit ids that would fail a shape check —
+`tests/EngineHarness/Program.cs:2268` uses `"p_bridge_test"`, and `relay/test/relay.test.ts`'s own
+envelope helper has sent `"p_x"` into every channel for the life of the suite. Neither reaches a
+relay today, but they are proof the shape rule is not universally respected here, which is precisely
+what to measure *before* the relay starts refusing on it — and the harnesses that would catch an
+over-tightening (`SyncLiveSmoke`, `Verify-Alpha.ps1`) need .NET.
+
+**PQ-S2-2 — one out-of-range `seq` wedges a direction permanently.** §3 gives `seq` no maximum.
+Measured:
+
+```
+push seq = 9007199254740991  -> 201
+push seq = 1                 -> 409  {"error":"replay_rejected","latest":9007199254740991}
+```
+
+Every later envelope in that direction is refused for as long as the row lives, with no recovery
+short of unpair or the TTL — and §6.1 tells a reconciling sender to resume *above* `latest`, which
+here is a number it cannot usefully exceed. Not an outsider attack (it needs the bearer) and it does
+not need malice: one sender bug that emits a garbage counter bricks the channel, presenting as "sync
+stopped" behind a 409 nobody can act on. Capping it relay-side **without a spec amendment first
+would be the size-cap bug run again** — a relay refusing what §3 declares legal. Recorded with the
+smaller sibling finding in the same field: the engine types `seq` as `long`
+(`src/Sync/EnvelopeCodec.cs:7`) while the relay reads it through `JSON.parse` into a double, so the
+two diverge silently above 2⁵³. Unreachable in practice, same answer, so they should be settled
+together: `2^53 - 1` is the largest integer all three implementations agree on exactly.
+
+### S2R-6 What ran
+
+```
+npx vitest run  (baseline, parent 9c05ef7)          ->  36 passed
+npx vitest run  (this branch)                       ->  42 passed, 0 failed
+npx vitest run  (this branch's TESTS, parent's src) ->  2 failed | 40 passed   <- the defect
+npx tsc --noEmit            (after npx wrangler types)  ->  exit 0
+node docs/sync-vectors/generate.mjs --check         ->  OK: 28 vector files match the generator. (exit 0)
+grep -rniE 'subtle\.(decrypt|importKey)|createDecipher|aes-256-gcm' relay/src/  ->  (nothing) — CI's blindness step
+git diff --stat 9c05ef7..HEAD -- docs/ src/ tests/ scripts/  ->  (nothing)
+```
+
+**The two-failure run is the evidence, and it was run deliberately.** A regression test that passes
+with and without the fix pins nothing, so the fix was reverted (`git checkout 9c05ef7 --
+relay/src/channel.ts`) with the new tests kept, and both failed with exactly the symptoms the probes
+had found — 1 envelope served instead of 0, `latest` 2 instead of 1. The other four new tests pass
+in both states **by design**: they pin behaviour that already existed (S2R-3, S2R-4), and this entry
+would be overstating them if it called them regression tests.
+
+**`Verify-Alpha.ps1` did not run and cannot** — no .NET. It also cannot be affected: no file outside
+`relay/` was written, so `$ExpectedOfflineTotal` (598) is untouched by construction, and the third
+diff command above is the check rather than the assertion. **The android gate did not run and
+cannot** (B-7). **Neither did `npx wrangler deploy --dry-run`**, which CI does run — see the
+boundary paragraph.
+
+### S2R-7 Ladder effect, stated narrowly
+
+**S2 stays PARTIAL, and this slice does not move it toward DONE.** B-2's remaining gap is the
+desktop `/pair` page and nothing here touched it. What changed is that S2's transport half is a
+little less wrong than it was, and the reason to say it that way is that the previous relay slice
+(the size cap) also fixed a real latent defect without closing anything — two consecutive iterations
+have now improved the relay while B-2 stood exactly where it was. **A rung does not advance because
+work happened in its neighbourhood.**
+
+The honest summary of this iteration's effect: one live defect fixed (retention was observable, not
+latent — every pull between expiry and collection served it), one hang-shaped consequence prevented
+before it shipped, four guarantees pinned, two findings handed to a machine that can gate them.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** PRs #32 and #33 stay drafts and were neither merged,
+retargeted nor force-pushed; android PR #6 stays a draft. The new branch was created and pushed
+**forward-only** — no force-push, no history rewrite, no branch deleted, in either repo.
+
+**Two files changed in the main repo, both under `relay/`.** No `.cs` file, no harness, no
+`$ExpectedOfflineTotal`, no `Verify-Alpha.ps1`, no count-reporting doc, and **no
+`docs/Sync-Protocol.md` change** — the retention fix is conformance to §2 as already written and
+needs no amendment, and the two findings that *would* need one were recorded as PQ-S2-1/-2 in this
+repo instead. **No vector byte changed and no vector was added**; `generate.mjs --check` was run
+once, read-only, and reports 28 on this branch, which is #32's figure and not `main`'s 26. Nothing
+was re-vendored and the android pin stays `679a317`.
+
+**No deploy of any kind** (Cloudflare, Workers, relay, site, Pages), and **`npx wrangler deploy
+--dry-run` was deliberately not run** even though CI runs it and it does not deploy: declining every
+`wrangler deploy` variant from an unattended sandbox is the conservative reading of a standing
+"no deploys" embargo, and `wrangler.jsonc` was not touched, so the step is unaffected by this diff.
+`npx wrangler types` **was** run — local codegen into a gitignored file, no network, no account.
+**The production relay was contacted zero times, not even `GET /v1/health`** — every relay in this
+slice is miniflare inside the test runner.
+
+**No `:core` or `:app` file of any kind**, no Gradle or version-catalog file, no emulator, no
+`sdkmanager`, no AVD, and no attempt to route around the `dl.google.com` denial. No Google, Play,
+OAuth or Console action; no accounts, no purchases, no Play Billing code; no email or Gmail
+anything; no cert-store, MSIX or keystore action — the upload keystore and its password file were
+neither read nor referenced beyond their paths. **No secrets read, written or printed.**
+
+Terra's state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged
+at 2026-08-07T21:18, **claims no files** — no collision. `relay/` has never been Terra's territory,
+and it was already claimed by me through #32.

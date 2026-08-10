@@ -2680,3 +2680,215 @@ grep -c "FAILED" <log>                    # expect 0
 grep -o "() PASSED" <log> | wc -l         # expect 177  -- NOT yet run; this is the gap above
 git rev-parse HEAD                        # must equal the run's head_sha
 ```
+
+---
+
+## S2 relay conformance — retention on the read path (C-S2R-8 … C-S2R-15)
+
+All commands run from a clone of `ShivaClaw/careerseeker` at `claude/s2-relay-retention`
+(draft PR, stacked on #32), with `cd relay && npm ci && npx wrangler types` done once.
+Branch commits: `90ae2a1` (the fix), `310406a` (the pins); parent `9c05ef7` = #32's head.
+
+Several probes below assert a **deliberately wrong** expected value, so the runner prints the
+measured one in its diff. That is the house trick for reading a value out of the Workers pool:
+`console.log` inside `@cloudflare/vitest-pool-workers` does not reach the terminal, so an
+intentional mismatch is the cheapest way to make the runtime state its own answer. **A red run is
+the evidence here, not a failure** — read the `Received` line.
+
+### C-S2R-8 — The relay never checks the `pairing` field it declares (PQ-S2-1)
+
+> **Claim.** `POST /push` accepts an envelope whose `pairing` is malformed, absent, or names a
+> *different* pairing — 201 in all three cases.
+
+Write `relay/test/probe.test.ts`:
+
+```ts
+import { env } from 'cloudflare:workers';
+import { describe, expect, it } from 'vitest';
+import worker from '../src/index';
+const call = (p: string, i?: RequestInit) => worker.fetch(new Request(`https://r.example${p}`, i), env as never);
+const bearer = { authorization: 'Bearer tok' };
+const base = { v: 1, dir: 'e2p', ts: '2026-06-11T14:02:11Z', key_id: 'k-1', nonce: 'AAAAAAAAAAAAAAAA', ciphertext: 'op' };
+describe('probe', () => {
+  it('accepts any pairing value', async () => {
+    const id = 'p_000042ProbeVbN3W';
+    expect((await call(`/v1/${id}/create`, { method: 'POST', headers: bearer })).status).toBe(201);
+    const push = (b: object) => call(`/v1/${id}/push`, { method: 'POST', headers: bearer, body: JSON.stringify(b) });
+    const a = await push({ ...base, pairing: 'p_x', seq: 1 });              // wrong shape, not this channel
+    const b = await push({ ...base, seq: 2 });                              // field absent entirely
+    const c = await push({ ...base, pairing: 'p_AAAAAAAAAAAAAAAA', seq: 3 }); // a different valid pairing
+    expect([a.status, b.status, c.status]).toEqual([0, 0, 0]);              // deliberate mismatch
+  });
+});
+```
+
+```bash
+cd relay && npx vitest run test/probe.test.ts; rm test/probe.test.ts
+```
+
+*Expected:* the test fails with `Received: [ 201, 201, 201 ]`. Any `400` in that array means the
+check has since been added and **PQ-S2-1 should be closed**.
+
+The two non-conforming pairing ids the PQ cites, which are why this was recorded rather than fixed:
+
+```bash
+grep -n 'p_bridge_test' tests/EngineHarness/Program.cs      # -> 2268 (and 2325): 11 chars after p_, not 16
+grep -n "pairing: 'p_x'" relay/test/relay.test.ts           # -> the suite's own envelope helper
+```
+
+### C-S2R-9 — One out-of-range `seq` wedges a direction permanently (PQ-S2-2)
+
+> **Claim.** A push at `Number.MAX_SAFE_INTEGER` is accepted (201), after which every legitimate
+> envelope in that direction is refused 409 with `latest: 9007199254740991`.
+
+Write `relay/test/probe.test.ts`:
+
+```ts
+import { env } from 'cloudflare:workers';
+import { describe, expect, it } from 'vitest';
+import worker from '../src/index';
+const call = (p: string, i?: RequestInit) => worker.fetch(new Request(`https://r.example${p}`, i), env as never);
+const bearer = { authorization: 'Bearer tok' };
+const env1 = (seq: number) => JSON.stringify({ v: 1, pairing: 'p_x', dir: 'e2p', seq,
+  ts: '2026-06-11T14:02:11Z', key_id: 'k-1', nonce: 'AAAAAAAAAAAAAAAA', ciphertext: 'op' });
+describe('probe', () => {
+  it('wedges on a huge seq', async () => {
+    const id = 'p_000043ProbeVbN3W';
+    expect((await call(`/v1/${id}/create`, { method: 'POST', headers: bearer })).status).toBe(201);
+    const huge = await call(`/v1/${id}/push`, { method: 'POST', headers: bearer, body: env1(Number.MAX_SAFE_INTEGER) });
+    const next = await call(`/v1/${id}/push`, { method: 'POST', headers: bearer, body: env1(1) });
+    expect([huge.status, next.status, await next.text()]).toEqual([0, 0, '']);  // deliberate mismatch
+  });
+});
+```
+
+```bash
+cd relay && npx vitest run test/probe.test.ts; rm test/probe.test.ts
+```
+
+*Expected:* fails with `Received: [ 201, 409, '{"error":"replay_rejected","latest":9007199254740991}' ]`.
+
+The type mismatch half of the PQ is two greps, no runtime needed:
+
+```bash
+grep -n 'long Seq' src/Sync/EnvelopeCodec.cs     # -> 7: 64-bit on the engine side
+grep -n 'Number.isInteger(seq)' relay/src/channel.ts   # -> the relay reads it as a JS double (2^53)
+```
+
+### C-S2R-10 — The read path served expired envelopes (the finding)
+
+> **Claim.** Before `90ae2a1`, `GET /pull` returned an envelope whose `expires_at` had passed but
+> which the TTL alarm had not yet collected, and counted it in `latest`.
+
+This is a claim about the code *before* the fix, so it re-verifies by reverting one file and
+running the tests that were written for it:
+
+```bash
+git checkout claude/s2-relay-retention
+git checkout 9c05ef7 -- relay/src/channel.ts     # parent's channel.ts, this branch's tests
+cd relay && npx vitest run
+git checkout HEAD -- src/channel.ts              # put the fix back
+```
+
+*Expected:* **2 failed | 40 passed**, and the two failures name the defect exactly —
+
+```
+× does not serve an expired envelope that the alarm has not collected yet
+    AssertionError: expected [ { seq: 1, expired: true } ] to have a length of +0 but got 1
+× excludes expired rows from latest, so the page and its loop bound agree
+    AssertionError: expected [ 1, 2 ] to deeply equal [ 1 ]
+```
+
+**A red run here is the defect reproducing.** The second failure is the one that matters most:
+`latest: 2` against a page that stops at `1` is a loop bound the client can never reach, so a
+paging caller re-pulls the same page until the alarm fires.
+
+### C-S2R-11 — The fix, and the suite it moved
+
+> **Claim.** With `90ae2a1` and `310406a` applied the whole relay suite is green at **42 passed**
+> (from a **36** baseline re-measured on the parent in the same session), and the CI typecheck is
+> clean.
+
+```bash
+git checkout claude/s2-relay-retention && cd relay
+npm ci && npx wrangler types
+npx tsc --noEmit; echo "tsc exit=$?"
+npx vitest run
+```
+
+*Expected:* `tsc exit=0`, and `Test Files 1 passed (1) / Tests 42 passed (42)`.
+
+Baseline, for the delta:
+
+```bash
+git stash; git checkout 9c05ef7 && cd relay && npx vitest run    # -> 36 passed
+```
+
+The +6 is four pins (C-S2R-12, C-S2R-13) and the two regression tests in C-S2R-10.
+
+### C-S2R-12 — `push` still counts expired rows, and the relay guard is not durable
+
+> **Claim.** The fix is confined to the read path. `POST /push` deliberately still refuses a `seq`
+> at or below an expired-but-uncollected row — and, separately, the relay's replay floor disappears
+> once the queue is emptied, because it is `MAX(seq)` over live rows.
+
+```bash
+cd relay && npx vitest run -t 'still refuses a seq at or below an expired-but-uncollected row'
+cd relay && npx vitest run -t 'loses its replay floor once the queue is emptied'
+```
+
+*Expected:* both pass. The second is the one to read carefully: pushing `seq 9`, purging, then
+pushing `seq 1` returns **201**. That is not a defect being pinned as acceptable — §6.2 puts the
+authoritative replay check on the receiver's persisted high-water mark, and the test exists so a
+future reader does not move that obligation onto the relay. `relay/src/channel.ts` carries the same
+statement in a comment above the guard.
+
+### C-S2R-13 — The 409 carries `latest`, and unknown fields survive verbatim
+
+> **Claim.** Two guarantees the relay already made and nothing tested: the replay refusal's body is
+> `{"error":"replay_rejected","latest":N}`, and an unrecognised top-level envelope field arrives at
+> the puller unmodified.
+
+```bash
+cd relay && npx vitest run -t 'reports its high-water mark in the refusal'
+cd relay && npx vitest run -t 'carries an unknown top-level field through to the receiver verbatim'
+```
+
+*Expected:* both pass. The first is a **cross-repo** contract — the android `:core` `RelayClient`
+parses `latest` into `RelayResult.Conflict` (see C-S6S-2), and before this test a tidy-up dropping
+the field would have been green in this repo while breaking the phone's only exit from a wedged
+counter. The second is the wire behaviour PQ-A2-3's `invalid-unknown-field` vector depends on:
+§3 binds *receivers* to reject unknown fields, so the relay must not silently repair them.
+
+### C-S2R-14 — Nothing outside `relay/` moved
+
+> **Claim.** Two files changed in the main repo, both under `relay/`. No vector byte, no `.cs`
+> file, no doc, no `$ExpectedOfflineTotal`, and no android file.
+
+```bash
+git diff --stat 9c05ef7..claude/s2-relay-retention
+node docs/sync-vectors/generate.mjs --check
+git diff --stat 9c05ef7..claude/s2-relay-retention -- docs/ src/ tests/ scripts/
+```
+
+*Expected:* the first prints exactly `relay/src/channel.ts` and `relay/test/relay.test.ts`; the
+second prints `OK: 28 vector files match the generator.` and exits 0; the **third prints nothing**.
+The offline pin therefore cannot have moved — no file it measures was written.
+
+### C-S2R-15 — CI is the gate, and this claim is open until it reports
+
+> **Claim.** `Verify-Alpha.ps1` did not run and cannot here (no .NET). The relay job on
+> `ubuntu-latest` is the real gate, and it runs two steps this session did **not**:
+> `npx wrangler deploy --dry-run` and the vendored-vector drift check.
+
+```bash
+gh run list --repo ShivaClaw/careerseeker --branch claude/s2-relay-retention --limit 3
+gh run view <id> --repo ShivaClaw/careerseeker --log | grep -E 'Typecheck|Test|dry-run|OK:'
+```
+
+*Expected:* the *Blind relay (Worker)* job green. **`wrangler deploy --dry-run` was deliberately not
+run in this session** — the standing embargo is "no deploys of any kind", and while `--dry-run`
+does not deploy, declining to run any `wrangler deploy` variant from an unattended sandbox is the
+conservative reading. The step is unaffected by this diff on its face (`wrangler.jsonc` was not
+touched — `git diff 9c05ef7..HEAD -- relay/wrangler.jsonc` is empty), but that is an argument, not
+a measurement, and CI is what settles it.

@@ -628,3 +628,48 @@ C-S6S-5). A phone with a resetting counter now stalls visibly instead of droppin
 the same lag on a lost response), and a startup reconciliation against
 `GET /pull?dir=p2e&since=0`'s `latest`, per §6.1's own recipe for the engine side. See **PQ-S6-2**
 for the spec half — §6.1 states that recipe for the engine's counter only.
+
+---
+
+## No new blocker arose 2026-08-10 (S2 relay conformance, eleventh cloud iteration)
+
+**Recorded because the absence is the point.** This slice produced **two new findings and zero new
+blockers**, and both findings are the kind that read like blockers if skimmed. Writing them up as
+`BLOCKED` would send the next session hunting for an obstruction that does not exist.
+
+**PQ-S2-1** (the relay never validates the `pairing` field it declares) and **PQ-S2-2** (one
+out-of-range `seq` wedges a direction permanently) are **not blocked. They are unblocked and
+deliberately deferred**, which is a different status with a different next action. Nothing is
+missing from any machine: both are a few lines in `relay/src/channel.ts`. What is missing is the
+*evidence to change them safely*, and that is a property of where the change lands, not of this
+sandbox:
+
+- Both tighten what the relay **refuses**, which is the exact shape of the 2026-08-09 size-cap bug
+  — a relay refusing what `docs/Sync-Protocol.md` declares legal, discoverable by a conforming
+  sender only as a 413 on a correctly-sized chunk. §3.1's own amendment now says the relay MUST
+  carry every envelope the section declares legal.
+- PQ-S2-2 needs a **spec amendment first**: §3 states no maximum for `seq`, so capping it relay-side
+  would refuse conforming envelopes by definition. Spec, then relay — the reverse is the bug again.
+- PQ-S2-1 has direct evidence against a blind fix, found while checking whether one was safe:
+  `tests/EngineHarness/Program.cs:2268` constructs a publisher with `"p_bridge_test"` (11 chars
+  after `p_`, not 16) and `relay/test/relay.test.ts`'s own envelope helper has sent `"p_x"` into
+  every channel for the life of the suite. Neither reaches a relay today; both prove the shape rule
+  is not universally respected in this codebase, which is what to measure *before* the relay starts
+  refusing on it.
+
+**Smallest unblock: none — there is nothing to unblock.** The next action for both is a session on a
+machine with .NET, which can run `Verify-Alpha.ps1` and the engine↔local-relay smoke and therefore
+observe an over-tightening instead of arguing about one. Re-verification commands are
+`AUDIT-REQUEST.md` **C-S2R-8** and **C-S2R-9**; the full write-ups with the closing decision are
+`docs/protocol-questions.md` **PQ-S2-1** and **PQ-S2-2**.
+
+**One thing this iteration chose not to run, which is an embargo and not a blocker.** CI's relay job
+runs `npx wrangler deploy --dry-run` as a config validation. It does not deploy, but declining every
+`wrangler deploy` variant from an unattended sandbox is the conservative reading of the standing
+"no deploys of any kind" embargo, so it was skipped. `relay/wrangler.jsonc` was not touched by this
+diff, so the step is unaffected on its face — but that is an argument, and CI is the measurement
+(**C-S2R-15**).
+
+**B-7 was not re-measured this iteration** and is carried forward unchanged: this slice needed
+neither Gradle nor the Android SDK, so it produced no new evidence about `dl.google.com`. The last
+measurement stands (2026-08-10, tenth run).
