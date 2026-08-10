@@ -125,6 +125,13 @@ class PairingFlowTest {
         assertEquals(1, relay.calls.size, "exactly one relay call")
         assertEquals("POST", relay.calls[0].method)
         assertEquals("/v1/$pairingId/pair", relay.calls[0].path)
+
+        // The recorder reads the request body through a cast; assert it really captured something,
+        // or the "identical bytes" assertion below could pass on a set of one empty string.
+        val body = json.parseToJsonElement(relay.calls[0].body).jsonObject
+        assertEquals(Protocol.SUITE, body["suite"]!!.jsonPrimitive.content)
+        assertTrue(body["phone_pub"]!!.jsonPrimitive.content.isNotEmpty())
+        assertTrue(body["ciphertext"]!!.jsonPrimitive.content.isNotEmpty())
     }
 
     @Test
@@ -204,6 +211,7 @@ class PairingFlowTest {
         assertEquals(1, flow.completionBuilds, "the completion is derived once per invite")
         val bodies = relay.calls.map { it.body }.toSet()
         assertEquals(1, bodies.size, "every attempt sent identical bytes; got ${bodies.size} distinct bodies")
+        assertTrue(bodies.single().contains("\"ciphertext\""), "the recorder captured nothing, so the line above proves nothing")
     }
 
     @Test
