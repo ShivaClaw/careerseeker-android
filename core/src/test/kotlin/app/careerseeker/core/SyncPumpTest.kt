@@ -471,9 +471,9 @@ class SyncPumpTest {
         assertEquals(listOf(ErrorCode.DECRYPT_FAILED), report.rejections)
 
         // Stated rather than hidden: the discarded item still advances the cursor, and with no
-        // authenticated seq to use it advances to the element's *claimed* 999. That is the same
-        // don't-stall-on-one-bad-byte rule as the test below, and it is the residual hazard
-        // recorded as PQ-S4-3 — this slice narrowed the wrapper hole, it did not close that one.
+        // authenticated seq to use it advances to the element's *claimed* 999 — bounded by §6.4
+        // against this page's `latest`, which is also 999, so the bound is a no-op here. That is
+        // deliberate: PQ-S4-3's fix is a ceiling, not a behaviour change on conforming pages.
         assertEquals(999L, report.cursor)
     }
 
@@ -510,6 +510,81 @@ class SyncPumpTest {
 
         pump.pump()
         assertEquals(6L, sinceOf(relay.pullUrls[1]))
+    }
+
+    /**
+     * §6.4, and the attack it exists to bound. The relay is blind but not trusted (§2): it cannot
+     * forge an envelope, but it can append an element that does not parse and claim any `seq` it
+     * likes. The cursor never moves backwards, so an unbounded claim of 1000000 retires every
+     * sequence number below it — permanently, silently, and without decrypting a byte.
+     */
+    @Test
+    fun `an unparseable element cannot move the cursor past the page's latest`() = runTest {
+        val truncator =
+            """{"v":1,"pairing":"$pairing","dir":"e2p","seq":1000000,"ts":"2026-08-10T09:00:00Z",""" +
+                """"key_id":"$keyId","nonce":"AAAAAAAAAAAAAAAA","ciphertext":"AAAA","surprise":"v2"}"""
+        val relay = FakeRelay(listOf(page(truncator, latest = 10), page(latest = 10)))
+        val replica = FakeReplica(warm(1)) { _, _ -> ApplyDisposition.APPLIED }
+        val pump = pumpOver(relay, replica)
+
+        val report = pump.pump()
+        assertEquals(listOf(ErrorCode.DECRYPT_FAILED), report.rejections)
+        assertEquals(10L, report.cursor, "1000000 is a claim; the page's own latest is the ceiling")
+
+        // The ceiling is the `since` the next pull actually sends — the cursor, not just the report.
+        pump.pump()
+        assertEquals(10L, sinceOf(relay.pullUrls[1]))
+    }
+
+    /**
+     * The precise value of the bound, and the reason it is `latest` rather than a refusal.
+     *
+     * The ceiling does **not** protect envelopes the relay already holds — it could withhold those
+     * without any malformed element. What it protects is everything issued *afterwards*: an
+     * unbounded claim parks the cursor in the future, so every envelope the engine publishes up to
+     * that number arrives at a receiver that believes it is already past them. Bounded, the stream
+     * is correct again the moment a readable page arrives.
+     */
+    @Test
+    fun `after a bounded skip the stream still delivers envelopes issued later`() = runTest {
+        val truncator =
+            """{"v":1,"pairing":"$pairing","dir":"e2p","seq":1000000,"ts":"2026-08-10T09:00:00Z",""" +
+                """"key_id":"$keyId","nonce":"AAAAAAAAAAAAAAAA","ciphertext":"AAAA","surprise":"v2"}"""
+        val relay = FakeRelay(
+            listOf(
+                page(truncator, latest = 10),
+                // Issued after the attack, well below the number the bad element claimed.
+                page(e2p(11, "snapshot"), latest = 11),
+            ),
+        )
+        val replica = FakeReplica(cold()) { _, _ -> ApplyDisposition.APPLIED_SNAPSHOT }
+        val pump = pumpOver(relay, replica)
+
+        pump.pump()
+        val second = pump.pump()
+
+        assertEquals(listOf(11L), replica.applied.map { it.first }, "seq 11 is below the claimed 1000000")
+        assertEquals(11L, second.cursor)
+    }
+
+    /**
+     * The bound applies to the *unauthenticated* path only. A `seq` recovered from the sealed bytes
+     * is a fact (§4.1) and is never clamped — clamping it would hand the relay the opposite lever,
+     * letting a understated `latest` hold a receiver's cursor below envelopes it has already read
+     * and accepted.
+     */
+    @Test
+    fun `an authenticated seq above latest still moves the cursor`() = runTest {
+        val relay = FakeRelay(listOf(page(e2p(7, "snapshot"), latest = 3), page(latest = 3)))
+        val replica = FakeReplica(cold()) { _, _ -> ApplyDisposition.APPLIED_SNAPSHOT }
+        val pump = pumpOver(relay, replica)
+
+        val report = pump.pump()
+        assertEquals(listOf(7L), replica.applied.map { it.first })
+        assertEquals(7L, report.cursor, "7 is authenticated; latest=3 is the relay's claim")
+
+        pump.pump()
+        assertEquals(7L, sinceOf(relay.pullUrls[1]))
     }
 
     // ---------------------------------------------------------------- failure mapping

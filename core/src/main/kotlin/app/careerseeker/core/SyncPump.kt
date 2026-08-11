@@ -143,13 +143,21 @@ fun interface ReplicaPositionSource {
  * contract: if the push does not land, [PullPolicy.onRequestFailed] is called so the latch does
  * not silence the policy for the life of the process over one dropped packet.
  *
- * **4. Sequence numbers come from inside the envelope, never from the relay's page wrapper.**
- * [RelayClient.pull] reports a `seq` per item alongside the sealed bytes. That number is transport
- * metadata: the relay is blind, but blind is not the same as trusted (§2). The envelope's own
- * `seq` is authenticated — it is in the AAD, so the AEAD tag covers it — and it is the one that
- * moves the cursor and measures the gap. The two agree against this relay, which splices the
- * envelope back verbatim; the rule is what keeps that a property of this deployment rather than an
- * assumption baked into the phone.
+ * **4. Sequence numbers come from inside the envelope; an unauthenticated one is bounded by
+ * `latest`.** [RelayClient.pull] reports a `seq` per element alongside the sealed bytes. That
+ * number is transport metadata: the relay is blind, but blind is not the same as trusted (§2). The
+ * envelope's own `seq` is authenticated — it is in the AAD, so the AEAD tag covers it — and it is
+ * the one that moves the cursor and measures the gap. The two agree against this relay, which
+ * splices the envelope back verbatim; the rule is what keeps that a property of this deployment
+ * rather than an assumption baked into the phone.
+ *
+ * An element that fails the §3 parse has no authenticated `seq` at all, and that is the case §6.4
+ * governs: the claimed number MAY move the cursor, but never past the page's own `latest`. Letting
+ * it move the cursor freely is history truncation performed without decrypting anything — one
+ * unparseable element claiming `seq: 1000000` skips every envelope below it, permanently, because
+ * the cursor never moves backwards. Refusing to move at all is the opposite failure and §6.2
+ * forbids it by name. The asymmetry is what decides it: a stall is recoverable and visible, a
+ * truncation is silent and is not.
  *
  * ## What this class deliberately does not do
  *
@@ -234,15 +242,22 @@ class SyncPump(
             //
             // Rule 4, and it is the reason the parse is hoisted: the seq that drives the cursor is
             // the one inside the envelope, which the AEAD tag authenticates through the AAD — not
-            // the one the relay put in the page wrapper. The relay is blind but it is not trusted
-            // (§2), and a wrapper seq of 999999 on an envelope carrying 5 would otherwise skip the
-            // stream past everything the phone had not read. They agree in practice today because
-            // the relay splices the envelope back verbatim; the rule is what keeps that a fact
-            // about this relay rather than an assumption about every relay. An envelope that does
-            // not parse has no authenticated seq, so it falls back to the wrapper's — the only
-            // number available, and safe because the item is discarded either way and the
-            // alternative is a permanent stall on one malformed byte.
-            val seq = header?.seq ?: envelope.seq
+            // the one the relay put in the page. The relay is blind but it is not trusted (§2),
+            // and a claimed seq of 999999 on an envelope carrying 5 would otherwise skip the
+            // stream past everything the phone had not read.
+            //
+            // An envelope that does not parse has no authenticated seq, so the only number
+            // available is the one it claims. §6.4 says it MAY be used and MUST be bounded by the
+            // page's own `latest`. Bounded, not refused: refusing stalls the direction forever on
+            // one corrupt byte, which §6.2 forbids. Bounded, not free: free is history truncation
+            // achieved without decrypting anything, and the two failure modes are not symmetric —
+            // a stall keeps `latest` above the cursor and resumes the moment a readable page
+            // arrives, while truncation is silent, permanent, and looks like a healthy sync.
+            //
+            // `latest` is the bound because it costs the relay nothing it did not already have:
+            // it is the same number that decides `moreAvailable` below. Against an honest relay
+            // this is a no-op — its `latest` covers every row it serves.
+            val seq = header?.seq ?: minOf(envelope.seq, page.latest)
             if (seq > cursorValue) cursorValue = seq
 
             if (header == null) {
