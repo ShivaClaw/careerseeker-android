@@ -4038,3 +4038,175 @@ merge cleanly — measured before and after this PR); and no `dotnet` on PATH.
 **`npx tsc --noEmit` prints 55 errors on this branch and 55 on its base** — all unresolved
 `Env`/`Response`, because the project typecheck is `wrangler types && tsc --noEmit` and no
 `wrangler` was invoked. The only claim that supports is *unchanged by this diff*.
+
+---
+
+## CP — the `:core` verification lane (eighteenth cloud iteration, 2026-08-11)
+
+Every claim below was produced on a Linux cloud sandbox with **no Android SDK**. The headline is a
+*negative* claim being retracted, so the commands are written to let an auditor reproduce the
+retraction rather than take it.
+
+### C-CP-1 — One host is denied, not four
+
+> **Claim.** B-7's egress denial covers `dl.google.com` and `api.foojay.io`. The Gradle
+> distribution service, Maven Central and the Gradle plugin portal are all reachable, so `:core`'s
+> entire dependency set is fetchable here.
+
+```bash
+for h in https://services.gradle.org/distributions/ \
+         https://repo1.maven.org/maven2/ \
+         https://plugins.gradle.org/m2/ \
+         https://dl.google.com/dl/android/maven2/ \
+         https://api.foojay.io/disco/v3.0/distributions ; do
+    printf "%-52s " "$h"; curl -s -o /dev/null -w "%{http_code}\n" --max-time 20 "$h"
+done
+```
+
+*Expected:* `200`, `200`, `200`, **`000`**, **`000`** — in that order. The two zeros are B-7; the
+three 200s are what B-7 was over-read as also covering.
+
+### C-CP-2 — `:core` needs nothing from Google, and the root script is what does
+
+> **Claim.** `:core` declares only Maven Central artifacts. The repository build fails here because
+> the **root** script resolves AGP from `google()`, not because of anything in `:core`.
+
+```bash
+cd <android>
+sed -n '1,3p' core/build.gradle.kts                     # plugins { alias(libs.plugins.kotlin.jvm) }
+grep -n "implementation\|testImplementation" core/build.gradle.kts | grep -v "^.*//"
+sed -n '1,4p' build.gradle.kts                          # the AGP alias, apply false
+grep -n "include(" settings.gradle.kts
+```
+
+*Expected:* `:core` applies **only** the Kotlin JVM plugin; its six dependencies are
+`kotlinx-serialization-json`, `ktor-client-core`, `kotlin-test`, `kotlinx-serialization-json`
+(test), `ktor-client-mock`, `kotlinx-coroutines-test` — **no `androidx.*`, no `com.android.*`,
+no `com.google.*`**; the root script declares `alias(libs.plugins.android.application) apply false`;
+`settings.gradle.kts` includes both `:core` and `:app`.
+
+### C-CP-3 — The lane runs, from a clean build directory
+
+> **Claim.** `scripts/core-probe.sh` runs `:core:test` to completion on a machine with no Android
+> SDK: **190 tests, 0 failed, 0 skipped, 14 classes**, exit 0.
+
+```bash
+cd <android>
+ls /usr/lib/jvm/ | grep 17 || \
+  (apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless)
+rm -rf core/build
+./scripts/core-probe.sh; echo "exit: $?"
+git status --porcelain            # MUST print nothing but untracked scratch, if any
+```
+
+*Expected:* `BUILD SUCCESSFUL`, then `core-probe: 190 tests, 0 failed, 0 skipped, across 14 classes`,
+`exit: 0`. **The working tree must be unmodified** — the probe writes only to `core/build/`, which
+`.gitignore` covers.
+
+**The `apt-get update` is not optional.** `apt-get install` alone returns `404 Not Found` against
+the stale index; measured here before the update was added.
+
+### C-CP-4 — The lane is identical to CI's `:core` step, class by class
+
+> **Claim.** Not "comparable to" CI — the same 190 tests in the same 14 classes, on the same commit
+> `34237ea`.
+
+```bash
+cd <android>
+python3 - <<'PY'
+import glob, xml.etree.ElementTree as ET
+for p in sorted(glob.glob('core/build/test-results/test/*.xml')):
+    r = ET.parse(p).getroot()
+    print(f"{r.get('name').split('.')[-1]:<26}{r.get('tests'):>4}  failures={r.get('failures')} errors={r.get('errors')}")
+PY
+```
+
+Compare against CI run **31518619205**, job **93869950639**, step *Unit tests (:core)* — its log
+carries **190 `PASSED` lines, 0 `FAILED`**, across the same 14 class names:
+
+`EntitlementAckTest` 9 · `EntitlementVectorsTest` 5 · `EnvelopeJsonTest` 8 · `OutboundEnvelopesTest`
+10 · `OutboundQueueTest` 20 · `OutcomeMarkPolicyTest` 22 · `PairingFlowTest` 21 · `PairingSessionTest`
+8 · `ProStateTest` 5 · `ProtocolTest` 11 · `ProtocolVectorsTest` 6 · `PullPolicyTest` 17 ·
+`RelayClientTest` 26 · `SyncPumpTest` 22.
+
+*Expected:* every class present with an identical count; totals `190 = 190`.
+
+### C-CP-5 — Proven live: the lane fails on a real regression
+
+> **Claim.** A one-line change to `RelayClient.kt` fails **exactly two** tests and exits **1**.
+
+```bash
+cd <android>
+python3 -c "
+p='core/src/main/kotlin/app/careerseeker/core/RelayClient.kt'; s=open(p).read()
+s=s.replace('HttpStatusCode.NotFound -> return RelayResult.PairingUnknown',
+            'HttpStatusCode.NotFound -> return RelayResult.Unauthorised')
+open(p,'w').write(s)"
+git diff --numstat core/src/main/kotlin/app/careerseeker/core/RelayClient.kt   # MUST be 1 1
+./scripts/core-probe.sh --rerun 2>&1 | grep -E "FAILED|BUILD"; echo "exit: ${PIPESTATUS[0]}"
+git checkout core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+./scripts/core-probe.sh --rerun 2>&1 | tail -1
+```
+
+*Expected:* `1 1`; then `RelayClientTest > relay answers map to the decision the caller has to
+make() FAILED` and `RelayClientTest > a 4xx is a decision and is never retried() FAILED`,
+`BUILD FAILED`, `exit: 1`; then after the revert, `core-probe: 190 tests, 0 failed, ...`.
+
+### C-CP-6 — C-S2T-7's "read, not executed" caveat is retired, with no new code
+
+> **Claim.** The five assertions behind PQ-S2-4's phone-half consequence were already written and
+> are inside the 190 that pass. Nothing was added to make this true.
+
+```bash
+cd <android>
+sed -n '284,286p' core/src/test/kotlin/app/careerseeker/core/RelayClientTest.kt
+sed -n '269,279p' core/src/test/kotlin/app/careerseeker/core/OutboundQueueTest.kt
+sed -n '281,293p' core/src/test/kotlin/app/careerseeker/core/OutboundQueueTest.kt
+git diff --stat HEAD~1 -- core/     # MUST be empty: no :core file changed this iteration
+```
+
+*Expected:* `404 → PairingUnknown`, `401`/`403 → Unauthorised`; `PairingUnknown → PAIRING_GONE` with
+neither clearing call reviving it; `Unauthorised → UNAUTHORISED` cleared only by `reauthorised()`
+with the wire bytes preserved. **No diff under `core/`.**
+
+**The limit of the claim.** This upgrades the evidence under PQ-S2-4's *consequence*. It does **not**
+close PQ-S2-4, whose resolution is a product decision, and it does not touch the relay-side
+measurement (miniflare, seventeenth iteration, C-S2T-1…6).
+
+### C-CP-7 — The seventeenth iteration's CI hang resolved without intervention
+
+> **Claim.** Neither hung run ever failed; both were cancelled by a superseding push, and the branch
+> tip ran green with step timings back at baseline.
+
+```bash
+# GitHub API, or the Actions UI for ShivaClaw/careerseeker-android:
+#   runs 31517760672, 31518284889  -> conclusion "cancelled"
+#   run  31518619205 (head 34237ea) -> conclusion "success", job 93869950639
+```
+
+*Expected:* on run `31518619205`, `Unit tests (:core)` **17:41:23 → 17:42:17 = 54 s** (baseline
+50 s), `Unit tests (:app, Robolectric)` **17:42:17 → 17:44:05 = 108 s** (baseline 93 s), whole job
+**17:39:03 → 17:46:53 = 7 m 50 s** (baseline 7 m 26 s). No step near the 16× excursion S2T-10
+recorded.
+
+### C-CP-8 — Nothing in the main repo moved, and no vector byte moved
+
+> **Claim.** This iteration touched no main-repo file except the `autonomy/claude-state` bus entry,
+> and armed no drift trap in either repo.
+
+```bash
+cd <main>
+git status --porcelain                          # clean
+node docs/sync-vectors/generate.mjs --check
+cd <android>
+git diff --stat HEAD~1 -- core/ app/ gradle/ settings.gradle.kts build.gradle.kts   # empty
+git diff --name-only HEAD~1                     # records + scripts/core-probe.sh only
+```
+
+*Expected:* a clean main-repo tree; `OK: 28 vector files match the generator.` and exit 0; **no**
+diff under `core/`, `app/`, `gradle/` or either build script; and the android diff limited to
+`LOG.md`, `STATE.md`, `BLOCKED.md`, `AUDIT-REQUEST.md` and `scripts/core-probe.sh`.
+
+**Not run and not runnable here:** `Verify-Alpha.ps1` (no .NET — `which dotnet` prints nothing) and
+the android gate's other three tasks, `checkCoreIsAndroidFree`, `:app:assembleDebug`,
+`:app:lintDebug` (all need the Android SDK). CI is the gate for those.

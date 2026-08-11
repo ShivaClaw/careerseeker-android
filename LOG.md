@@ -4780,3 +4780,199 @@ Terra's state was read at iteration start **and again before writing the bus ent
 BLOCKED on draft PR #26, heartbeat unchanged at **2026-08-07T21:18**, **claims no files** — no
 collision. `relay/test/relay.test.ts` is written to on this branch; `relay/src/` is held but **not**
 modified. Terra has right-of-way and I rebase on request.
+
+---
+
+## CP — the sandbox could run `:core` all along (eighteenth cloud iteration, 2026-08-11)
+
+**Slice:** not a rung. A **gate**. Every rung this program can still move needs Kotlin verified, and
+for seven iterations that was believed impossible here, so seven iterations wrote spec paragraphs
+instead. The belief was wrong, and this iteration spent itself proving that rather than adding an
+eighth paragraph.
+
+### CP-1 What B-7 actually says, versus what it was read as saying
+
+B-7 records that the cloud sandbox cannot resolve Google-hosted artifacts, and concludes: *"the
+android gate is unrunnable here."* **That conclusion is correct.** The gate is
+`checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug`, and three of those four need
+the Android SDK.
+
+What it was *read* as saying — in `AUDIT-REQUEST.md` C-S2T-7, in the S2T records, in the S4C row's
+"engine half unwritten, not blocked" framing — is **"no Kotlin can be executed here"**. That is a
+different and false claim. Measured this iteration, before anything was built:
+
+| host | status |
+| --- | --- |
+| `services.gradle.org/distributions/` | **200** |
+| `repo1.maven.org/maven2/` | **200** |
+| `plugins.gradle.org/m2/` | **200** |
+| `dl.google.com/dl/android/maven2/` | **000** |
+
+**One denial, not four.** And `:core` is a pure-Kotlin/JVM module *by construction* — that is the
+whole point of the `checkCoreIsAndroidFree` task in `build.gradle.kts` and the comment in
+`settings.gradle.kts`. Its six dependencies (Kotlin JVM plugin, `kotlinx-serialization-json`,
+`ktor-client-core`, `kotlin-test`, `ktor-client-mock`, `kotlinx-coroutines-test`) are all on Maven
+Central. **`:core` needs nothing from Google, and never did.**
+
+**What actually blocks the repo's build here is the root script, not `:core`.**
+`build.gradle.kts` declares `alias(libs.plugins.android.application) apply false`, which resolves AGP
+from `google()` at configuration time, and `settings.gradle.kts` includes `:app`. So
+`./gradlew :core:test` in the repository fails — and that failure was reasonably, and wrongly, read
+as "`:core` cannot be built here".
+
+### CP-2 The lane, and why it is a generated file rather than a checked-in one
+
+`scripts/core-probe.sh` builds a throwaway Gradle build in `mktemp -d` that includes `:core` and
+only `:core`, pointed at the repository's own `core/` directory and its own
+`gradle/libs.versions.toml`, with **`google()` deliberately absent** from the resolver. The
+repository working tree is never modified; Gradle writes to `core/build/`, which `.gitignore`
+already covers.
+
+The settings file is **regenerated on every run rather than checked in**. A second, committed
+settings file is precisely the thing that drifts from the real one without anyone noticing — the
+doc/verifier trap in the main repo's `CLAUDE.md`, in Gradle form. Generating it from the repo's own
+catalog and module directory means there is nothing to keep in sync.
+
+**The JDK was the last obstacle and it is not egress.** `:core` pins `jvmToolchain(17)`; only JDK 21
+is preinstalled; Gradle's auto-provisioner downloads from `api.foojay.io`, which **is** denied
+(measured `000`, consistent with B-7). But the sandbox is Ubuntu and the distro archive is
+reachable: `apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless`
+installs `17.0.19+10`. **`apt-get install` alone 404s against the stale index — the `update` is not
+optional**, which is recorded in the script's own error message because it cost a cycle here.
+
+### CP-3 The measurement, and it is not "close to" CI — it is identical
+
+`scripts/core-probe.sh` from a deleted `core/build/`: **`190 tests, 0 failed, 0 skipped, across 14
+classes`**, `BUILD SUCCESSFUL`, exit 0.
+
+CI run **31518619205**, job **93869950639**, on the same commit `34237ea` — its `Unit tests (:core)`
+step logs **190 `PASSED` lines and 0 `FAILED`**, across **14** classes. Compared class by class,
+not just in total:
+
+| class | CI | probe | | class | CI | probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| `EntitlementAckTest` | 9 | 9 | | `ProStateTest` | 5 | 5 |
+| `EntitlementVectorsTest` | 5 | 5 | | `ProtocolTest` | 11 | 11 |
+| `EnvelopeJsonTest` | 8 | 8 | | `ProtocolVectorsTest` | 6 | 6 |
+| `OutboundEnvelopesTest` | 10 | 10 | | `PullPolicyTest` | 17 | 17 |
+| `OutboundQueueTest` | 20 | 20 | | `RelayClientTest` | 26 | 26 |
+| `OutcomeMarkPolicyTest` | 22 | 22 | | `SyncPumpTest` | 22 | 22 |
+| `PairingFlowTest` | 21 | 21 | | `PairingSessionTest` | 8 | 8 |
+
+**14/14 classes match exactly; 190 = 190.** The lane is not an approximation of CI's `:core` step,
+it is the same suite.
+
+**Proven live, because a green suite that cannot fail is worthless.** Mutating one line of
+`RelayClient.kt` — `HttpStatusCode.NotFound -> RelayResult.PairingUnknown` to `RelayResult.Unauthorised`,
+a `1 1` numstat — fails **exactly two tests** (`relay answers map to the decision the caller has to
+make`, `a 4xx is a decision and is never retried`) and the script **exits 1**. Reverted; the suite
+returns to 190/0. The lane detects a real regression in the exact area the previous iteration could
+only reason about.
+
+### CP-4 The dividend, claimed narrowly and taken immediately
+
+The seventeenth iteration wrote, in `AUDIT-REQUEST.md` **C-S2T-7**:
+
+> *"**No Kotlin was compiled or run: there is no Android SDK in this sandbox (B-7).** Treat it as a
+> hypothesis with file:line support, not as a measurement. … The gate that would confirm the
+> consequence is `./gradlew … :core:test`, which did not run."*
+
+**That gate has now run, and it required no new code**, which is the part worth stating precisely.
+The claim's two halves were already pinned by tests that were merely never executed here:
+
+- `RelayClientTest.kt:284-286` — `404 → PairingUnknown`, `401 → Unauthorised`, `403 → Unauthorised`.
+- `OutboundQueueTest.kt:269-279` — `PairingUnknown → SendHalt.PAIRING_GONE`, and neither
+  `reconciled()` nor `reauthorised()` revives it (terminal).
+- `OutboundQueueTest.kt:281-293` — `Unauthorised → SendHalt.UNAUTHORISED`, cleared **only** by
+  `reauthorised()`, envelope bytes preserved (recoverable).
+
+All five assertions are inside the 190 that just passed. Composed with S2T's miniflare measurement
+that a purged pairing answers **401**, PQ-S2-4's consequence is now **executed rather than read**: an
+unpaired phone halts `UNAUTHORISED` and waits for a bearer that cannot exist, while `PAIRING_GONE` —
+the terminal state built for exactly this — is unreachable on today's wire.
+
+**What this does not do:** it does not change PQ-S2-4's status. The question is still open and its
+resolution is still a product decision. It upgrades the *evidence* under one caveat, and C-S2T-7's
+"hypothesis, not a measurement" disclaimer is retired.
+
+### CP-5 An independent check falls out of the construction, and it is worth one sentence
+
+Because `google()` is absent from the probe's resolver **entirely**, a successful run proves `:core`
+resolves with the Android repository unreachable. `checkCoreIsAndroidFree` asserts the same rule by
+scanning imports and the `plugins {}` block — a *source-text* check. This asserts it at the
+**dependency-resolution** layer. Two independent mechanisms for one invariant, and the new one
+cannot be fooled by a transitive Android dependency that arrives without an `import android.` line.
+
+**Not claimed as a replacement.** The scanning task also runs in CI and catches things this cannot
+(a `com.android.library` plugin swap would fail resolution here, but so would a network blip).
+
+### CP-6 The CI hang from the seventeenth iteration resolved on its own, and the record should say so
+
+S2T-10 recorded two docs-only runs hanging on test steps at ~16× baseline, "still not diagnosed,
+and deliberately not chased". Checked this iteration rather than left open:
+
+| run | head | outcome |
+| --- | --- | --- |
+| 31517760672 | `c68ef07` | **cancelled** (superseded by the next records push) |
+| 31518284889 | `f49290e` | **cancelled** (superseded) |
+| **31518619205** | **`34237ea`** (branch tip) | **success** |
+
+The tip run's step timings are back at baseline: `Unit tests (:core)` **54 s** (baseline 50 s),
+`Unit tests (:app, Robolectric)` **108 s** (baseline 93 s), whole job **7 m 50 s** against 7 m 26 s.
+**Neither hung run was ever observed to fail** — both were cancelled by the next push while still
+in-progress, so nothing was ever red. **Transient runner infrastructure, self-resolved, no action.**
+Recorded because an open "undiagnosed hang" left in the records sends the next session hunting for a
+fault that is not there — the same failure mode as calling something BLOCKED when nothing blocks it.
+
+### CP-7 Ladder effect, stated narrowly and this time it is not the usual sentence
+
+**No rung moved, and this iteration did not try to move one.** S2 is still PARTIAL with B-2 still
+exactly the missing `/pair` page.
+
+What changed is the **shape of what a cloud iteration can do**. Seven consecutive iterations
+hardened spec because spec was believed to be the only verifiable surface. It was not. From here a
+cloud session can write Kotlin in `:core` and **run it** — which covers `SyncPump`, `OutboundQueue`,
+`RelayClient`, `PullPolicy`, `PairingFlow`, `EntitlementAckApplier` and the protocol/vector tests.
+**B-8's owner problem is `:app`/Room and stays blocked**; the `:app` half of everything stays
+blocked; the engine's C# stays blocked. The unblocked surface is `:core`, and it is large.
+
+**Stated as a limit, not a boast:** this runs **one** of the gate's four tasks. Any future record
+citing it must say `:core:test, via scripts/core-probe.sh` and name what did not run. It is not the
+android gate and must never be reported as one.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** Android PR #6 stays a draft; main-repo PRs #32, #33, #34,
+#35 and #36 were neither merged, retargeted, rebased nor force-pushed, and **were not touched at
+all** — this iteration wrote nothing in the main repo except the `autonomy/claude-state` bus entry.
+The branch pushed **forward-only** — no force-push, no history rewrite, no branch deleted.
+
+**Android repo: one new file** (`scripts/core-probe.sh`) **plus these records.** `RelayClient.kt`
+was mutated to prove the lane detects a regression and **reverted in the same step** — verified with
+`git status --porcelain`, which shows no modification to it. **Zero net Kotlin changes: no `:core`
+source, no `:core` test, no `:app` file, no Gradle build script, no version catalog, no
+`settings.gradle.kts`.** The 190-test suite is the repository's own, unchanged; **no test was added,
+so the count did not move** and no count-reporting doc needed the drift sweep.
+
+**Main repo: nothing.** No `docs/Sync-Protocol.md` edit, **no vector byte, no `generate.mjs`
+change**, no harness, no `Verify-Alpha.ps1`, no `$ExpectedOfflineTotal`. The vendored vector pin
+stays `679a317` and no vendored byte moved — this iteration had no reason to go near them.
+
+**Neither gate ran in full and neither could.** `Verify-Alpha.ps1` needs .NET (`which dotnet` →
+nothing). The android gate needs the Android SDK for three of its four tasks; **the fourth,
+`:core:test`, ran here — that is the entire finding** and it is not a gate result.
+
+**`apt-get install openjdk-17-jdk-headless` was run**, which modifies the *sandbox*, not the
+repository. Recorded because it is the one environment change this iteration made and the next
+session needs it.
+
+**No deploy of any kind** (Cloudflare, Workers, relay, site, Pages) and **no `wrangler` invocation**.
+**The production relay was contacted zero times, not even `GET /v1/health`** — no relay test ran at
+all this iteration. Network egress was: the Gradle distribution, Maven Central, the Ubuntu archive,
+and the GitHub API. No Google, Play, OAuth or Console action; no accounts, no purchases; no Gmail;
+no cert-store, MSIX or keystore action — the upload keystore was neither read nor referenced.
+**No secrets read, written or printed.**
+
+Terra's state was read at iteration start: still **R6(b) BLOCKED** on draft PR #26, heartbeat
+unchanged at **2026-08-07T21:18**, **claims no files** — no collision, and this iteration claims no
+main-repo file at all.
