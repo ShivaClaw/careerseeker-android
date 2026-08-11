@@ -524,6 +524,56 @@ question.
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-S6S-2** and **C-S6S-5**.
 
+### CLOSED 2026-08-11 (fifteenth cloud iteration) — the cheap form, plus the field it depends on
+
+Closed the way this question recommended: §6.1's resume rule now reads "a sender MUST resume its
+counter above `max(persisted_seq, relay_latest_seq_for_that_direction)`", with the engine's e2p case
+kept as the worked example and the phone's p2e obligation stated explicitly. Main repo,
+`claude/s4-pull-request-semantics`.
+
+**But the recommendation had a hole, and closing it needed a second section.** This question's "to
+close" paragraph noted, almost as an aside, that the 409 body carries `latest` and that the field
+"is currently documented nowhere in `Sync-Protocol.md` despite being implemented and relied upon".
+**A §6.1 rule that points at an undocumented field is not closed** — it is the PQ-S4-2 defect
+one level down, where normative text depends on a body no section defines. So the slice wrote
+**§2.2** first, pinning the push route's four responses, and only then amended §6.1 to name both
+sources of the relay's number.
+
+**Measured, not read off the source** — the eleventh run's probe trick, throwaway tests under
+miniflare asserting deliberately wrong values so vitest prints the measured one:
+
+| probe | measured |
+| --- | --- |
+| first accepted push | `201 {"ok":true,"seq":1}` |
+| replayed seq 7 | `409 {"error":"replay_rejected","latest":7}`, keys exactly `error\|latest` |
+| regressed seq 3 with high-water 50 | `409 … latest=50` |
+| `p2e` seq 4 replayed while `e2p` holds 90 | `409 … latest=4` — **per direction, not per pairing** |
+| unparseable body / `seq: 0` | `400 {"error":"bad_request"}` — no `latest` |
+| oversize ciphertext | `413 {"error":"too_large"}` — no `latest` |
+| first push on a direction holding nothing | `201` even at seq 1 |
+| `GET /pull?dir=p2e&since=0` on an empty direction | `200 {"envelopes":[],"latest":0}` |
+
+The probe file was **deleted before committing** and the relay suite measured **36 / 0 both before
+and after** on this branch — it is a measurement, not a suite member. (36 is the
+`claude/s4-pull-request-semantics` figure; the 42 in `STATE.md` is `claude/s2-relay-retention`'s,
+and reading one as the other is the count-drift trap one branch over.)
+
+**The close is honest about non-conformance rather than implying conformance.** §6.1 now carries a
+measured conformance note: neither shipping sender fully satisfies the rule. The engine reconciles
+not at all (**PQ-S6-3**, opened here); the phone reconciles but persists nothing (**B-8**). Writing
+a MUST that both implementations miss is normally the §2.1 defect — a spec tightening ahead of its
+implementations — and the reason it is not that here is stated in the section itself: the rule was
+**already normative for one of the two senders**, the first sentence of §6.1 **already** bound both
+to persist, and the property is safety rather than error-reporting style. What generalising changed
+is that a second phone implementation now has a rule to follow; it did not invent an obligation.
+
+**Two probe results contradicted nothing but were worth pinning anyway**: `latest` is per-direction
+(a sender that read it as a pairing-wide position would resume far too high, skipping seqs and
+creating gaps the receiver reads as legitimate), and a direction holding nothing accepts seq 1
+rather than answering 409 with `latest: 0`.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S6C-1…6**.
+
 ---
 
 ## PQ-S2-1 — The relay declares a `pairing` field it never checks
@@ -812,3 +862,109 @@ in this sandbox, so it is unwritten, not verified-absent. It is **unblocked and 
 see `BLOCKED.md`'s note; do not file it as a blocker.
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-S4C-1…6**.
+
+---
+
+## PQ-S2-3 — The relay's transport error vocabulary is documented nowhere, and two of its names collide with §7.2's payload codes
+
+**Opened 2026-08-11 (S6 counter symmetry, fifteenth cloud iteration).** Not a blocker. Opened by
+the slice that wrote §2.2, which pinned the **push** route's bodies and deliberately left the rest
+observed-but-not-normative rather than inventing them from a sandbox.
+
+**The two vocabularies.** §7.2 defines the sealed `error` *payload*: `{code, detail?, ref_seq?}`,
+exchanged between engine and phone, invisible to the relay. The relay separately answers HTTP with
+`{"error": …}` — a different key, a different namespace, and a different party. Nothing in
+`Sync-Protocol.md` said so until §2.2.
+
+**Measured.** `grep -rho "error: '[a-z_]*'" relay/src/*.ts | sort -u` yields eight distinct
+transport codes. Against the document (`grep -c` on `docs/Sync-Protocol.md`, run 2026-08-11 on
+`claude/s4-pull-request-semantics` before §2.2 was written):
+
+| transport code | in §7.2? | in the doc at all, before §2.2? |
+| --- | --- | --- |
+| `replay_rejected` | yes | yes — but as a *payload* code |
+| `too_large` | yes | yes — but as a *payload* code |
+| `pairing_unknown` | yes | yes — but as a *payload* code |
+| `bad_request` | **no** | **no — zero occurrences** |
+| `unauthorized` | **no** | **no — zero occurrences** |
+| `not_found` | **no** | **no — zero occurrences** |
+| `method_not_allowed` | **no** | **no** |
+| `upgrade_required` | **no** | **no** |
+
+**Why the overlap is the dangerous half rather than the gap.** A third implementer who reads §7.2,
+sees `replay_rejected`, and then receives `{"error":"replay_rejected","latest":7}` from the relay
+has every reason to parse it as a payload error — looking for `code`, finding none, and falling
+through to a generic failure. That is precisely how the 409's `latest` came to be discarded by the
+engine (PQ-S6-3). The names matching is what makes the mistake feel correct.
+
+**To close.** Either (a) extend §2.2 into a full transport-response section covering `create`,
+`pair`, `pull`, `live` and `DELETE`, measured the same way push's was; or (b) state that transport
+bodies are relay implementation detail beyond the fields §2.1/§2.2 pin, and that clients MUST key
+off the HTTP **status**, treating `{"error": …}` as advisory. **(a) is recommended** — the 409's
+`latest` is the proof that a transport body can carry a field the protocol depends on, so
+"implementation detail" is already false once.
+
+**Not done in this slice deliberately.** Pinning five more routes' bodies from a sandbox that cannot
+run `Verify-Alpha.ps1` is the size-cap mistake's shape: a document tightening around behaviour whose
+regression tests live somewhere this machine cannot reach. Push was pinned because §6.1 *depends* on
+its 409; nothing depends on the others yet.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S6C-5**.
+
+---
+
+## PQ-S6-3 — The engine implements half of §6.1's resume rule, and its own comment states the other half
+
+**Opened 2026-08-11 (S6 counter symmetry, fifteenth cloud iteration).** Engine-side, C#, **unblocked
+and merely unwritten** — there is no .NET in this sandbox. Do not file it as a blocker.
+
+**Spec (§6.1).** A sender MUST resume its counter above
+`max(persisted_seq, relay_latest_seq_for_that_direction)`. This was already normative for the engine
+before this iteration; the 2026-08-11 amendment generalised it to both senders, it did not create
+the engine's obligation.
+
+**What the engine does.** `src/Engine/Program.cs:288`:
+
+```csharp
+        startSeq: paired.LastE2pSeq);
+```
+
+The persisted term only. **The `max(…)` is not computed and the relay is never consulted** — no
+`PullAsync(…, since: 0)` call exists on the startup path. The comment block at
+`src/Engine/Program.cs:239-243` states the rule the code below it does not implement:
+
+> The vault MUST persist the last e2p seq and this method MUST construct the publisher with
+> `startSeq = max(vault.last_e2p_seq, relay latest e2p)` — Sync-Protocol.md §6.1.
+
+**And the second half compounds it.** `RelayClient.PushAsync` (`src/Sync/RelayClient.cs:51-60`)
+returns `res.StatusCode is HttpStatusCode.Created` — a bare `bool`. A 409 `replay_rejected` is
+therefore indistinguishable from a timeout, a 400 or a 413, and the `latest` the relay puts in that
+body (§2.2) is **discarded unread**. So the engine can neither reconcile up front nor recover from
+the refusal that tells it to.
+
+**What actually happens today, stated precisely, because it is milder than it first looks.**
+`SyncPublisher` assigns `seq` with `Interlocked.Increment` *before* the sink runs
+(`src/Sync/SyncPublisher.cs:90`) and the vault records the mark only on success
+(`src/Engine/Program.cs:285`). So a stale vault does not deadlock: each refused push burns one seq
+and the next attempt is one higher, and the counter climbs back to the relay's mark on its own.
+**The cost is one dropped envelope per burned seq**, and if the vault is behind by N — a restore
+from backup, a rolled-back store, a run of pushes whose responses were lost — that is N envelopes
+silently discarded, *including the recovery `snapshot`* if it falls in the run. Every one of them
+returns `false` to a caller that has no retry. So §6.1's named catastrophe is **mitigated into a
+window rather than prevented**, and nothing reports the window.
+
+**To close (engine only; the spec half is done).** Two commits, in either order:
+
+- Make `PushAsync` return a result that distinguishes 409 from every other failure and carries the
+  body's `latest` — the phone's `RelayResult.Conflict(latest)` is the shape to mirror, and the field
+  is now pinned in §2.2 rather than being a relay implementation detail.
+- On the startup path, take `max(paired.LastE2pSeq, RelayClient.PullAsync(dir: "e2p", since: 0).Latest)`
+  before constructing the publisher, per §6.1. `PullAsync` already returns `Latest`, so this is a
+  read the client can already do.
+
+Both need `Verify-Alpha.ps1`, and `SyncHarness` is where the regression test belongs (it already
+covers the resumed-publisher case at `tests/SyncHarness/Program.cs:419-425`, with `startSeq: 41`).
+**Adding a harness assertion moves `$ExpectedOfflineTotal`** (598) and every doc that reports it —
+the drift trap in `CLAUDE.md`. That is a local session's slice.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S6C-3** and **C-S6C-4**.
