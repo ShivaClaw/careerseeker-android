@@ -4203,7 +4203,12 @@ git diff --stat HEAD~1 -- core/ app/ gradle/ settings.gradle.kts build.gradle.kt
 git diff --name-only HEAD~1                     # records + scripts/core-probe.sh only
 ```
 
-*Expected:* a clean main-repo tree; `OK: 28 vector files match the generator.` and exit 0; **no**
+*Expected:* a clean main-repo tree; `OK: <n> vector files match the generator.` and **exit 0** —
+**`<n>` is branch-dependent and that is the point of writing it this way**: `origin/main` carries
+**26** (measured this iteration), and the S5-stacked branches carry **28**, because PR #32 adds the
+two `entitlement_ack` vectors. **Assert the exit code, not the number**, unless you also say which
+branch you are on. (The seventeenth iteration's records quote 28 correctly — they were written on
+`claude/s2-transport-vocabulary`, which sits above #32.) Then: **no**
 diff under `core/`, `app/`, `gradle/` or either build script; and the android diff limited to
 `LOG.md`, `STATE.md`, `BLOCKED.md`, `AUDIT-REQUEST.md` and `scripts/core-probe.sh`.
 
