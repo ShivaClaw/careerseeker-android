@@ -844,3 +844,91 @@ from reading `RelayClient.kt:283-284`, `OutboundQueue.kt:267-269`, `OutboundQueu
 `OutboundQueueTest.kt:269`, **not from executing anything**. It is labelled a hypothesis in
 `AUDIT-REQUEST.md` **C-S2T-7** rather than a measurement. The relay half of the same question *is*
 measured under miniflare. Whoever has an SDK should confirm the Kotlin half before anyone acts on it.
+
+---
+
+## B-7 SCOPE CORRECTED 2026-08-11 (eighteenth cloud iteration) — it never covered `:core`
+
+**B-7 is not closed and its facts were never wrong.** `dl.google.com` and `api.foojay.io` are still
+denied, re-measured this iteration (`000` for both). What is corrected is **how far the denial
+reaches**, because seven iterations read it as a wider blocker than it is.
+
+**What B-7 says:** the android **gate** — `checkCoreIsAndroidFree :core:test :app:assembleDebug
+:app:lintDebug` — cannot run here. **Still true.** Three of those four tasks need the Android SDK.
+
+**What it was read as saying:** that no Kotlin could be compiled or executed in a cloud session.
+That produced `AUDIT-REQUEST.md` C-S2T-7's "*no Kotlin was compiled or run … treat it as a
+hypothesis, not a measurement*", and it is the reason seven consecutive iterations produced spec
+paragraphs. **False, and demonstrated false rather than argued:**
+
+```
+services.gradle.org   200      dl.google.com/dl/android/maven2/   000
+repo1.maven.org       200      api.foojay.io                      000
+plugins.gradle.org    200
+```
+
+`:core` is pure-Kotlin/JVM **by construction** — that is what `checkCoreIsAndroidFree` exists to
+enforce — and all six of its dependencies are on Maven Central. It needs nothing from Google.
+
+**What actually failed, and why it looked like `:core`.** `./gradlew :core:test` in the repository
+fails here, but on the **root** script: `build.gradle.kts` declares
+`alias(libs.plugins.android.application) apply false`, which resolves AGP from `google()` at
+configuration time, and `settings.gradle.kts` includes `:app`. The failure is real; attributing it
+to `:core` was the error.
+
+**Now measured:** `scripts/core-probe.sh` runs `:core:test` here — **190 tests, 0 failed, 14
+classes**, identical class-by-class to CI run `31518619205`'s `:core` step on the same commit, and
+**proven live** (a one-line `RelayClient.kt` regression fails exactly two tests, exit 1). See
+`LOG.md` §CP and `AUDIT-REQUEST.md` C-CP-1…8.
+
+**The JDK was the last obstacle and it is not egress.** `:core` pins `jvmToolchain(17)`; Gradle's
+auto-provisioner needs `api.foojay.io`, which is denied. The Ubuntu archive is not:
+`apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless`. **The
+`update` is not optional** — `install` alone 404s against the stale index.
+
+### What remains blocked by B-7, unchanged
+
+- **`:app` entirely** — AGP, `androidx`, Compose, Room, Robolectric all resolve from `google()`.
+  Every `:app` claim stays CI-verified or unverified.
+- **`checkCoreIsAndroidFree`, `:app:assembleDebug`, `:app:lintDebug`** — three of the gate's four
+  tasks. **The gate remains unrunnable here and CI remains the gate.**
+- **B-8's persisted `p2e` counter**, which belongs in Room, which is `:app`. Unchanged.
+- **B-4's emulator lane**, which is a different blocker on a different machine and is untouched by
+  any of this.
+
+### What this unblocks, stated as a surface rather than a promise
+
+A cloud session can now write Kotlin in `:core` **and run it**: `SyncPump`, `OutboundQueue`,
+`RelayClient`, `PullPolicy`, `PairingFlow`, `EntitlementAckApplier`, `OutcomeMarkPolicy`,
+`EnvelopeJson`, `ProState` and the protocol/vector suites. That is where most of the protocol logic
+lives, so the honest next question for a cloud iteration is no longer "which spec paragraph can I
+verify" but "which `:core` behaviour is unwritten or untested".
+
+**The standing caution.** This runs **one** of the gate's four tasks. Any record citing it must say
+`:core:test, via scripts/core-probe.sh` and name what did not run. Reporting it as "the android
+gate passed" would be exactly the failure this file exists to prevent.
+
+**Smallest human unblock for the rest of B-7:** unchanged — allow `dl.google.com` (and
+`api.foojay.io`, though `apt` makes that one unnecessary) through the sandbox egress policy, or
+accept CI as the gate for `:app`. Nothing here changes that ask.
+
+---
+
+## No new blocker arose 2026-08-11 (`:core` lane, eighteenth cloud iteration)
+
+**Recorded because the absence is the point, and because one open item was closed by observation.**
+
+The seventeenth iteration left S2T-10 open: two docs-only CI runs hung on test steps at ~16×
+baseline, "still not diagnosed, and deliberately not chased". Checked rather than inherited:
+
+| run | head | outcome |
+| --- | --- | --- |
+| 31517760672 | `c68ef07` | **cancelled** — superseded by the next records push |
+| 31518284889 | `f49290e` | **cancelled** — superseded |
+| **31518619205** | **`34237ea`** | **success**, steps back at baseline |
+
+**Neither hung run ever failed.** Both were cancelled in-progress by the following push, so nothing
+was ever red, and the branch tip is green with `:core` at 54 s (baseline 50 s) and `:app` Robolectric
+at 108 s (baseline 93 s). **Transient runner infrastructure, self-resolved.** It is **not** a
+blocker and was never one; leaving it phrased as an open anomaly would send the next session hunting
+a fault that is not there.
