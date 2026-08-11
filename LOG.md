@@ -4429,3 +4429,234 @@ Terra's state was read at iteration start **and again before writing the bus ent
 BLOCKED on draft PR #26, heartbeat unchanged at 2026-08-07T21:18, **claims no files** — no
 collision. `relay/src/protocol.ts` and `relay/src/channel.ts` are now **written to** rather than
 merely held, and the bus says so; Terra has right-of-way and I rebase on request.
+
+---
+
+## S2T — `pairing_unknown` never means the pairing is unknown (seventeenth cloud iteration, 2026-08-11)
+
+**Environment:** Linux cloud sandbox. **No .NET** (`which dotnet` → nothing), **no Android SDK**
+(B-7). Neither gate could run here, and nothing below claims one did — **CI is the gate**, and it is
+cited by run and job id.
+
+### S2T-0 Why this slice, and not the one the iteration prompt asked for
+
+The prompt assigned **S5**, on the stated basis that S5 was "NOT STARTED and genuinely NOT blocked".
+**Derived after the mandatory fetch, that is false, and the correction is the first evidence in this
+entry.** `origin/claude/s5-entitlement-ack-spec` has carried four commits since **2026-08-09** and is
+open as **draft PR #32**:
+
+```
+$ git log --oneline origin/main..origin/claude/s5-entitlement-ack-spec
+9c05ef7 S5: correct 3.1's relay paragraph -- it reasoned in one direction only
+a564c0c S5: the relay refused envelopes the protocol declares legal -- derive its cap
+22b028e S5: pin section 4.3.3 with two entitlement_ack vectors, generated not hand-written
+8575539 S5: define the entitlement_ack body, and say what the size cap actually measures
+```
+
+So every named sub-task was already done: §4.3.3 defines `{product_id, acknowledged_at, order_id?}`
+per PQ-A6-1; the two `entitlement_ack` vectors exist (28 files, up from `main`'s 26); PQ-A2-1 and
+PQ-A2-2 are closed. **The one exception is PQ-A2-3**, whose vector cannot be added: **B-6**, engine
+has no inbound wire-JSON parser, so the vector would assert a rejection the engine does not perform
+and would turn the offline gate red for whoever pushes next. That is C# and there is no .NET here.
+**The prompt's own instruction covers this case** — pick the topmost genuinely verifiable rung and
+justify it — so this iteration took **PQ-S2-3**, which the fifteenth run left open with option (a)
+recommended, and which is relay + spec work that this sandbox *can* execute.
+
+**A stale iteration summary is worth recording as a finding in itself.** The prompt described the
+ladder as of roughly the fourth iteration; thirteen have run since. The mandatory fetch is what
+caught it, which is the whole point of rule one.
+
+### S2T-1 The question's own table was short by one, and its re-verification command proved it
+
+PQ-S2-3 said the relay emits **eight** transport codes. Running **its own command on the commit it
+cited**:
+
+```
+$ mkdir -p /tmp/pqcheck
+$ git archive origin/claude/s4-pull-request-semantics relay/src | tar -x -C /tmp/pqcheck
+$ grep -rho "error: '[a-z_]*'" /tmp/pqcheck/relay/src/*.ts | sort -u
+bad_request  exists  method_not_allowed  not_found  pairing_unknown
+replay_rejected  too_large  unauthorized  upgrade_required
+```
+
+**Nine.** `exists` was dropped in transcription, not by the grep — and `git grep 'exists' origin/main`
+confirms it predates the question, so this was never a later addition. It is emitted by **two**
+routes for **two** different conditions (`create` on an existing channel, `pair` on an already-stored
+completion), so it was never marginal.
+
+**`AUDIT-REQUEST.md`'s C-S6C-5 inherited the error and became self-contradicting**: its command
+returns nine while its claim and its *Expected* line both said eight, so anyone running the
+re-verification as written would have seen it fail. Corrected in place, with the correction stated
+rather than silently overwritten.
+
+### S2T-2 The measurement, and the finding it turned up
+
+`relay/test/_measure.test.ts` (scratch, deleted before commit) exercised every route under
+miniflare. `console.log` is swallowed in the workerd pool, so the matrix was forced out through a
+deliberate `throw` — noted because it is the trick the next session will need.
+
+The finding is in the last five rows. **After `DELETE /v1/{pairing}` — the exact condition §7.2 names
+`pairing_unknown`, "the relay has no Durable Object for this pairing":**
+
+```
+401 {"error":"unauthorized"}   GET  /v1/{p}/pull?dir=e2p&since=0
+401 {"error":"unauthorized"}   POST /v1/{p}/push
+401 {"error":"unauthorized"}   GET  /v1/{p}/pair
+401 {"error":"unauthorized"}   DELETE /v1/{p}
+201 {"ok":true}                POST /v1/{p}/create      <- the id re-bootstraps
+```
+
+**The transport `pairing_unknown` is never emitted for this.** It fires only on a pairing-id *shape*
+failure (`relay/src/index.ts:56`), checked before authentication. A well-formed id that was never
+created also answers **401**. So the transport code's name describes a condition it is never emitted
+for, and the condition it is named for has **no transport code at all**.
+
+**What it costs the phone — and this half is READ, not executed.** `RelayClient.kt:283-284` maps any
+404 → `PairingUnknown`; `OutboundQueue.kt:267-269` maps `PairingUnknown` → `SendHalt.PAIRING_GONE`
+(**terminal** — `OutboundQueueTest.kt:269` is literally named *`pairing_unknown` is terminal and no
+clearing call revives it*) and `Unauthorised` → `SendHalt.UNAUTHORISED`, which
+`OutboundQueue.kt:288-290` clears "when a fresh bearer is in hand". **So a genuinely unpaired phone
+halts on the recoverable state and waits for a bearer that cannot exist**, while the terminal state
+built for exactly this is never entered. It appears unreachable outright: no route the phone calls
+can 404 — the malformed-id path is impossible because `RelayClient.init` requires
+`isValidPairingId`, and the one transiently-404ing route (`GET /pair`, answered `not_found` both
+before a completion is posted and after the engine's one-shot read) **is never called by the phone**.
+
+**That reachability claim is a hypothesis with file:line support and is unverified by execution.**
+`./gradlew … :core:test` did not run and could not (B-7). The relay half is measured; the phone half
+is read. Recorded as **PQ-S2-4**, deliberately *not* as a blocker — nothing is blocked, a decision
+has not been made.
+
+### S2T-3 §2.3, written descriptively, and why that direction is the load-bearing part
+
+New **§2.3** pins `create`, `pair`, `pull`, `live`, `DELETE` and `health` — statuses and bodies —
+plus three rules: key off the HTTP status; `{"error": …}` is transport and `{"code": …}` is payload;
+409 is three different answers, and only push's carries a number.
+
+**Every line was read off the running Worker and written down second, so `relay/src/` is
+byte-identical on this branch** (`git diff …-- relay/src/` → empty). Nothing new is refused. That is
+deliberate and it is the §3.1 size-cap lesson applied: a transport section written from the spec
+downwards is how a relay comes to reject what the document declares legal.
+
+**v1 pins the 401 rather than adding a code**, and §2.3 says why: a purged pairing is
+indistinguishable from one that never existed, so the relay never answers "did this pairing ever
+exist?" to a caller holding a wrong credential — and the measured re-bootstrap proves there is no
+tombstone to disclose. **Whether that privacy property is worth more than the phone being able to
+tell it was unpaired is Brandon's call, not a spec section's**, and PQ-S2-4 says so.
+
+A second correction the measurement forced: §2.2 says "two names appear in both vocabularies". The
+intersection of the nine transport and ten §7.2 payload codes is **three** — `replay_rejected` and
+`too_large` agree, **`pairing_unknown` does not**. §2.2's sentence is *true as written* (it says two
+collide *with the same meaning*); the third name is the dangerous one and nothing said so.
+
+### S2T-4 The tests, and the honest label on the one that is not proven
+
+**36 → 47.** Because no relay code changed, **all eleven are pins by construction — none of them CAN
+fail against the current source** — so rather than assert they were useful, each was checked against
+a deliberately mutated relay. Four mutations, each reverted:
+
+| mutation | caught by |
+| --- | --- |
+| purged channel answers 404 `pairing_unknown` | `means the id is MALFORMED`, `after unpair every route answers 401` |
+| `GET /pair` empty → 204; `DELETE` drops `purged` | `ordinary "nothing waiting" case`, `{ok,purged:N}` |
+| create-conflict drops `exists`; a 400 gains a `hint`; rotation drops its flag | `exactly nine codes`, `409 carries three bodies`, `{ok,rotated:true}`, `every error body is exactly {error}` |
+| worker-level 405 → 404 and 426 → 400 | `405 is reachable only for…`, `live answers 426` |
+
+**Ten of eleven proven. The eleventh — `unpair is not a tombstone` — is NOT proven and is labelled a
+pin**, since breaking it needs a future change rather than a mutation of today's code. This is the
+thirteenth run's lesson applied forward: a test that still passes after a behaviour change is the one
+to read, so each was checked for which side of that line it sits on rather than waiting to be
+surprised.
+
+**An audit command that did not reproduce its own expected output was caught and fixed before it
+shipped.** The first `sed` recipe written into C-S2T-6 matched **three** call sites, not one, and
+produced `5 failed` against the documented `4 failed`. It was run, the mismatch showed, and it was
+replaced with a single-site mutation plus a `git diff --numstat` guard so the next reader catches an
+over-broad match. **A re-verification command that does not reproduce its own claim is worse than no
+command, because it reads as evidence.**
+
+### S2T-5 What CI said, because I could not say it
+
+Draft PR **#36** (`claude/s2-transport-vocabulary`), stacked **#33 → #32 → `main`**. Run
+**31516194482** on **`4db3543`**, the branch tip — **both jobs `success`**:
+
+- *Build and offline harnesses* (`windows-latest`, job 93861817135): `=== 130 passed, 0 failed ===`
+  for `SyncHarness`, then **`=== Offline total: 598 passed, 0 failed ===`** and
+  `CareerSeeker alpha verification complete.` — so `Verify-Alpha.ps1` ran in full on a machine that
+  is not mine, and **598 is unchanged**. The PR predicted the total would not move on the grounds
+  that no `.cs`, no harness and no `$ExpectedOfflineTotal` was touched; that prediction is now
+  **observed rather than reasoned**.
+- *Blind relay (Worker)* (`ubuntu-latest`, job 93861817039): green, including *Typecheck*, *Test*,
+  *Assert the relay has no decryption path* and *Assert sync vectors match their generator*.
+
+Locally: `node docs/sync-vectors/generate.mjs --check` → `OK: 28 vector files match the generator.`,
+exit 0. `npx tsc --noEmit` prints **55** errors here, all unresolved `Env`/`Response`, because the
+project typecheck is `wrangler types && tsc --noEmit` and no `wrangler` was invoked — measured
+**identical on the base branch and this one (55 = 55)**, which is the only claim it supports. CI's
+*Typecheck* step passes because it runs *Generate runtime types* first.
+
+### S2T-6 A stack-topology hazard that predates this slice, and that no PR in the stack mentions
+
+**§2.1 and §2.2 do not exist on the `seq`-bound line.** They landed on `claude/s4-pull-request-semantics`
+(#33); `claude/s2-relay-retention` (#34) → `claude/s2-seq-bound` (#35) branch off **#32 as siblings**.
+Both lines edit `docs/Sync-Protocol.md` off the same base `9c05ef7`:
+
+```
+$ git merge-base origin/claude/s4-pull-request-semantics origin/claude/s2-seq-bound
+9c05ef7
+$ git diff --stat 9c05ef7..origin/claude/s4-pull-request-semantics   # 1 file, +306
+$ git diff --stat 9c05ef7..origin/claude/s2-seq-bound                # 4 files, +311
+```
+
+This slice was **re-based onto #33 after starting on #35**, because extending §2.2 from a branch
+without §2.2 would have written a section referring to nothing. Measured with `git merge-tree`, the
+two lines **merge cleanly — before this PR and after it** (exit 0, no conflict list), because #33's
+additions sit in §2 and the other line's in §3. New tests were placed near base line ~90, away from
+#35's hunks at ~199 and ~327, so the diamond was not made worse. **Merge order is still a human
+decision and nothing in the stack records this**, which is why it is here and in the PR self-audit.
+
+### S2T-7 Ladder effect, stated narrowly
+
+**S2 stays PARTIAL and this slice does not move it toward DONE.** B-2 is still exactly the missing
+desktop `/pair` page, which is C# and unreachable here. This is the **fourth** hardening of S2's
+transport half — size cap (ninth run), retention predicate (eleventh), `seq` bound (sixteenth), now
+the response vocabulary — and hardening a rung's transport is not advancing the rung. **Seventh
+iteration in a row that this sentence has been written.**
+
+**PQ-S2-3 is closed. PQ-S2-4 is opened and is not a blocker.** S5's spec half remains closed and its
+applier half remains unwritten, which is a local session's slice: two appliers, two languages,
+neither compilable here.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** PR #36 was opened as a **draft**; #32, #33, #34 and #35 stay
+drafts and were neither merged, retargeted, rebased nor force-pushed. Android PR #6 stays a draft.
+Both branches pushed **forward-only** — no force-push, no history rewrite, no branch deleted.
+
+**Main repo: two files written** — `docs/Sync-Protocol.md` and `relay/test/relay.test.ts`. **No
+relay source change**: `git diff origin/claude/s4-pull-request-semantics -- relay/src/` is **empty**,
+and that is the slice's central property, not an incidental one. **No `.cs`** — the engine is
+described at `RelayClient.cs:51-60` and not edited. **No harness, no `Verify-Alpha.ps1`, no
+`$ExpectedOfflineTotal`, no count-reporting doc, no vector byte, no `generate.mjs` change.** The
+vendored vector pin stays `679a317` and no vendored byte moved.
+
+**Android repo: `docs/protocol-questions.md` plus these records. Zero `:core` files, zero `:app`
+files, zero Kotlin of any kind** — `RelayClient.kt`, `OutboundQueue.kt` and `OutboundQueueTest.kt`
+were **read and cited, never edited**. No Gradle or version-catalog file, no emulator, no
+`sdkmanager`, no AVD, and no attempt to route around the `dl.google.com` denial.
+
+**Neither gate ran and neither could.** `Verify-Alpha.ps1` needs .NET; the android gate needs an SDK
+(B-7). **CI is the gate**, cited above by run and job id, and nothing here asserts otherwise.
+
+**No deploy of any kind** (Cloudflare, Workers, relay, site, Pages) and **no `wrangler` invocation at
+all** — the relay ran only under `vitest`/miniflare inside the test runner, and `npm ci` fetched from
+the npm registry only. **The production relay was contacted zero times, not even `GET /v1/health`.**
+
+No Google, Play, OAuth or Console action; no accounts, no purchases, no Play Billing code; no email
+or Gmail anything; no cert-store, MSIX or keystore action — the upload keystore and its password file
+were neither read nor referenced beyond their paths. **No secrets read, written or printed.**
+
+Terra's state was read at iteration start **and again before writing the bus entry**: still R6(b)
+BLOCKED on draft PR #26, heartbeat unchanged at **2026-08-07T21:18**, **claims no files** — no
+collision. `relay/test/relay.test.ts` is written to on this branch; `relay/src/` is held but **not**
+modified. Terra has right-of-way and I rebase on request.

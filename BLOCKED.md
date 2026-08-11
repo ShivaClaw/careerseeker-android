@@ -798,3 +798,49 @@ return-day decision list, not here.
 
 **B-4, B-5, B-7, B-8 were not re-tested this iteration** — nothing in the slice touched an Android
 SDK, an emulator, Room, or a persisted counter — and are carried forward unchanged.
+
+---
+
+## No new blocker arose 2026-08-11 (S2 transport vocabulary, seventeenth cloud iteration)
+
+Recorded as an entry because its absence is otherwise indistinguishable from an omission, and
+because this iteration produced **two** things that look like blockers and are not.
+
+**The slice completed end to end on this machine.** PQ-S2-3 is closed by §2.3 in the main repo
+(draft PR #36), the relay suite went 36 → 47 with ten of eleven new tests proven against a mutated
+relay, `generate.mjs --check` passed, and CI was green on the branch tip (run `31516194482`, both
+jobs, offline total 598 unchanged). Nothing was attempted and abandoned.
+
+**Not a blocker (1): PQ-S2-4.** The measured 401-vs-404 gap — a purged pairing answers
+`unauthorized`, so the phone's terminal `SendHalt.PAIRING_GONE` is never entered and appears
+unreachable — is **a decision that has not been made**, not an obstacle. Brandon has to weigh "the
+phone can tell it was remotely unpaired" against "a wrong credential cannot learn a pairing id was
+ever real". Either answer is implementable; nothing prevents the work. Filing it here would send the
+next session hunting for a phantom obstacle, which is the failure mode `BLOCKED.md` is supposed to
+prevent. It is in `docs/protocol-questions.md` as **PQ-S2-4** and in `HUMAN-QUEUE` terms it is a
+one-question decision.
+
+**Not a blocker (2): the S5 slice this iteration was assigned.** The prompt asked for S5 on the
+basis that it was "NOT STARTED". Derived after the mandatory fetch, S5's spec half has been **done
+since 2026-08-09** (draft PR #32, four commits, §4.3.3 + two `entitlement_ack` vectors, PQ-A6-1 /
+PQ-A2-1 / PQ-A2-2 closed). Its remaining half is the **engine and phone appliers**, which are C# and
+Kotlin — uncompilable here — and that is **B-6/B-7 territory already recorded**, not a new blocker.
+A stale iteration summary is not an obstacle either; it is a reason to derive before acting.
+
+### B-6 status 2026-08-11 (seventeenth iteration) — unchanged, re-read rather than assumed
+
+PQ-A2-3's `invalid-unknown-field` vector still cannot be added. `src/Sync` still has no inbound
+wire-JSON parser, so an unknown top-level field is discarded before any rejection check runs and the
+engine would **accept** the envelope; a vector asserting rejection would turn the offline gate red
+for whoever pushes next. Parser first, vector second — C#, and no cloud session has .NET. **A
+session handed "add the unknown-field vector" as a task should read this entry before starting.**
+This iteration was handed exactly that task and did read it first.
+
+### B-7 status 2026-08-11 (seventeenth iteration) — unchanged, and it bounded one claim in this slice
+
+No Android SDK, so `./gradlew … :core:test` did not run. **The specific cost this time:** PQ-S2-4's
+phone-side half — that `PairingUnknown`/`PAIRING_GONE` is unreachable on today's wire — is derived
+from reading `RelayClient.kt:283-284`, `OutboundQueue.kt:267-269`, `OutboundQueue.kt:288-290` and
+`OutboundQueueTest.kt:269`, **not from executing anything**. It is labelled a hypothesis in
+`AUDIT-REQUEST.md` **C-S2T-7** rather than a measurement. The relay half of the same question *is*
+measured under miniflare. Whoever has an SDK should confirm the Kotlin half before anyone acts on it.

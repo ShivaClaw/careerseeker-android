@@ -3526,8 +3526,18 @@ grep -rho "error: '[a-z_]*'" relay/src/*.ts | sort -u
 git show aa305de~1:docs/Sync-Protocol.md | grep -c "bad_request"      # before §2.2
 ```
 
-*Expected:* eight codes; `0` occurrences of `bad_request` before the amendment. v1 pins **push's**
-mapping and no other route's — the rest are observed, not normative, deliberately.
+*Expected:* ~~eight codes~~ **NINE codes** — see the correction below; `0` occurrences of
+`bad_request` before the amendment. v1 pins **push's** mapping and no other route's — the rest are
+observed, not normative, deliberately.
+
+> **CORRECTED 2026-08-11 (seventeenth cloud iteration).** This entry as first written was
+> **self-contradicting**: the command above yields **nine** codes on the commit it cites, while the
+> claim and the *Expected* line both said eight. `exists` was dropped in transcription, so anyone
+> running the re-verification as written would have seen it fail. The claim's "eight" and the
+> "eight codes" expectation are wrong; everything else in the entry holds. The nine are
+> `bad_request`, `exists`, `method_not_allowed`, `not_found`, `pairing_unknown`, `replay_rejected`,
+> `too_large`, `unauthorized`, `upgrade_required`. PQ-S2-3 is now **closed** by §2.3 — see
+> **C-S2T-1** below.
 
 ### C-S6C-6 — No vector moved, no relay code moved, the drift trap is not armed, and neither gate ran
 
@@ -3769,3 +3779,189 @@ silence is indistinguishable from a poll loop that is still waiting, so a watch 
 *error* path too, not only on success. Use the MCP tools for CI state and keep `curl` for nothing
 that a decision depends on. Precedent: **C-S4P-12** recorded the same 403 class for the Actions REST
 API and this iteration rediscovered it the expensive way.
+
+---
+
+## S2T — the transport vocabulary, every route (seventeenth cloud iteration, 2026-08-11)
+
+Main-repo branch `claude/s2-transport-vocabulary`, **draft PR #36**, stacked on #33 → #32 → `main`.
+Two commits: `cc6d966` (§2.3) and `4db3543` (the tests). Every command below was run in this
+session on a Linux cloud sandbox with **no .NET and no Android SDK**; where a claim needs a gate
+that does not exist here, the entry says so instead of asserting a result.
+
+Set up once:
+
+```bash
+cd <main>
+git fetch --all --prune
+git checkout claude/s2-transport-vocabulary
+cd relay && npm ci
+```
+
+### C-S2T-1 — The relay emits nine transport codes, and PQ-S2-3's table dropped one
+
+> **Claim.** The vocabulary is **nine** codes, not the eight recorded in PQ-S2-3 and echoed in
+> C-S6C-5. `exists` was dropped **in transcription** — the question's own command, on the commit the
+> question cited, returns it.
+
+```bash
+cd <main>
+mkdir -p /tmp/pqcheck                                  # tar will not create it, and fails if absent
+git archive origin/claude/s4-pull-request-semantics relay/src | tar -x -C /tmp/pqcheck
+grep -rho "error: '[a-z_]*'" /tmp/pqcheck/relay/src/*.ts | sort -u | wc -l
+```
+
+*Expected:* `9`. The set is `bad_request`, `exists`, `method_not_allowed`, `not_found`,
+`pairing_unknown`, `replay_rejected`, `too_large`, `unauthorized`, `upgrade_required`. The suite
+pins it independently, so the document and the Worker cannot drift apart silently:
+
+```bash
+cd <main>/relay && npx vitest run -t 'emits exactly nine transport codes'
+```
+
+*Expected:* 1 passed.
+
+### C-S2T-2 — The two vocabularies share exactly three names, and one of them means two things
+
+> **Claim.** Nine transport codes, ten §7.2 payload codes, intersection **three**:
+> `pairing_unknown`, `replay_rejected`, `too_large`. The first means something *different* on each
+> side; the other two agree. §2.2's "two names … with the same meaning" is true as written and
+> incomplete as read.
+
+```bash
+cd <main> && python3 - <<'EOF'
+import re
+transport={'bad_request','exists','method_not_allowed','not_found','pairing_unknown',
+           'replay_rejected','too_large','unauthorized','upgrade_required'}
+s=open('docs/Sync-Protocol.md').read()
+sec=s[s.index('### 7.2 Error kinds'):s.index('## 8. What this protocol cannot do')]
+payload=set(re.findall(r'^\| `([a-z_]+)` \|', sec, re.M))
+print(len(transport), len(payload), sorted(transport&payload))
+EOF
+```
+
+*Expected:* `9 10 ['pairing_unknown', 'replay_rejected', 'too_large']`.
+
+### C-S2T-3 — `pairing_unknown` means the id is malformed, never that the pairing is unknown
+
+> **Claim.** The transport code fires only on a pairing-id **shape** failure, checked before
+> authentication. A well-formed id that was never created answers **401**, not 404.
+
+```bash
+cd <main>/relay && npx vitest run -t 'means the id is MALFORMED'
+```
+
+*Expected:* 1 passed. Asserts `404 {"error":"pairing_unknown"}` for `/v1/not-a-pairing/pull` and
+`401 {"error":"unauthorized"}` for a fresh well-formed id.
+
+### C-S2T-4 — A purged pairing answers 401 on every route, so §7.2's condition has no transport code
+
+> **Claim.** After `DELETE /v1/{pairing}`, `pull`, `push`, `pair` and `DELETE` all answer
+> `401 {"error":"unauthorized"}` — identical to a wrong token. This is **PQ-S2-4**.
+
+```bash
+cd <main>/relay && npx vitest run -t 'after unpair every route answers 401'
+```
+
+*Expected:* 1 passed.
+
+### C-S2T-5 — `relay/src/` is byte-identical: §2.3 changed no relay behaviour
+
+> **Claim.** The section is **descriptive**. Nothing new is refused, which is the property §3.1's
+> amendment makes load-bearing. Only the doc and the test file moved.
+
+```bash
+cd <main>
+git diff --stat origin/claude/s4-pull-request-semantics..claude/s2-transport-vocabulary -- relay/src/
+git diff --stat origin/claude/s4-pull-request-semantics..claude/s2-transport-vocabulary
+```
+
+*Expected:* the first prints **nothing**; the second prints exactly two files —
+`docs/Sync-Protocol.md` and `relay/test/relay.test.ts`.
+
+### C-S2T-6 — 36 → 47, and ten of the eleven new tests were proven against a mutated relay
+
+> **Claim.** All eleven are pins by construction (no relay code changed), so each was checked
+> against a deliberately broken relay rather than assumed useful. **Ten caught something.** The
+> eleventh — `unpair is not a tombstone` — is **not** proven and is labelled a pin.
+
+```bash
+cd <main>/relay
+git stash && npm test 2>&1 | grep "Tests "     # base: 36 passed
+git stash pop && npm test 2>&1 | grep "Tests " # branch: 47 passed
+```
+
+*Expected:* `36 passed (36)` then `47 passed (47)`.
+
+To reproduce one mutation (revert afterwards — the branch must stay byte-identical in `relay/src/`):
+
+```bash
+cd <main>
+python3 -c "
+p='relay/src/channel.ts'; s=open(p).read()
+s=s.replace(\"if (!(await this.authorize(bearer))) return this.json({ error: 'unauthorized' }, 401);\",
+            \"if (!(await this.authorize(bearer))) return this.json({ error: 'pairing_unknown' }, 404);\")
+open(p,'w').write(s)"
+git diff --numstat relay/src/channel.ts          # MUST be 1 1 — see the note below
+cd relay && npm test 2>&1 | grep -E "Tests |FAIL"
+cd .. && git checkout relay/src/channel.ts
+```
+
+*Expected:* `1	1	relay/src/channel.ts`, then `4 failed | 43 passed`, two of them the §2.3 tests
+(`means the id is MALFORMED`, `after unpair every route answers 401`). The other two failures are
+pre-existing tests that also depend on the 401 (`rotates provisional -> final`, `DELETE purges the
+queue and the token`). The other three mutations and the tests they catch are enumerated in commit
+`4db3543`'s message.
+
+> **Why this recipe replaces the `sed` first written here, and it is the entry's own lesson.** The
+> first version of this command was `sed -i "s/return this.json({ error: 'unauthorized' }, 401);$/…/"`,
+> which **matches three sites**, not one — `authorize` plus both bearer checks inside `create` — and
+> so produces `5 failed`, not the `4 failed` this entry claimed. It was run before being written
+> down, the mismatch showed up immediately, and the recipe was replaced with one that mutates a
+> single site. **A re-verification command that does not reproduce its own expected output is worse
+> than no command**, because it reads as evidence. The `git diff --numstat` line is in the recipe so
+> the next reader catches an over-broad match before interpreting the failure count.
+
+### C-S2T-7 — The phone-side half of PQ-S2-4 is READ, not executed
+
+> **Claim, and its limit.** The relay half of PQ-S2-4 is measured under miniflare. The phone half —
+> that `Unauthorised` is the *recoverable* halt while `PairingUnknown`/`PAIRING_GONE` is terminal and
+> **unreachable on today's wire** — is derived by reading source. **No Kotlin was compiled or run:
+> there is no Android SDK in this sandbox (B-7).** Treat it as a hypothesis with file:line support,
+> not as a measurement.
+
+```bash
+cd <android>
+sed -n '283,285p' core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+sed -n '267,270p;288,291p' core/src/main/kotlin/app/careerseeker/core/OutboundQueue.kt
+grep -n 'pairing_unknown is terminal' core/src/test/kotlin/app/careerseeker/core/OutboundQueueTest.kt
+grep -rn '/pair' core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+```
+
+*Expected:* the 404 → `PairingUnknown` mapping; `PairingUnknown` → `SendHalt.PAIRING_GONE` and
+`Unauthorised` → `SendHalt.UNAUTHORISED`; a clearing method that clears **only** `UNAUTHORISED`; the
+terminal-ness test at `OutboundQueueTest.kt:269`; and **exactly one** `/pair` reference, an
+`http.post` — the phone never issues `GET /pair`, which is the one route that 404s transiently.
+**The gate that would confirm the consequence is `./gradlew … :core:test`, which did not run.**
+
+### C-S2T-8 — No vector moved, no gate ran, and the stack still merges
+
+> **Claim.** No vector byte changed and `generate.mjs` was not edited. The drift trap is not armed:
+> no harness assertion, no `$ExpectedOfflineTotal`, no count-reporting doc. Neither gate ran and
+> neither could.
+
+```bash
+cd <main>
+node docs/sync-vectors/generate.mjs --check
+git diff --stat origin/claude/s4-pull-request-semantics..claude/s2-transport-vocabulary -- docs/sync-vectors/ scripts/
+git merge-tree --write-tree --name-only claude/s2-transport-vocabulary origin/claude/s2-seq-bound >/dev/null; echo "merge-tree exit: $?"
+which dotnet || echo "no .NET — Verify-Alpha.ps1 cannot run here"
+```
+
+*Expected:* `OK: 28 vector files match the generator.` and exit 0; **no** diff under
+`docs/sync-vectors/` or `scripts/`; `merge-tree exit: 0` (the #33 line and the #34/#35 line still
+merge cleanly — measured before and after this PR); and no `dotnet` on PATH.
+
+**`npx tsc --noEmit` prints 55 errors on this branch and 55 on its base** — all unresolved
+`Env`/`Response`, because the project typecheck is `wrangler types && tsc --noEmit` and no
+`wrangler` was invoked. The only claim that supports is *unchanged by this diff*.

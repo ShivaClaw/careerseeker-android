@@ -986,6 +986,112 @@ its 409; nothing depends on the others yet.
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-S6C-5**.
 
+### CLOSED 2026-08-11 (seventeenth cloud iteration) — option (a), and the question's own table was short
+
+Closed the recommended way: **§2.3** in the main repo
+([careerseeker#36](https://github.com/ShivaClaw/careerseeker/pull/36), stacked on #33 → #32) pins
+`create`, `pair`, `pull`, `live`, `DELETE` and `health`, measured under miniflare and written down
+second. **`relay/src/` is byte-identical on that branch** — the section is descriptive, so nothing
+new is refused, which is the direction §3.1's amendment makes load-bearing.
+
+**This question's own table was wrong, and so was the §2.2 prose derived from it.** It listed
+**eight** transport codes. Re-running **its own command on the commit it cited** yields **nine** —
+`exists` was dropped in transcription, not by the grep:
+
+```
+$ git archive origin/claude/s4-pull-request-semantics relay/src | tar -x -C /tmp/x
+$ cd /tmp/x && grep -rho "error: '[a-z_]*'" relay/src/*.ts | sort -u
+bad_request  exists  method_not_allowed  not_found  pairing_unknown
+replay_rejected  too_large  unauthorized  upgrade_required
+```
+
+`exists` is emitted by **two** routes for **two** different conditions (`create` on an existing
+channel, `pair` on an already-stored completion), so it was never a marginal code.
+
+**A second correction the measurement forced.** §2.2 says "two names appear in both vocabularies".
+Measured, the intersection of the nine transport codes and §7.2's ten payload codes is **three**:
+`replay_rejected` and `too_large` mean the same thing in each, and **`pairing_unknown` means
+something different in each**. §2.2's sentence is *true as written* — it says two names collide
+*with the same meaning* — but the third name is the dangerous one, and nothing said so.
+
+**What the measurement turned up is bigger than the gap it was opened for**, and is recorded
+separately as **PQ-S2-4**.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S2T-1** … **C-S2T-6**.
+
+---
+
+## PQ-S2-4 — A purged pairing answers `unauthorized`, so the phone's terminal "unpaired" state is unreachable
+
+**Opened 2026-08-11 (S2 transport vocabulary, seventeenth cloud iteration).** Recorded, **not
+fixed**: the fix touches the relay, the phone and a product decision, and none of the three can be
+gated from this sandbox.
+
+**Spec (§7.2).** The payload code `pairing_unknown` means "the relay has no Durable Object for this
+pairing."
+
+**What the relay actually answers for exactly that condition.** Measured under miniflare after
+`DELETE /v1/{pairing}`, on every route:
+
+```
+401 {"error":"unauthorized"}   GET  /v1/{p}/pull?dir=e2p&since=0
+401 {"error":"unauthorized"}   POST /v1/{p}/push
+401 {"error":"unauthorized"}   GET  /v1/{p}/pair
+401 {"error":"unauthorized"}   DELETE /v1/{p}
+201 {"ok":true}                POST /v1/{p}/create      <- the id re-bootstraps
+```
+
+**The transport `pairing_unknown` is never emitted for this.** It fires only when the pairing id
+fails the `p_` + 16-base64url-char shape check, which the Worker applies *before* it authenticates
+(`relay/src/index.ts:56`). A well-formed id that was never created also answers **401**.
+
+**What that costs the phone. Read, not executed — there is no Android SDK here (B-7).**
+
+- `RelayClient.kt:283-284` maps `Unauthorized`/`Forbidden` → `RelayResult.Unauthorised` and **any
+  404** → `RelayResult.PairingUnknown`.
+- `OutboundQueue.kt:267-269` maps `Unauthorised` → `halted(SendHalt.UNAUTHORISED)` and
+  `PairingUnknown` → `halted(SendHalt.PAIRING_GONE)`.
+- `UNAUTHORISED` is the **recoverable** halt: `OutboundQueue.kt:288-290` clears it when "a fresh
+  bearer is in hand (`RelayTokenLadder`)". `PAIRING_GONE` is **terminal** — `OutboundQueueTest.kt:269`
+  is named `pairing_unknown is terminal and no clearing call revives it`.
+
+So when the user is actually unpaired, the phone halts on the **recoverable** state and waits for a
+fresher bearer that cannot exist, because the Durable Object holding the token hash is gone and
+every bearer now fails. **The terminal state built for precisely this condition is never entered.**
+
+**And it appears to be unreachable outright.** Of the routes the phone calls — `create`, `POST /pair`,
+`push`, `pull`, `live`, `DELETE` — none can 404 under any measured condition: the malformed-id 404
+is impossible because `RelayClient.init` requires `isValidPairingId(pairing)`, and the one route
+that 404s transiently (`GET /pair`, answered `not_found` both before a completion is posted and
+after the engine's one-shot read) **is never called by the phone**. That makes `SendHalt.PAIRING_GONE`
+dead code on today's wire. **This half is derived by reading and is unverified by execution** — the
+relay half above is measured, this one is not.
+
+**Why nothing was changed here, and the reasoning is the size-cap lesson.** Three options were
+considered:
+
+1. **Make the relay answer 404 `pairing_unknown` on a purged channel.** This is the intuitive fix and
+   it is the one to be most careful with: it changes what two shipping clients receive, and neither
+   can be compiled or gated from this sandbox. It also **gives up a privacy property** — measured,
+   the same pairing id re-bootstraps after `DELETE`, so a purged pairing is currently
+   indistinguishable from one that never existed, and the relay never answers "did this pairing ever
+   exist?" to a caller holding a wrong token. §2.3 pins the 401 for that reason.
+2. **Change the phone's mapping** so `Unauthorised` becomes terminal after N failed token
+   acquisitions. Kotlin, uncompilable here (B-7), and it converts a genuine transient — a bearer
+   mid-rotation (§5.2.3) — into a terminal state, which is its own bug.
+3. **Add a distinguishing field to the 401 body.** Cheapest on the wire, but it is a new normative
+   field, and §2.3 has just finished saying every transport error body is exactly `{"error": …}`.
+
+**Smallest human unblock — a decision, then two small changes on a machine with both gates:**
+Brandon decides whether "the phone can tell it was remotely unpaired" is worth more than "a wrong
+credential cannot learn a pairing id was ever real". If yes, option (3) plus a phone-side branch, and
+§2.3's "every body is exactly `{error}`" rule is amended in the same change. If no, the phone's
+`PAIRING_GONE` should be **deleted** rather than left as unreachable code that reads like coverage.
+
+**Not filed in `BLOCKED.md`:** nothing is blocked. This is a decision that has not been made.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S2T-3**, **C-S2T-4**, **C-S2T-7**.
+
 ---
 
 ## PQ-S6-3 — The engine implements half of §6.1's resume rule, and its own comment states the other half
