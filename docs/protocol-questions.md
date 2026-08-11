@@ -665,6 +665,80 @@ Worth deciding alongside whether the relay should expose any channel-level reset
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-S2R-9**.
 
+### CLOSED IN PART 2026-08-11 (sixteenth cloud iteration) — the bound, and the half it does not reach
+
+Closed exactly as the "to close" paragraph above prescribes, in that order: §3 amendment first
+(**§3.2**), relay enforcement second (draft PR **#35**, `claude/s2-seq-bound`, stacked on #34 →
+#32). **The open half is named at the bottom of this note and is not closed.**
+
+**This question was deferred on 2026-08-10 and again on 2026-08-11 as "do not close from a
+sandbox", and that inheritance was wrong.** It came from PQ-S2-1, whose "to close" genuinely does
+begin *"On a machine with .NET"* — because fixing it means changing two engine test fixtures. This
+one's does not: it says *spec first, relay second*, and both halves are Markdown and TypeScript.
+The two questions were opened in the same iteration and got summarised together, and the summary
+was what carried forward. **A deferral reason attached to a neighbouring question is not a finding
+about this one** — the fifteenth run's ninth correction, arriving one iteration later in a
+different costume.
+
+**Two things measured before writing the rule, neither of which this question had.**
+
+**1. The reachable ceiling was not `MAX_SAFE_INTEGER`.** The measurement above stops at
+`Number.MAX_SAFE_INTEGER`, which reads as though that were the boundary. `Number.isInteger` is
+**not a range check** — it is true for every finite double — so `1e300` pushes just as well, and
+only `Infinity` was refused (it answers `400`, since `Number.isInteger(Infinity)` is `false`). The
+reachable range was ~1.8e308.
+
+**2. The read path breaks too, and it is the severe half.** This question costed the wedge on the
+*write* path only: "every subsequent envelope in that direction is refused". But `latest` is
+emitted from the same double, so measured under miniflare against the real Worker:
+
+| pushed `seq` | relay reported `latest` as | consequence |
+| --- | --- | --- |
+| `4611686018427387904` (2⁶²) | `4611686018427388000` | **silently rounded** — off by 96; both receivers parse it happily and are now 96 ahead of the sender |
+| `10000000000000000000` (1e19) | `10000000000000000000` | above `Long.MaxValue`; **neither receiver can parse it** |
+| `1e300` | `1e+300` | exponent notation; **neither receiver can parse it** |
+
+Both receivers read `latest` strictly: `src/Sync/RelayClient.cs:74` is
+`GetProperty("latest").GetInt64()` with **no catch on that path** (it throws out of `PullAsync`),
+and the phone's `strictLong` goes through `toLongOrNull()` to a rejected page reported as
+`Unavailable` (`core/.../RelayClient.kt:258-262`). **So one out-of-range envelope disables the
+`GET /pull` reconciliation §6.1 prescribes for exactly this situation.** The wedge takes out the
+instrument used to diagnose it — which is why this earned a rule rather than a note.
+
+**The "unreachable in practice" clause was also wrong, and that is worth reading carefully.** This
+question dismissed the precision divergence because "2⁵³ envelopes is not a number this product
+produces". True, and irrelevant: reaching 2⁵³ does not require *sending* 2⁵³ envelopes, only
+emitting one counter that large. Measured, `9007199254740992` answered `201` and then
+`9007199254740993` answered `409 replay_rejected` — **a strictly larger integer refused as a
+replay**, because both land on the same double. One buggy sender reaches that in one step.
+
+**What was decided.** `seq` MUST NOT exceed **`2^53 - 1`**. Sender MUST NOT emit above it; relay
+MUST refuse with `400 bad_request`; receiver **SHOULD** reject. The bound is the derivation the
+question itself proposed — the largest integer the two 64-bit receivers and the relay's double all
+represent **exactly** — and `MAX_SEQ` is spelled `Number.MAX_SAFE_INTEGER` rather than as a
+literal, per §3.1's lesson about round numbers.
+
+**`SHOULD` on the receiver, deliberately.** A `MUST` would be a spec tightening ahead of two
+shipping implementations that do not do it, which the eighth correction names as the same defect as
+an implementation tightening ahead of its spec. The relay is the only ingress, so the receiver check
+is defence in depth rather than the property being protected. **§3.2 states the non-conformance in a
+measured note rather than implying conformance.** If ingress ever stops being single, this becomes a
+`MUST` plus two code changes.
+
+**STILL OPEN, and it is the half a reader should not assume closed.** The bound stops a channel
+being wedged **out of range**; it does nothing for one wedged **in** range. A sender that emits
+`9007199254740991` legitimately-shaped still refuses every later envelope in that direction until
+the row expires or the pairing is deleted, and **the relay still exposes no channel-level reset
+short of `DELETE /v1/{pairing}`**. This question's own last line asked for that to be settled
+alongside the cap; it was not, because **it is a product decision** — a reset endpoint is a new
+authenticated destructive route, and inventing one from a sandbox that cannot run
+`Verify-Alpha.ps1` is the size-cap mistake's shape. **For Brandon, not for a cloud iteration.**
+
+**Not verified here:** `Verify-Alpha.ps1` and `SyncLiveSmoke` did not run (no .NET). `SyncLiveSmoke`
+pushes seqs from 1 and should be unaffected — **reasoning, not evidence**.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S2Q-1…7**.
+
 ---
 
 ## PQ-S4-2 — The `pull` response body is not defined anywhere, and the three implementations disagree about it

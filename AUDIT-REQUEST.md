@@ -3575,3 +3575,126 @@ found. **CI is the gate.**
 *Build and offline harnesses*; the two totals above present verbatim. **This upgrades C-S6C-6's
 "unchangeable by construction" from an argument to an observation** — the pin was measured at 598
 after this iteration's commits, not merely argued to be untouched.
+
+---
+
+## S2 `seq` bound — sixteenth cloud iteration, 2026-08-11 (PQ-S2-2, closed in part)
+
+Branch `claude/s2-seq-bound` in `careerseeker`, draft PR **#35**, stacked on #34 → #32. Every
+command below runs on Linux with Node only; **none of them needs .NET or an Android SDK.**
+
+### C-S2Q-1 — The relay's old guard was not a range check, and the reachable ceiling was ~1.8e308
+
+> **Claim.** `relay/src/channel.ts` validated `seq` with `Number.isInteger(seq) && seq >= 1` and
+> nothing else. `Number.isInteger` is true for every finite double, so values to ~1.8e308 were
+> accepted and appended; only `Infinity` was refused, and it fails because
+> `Number.isInteger(Infinity)` is `false`, not because of any bound.
+
+```bash
+git -C careerseeker show origin/claude/s2-relay-retention:relay/src/channel.ts | grep -n "isInteger(seq)"
+node -e "console.log(Number.isInteger(1e300), Number.isInteger(2**53), Number.isInteger(Infinity))"
+```
+
+*Expected:* the pre-change line `|| !Number.isInteger(seq) || seq < 1` with **no upper term**, and
+`true true false`.
+
+### C-S2Q-2 — §3.2 exists, states the bound, and states its own non-conformance
+
+> **Claim.** `docs/Sync-Protocol.md` gained **§3.2 Sequence number range**: maximum `2^53 - 1`,
+> sender MUST NOT emit above it, relay MUST refuse `400 bad_request`, receiver **SHOULD** reject —
+> plus a measured conformance note saying **neither receiver implements the SHOULD**, and a closing
+> paragraph saying the bound does **not** address a channel wedged *in* range.
+
+```bash
+cd careerseeker && git checkout claude/s2-seq-bound
+sed -n '/^### 3.2 Sequence number range/,/^---$/p' docs/Sync-Protocol.md
+grep -n "maximum \`2\^53 - 1\`" docs/Sync-Protocol.md          # the field-table row
+```
+
+*Expected:* the section present; `SHOULD` (not `MUST`) on the receiver bullet; the phrase
+**"Neither receiver implements the SHOULD"**; and the "What this does not fix" paragraph naming
+`DELETE /v1/{pairing}` and deferring the reset question to PQ-S2-2's open half.
+
+### C-S2Q-3 — `MAX_SEQ` is the derivation, not a literal, and the relay enforces it
+
+> **Claim.** `relay/src/protocol.ts` exports `MAX_SEQ = Number.MAX_SAFE_INTEGER` (which *is*
+> `2^53 - 1`), and `relay/src/channel.ts` refuses `seq > MAX_SEQ` with `400 bad_request` in the
+> header-shape check — before the monotonicity comparison, so nothing is appended.
+
+```bash
+cd careerseeker/relay
+grep -n "MAX_SEQ" src/protocol.ts src/channel.ts
+node -e "console.log(Number.MAX_SAFE_INTEGER === 2**53 - 1)"
+```
+
+*Expected:* `MAX_SEQ = Number.MAX_SAFE_INTEGER` with no numeric literal spelled out; the guard term
+`|| seq > MAX_SEQ` sitting inside the same `if` as the other header checks and **above** the
+`SELECT MAX(seq)` block; and `true`.
+
+### C-S2Q-4 — The relay suite is 42 → 51 and green
+
+> **Claim.** Nine tests added. Suite **51 passed (51)** on `claude/s2-seq-bound`. **42 is this
+> branch's base** (`claude/s2-relay-retention`); the **36** in the S6 records is
+> `claude/s4-pull-request-semantics`'s. Three branches, three figures — reading one as another is
+> the count-drift trap one branch over.
+
+```bash
+cd careerseeker/relay && npm ci && npm test
+```
+
+*Expected:* `Tests  51 passed (51)`, `Test Files  1 passed (1)`. On the base branch the same
+command prints `42 passed (42)`.
+
+### C-S2Q-5 — Seven of the nine new tests fail without the guard (proven, not assumed)
+
+> **Claim.** The regression coverage was verified by reverting the guard and re-running, not by
+> inspection. Seven fail: the four band cases, the no-counter-evidence rule, the
+> direction-stays-usable regression, and the 2⁵³/2⁵³+1 collision. **Two pass either way** — the
+> boundary-accepted pin and the `latest`-parseability pin — and are labelled pins rather than
+> regression catchers.
+
+```bash
+cd careerseeker/relay
+sed -i 's/ || seq > MAX_SEQ//' src/channel.ts && npm test; git checkout src/channel.ts && npm test
+```
+
+*Expected:* `Tests  7 failed | 44 passed (51)` with the guard removed, then `51 passed (51)` after
+restoring it. **Restore the file** — the `git checkout` above is part of the command, not optional.
+
+### C-S2Q-6 — No vector byte moved, and the 598 pin is unchanged, both measured
+
+> **Claim.** This slice touched four files: one Markdown and three TypeScript. **No vector, no
+> harness, no `.cs`, no count-reporting doc, and not `Verify-Alpha.ps1`.** CI's *Build and offline
+> harnesses* job on this head reported **`=== Offline total: 598 passed, 0 failed ===`**, so the pin
+> is confirmed by observation rather than argued from the diff.
+
+```bash
+cd careerseeker
+git diff --stat origin/claude/s2-relay-retention..claude/s2-seq-bound
+node docs/sync-vectors/generate.mjs --check
+git diff --name-only origin/claude/s2-relay-retention..claude/s2-seq-bound -- docs/sync-vectors/ scripts/ tests/ src/
+# MCP, not curl -- the Actions REST API is 403 to curl from this sandbox (C-S4P-12)
+#   get_job_logs  job_id=93789450880  return_content=true  tail_lines=45
+```
+
+*Expected:* exactly four files (`docs/Sync-Protocol.md`, `relay/src/protocol.ts`,
+`relay/src/channel.ts`, `relay/test/relay.test.ts`); `OK: 28 vector files match the generator.` exit
+0 (**28 is the branch figure**, `main` is 26); the third command prints **nothing**; and both
+`=== 130 passed, 0 failed ===` and `=== Offline total: 598 passed, 0 failed ===` in the job log,
+run `31494720248`, both jobs `success`.
+
+### C-S2Q-7 — `tsc` reports the same 55 errors before and after, so none is mine
+
+> **Claim.** The project's typecheck is `wrangler types && tsc --noEmit`; **no `wrangler` was
+> invoked**, so bare `tsc` cannot resolve `Env`/`SqlStorage`/`cloudflare:workers` and prints 55
+> errors. That count is **identical on the base branch and on this one**, which is the evidence that
+> this change introduces none.
+
+```bash
+cd careerseeker/relay
+git stash -u && npx tsc --noEmit -p tsconfig.json 2>&1 | wc -l && git stash pop
+npx tsc --noEmit -p tsconfig.json 2>&1 | wc -l
+```
+
+*Expected:* `55` both times. This is **not** a clean typecheck and must not be reported as one —
+run `npm run typecheck` on a machine where invoking `wrangler` is in scope.

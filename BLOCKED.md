@@ -764,3 +764,37 @@ original framing — it claimed the `latest` bound capped the attack outright, a
 confines the damage to envelopes the relay already holds, which it could withhold regardless, and
 removes only the forward-going part. That is a smaller claim than the one it opened with, and the
 spec states the smaller one.
+
+---
+
+## No new blocker arose 2026-08-11 (S2 `seq` bound, sixteenth cloud iteration)
+
+The slice ran end to end in this sandbox: §3.2 written, `relay/src/channel.ts` enforcing it, nine
+tests added, suite **42 → 51**, CI green on both jobs (run `31494720248`). Nothing was attempted
+twice and abandoned, so nothing here is a blocker.
+
+**PQ-S2-2's remaining half is deliberately NOT filed as one, and the distinction is the point of
+this entry.** The bound closes the *out-of-range* wedge. A channel wedged **in** range — a sender
+that emits `9007199254740991` legitimately-shaped — still refuses every later envelope in that
+direction until the row expires or the pairing is deleted, and the relay exposes no reset short of
+`DELETE /v1/{pairing}`. **Nothing blocks fixing that.** It is a **product decision** Brandon has not
+made: a channel-level reset is a new authenticated destructive route, and its shape (who may call
+it, whether it purges one direction or both, whether it is distinguishable from unpair) is a
+question about what the product promises, not about what this machine can run. Filing it as
+`BLOCKED` would send the next session hunting for a toolchain that would not help it.
+
+It is recorded as the open half of **PQ-S2-2** in `docs/protocol-questions.md` and belongs on the
+return-day decision list, not here.
+
+**Two blockers were re-read rather than assumed, and both stood.**
+
+- **B-6** (PQ-A2-3's `invalid-unknown-field` vector) is why **no vector expresses §3.2 either.** A
+  `seq` **range** rule is a rejection rule, and a rejection vector asserts a rejection the engine has
+  nowhere to perform — `EnvelopeReceiver.cs:33` takes an already-parsed record and
+  `SyncHarness/Program.cs:696` cherry-picks keys. Parser first, vector second, and the parser is C#.
+  **Unchanged.**
+- **B-2** is still exactly the missing desktop `/pair` page. This slice hardened S2's transport for
+  the third time and moved B-2 not at all. **Unchanged.**
+
+**B-4, B-5, B-7, B-8 were not re-tested this iteration** — nothing in the slice touched an Android
+SDK, an emulator, Room, or a persisted counter — and are carried forward unchanged.

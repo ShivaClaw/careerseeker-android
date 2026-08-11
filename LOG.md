@@ -4230,3 +4230,196 @@ file were neither read nor referenced beyond their paths. **No secrets read, wri
 Terra's state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged
 at 2026-08-07T21:18, **claims no files** — no collision. This slice's only main-repo territory is
 `docs/Sync-Protocol.md`, already claimed via #32/#33, so no new claim was taken.
+
+---
+
+## S2Q — The `seq` field had no maximum, and the wedge reached further than the question recorded (sixteenth cloud iteration, 2026-08-11)
+
+Linux cloud sandbox. No .NET, no Android SDK, no emulator, no Windows. **Neither gate ran**; CI is
+the gate, and where CI is the evidence the run id is cited.
+
+### S2Q-1 Why this slice, and the deferral that turned out to be inherited rather than derived
+
+`git fetch --all --prune` in both checkouts first, per rule one. Both clean. Counts below are all
+post-fetch.
+
+**The standing prompt again nominated S5's spec half** — §4.3 `entitlement_ack`, the ack vector,
+PQ-A2-1/-2/-3 — and again described S5 as "NOT STARTED and genuinely NOT blocked". That is the
+fourth correction in `STATE.md`, now in its fourth iteration of being right: all of it except
+PQ-A2-3 landed 2026-08-09 on `claude/s5-entitlement-ack-spec` (draft PR #32), and PQ-A2-3 is **B-6**
+(the engine has no inbound wire-JSON parser, so the vector would assert a rejection nothing can
+perform). **Verified rather than inherited** — `git log --oneline origin/main..origin/claude/s5-entitlement-ack-spec`
+prints the same four commits it did last iteration. The prompt is a stored snapshot; the records are
+the state.
+
+So the pick came from the open-question list. **PQ-S2-2**, and the reason it was still open is the
+interesting half.
+
+**It had been carried as "do not close from a sandbox" for two iterations, and that was inherited
+from its neighbour.** PQ-S2-1 and PQ-S2-2 were opened in the same iteration and summarised together
+ever since. PQ-S2-1's "to close" genuinely does begin *"On a machine with .NET"* — closing it means
+changing two engine test fixtures that emit non-conforming pairing ids. **PQ-S2-2's does not.** Read
+in full, it says: *"A §3 amendment giving `seq` an explicit maximum, then the relay enforcing it as
+a `400`. … Spec first, relay second."* Markdown and TypeScript — both of which run here.
+
+**That is the fifteenth run's ninth correction arriving one iteration later in a different
+costume.** That one was about a deferral reason that was an argument about *cost*, made before
+anyone checked the substance. This one is about a deferral reason that belonged to a *different
+question* and was never about this one at all. **Before inheriting a deferral, check which question
+it was written against.**
+
+### S2Q-2 What was measured, before anything was written
+
+The eleventh run's probe method, reused: throwaway vitest tests under miniflare asserting
+deliberately **wrong** values so the runner prints the measured one in its diff, with the value
+**first and short** per C-S6C-2's lesson about vitest truncating long diffs. Fourteen probes. The
+file was deleted before committing and `git status --porcelain` was empty after.
+
+Baseline first, so the count means something: **`Tests 42 passed (42)`** on
+`claude/s2-relay-retention`, this slice's base.
+
+| probe | measured |
+| --- | --- |
+| `seq` = 9007199254740991 (2⁵³−1) | `201 {"ok":true,"seq":9007199254740991}` |
+| then `seq` = 1 | `409 {"error":"replay_rejected","latest":9007199254740991}` |
+| **`seq` = 1e300** | **`201 {"ok":true,"seq":1e+300}`** |
+| pull after 1e300 | `200 … "latest":1e+300` |
+| then `seq` = 2 | `409 … latest: 1e+300` |
+| `seq` = 2⁵³ then 2⁵³+1 | `201`, then **`409 replay_rejected, latest: 9007199254740992`** |
+| `seq` = 1.5 | `400 bad_request` |
+| `seq` = 1e400 (→ `Infinity`) | `400 bad_request` |
+| `Number.isInteger(1e300 / 2⁵³ / Infinity)` | `true / true / false` |
+| `seq` = 2⁶² = 4611686018427387904 | pull reports **`"latest":4611686018427388000`** |
+| `seq` = 1e19 | pull reports `"latest":10000000000000000000` |
+| `seq` = 1e21 | pull reports `"latest":1e+21` |
+
+**Three findings the question did not have.**
+
+**(a) The reachable ceiling was not `MAX_SAFE_INTEGER`.** PQ-S2-2's measurement stops there and
+reads as though that were the boundary. `Number.isInteger` is **not a range check** — it is true for
+every finite double — so the accepted range ran to ~1.8e308, and `Infinity` is refused only as a
+side effect of `Number.isInteger(Infinity)` being `false`.
+
+**(b) The read path breaks, and it is the severe half.** The question costed the wedge on the write
+path only. But `latest` is emitted from the same double, and **both receivers parse it strictly**:
+`src/Sync/RelayClient.cs:74` is `GetProperty("latest").GetInt64()` with **no catch on that path**,
+and the phone's `strictLong` goes through `toLongOrNull()` (`core/.../RelayClient.kt:258-262`) to a
+page rejected as `Unavailable`. Above `Long.MaxValue` the number renders as plain decimal neither
+can parse; past 1e21 it renders in exponent notation. **So one garbage counter disables the
+`GET /pull` reconciliation §6.1 prescribes for exactly that situation** — it takes out the
+instrument used to diagnose it. That is what moved this from a note to a rule.
+
+**(c) "Unreachable in practice" was wrong.** The question dismissed the precision divergence because
+"2⁵³ envelopes is not a number this product produces". True and irrelevant: **reaching 2⁵³ does not
+require sending 2⁵³ envelopes, only emitting one counter that large.** Measured, 2⁵³ then 2⁵³+1
+answered `201` then `409 replay_rejected` — a strictly **larger** integer refused as a **replay**,
+because both land on the same double. One buggy sender does that in one step.
+
+### S2Q-3 §3.2, and why the bound is a property of the wire rather than of the relay
+
+New **§3.2**: `seq` MUST NOT exceed **`2^53 - 1`**. Sender MUST NOT emit above it; relay MUST refuse
+with `400 bad_request`; receiver **SHOULD** reject as a structural rejection.
+
+**`2^53 - 1` is chosen at the point where the wire stops being unambiguous**, not for the relay's
+convenience: both receivers type `seq` as a 64-bit integer (`src/Sync/EnvelopeCodec.cs:7`
+`long Seq`; the Kotlin header likewise) and the relay reads it into a double, so this is the largest
+integer **all three represent exactly**. A cap picked to suit the relay would be §3.1's size-cap bug
+again. `MAX_SEQ` is spelled `Number.MAX_SAFE_INTEGER` — the derivation, not a literal — per the
+lesson `relay/src/protocol.ts` already records about round numbers.
+
+**Spec first, relay second, deliberately.** Refusing an envelope the document declares legal is the
+one thing §3.1's amendment forbids, so the bound had to be *stated* before `channel.ts` could
+*enforce* it. Two commits, in that order.
+
+**`SHOULD` on the receiver, and this is the softest thing in the slice.** A `MUST` would be a spec
+tightening ahead of two shipping implementations that do not do it — the eighth correction's defect,
+and the §2.1 precedent. The argument for `SHOULD` is that **the relay is the only ingress**, so a
+receiver check is defence in depth rather than the property being protected. §3.2 states the
+non-conformance in a measured note rather than implying conformance. **If ingress ever stops being
+single — a direct peer mode, or a live path that does not transit `push` — the argument fails and
+this becomes a `MUST` plus two code changes.** Written into the PR's self-audit as the first thing
+to attack.
+
+### S2Q-4 The relay half, and the test that had to be proven rather than trusted
+
+`relay/src/channel.ts` gained `|| seq > MAX_SEQ` inside the existing header-shape `if` — **above**
+the `SELECT MAX(seq)` block, so a refused envelope is never appended and the `400` carries no
+counter evidence.
+
+Suite **42 → 51**. **Seven of the nine new tests were proven to fail against the previous
+`channel.ts`** — the guard was reverted and the suite re-run, giving `Tests 7 failed | 44 passed
+(51)`, then restored to `51 passed (51)`. **The other two pass either way**, and they are labelled
+as pins rather than regression catchers: the boundary value being accepted, and `latest` staying
+inside the range both receivers can parse. **That labelling is the thirteenth run's second lesson
+applied forward** — a test that still passes after a behaviour change is the one to read, so rather
+than wait to be surprised by one, each new test was checked for which side of that line it sits on.
+
+`node docs/sync-vectors/generate.mjs --check` → `OK: 28 vector files match the generator.`, exit 0.
+**28 is the branch figure; `main` is 26.** No vector byte moved: a `seq` **range** rule cannot be
+expressed as a §3 vector without the inbound wire-JSON parser **B-6** is waiting on, which is the
+same wall PQ-A2-3 sits behind.
+
+### S2Q-5 What CI said, because I could not say it
+
+Draft PR **#35** (`claude/s2-seq-bound`, stacked on #34 → #32). Run **31494720248**, **both jobs
+`success`**. From the *Build and offline harnesses* job log (id 93789450880):
+`=== 130 passed, 0 failed ===` and **`=== Offline total: 598 passed, 0 failed ===`**. **So the 598
+pin is confirmed by observation, not argued from the diff** — and the *Blind relay (Worker)* job
+ran this slice's tests on a machine that is not mine.
+
+**`SyncLiveSmoke` was not re-run and this slice does not claim it passes.** It pushes seqs from 1
+and should be unaffected by a bound at 2⁵³−1 — **that is reasoning, not evidence**, and it is
+written into the PR that way. `tsc --noEmit` prints 55 unresolved-`Env` errors because the project's
+typecheck is `wrangler types && tsc --noEmit` and **no `wrangler` was invoked**; the count was
+measured **identical on the base branch and on this one**, which is the only claim it supports.
+
+### S2Q-6 Ladder effect, stated narrowly
+
+**S2 stays PARTIAL and this slice does not move it toward DONE.** **B-2 is still exactly the missing
+desktop `/pair` page**, which is C# and unreachable here. This is the **third** hardening of S2's
+transport half — size cap (ninth run), retention predicate (eleventh), now the `seq` bound — and
+hardening a rung's transport is not the same as advancing the rung. **Sixth iteration in a row that
+this sentence has been written**, which by now is less an observation than a property of doing
+sandbox-reachable work on a ladder whose remaining rungs need machines.
+
+**PQ-S2-2 is closed in part, not closed.** The bound stops a channel being wedged **out of range**
+and does nothing for one wedged **in** range: a sender emitting `9007199254740991`
+legitimately-shaped still bricks the direction until TTL or unpair. The question's own last line
+asked for the reset question to be settled alongside the cap; **it was not, because it is a product
+decision** — a channel reset is a new authenticated destructive route, and inventing one here is the
+size-cap mistake's shape. **That is for Brandon.** Recorded as the open half, and deliberately
+**not** filed in `BLOCKED.md`: nothing blocks it, it is a decision that has not been made.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** PR #35 was opened as a **draft**; #32, #33 and #34 stay
+drafts and were neither merged, retargeted, rebased nor force-pushed. Android PR #6 stays a draft.
+Both branches pushed **forward-only** — no force-push, no history rewrite, no branch deleted, in
+either repo.
+
+**Main repo: four files written** — `docs/Sync-Protocol.md`, `relay/src/protocol.ts`,
+`relay/src/channel.ts`, `relay/test/relay.test.ts` — plus the coordination bus. **No `.cs`**: the
+engine is described at `RelayClient.cs:74` and not edited. **No harness, no `Verify-Alpha.ps1`, no
+`$ExpectedOfflineTotal`, no count-reporting doc, no vector byte and no `generate.mjs` change.**
+Verify with `git diff --stat origin/claude/s2-relay-retention..claude/s2-seq-bound` — four files.
+
+**Android repo: `docs/protocol-questions.md` plus these records. Zero `:core` files, zero `:app`
+files, zero Kotlin of any kind**, no Gradle or version-catalog file, no emulator, no `sdkmanager`,
+no AVD, and no attempt to route around the `dl.google.com` denial. The vendored vector pin stays
+`679a317` and **no vendored byte was touched**.
+
+**Neither gate ran and neither could.** `Verify-Alpha.ps1` needs .NET (`which dotnet` → nothing);
+the android gate needs an SDK (B-7). **CI is the gate**, and nothing here asserts otherwise.
+
+**No deploy of any kind** (Cloudflare, Workers, relay, site, Pages) and **no `wrangler` invocation at
+all** — the relay ran only under `vitest`/miniflare inside the test runner, and `npm ci` fetched from
+the npm registry only. **The production relay was contacted zero times, not even `GET /v1/health`.**
+
+No Google, Play, OAuth or Console action; no accounts, no purchases, no Play Billing code; no email
+or Gmail anything; no cert-store, MSIX or keystore action — the upload keystore and its password
+file were neither read nor referenced beyond their paths. **No secrets read, written or printed.**
+
+Terra's state was read at iteration start **and again before writing the bus entry**: still R6(b)
+BLOCKED on draft PR #26, heartbeat unchanged at 2026-08-07T21:18, **claims no files** — no
+collision. `relay/src/protocol.ts` and `relay/src/channel.ts` are now **written to** rather than
+merely held, and the bus says so; Terra has right-of-way and I rebase on request.
