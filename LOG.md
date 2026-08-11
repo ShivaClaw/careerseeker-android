@@ -4551,7 +4551,7 @@ collide *with the same meaning*); the third name is the dangerous one and nothin
 
 ### S2T-4 The tests, and the honest label on the one that is not proven
 
-**36 → 48.** Because no relay code changed, **all twelve are pins by construction — none of them CAN
+**36 → 49.** Because no relay code changed, **all thirteen are pins by construction — none of them CAN
 fail against the current source** — so rather than assert they were useful, each was checked against
 a deliberately mutated relay. Four mutations, each reverted:
 
@@ -4562,8 +4562,9 @@ a deliberately mutated relay. Four mutations, each reverted:
 | create-conflict drops `exists`; a 400 gains a `hint`; rotation drops its flag | `exactly nine codes`, `409 carries three bodies`, `{ok,rotated:true}`, `every error body is exactly {error}` |
 | worker-level 405 → 404 and 426 → 400 | `405 is reachable only for…`, `live answers 426` |
 | `/pair`'s cap counts bytes instead of characters | `cap counts characters, not bytes` (§S2T-8) |
+| `rotate_to` regex relaxed to accept uppercase hex | `rotate_to is LOWERCASE hex` (§S2T-9) |
 
-**Eleven of twelve proven. The twelfth — `unpair is not a tombstone` — is NOT proven and is labelled a
+**Twelve of thirteen proven. The thirteenth — `unpair is not a tombstone` — is NOT proven and is labelled a
 pin**, since breaking it needs a future change rather than a mutation of today's code. This is the
 thirteenth run's lesson applied forward: a test that still passes after a behaviour change is the one
 to read, so each was checked for which side of that line it sits on rather than waiting to be
@@ -4654,8 +4655,8 @@ cap is stated in the unit it uses, plus the rule for any future amendment — **
 and derive the character constant from it, never the other way round**, which is what
 `MAX_CIPHERTEXT_B64U_CHARS` already does.
 
-Suite **47 → 48**, and the new test is **proven live**: mutating the cap to `new TextEncoder()
-.encode(raw).length` fails this test **and only this test**. So **eleven of twelve are proven**; the
+Suite **47 → 48**, and that test is **proven live**: mutating the cap to `new TextEncoder()
+.encode(raw).length` fails this test **and only this test**. With §S2T-9 that becomes **twelve of thirteen proven**; the
 unproven one is still `unpair is not a tombstone`, still labelled a pin.
 
 **The method is the transferable part.** This was not found by reading `channel.ts` — it was found by
@@ -4663,6 +4664,28 @@ unproven one is still `unpair is not a tombstone`, still labelled a pin.
 iteration's findings came from the same move: the nine-vs-eight code count, the self-contradicting
 `sed` in C-S2T-6, and this. **A draft's own claims are the cheapest place to find a defect and the
 last place anyone looks.**
+
+### S2T-9 A thirteenth test, from the same move, and this one is an interop trap
+
+The §2.3 row for `POST /create`'s 400 said "`rotate_to` was not 64 hex chars". The regex is
+`/^[0-9a-f]{64}$/` — **case-sensitive**, which the row did not say.
+
+**That is not pedantry, because C#'s `Convert.ToHexString` returns UPPERCASE.** The engine's only
+rotation caller (`tests/SyncLiveSmoke/Program.cs:84`) is correct **solely** because it appends an
+explicit `.ToLowerInvariant()`. Remove that one call and rotation is refused with a bare `400` —
+and `RelayClient.RotateTokenAsync` returns `res.IsSuccessStatusCode`, a bare `bool`
+(`src/Sync/RelayClient.cs:30-38`), so the failure is **indistinguishable from a network error**, on
+the one call in the protocol that is **one-way** and locks the engine out of the channel if it
+half-succeeds. The codebase's own habit is right — `Convert.ToHexString(...).ToLowerInvariant()`
+appears throughout `src/` — but **a habit is not a test**, and nothing stated the requirement.
+
+Now both state it: §2.3 says lowercase and says why, and the suite pins it. Suite **48 → 49**,
+**proven live** — relaxing the regex to `[0-9a-fA-F]` fails this test and only this test.
+
+**Nothing was changed in the relay to accommodate it.** Current behaviour is correct; the defect was
+in the *document*, and the fix is the document plus a test. Relaxing the regex would be the size-cap
+mistake pointing the other way — loosening what the relay accepts from a sandbox that cannot run the
+engine's gate.
 
 ### Boundary — what was not touched
 

@@ -3879,11 +3879,11 @@ git diff --stat origin/claude/s4-pull-request-semantics..claude/s2-transport-voc
 *Expected:* the first prints **nothing**; the second prints exactly two files —
 `docs/Sync-Protocol.md` and `relay/test/relay.test.ts`.
 
-### C-S2T-6 — 36 → 48, and eleven of the twelve new tests were proven against a mutated relay
+### C-S2T-6 — 36 → 49, and twelve of the thirteen new tests were proven against a mutated relay
 
-> **Claim.** All twelve are pins by construction (no relay code changed), so each was checked
-> against a deliberately broken relay rather than assumed useful. **Eleven caught something.** The
-> twelfth — `unpair is not a tombstone` — is **not** proven and is labelled a pin.
+> **Claim.** All thirteen are pins by construction (no relay code changed), so each was checked
+> against a deliberately broken relay rather than assumed useful. **Twelve caught something.** The
+> thirteenth — `unpair is not a tombstone` — is **not** proven and is labelled a pin.
 
 ```bash
 cd <main>/relay
@@ -3891,7 +3891,7 @@ git stash && npm test 2>&1 | grep "Tests "     # base: 36 passed
 git stash pop && npm test 2>&1 | grep "Tests " # branch: 47 passed
 ```
 
-*Expected:* `36 passed (36)` then `48 passed (48)`.
+*Expected:* `36 passed (36)` then `49 passed (49)`.
 
 To reproduce one mutation (revert afterwards — the branch must stay byte-identical in `relay/src/`):
 
@@ -3907,7 +3907,7 @@ cd relay && npm test 2>&1 | grep -E "Tests |FAIL"
 cd .. && git checkout relay/src/channel.ts
 ```
 
-*Expected:* `1	1	relay/src/channel.ts`, then `4 failed | 44 passed`, two of them the §2.3 tests
+*Expected:* `1	1	relay/src/channel.ts`, then `4 failed | 45 passed`, two of them the §2.3 tests
 (`means the id is MALFORMED`, `after unpair every route answers 401`). The other two failures are
 pre-existing tests that also depend on the 401 (`rotates provisional -> final`, `DELETE purges the
 queue and the token`). The other three mutations and the tests they catch are enumerated in commit
@@ -3952,13 +3952,48 @@ cd relay && npm test 2>&1 | grep -E "Tests |×"
 cd .. && git checkout relay/src/channel.ts
 ```
 
-*Expected:* `1 failed | 47 passed (48)`, the failure being this test.
+*Expected:* `1 failed | 48 passed (49)`, the failure being this test.
 
 **How it was found, because the method is the point.** It was not found by reading `channel.ts`; it
 was found by **auditing my own §2.3 table before shipping it**. The row originally read "body over
 16 KiB", copied from the constant's appearance rather than from its behaviour. Had it shipped, the
 spec would have asserted a byte budget the relay does not enforce — the §3.1 bug's exact shape,
 written into the document that exists to prevent it.
+
+### C-S2T-6c — `rotate_to` is lowercase hex, and C# defaults to uppercase
+
+> **Claim.** The relay tests `/^[0-9a-f]{64}$/`, **case-sensitive**. `Convert.ToHexString` returns
+> **uppercase** in C#, and the engine's only rotation caller is correct solely because it appends an
+> explicit `.ToLowerInvariant()`. Drop it and rotation 400s, while `RotateTokenAsync` returns a bare
+> `bool` — so the failure is indistinguishable from a network error, on a call that is **one-way**
+> and locks the engine out of the channel if it half-succeeds. Current behaviour is correct; the
+> requirement was a **habit rather than a test**, and is now both.
+
+```bash
+cd <main>
+grep -n "0-9a-f" relay/src/channel.ts
+sed -n '84p' tests/SyncLiveSmoke/Program.cs
+sed -n '30,38p' src/Sync/RelayClient.cs
+cd relay && npx vitest run -t "rotate_to is LOWERCASE hex"
+```
+
+*Expected:* the case-sensitive regex; a caller ending in `.ToLowerInvariant()`; a method returning
+`res.IsSuccessStatusCode`; 1 passed.
+
+Proven live by relaxing the regex — **this test fails and only this test**:
+
+```bash
+cd <main>
+python3 -c "
+p='relay/src/channel.ts'; s=open(p).read()
+s=s.replace('/^[0-9a-f]{64}\$/', '/^[0-9a-fA-F]{64}\$/')
+open(p,'w').write(s)"
+git diff --numstat relay/src/channel.ts          # MUST be 1 1
+cd relay && npm test 2>&1 | grep -E "Tests |×"
+cd .. && git checkout relay/src/channel.ts
+```
+
+*Expected:* `1 failed | 48 passed (49)`.
 
 ### C-S2T-7 — The phone-side half of PQ-S2-4 is READ, not executed
 
