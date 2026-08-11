@@ -3145,3 +3145,146 @@ curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $GH_TOKEN" \
 note is repeated here rather than left at C-S6A-1 because being written down once demonstrably did
 not stop it — which is the same failure mode as the defect this slice fixed, one level up: an
 invariant recorded in one place and not applied where it was needed.
+
+---
+
+## S4 pull-page semantics — PQ-S4-2 closed (thirteenth cloud iteration, 2026-08-11)
+
+Two repos, spec first. The main-repo half is a **doc-only** change on
+`claude/s4-pull-request-semantics` (draft PR #33); the android half is two `:core` Kotlin test files
+and one `:core` source file. Numbers below come from the **reduced** probe (C-S6A-1); the gate is CI
+(C-S6A-8). Where a claim is unverified, it says so and why.
+
+### C-S4S-1 — Before this slice the pull *response* body was defined nowhere
+
+> **Claim.** On `origin/main` and on the parent commit of this slice, `docs/Sync-Protocol.md` defines
+> the pull **request** in §2's route table and never defines the response. `latest` appears in the
+> normative text exactly once, in §6.1, used without being defined.
+
+```bash
+cd <careerseeker>
+git show origin/main:docs/Sync-Protocol.md | grep -n "latest"
+git show origin/main:docs/Sync-Protocol.md | grep -n "envelopes\"\|\"envelopes"
+```
+
+*Expected:* the `latest` hits are §6.1's reconciliation sentence and §3.1/§4 matter unrelated to the
+page; **no section defines a 200 body for `/pull`**, and there is no `### 2.1`.
+
+### C-S4S-2 — §2.1 now defines it, and pins the engine's reading rather than a fourth one
+
+> **Claim.** `docs/Sync-Protocol.md` §2.1 requires both fields, types `latest` as a bare integer,
+> makes elements bare §3 envelopes, states the page may be truncated, forbids turning an unreadable
+> body into a successful empty pull (**MUST**) while leaving the error type to the receiver
+> (**SHOULD**), and refuses the `{"seq":N,"envelope":…}` wrapper. It matches what
+> `src/Sync/RelayClient.cs` already enforced — including its error posture, which is why that clause
+> is a SHOULD; see the second commit on the branch.
+
+```bash
+cd <careerseeker> && git checkout claude/s4-pull-request-semantics
+sed -n '/^### 2.1 Pull response body/,/^---$/p' docs/Sync-Protocol.md
+sed -n '/GetProperty("envelopes")/,+2p' src/Sync/RelayClient.cs
+```
+
+*Expected:* §2.1 prints with the five rules above; the C# lines show
+`GetProperty("envelopes")` and `GetProperty("latest").GetInt64()` — absent keys and quoted numbers
+both throw there, which is the reading §2.1 pins.
+
+### C-S4S-3 — No vector was added or changed, in either repo
+
+> **Claim.** A page is not an envelope, so no vector applies. `SyncHarness` enumerates
+> `docs/sync-vectors/v1/*.json`, so **adding** a file would move `$ExpectedOfflineTotal` (598) — a
+> number this machine has no .NET to measure. Nothing was added; the generator still reports no drift.
+
+```bash
+cd <careerseeker> && node docs/sync-vectors/generate.mjs --check ; echo "exit=$?"
+git diff --stat origin/main..claude/s4-pull-request-semantics -- docs/sync-vectors/
+grep -n 'Directory.GetFiles(vectorDir' tests/SyncHarness/Program.cs
+```
+
+*Expected:* `OK: 28 vector files match the generator.` / `exit=0` (28 is the **branch** figure — #32's
+two ack vectors are not on `main`, where it is 26); the diff is **empty**; the grep shows the
+directory enumeration that makes a new file a count change. Run here, exit 0.
+
+### C-S4S-4 — The phone no longer unwraps, and the new case fails against the pre-change parser
+
+> **Claim.** `parsePullPage` forwards the whole element as `wire`. The new `RelayClientTest` case
+> was run against the **pre-change** `RelayClient.kt` and **failed**, while all **25** pre-existing
+> cases in that class passed — so it pins new behaviour and moved no existing assertion.
+
+```bash
+# with the C-S6A-1 probe root in place:
+cd <android> && git stash                      # revert both files
+git checkout stash@{0} -- core/src/test/kotlin/app/careerseeker/core/RelayClientTest.kt
+cd <probe> && <android>/gradlew --no-daemon -I init.gradle.kts :core:test --rerun-tasks \
+  --console=plain --tests 'app.careerseeker.core.RelayClientTest'
+```
+
+*Expected — measured here, verbatim:*
+
+```
+RelayClientTest > a wrapped envelope is refused end to end, even when the envelope inside it is valid() FAILED
+26 tests completed, 1 failed
+BUILD FAILED
+```
+
+with every other `RelayClientTest` case `PASSED`. Restore with
+`git checkout -- …/RelayClientTest.kt && git stash pop`.
+
+### C-S4S-5 — `:core` is 185 → 187 / 0 / 0, and no class was added, deleted or renamed
+
+> **Claim.** Baseline re-measured on the untouched branch in this session: **185 / 0 / 0 across 14
+> classes**, matching what `STATE.md` carried. After: **187 / 0 / 0 across 14**. `RelayClientTest`
+> 25 → **26**, `SyncPumpTest` 18 → **19**.
+
+```bash
+# after the C-S6A-1 recipe:
+python3 - <<'PY'
+import glob, xml.etree.ElementTree as ET
+t=f=s=0; c=0
+for p in sorted(glob.glob('<android>/core/build/test-results/test/TEST-*.xml')):
+    r=ET.parse(p).getroot(); c+=1
+    t+=int(r.get('tests')); f+=int(r.get('failures'))+int(r.get('errors')); s+=int(r.get('skipped'))
+print(t, f, s, c)
+PY
+```
+
+*Expected:* `187 0 0 14`. For the baseline, check out the parent commit and repeat: `185 0 0 14`.
+Both ends were measured in this session.
+
+### C-S4S-6 — Two `SyncPumpTest` cases rested on the wrapper, and one of them passed for the wrong reason
+
+> **Claim.** The queued note predicted **one** existing assertion would have to be rewritten
+> (`RelayClientTest`'s). There were **three**, in two files. The second `SyncPumpTest` case —
+> `an envelope that does not parse is discarded and does not stall the cursor` — kept **passing**
+> after the change while testing something other than its title: it wrapped a malformed envelope to
+> exercise §3's unknown-field rule, and post-change the *wrapper* was what failed to parse, not the
+> `surprise` field. A green test is not evidence that it still tests what it says.
+>
+> **This is also where PQ-S4-3 came from.** `a wrapped envelope is never applied…` asserts
+> `report.cursor == 999` — the discarded element still advances the cursor to its own claimed
+> number, because an unparseable envelope has no authenticated `seq`. Pre-existing, not caused here.
+
+```bash
+cd <android>
+git show HEAD -- core/src/test/kotlin/app/careerseeker/core/SyncPumpTest.kt | grep -n "^[-+].*wrappedPage"
+grep -n "header?.seq ?: envelope.seq" -B 12 core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+```
+
+*Expected:* the diff shows `wrappedPage` removed from the unknown-field test and retained only in
+the new refusal test; the `SyncPump` grep prints the fallback and the KDoc whose safety argument
+covers the discarded *item* but not the *cursor* — which is PQ-S4-3 in two lines.
+
+### C-S4S-7 — Neither gate ran here, and neither can
+
+> **Claim.** The android gate (`./gradlew … :app:assembleDebug :app:lintDebug`) did **not** run: no
+> Android SDK, no JBR, and `dl.google.com` is an egress policy denial (B-7). `Verify-Alpha.ps1` did
+> **not** run: no .NET. Both statements are about this sandbox, not about the change.
+
+```bash
+which dotnet ; echo "dotnet exit=$?"
+curl -sS -o /dev/null -w '%{http_code}\n' https://dl.google.com/ ; echo "exit=$?"
+```
+
+*Expected:* `dotnet` not found; a CONNECT tunnel failure / 403 from the proxy. **The main-repo half
+of this slice is doc-only**, so `$ExpectedOfflineTotal` (598) is untouched by construction — no
+`.cs`, no harness, no vector and no count-reporting doc was written. CI is the gate for both halves.

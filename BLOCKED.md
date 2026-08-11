@@ -673,3 +673,36 @@ diff, so the step is unaffected on its face — but that is an argument, and CI 
 **B-7 was not re-measured this iteration** and is carried forward unchanged: this slice needed
 neither Gradle nor the Android SDK, so it produced no new evidence about `dl.google.com`. The last
 measurement stands (2026-08-10, tenth run).
+
+---
+
+## No new blocker arose 2026-08-11 (S4 pull-page semantics, thirteenth cloud iteration)
+
+Recorded explicitly, because "nothing blocked" is a finding too and the alternative is a future
+session hunting for a phantom.
+
+**The slice completed both halves it set out to do.** §2.1 landed in the main repo and the wrapper
+removal landed in `:core`, and neither needed a machine this sandbox is not. The spec half is
+doc-only; the phone half is `:core` Kotlin, which the reduced probe runs (C-S4S-5).
+
+**One candidate blocker was investigated and dismissed rather than filed.** The first draft of §2.1
+required a receiver to report an unreadable body "as an unavailability", which
+`src/Sync/RelayClient.cs`'s `PullAsync` does not do — it lets the parse throw. That looked like a
+new engine-side conformance gap needing .NET to close, i.e. a B-9. **It was not a gap in the engine;
+it was an over-reach in the clause I had just written**, and the fix was to write the clause
+correctly (MUST for the safety property both receivers hold, SHOULD for the error type they
+reasonably differ on). Filing it would have manufactured a blocker out of my own draft.
+
+**What remains unverified here, and it is the standing pair, not something new:**
+
+- The **android gate** did not run and cannot — no SDK, no JBR, `dl.google.com` egress-denied
+  (**B-7**). CI is the gate. Verify with C-S4S-7.
+- **`Verify-Alpha.ps1`** did not run and cannot — no .NET (**not** a new blocker; it is also
+  unaffected, since the main-repo half of this slice wrote one doc file and no `.cs`, no harness,
+  no vector and no count-reporting doc, so `$ExpectedOfflineTotal` (598) is untouched by
+  construction).
+
+**PQ-S4-3 is a finding, not a blocker.** Nothing prevents it being fixed — it needs a spec decision
+about how far an unparseable element may move a cursor, and both the decision and the `:core` half
+are reachable from a sandbox. It is queued as a slice, not filed here, and calling it BLOCKED would
+be exactly the mislabel this file's history is full of corrections for.

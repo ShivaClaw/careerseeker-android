@@ -673,3 +673,101 @@ on both sides. Doing it in the other order is the size-cap mistake again: an imp
 tightening ahead of the document it claims to implement.
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-S4P-6** and **C-S4P-7**.
+
+### CLOSED 2026-08-11 (S4 pull-page semantics, thirteenth cloud iteration) — spec first, then the phone
+
+**Spec half.** `docs/Sync-Protocol.md` gained **§2.1 Pull response body** on
+`claude/s4-pull-request-semantics` (main repo, draft PR #33). It pins the strictest reading already
+shipping — the engine's — rather than inventing a fourth: `envelopes` and `latest` both **REQUIRED**,
+`latest` a bare JSON integer, elements **bare §3 envelopes** in ascending `seq`, the page explicitly
+**truncatable** (so `latest` is the only "am I caught up" signal and a short page is not one), and an
+unreadable body something a receiver **MUST NOT** turn into a successful pull of zero envelopes. The
+`{"seq":N,"envelope":…}` wrapper is refused in as many words. §2's route-table row and §6.1's use of
+`latest` now point at it.
+
+**One clause was written too strongly and corrected in the same slice**, which is worth recording
+because it is the size-cap mistake pointing the other way. The first draft said a receiver MUST
+report an unreadable body "as an unavailability" — the phone does, and the engine's `PullAsync` lets
+the parse throw instead. That would have made shipping engine code non-conformant on a question of
+**error-type style**, not safety. The safety property both receivers already hold — never a silent
+empty page — stays a MUST; the reporting mechanism is a SHOULD with both postures named. **A spec
+tightening ahead of its implementations is the same defect as an implementation tightening ahead of
+its spec**, and this one was caught only by going and reading `PullAsync` rather than assuming the
+engine matched the phone.
+
+**Phone half, in the same slice and deliberately second.** `RelayClient.parsePullPage` no longer
+unwraps: an element is the envelope, `wire` is the whole element, and a wrapper simply fails the
+receiver's strict §3 parse (`envelope` is not in `KNOWN_FIELDS`). The order matters — doing the
+implementation first is the size-cap mistake, an implementation tightening ahead of the document it
+claims to implement.
+
+**Two existing `SyncPumpTest` cases were built on the wrapper, not one.** The queued note only
+predicted `RelayClientTest`'s. Both were rewritten rather than deleted:
+
+- `the cursor follows the envelope's authenticated seq, not the relay's page wrapper` is now
+  `…, and nothing else can supply one`. **The property it defended is now structurally unreachable
+  rather than defended**, which is the strongest form of this result: `parsePullPage` reads `seq`
+  off the same element `EnvelopeJson.parse` reads it off, so for any element the two either agree
+  (it parsed) or both fail (it did not). `SyncPump`'s rule 4 survives as defence in depth, and the
+  test now says so instead of implying the check is load-bearing.
+- `an envelope that does not parse is discarded and does not stall the cursor` was **passing for the
+  wrong reason** after the change — it wrapped a malformed envelope to test §3's unknown-field rule,
+  and post-change the wrapper was what failed, not the `surprise` field. It now uses a bare
+  envelope, which is what it always meant.
+
+**What did not change:** no vector (a page is not an envelope, and `SyncHarness` enumerates
+`docs/sync-vectors/v1/*.json`, so a new file would move `$ExpectedOfflineTotal` — a number no
+.NET-less machine can measure); no relay code (it already emits the conforming shape); no engine code
+(see B-9).
+
+**Measured:** `:core` **185 → 187 / 0 / 0** across 14 classes on the reduced probe; the new
+`RelayClientTest` case was run against the pre-change parser and **failed** there while all 25
+pre-existing cases passed.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S4S-1…7**.
+
+---
+
+## PQ-S4-3 — An envelope that fails to parse still advances the cursor to a number it made up
+
+**Opened 2026-08-11 (S4 pull-page semantics, thirteenth cloud iteration).** Found while removing the
+wrapper shape, and **it predates that change** — the wrapper removal neither caused it nor worsened
+it, it merely made it the only remaining path by which a page's own numbers reach the cursor.
+
+**The rule.** `SyncPump` (`core/…/SyncPump.kt`) advances its transport cursor per element:
+
+```
+val seq = header?.seq ?: envelope.seq
+if (seq > cursorValue) cursorValue = seq
+```
+
+When the strict §3 parse fails there is no authenticated `seq`, so it falls back to the one the
+element **claims** at its top level, read leniently by `parsePullPage`. The KDoc justifies this as
+"safe because the item is discarded either way and the alternative is a permanent stall on one
+malformed byte".
+
+**Why the justification is narrower than the rule.** The *item* is discarded — that part is true and
+safe. The *cursor* is not: it advances to an unauthenticated number of the relay's choosing. A blind
+relay that appends one unparseable element carrying `"seq": 1000000` moves the phone's cursor past
+every envelope between its current position and that value. Those envelopes are never re-requested,
+because the cursor only ever moves forward. **That is history truncation, achieved without
+decrypting anything** — the same attack C-S4T-4 and §2.1's wrapper refusal each closed one door on,
+through the one door still open.
+
+**Why it is not fixed here.** Both obvious repairs have a wrong version that compiles:
+
+- *Do not advance on an unparseable element.* One corrupt byte then stalls the direction forever,
+  which is the failure §6.2 explicitly forbids ("a gap MUST NOT stall the stream").
+- *Advance by one instead.* Cheap, and it converts a truncation into a slow crawl — but it also
+  desynchronises the cursor from real sequence numbers, and nothing in the spec says the next `seq`
+  is `n+1` (the relay's TTL purge makes gaps legitimate).
+
+A third option — bound the advance by the page's own `latest`, which the relay must report anyway —
+looks best on the evidence, because it caps how far one bad element can move the cursor at a value
+the client was going to compare against regardless. **It is a decision, not a bug fix**, and it
+belongs in a slice whose title says so.
+
+**To close.** A §2.1 or §6.2 sentence stating how far an unparseable element may move a receiver's
+cursor, then the same rule in `SyncPump` and in the engine's reader. Spec first, again.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S4S-6**.

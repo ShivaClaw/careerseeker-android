@@ -3594,3 +3594,178 @@ reaches them. **`AUDIT-REQUEST.md` C-S6A-1 already recorded this**, from an earl
 lost the same time the same way, and I read past it. That is precisely the shape of the bug this
 slice fixed: *an invariant written down in one place and not applied where it was needed.* Repeated
 at C-S4P-12 rather than left where being written once demonstrably did not work.
+
+---
+
+## S4S — The pull page had no definition, so three implementations wrote three (2026-08-11, thirteenth cloud iteration)
+
+Linux cloud sandbox. **Two repos, spec first, deliberately in that order.**
+
+### S4S-1 Why this rung, when the stored prompt nominated another
+
+The scheduled prompt nominates S5's spec half every iteration — §4.3 amendment, ack vector,
+PQ-A2-1/-2/-3 — and describes S5 as "NOT STARTED and genuinely NOT blocked". **That has been wrong
+since 2026-08-09**, and this is the seventh iteration to re-derive it: §4.3.3, both ack vectors and
+the phone applier landed in PR #32 the first time it was nominated. The prompt is a stored snapshot
+and does not re-read itself; its own instruction — *"verify it; do not trust this summary"* — is the
+operative one. `STATE.md` and this file are the state.
+
+So the choice was again among the items a sandbox can actually reach. Every rung's *forward*
+remainder needs a machine this session is not (S2 the `/pair` page → .NET; S3 the Keystore and
+screens → B-4; S4's `:app` wiring → SDK/B-7; S5's C# applier → .NET; S6's device key → B-4+B-7).
+The queued `:core`/spec items were the field, and **PQ-S4-2's stated close was the topmost**: the
+twelfth iteration had opened it, written down exactly what would close it — *"a §2 (or a new §4.2)
+amendment defining the pull response body… Spec first, then the wrapper removal on both sides"* —
+and deliberately left it, because taking a spec decision inside an implementation slice is the
+size-cap mistake in reverse. This slice is that close, both halves.
+
+### S4S-2 The gap, stated
+
+§2's route table defines `GET /v1/{pairing}/pull?since={seq}&dir={dir}` as "Fetch envelopes for
+direction `dir` with `seq > since`" **and stops**. No response body: not `envelopes`, not `latest`,
+not their types, not whether either is required. `latest` appears in the normative text exactly
+once — §6.1 reconciles the engine's counter against "the relay's current `latest`" — **using a field
+the document never defines**. §3 pins the envelope to the byte; the page carrying envelopes was
+pinned nowhere. Three implementations each filled the gap differently (the table is in PQ-S4-2), and
+the phone's was the most permissive, which is the wrong direction under the interpretation rule.
+
+### S4S-3 What §2.1 says, and why each rule is the engine's
+
+The new section pins the strictest reading **already shipping** rather than inventing a fourth:
+both fields REQUIRED, `latest` a bare JSON integer, elements bare §3 envelopes in ascending `seq`,
+the page explicitly **truncatable** (`PULL_PAGE_SIZE` = 100, `relay/src/protocol.ts:64`) so `latest`
+is the only "am I caught up" signal, an unreadable body never a successful empty pull, and the
+`{"seq":N,"envelope":…}` wrapper refused.
+
+The load-bearing paragraph is why the fields are required rather than defaulted. **`latest` is the
+client's loop bound.** Default it to `0` and `cursor < latest` is false, so the client reports a
+healthy, fully-caught-up, permanently empty sync — one deleted field, no error anywhere, and the
+relay is the party that controls the body. Rejecting is loud; defaulting is not.
+
+### S4S-4 A clause I wrote too strongly, caught by reading the engine instead of assuming it
+
+The first draft required a receiver to report an unreadable body **"as an unavailability"**. The
+phone does. `src/Sync/RelayClient.cs`'s `PullAsync` does not — it has no `try`, and the parse throws
+to its caller. **That draft made shipping engine code non-conformant on a question of error-type
+style, not safety**, and briefly looked like a new engine-side blocker to file.
+
+It was not the engine's defect; it was mine, two commits old. The safety property both receivers
+genuinely hold — an unreadable body must never become a successful pull of zero envelopes — stays a
+MUST. The reporting mechanism dropped to SHOULD with both postures named. **A spec tightening ahead
+of its implementations is the same defect as an implementation tightening ahead of its spec**, and
+the relay's size cap is the precedent for the second direction. Corrected in the same slice
+(`10696d2`), not left for a reader to trip over.
+
+### S4S-5 The phone half, and the decision in it
+
+`parsePullPage` no longer unwraps. An element **is** the envelope; `wire` is the whole element; a
+wrapper fails the receiver's strict §3 parse, because `envelope` is not in `EnvelopeJson.KNOWN_FIELDS`.
+
+Accepting the wrapper was never free tolerance. It made the meaning of an element depend on whether
+it happened to contain a key named `envelope` — **a key the relay controls** — and it read a sequence
+number the relay authenticates with nothing from beside one the AAD covers.
+
+**The result is stronger than a fix, and this is the part worth carrying.** `SyncPump`'s rule 4
+(prefer `header.seq`, never the page's) was a *defence* against those two numbers disagreeing. With
+the wrapper gone they are read off the same field by both parsers, so for any element they either
+agree (it parsed) or both fail (it did not): **the disagreement is now structurally unreachable
+rather than defended against.** Rule 4 survives as defence in depth, and its test now says so
+instead of implying the check is load-bearing.
+
+### S4S-6 Three existing assertions rested on the wrapper, not the one that was predicted
+
+The queued note predicted `RelayClientTest`'s `pull returns envelopes unparsed…`. There were
+**three, in two files** — and the second `SyncPumpTest` case is the one worth the entry:
+
+`an envelope that does not parse is discarded and does not stall the cursor` **kept passing** after
+the change, while testing something other than its title. It wrapped a malformed envelope to
+exercise §3's unknown-field rule; post-change the *wrapper* was what failed to parse, not the
+`surprise` field, and the numbers happened to line up so the assertions still held. **A green test
+is not evidence that it still tests what it says.** It now uses a bare envelope, which is what it
+always meant. Nothing would have flagged this — it was found by reading every `wrappedPage` caller
+after the one failure, rather than stopping at the failure.
+
+### S4S-7 Evidence, and the red run was deliberate
+
+Baseline on the reduced probe (C-S6A-1 recipe, JDK 21) **before any edit**: **185 / 0 / 0 across 14
+classes**, matching the figure `STATE.md` carried from the twelfth iteration — re-derived, not
+copied. After: **187 / 0 / 0 across 14**. `RelayClientTest` 25 → **26**, `SyncPumpTest` 18 → **19**.
+
+The new `RelayClientTest` case was run against the **pre-change** parser, and failed there while all
+25 pre-existing cases in the class passed:
+
+```
+RelayClientTest > a wrapped envelope is refused end to end, even when the envelope inside it is valid() FAILED
+26 tests completed, 1 failed
+BUILD FAILED
+```
+
+Its inner envelope is deliberately **structurally valid** — that is the whole point. Under the old
+client the wrapper was unwrapped into something the receiver could parse, so the shape *worked*, and
+that is precisely why nobody noticed no implementation emits it.
+
+`node docs/sync-vectors/generate.mjs --check` → `OK: 28 vector files match the generator.`, exit 0
+(28 is the **branch** figure; `main` is 26).
+
+**This is the reduced probe, not the verification command of record.** `:app`, `lintDebug`,
+`assembleDebug` and `checkCoreIsAndroidFree` are absent from it and the toolchain is substituted
+17 → 21 (`api.foojay.io` egress-denied, B-7). **The gate is CI.** The android gate did not run and
+cannot here; **`Verify-Alpha.ps1` did not run and cannot** — no .NET — and is also unaffected: the
+main-repo half is one doc file, so `$ExpectedOfflineTotal` (598) is untouched by construction.
+
+### S4S-8 What this deliberately did not do
+
+**No vector was added or changed.** A page is not an envelope, so none applies — and `SyncHarness`
+enumerates `docs/sync-vectors/v1/*.json` (`tests/SyncHarness/Program.cs:50`), so adding a file moves
+`$ExpectedOfflineTotal`, a number no .NET-less machine can measure. The vendored pin stays `679a317`
+and no vendored byte was touched.
+
+**No relay change.** It already emits the conforming shape; §2.1 was written to match it, not to
+move it. **No engine change** — `PullAsync` is `.cs` and cannot be compiled or gated here.
+
+**PQ-S4-3 was opened, not fixed.** An element that fails the strict parse still advances the cursor
+to its own *claimed* `seq`, so one unparseable element carrying a large number can steer the cursor
+past envelopes that are then never re-requested. **It predates this slice and this slice neither
+caused nor worsened it** — it merely made it the only remaining path by which a page's own numbers
+reach the cursor. Both obvious repairs have a wrong version that compiles (refusing to advance
+stalls the direction forever, which §6.2 forbids; advancing by one desynchronises the cursor from
+real sequence numbers). Bounding the advance by the page's own `latest` looks best, and **that is a
+decision, not a bug fix** — a slice whose title says so, spec first again.
+
+### S4S-9 Ladder effect, stated narrowly
+
+**S4 stays PARTIAL and this slice does not move it toward DONE.** Its remainder is the `:app` wiring
+— the `ApplyResult` adapter, the Room-backed position source, the Ktor engine — and none of that was
+touched. What changed is that one more thing the phone trusted about an untrusted party is no longer
+trusted, and that a contract three implementations were each guessing at is now written down. **A
+rung does not advance because work happened in its neighbourhood** — the third iteration in a row
+that has had to write this sentence.
+
+**`SyncPump` still has no production caller** (`grep -rn SyncPump app/src` prints nothing), so
+nothing here is a field fix; it is all prospective.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** Android PR #6 stays a draft; main-repo PRs #32 and #33 stay
+drafts and were neither merged, retargeted, rebased nor force-pushed. Both branches were pushed
+**forward-only** — no force-push, no history rewrite, no branch deleted, in either repo.
+
+**Main repo: one file written** (`docs/Sync-Protocol.md`, on `claude/s4-pull-request-semantics`),
+plus the coordination bus. No `.cs`, no `relay/` file, no harness, no `Verify-Alpha.ps1`, no
+`$ExpectedOfflineTotal`, no count-reporting doc, no vector and no `generate.mjs` change.
+
+**Android repo: three `:core` files** (`RelayClient.kt`, `RelayClientTest.kt`, `SyncPumpTest.kt`)
+plus these records. **No `:app` file**, no Gradle or version-catalog file, no emulator, no
+`sdkmanager`, no AVD, and no attempt to route around the `dl.google.com` denial.
+
+**No deploy of any kind** (Cloudflare, Workers, relay, site, Pages) and no `wrangler` invocation at
+all. **The production relay was contacted zero times, not even `GET /v1/health`** — every relay in
+this slice is a Ktor `MockEngine` inside the test runner, and no test opens a socket.
+
+No Google, Play, OAuth or Console action; no accounts, no purchases, no Play Billing code; no email
+or Gmail anything; no cert-store, MSIX or keystore action — the upload keystore and its password
+file were neither read nor referenced beyond their paths. **No secrets read, written or printed.**
+
+Terra's state was read at iteration start and again before writing this: still R6(b) BLOCKED on
+draft PR #26, heartbeat unchanged at 2026-08-07T21:18, **claims no files** — no collision. This
+slice's only main-repo territory is `docs/Sync-Protocol.md`, already claimed via #32/#33.
