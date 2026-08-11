@@ -3704,3 +3704,48 @@ npx tsc --noEmit -p tsconfig.json 2>&1 | wc -l
 
 *Expected:* `55` both times. This is **not** a clean typecheck and must not be reported as one —
 run `npm run typecheck` on a machine where invoking `wrangler` is in scope.
+
+---
+
+## iOS portability measurement — 2026-08-11 (out of ladder, at Brandon's request)
+
+### C-IOS-1 — `:core` is 86% portable by line count, and the port surface is 5 files
+
+> **Claim.** `:core` is 18 files / ~3,150 lines. **13 files / ~2,720 lines carry zero
+> `java.*`/`javax.*` imports** and port to a Kotlin/Native iOS target unchanged. Five are JVM-bound:
+> `SyncCrypto.kt` (137 lines, 14 such imports), `Entitlement.kt` (138, 4), `PairingDerivation.kt`
+> (74, 1), `Hkdf.kt` (55, 2), `Base64Url.kt` (25, 1). Both `:core` dependencies
+> (`kotlinx-serialization-json`, `ktor-client-core`) are already multiplatform. `:app` is 12 files /
+> 1,200 lines.
+
+```bash
+cd careerseeker-android && git checkout claude/android-a0-probe
+for f in $(find core/src/main/kotlin -name "*.kt"); do
+  echo "$(grep -c '^import java\.\|^import javax\.' $f)	$(wc -l < $f)	$f"; done | sort -rn
+find app/src/main -name "*.kt" | wc -l
+find app/src/main -name "*.kt" -exec cat {} + | wc -l
+grep -n "kotlinx.serialization\|ktor.client.core" core/build.gradle.kts
+```
+
+*Expected:* five files with a non-zero first column and thirteen with `0`; `12` and `1200` for
+`:app`; both dependencies present as `implementation`. **The line counts are `wc -l`, so they
+include comments and blank lines** — this is a proportionality measurement, not a LOC estimate, and
+should not be quoted as effort.
+
+### C-IOS-2 — CI already produces a sideloadable debug APK
+
+> **Claim.** `.github/workflows/ci.yml` uploads `app/build/outputs/apk/debug/*.apk` as artifact
+> **`app-debug`** with `if-no-files-found: error` and 14-day retention. Since the *Build and test*
+> job concluded `success` on `e6e6dc5` (run `31495754391`), the artifact exists **by construction**:
+> the step fails the job when the APK is missing.
+
+```bash
+sed -n '117,123p' careerseeker-android/.github/workflows/ci.yml
+# then, in a browser (the Actions artifacts REST API is 403 to this sandbox -- C-S4P-12):
+#   https://github.com/ShivaClaw/careerseeker-android/actions/runs/31495754391
+```
+
+*Expected:* the `Upload debug APK` step as described, and an `app-debug` artifact on that run.
+**This is inference from config plus a green job, not an artifact I downloaded** — the sandbox
+cannot list Actions artifacts. It is **debug-signed**, so it is for the owner's own device and not
+for testers.
