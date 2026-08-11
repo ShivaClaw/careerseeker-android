@@ -3676,14 +3676,18 @@ git diff --stat origin/claude/s2-relay-retention..claude/s2-seq-bound
 node docs/sync-vectors/generate.mjs --check
 git diff --name-only origin/claude/s2-relay-retention..claude/s2-seq-bound -- docs/sync-vectors/ scripts/ tests/ src/
 # MCP, not curl -- the Actions REST API is 403 to curl from this sandbox (C-S4P-12)
-#   get_job_logs  job_id=93789450880  return_content=true  tail_lines=45
+#   get_job_logs  job_id=93792278316  return_content=true  tail_lines=48   # final head 2be00fc
+#   get_job_logs  job_id=93789450880  return_content=true  tail_lines=45   # earlier head 0af7012
 ```
 
 *Expected:* exactly four files (`docs/Sync-Protocol.md`, `relay/src/protocol.ts`,
 `relay/src/channel.ts`, `relay/test/relay.test.ts`); `OK: 28 vector files match the generator.` exit
 0 (**28 is the branch figure**, `main` is 26); the third command prints **nothing**; and both
-`=== 130 passed, 0 failed ===` and `=== Offline total: 598 passed, 0 failed ===` in the job log,
-run `31494720248`, both jobs `success`.
+`=== 130 passed, 0 failed ===` and `=== Offline total: 598 passed, 0 failed ===` in the job log.
+**Two runs, and the later one is the head that matters:** `31494720248` on `0af7012` (the code) and
+**`31495565325` on `2be00fc`** (the wording fix on top of it). **Both jobs `success` in both runs**,
+and both printed the same two totals — so the 598 pin is confirmed on the branch tip, not only on an
+intermediate commit.
 
 ### C-S2Q-7 — `tsc` reports the same 55 errors before and after, so none is mine
 

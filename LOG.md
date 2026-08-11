@@ -4363,9 +4363,13 @@ same wall PQ-A2-3 sits behind.
 
 ### S2Q-5 What CI said, because I could not say it
 
-Draft PR **#35** (`claude/s2-seq-bound`, stacked on #34 → #32). Run **31494720248**, **both jobs
-`success`**. From the *Build and offline harnesses* job log (id 93789450880):
-`=== 130 passed, 0 failed ===` and **`=== Offline total: 598 passed, 0 failed ===`**. **So the 598
+Draft PR **#35** (`claude/s2-seq-bound`, stacked on #34 → #32). **Two runs, because a wording fix
+landed after the code** — and the branch tip is the one that counts. Run **31494720248** on
+`0af7012` and run **31495565325** on **`2be00fc`**, the tip: **both jobs `success` in both**. From
+the *Build and offline harnesses* job log on the tip (id 93792278316):
+`=== 130 passed, 0 failed ===` and **`=== Offline total: 598 passed, 0 failed ===`**, then
+`CareerSeeker alpha verification complete.` — so `Verify-Alpha.ps1` ran in full and the pin is
+confirmed **on the head being reviewed**, not on an intermediate commit. **So the 598
 pin is confirmed by observation, not argued from the diff** — and the *Blind relay (Worker)* job
 ran this slice's tests on a machine that is not mine.
 
