@@ -3586,9 +3586,11 @@ command below runs on Linux with Node only; **none of them needs .NET or an Andr
 ### C-S2Q-1 — The relay's old guard was not a range check, and the reachable ceiling was ~1.8e308
 
 > **Claim.** `relay/src/channel.ts` validated `seq` with `Number.isInteger(seq) && seq >= 1` and
-> nothing else. `Number.isInteger` is true for every finite double, so values to ~1.8e308 were
-> accepted and appended; only `Infinity` was refused, and it fails because
-> `Number.isInteger(Infinity)` is `false`, not because of any bound.
+> nothing else. `Number.isInteger` rejects a fractional value but cannot reject a large
+> one — every double at or above `2^53` is necessarily integral — so the predicate is vacuously
+> true across exactly the range this rule cares about. Values to ~1.8e308 were accepted and
+> appended; only `Infinity` was refused, and it fails because `Number.isInteger(Infinity)` is
+> `false`, not because of any bound.
 
 ```bash
 git -C careerseeker show origin/claude/s2-relay-retention:relay/src/channel.ts | grep -n "isInteger(seq)"

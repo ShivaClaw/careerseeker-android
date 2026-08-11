@@ -4296,9 +4296,11 @@ Baseline first, so the count means something: **`Tests 42 passed (42)`** on
 **Three findings the question did not have.**
 
 **(a) The reachable ceiling was not `MAX_SAFE_INTEGER`.** PQ-S2-2's measurement stops there and
-reads as though that were the boundary. `Number.isInteger` is **not a range check** — it is true for
-every finite double — so the accepted range ran to ~1.8e308, and `Infinity` is refused only as a
-side effect of `Number.isInteger(Infinity)` being `false`.
+reads as though that were the boundary. `Number.isInteger` is **not a range check**: it rejects a
+fractional value but **cannot reject a large one**, because every double at or above 2⁵³ is
+necessarily integral — the format has no bits left for a fraction there — so the predicate is
+vacuously true across exactly the range this rule cares about. The accepted range ran to ~1.8e308,
+and `Infinity` is refused only as a side effect of `Number.isInteger(Infinity)` being `false`.
 
 **(b) The read path breaks, and it is the severe half.** The question costed the wedge on the write
 path only. But `latest` is emitted from the same double, and **both receivers parse it strictly**:

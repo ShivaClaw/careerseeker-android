@@ -684,7 +684,8 @@ different costume.
 
 **1. The reachable ceiling was not `MAX_SAFE_INTEGER`.** The measurement above stops at
 `Number.MAX_SAFE_INTEGER`, which reads as though that were the boundary. `Number.isInteger` is
-**not a range check** — it is true for every finite double — so `1e300` pushes just as well, and
+**not a range check**: it rejects a fractional value but cannot reject a large one, since every
+double at or above 2⁵³ is necessarily integral — so `1e300` pushes just as well, and
 only `Infinity` was refused (it answers `400`, since `Number.isInteger(Infinity)` is `false`). The
 reachable range was ~1.8e308.
 
