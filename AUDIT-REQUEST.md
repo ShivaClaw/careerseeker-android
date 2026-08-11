@@ -3879,11 +3879,11 @@ git diff --stat origin/claude/s4-pull-request-semantics..claude/s2-transport-voc
 *Expected:* the first prints **nothing**; the second prints exactly two files —
 `docs/Sync-Protocol.md` and `relay/test/relay.test.ts`.
 
-### C-S2T-6 — 36 → 47, and ten of the eleven new tests were proven against a mutated relay
+### C-S2T-6 — 36 → 48, and eleven of the twelve new tests were proven against a mutated relay
 
-> **Claim.** All eleven are pins by construction (no relay code changed), so each was checked
-> against a deliberately broken relay rather than assumed useful. **Ten caught something.** The
-> eleventh — `unpair is not a tombstone` — is **not** proven and is labelled a pin.
+> **Claim.** All twelve are pins by construction (no relay code changed), so each was checked
+> against a deliberately broken relay rather than assumed useful. **Eleven caught something.** The
+> twelfth — `unpair is not a tombstone` — is **not** proven and is labelled a pin.
 
 ```bash
 cd <main>/relay
@@ -3891,7 +3891,7 @@ git stash && npm test 2>&1 | grep "Tests "     # base: 36 passed
 git stash pop && npm test 2>&1 | grep "Tests " # branch: 47 passed
 ```
 
-*Expected:* `36 passed (36)` then `47 passed (47)`.
+*Expected:* `36 passed (36)` then `48 passed (48)`.
 
 To reproduce one mutation (revert afterwards — the branch must stay byte-identical in `relay/src/`):
 
@@ -3907,7 +3907,7 @@ cd relay && npm test 2>&1 | grep -E "Tests |FAIL"
 cd .. && git checkout relay/src/channel.ts
 ```
 
-*Expected:* `1	1	relay/src/channel.ts`, then `4 failed | 43 passed`, two of them the §2.3 tests
+*Expected:* `1	1	relay/src/channel.ts`, then `4 failed | 44 passed`, two of them the §2.3 tests
 (`means the id is MALFORMED`, `after unpair every route answers 401`). The other two failures are
 pre-existing tests that also depend on the 401 (`rotates provisional -> final`, `DELETE purges the
 queue and the token`). The other three mutations and the tests they catch are enumerated in commit
@@ -3921,6 +3921,44 @@ queue and the token`). The other three mutations and the tests they catch are en
 > single site. **A re-verification command that does not reproduce its own expected output is worse
 > than no command**, because it reads as evidence. The `git diff --numstat` line is in the recipe so
 > the next reader catches an over-broad match before interpreting the failure count.
+
+### C-S2T-6b — `POST /pair`'s 413 cap counts characters, not bytes
+
+> **Claim.** The check is `raw.length > 16 * 1024` on the decoded string, so the unit is UTF-16 code
+> units. A body of 16,384 three-byte characters — **49,152 bytes** — is *under* the cap. The
+> effective byte ceiling is up to **3×** what the constant looks like. This is the same
+> character-versus-byte conflation §3.1 was amended to fix, in a second place, and §2.3 now pins it
+> **in the unit the relay actually uses** rather than correcting it (correcting it would refuse
+> bodies v1 has never declared illegal — §3.1's own rule).
+
+```bash
+cd <main>/relay && npx vitest run -t "cap counts characters"
+```
+
+*Expected:* 1 passed — `413` at 16,385 ASCII chars, `400` at 16,384, `400` for 16,384 three-byte
+chars (49,152 bytes, under the cap, failing later on `JSON.parse`), `413` at 16,385 of them.
+
+Proven live by mutating the cap to count bytes — **this test fails and only this test**:
+
+```bash
+cd <main>
+python3 -c "
+p='relay/src/channel.ts'; s=open(p).read()
+s=s.replace('if (raw.length > 16 * 1024) return',
+            'if (new TextEncoder().encode(raw).length > 16 * 1024) return')
+open(p,'w').write(s)"
+git diff --numstat relay/src/channel.ts          # MUST be 1 1
+cd relay && npm test 2>&1 | grep -E "Tests |×"
+cd .. && git checkout relay/src/channel.ts
+```
+
+*Expected:* `1 failed | 47 passed (48)`, the failure being this test.
+
+**How it was found, because the method is the point.** It was not found by reading `channel.ts`; it
+was found by **auditing my own §2.3 table before shipping it**. The row originally read "body over
+16 KiB", copied from the constant's appearance rather than from its behaviour. Had it shipped, the
+spec would have asserted a byte budget the relay does not enforce — the §3.1 bug's exact shape,
+written into the document that exists to prevent it.
 
 ### C-S2T-7 — The phone-side half of PQ-S2-4 is READ, not executed
 

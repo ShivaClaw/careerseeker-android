@@ -4551,7 +4551,7 @@ collide *with the same meaning*); the third name is the dangerous one and nothin
 
 ### S2T-4 The tests, and the honest label on the one that is not proven
 
-**36 → 47.** Because no relay code changed, **all eleven are pins by construction — none of them CAN
+**36 → 48.** Because no relay code changed, **all twelve are pins by construction — none of them CAN
 fail against the current source** — so rather than assert they were useful, each was checked against
 a deliberately mutated relay. Four mutations, each reverted:
 
@@ -4561,8 +4561,9 @@ a deliberately mutated relay. Four mutations, each reverted:
 | `GET /pair` empty → 204; `DELETE` drops `purged` | `ordinary "nothing waiting" case`, `{ok,purged:N}` |
 | create-conflict drops `exists`; a 400 gains a `hint`; rotation drops its flag | `exactly nine codes`, `409 carries three bodies`, `{ok,rotated:true}`, `every error body is exactly {error}` |
 | worker-level 405 → 404 and 426 → 400 | `405 is reachable only for…`, `live answers 426` |
+| `/pair`'s cap counts bytes instead of characters | `cap counts characters, not bytes` (§S2T-8) |
 
-**Ten of eleven proven. The eleventh — `unpair is not a tombstone` — is NOT proven and is labelled a
+**Eleven of twelve proven. The twelfth — `unpair is not a tombstone` — is NOT proven and is labelled a
 pin**, since breaking it needs a future change rather than a mutation of today's code. This is the
 thirteenth run's lesson applied forward: a test that still passes after a behaviour change is the one
 to read, so each was checked for which side of that line it sits on rather than waiting to be
@@ -4626,6 +4627,42 @@ iteration in a row that this sentence has been written.**
 **PQ-S2-3 is closed. PQ-S2-4 is opened and is not a blocker.** S5's spec half remains closed and its
 applier half remains unwritten, which is a local session's slice: two appliers, two languages,
 neither compilable here.
+
+### S2T-8 A twelfth test, and the finding that came from auditing my own draft
+
+**The §2.3 table originally said `POST /pair` refuses "body over 16 KiB".** That was copied from how
+the constant *looks* (`16 * 1024`) rather than from what it *does*: the check is `raw.length` on the
+decoded string, so the unit is **UTF-16 code units**. Measured before the row was corrected:
+
+```
+413  16385 ASCII chars (16385 bytes)
+400  16384 ASCII chars (16384 bytes)        <- under the cap, fails later on JSON.parse
+400  16384 x 3-byte chars (49152 BYTES)     <- under the cap at 3x the bytes
+413  16385 x 3-byte chars
+```
+
+**The effective byte ceiling is up to 3× what the constant looks like**, and this is the *same*
+character-versus-byte conflation §3.1 was amended to fix on 2026-08-09 — in a second place, which
+nobody had written down. Had the row shipped as drafted, `Sync-Protocol.md` would have asserted a
+byte budget the relay does not enforce: **the §3.1 bug's exact shape, written into the document that
+exists to prevent it.**
+
+**v1 pins the measured behaviour rather than correcting it**, on §3.1's own reasoning: tightening the
+relay to a byte count refuses bodies this document has never declared illegal, and the completion is
+a small pairing document whose worst case is a bounded over-allocation, not a security property. The
+cap is stated in the unit it uses, plus the rule for any future amendment — **state the byte budget
+and derive the character constant from it, never the other way round**, which is what
+`MAX_CIPHERTEXT_B64U_CHARS` already does.
+
+Suite **47 → 48**, and the new test is **proven live**: mutating the cap to `new TextEncoder()
+.encode(raw).length` fails this test **and only this test**. So **eleven of twelve are proven**; the
+unproven one is still `unpair is not a tombstone`, still labelled a pin.
+
+**The method is the transferable part.** This was not found by reading `channel.ts` — it was found by
+**re-auditing my own table against the source before shipping it**, one row at a time. Three of this
+iteration's findings came from the same move: the nine-vs-eight code count, the self-contradicting
+`sed` in C-S2T-6, and this. **A draft's own claims are the cheapest place to find a defect and the
+last place anyone looks.**
 
 ### Boundary — what was not touched
 
