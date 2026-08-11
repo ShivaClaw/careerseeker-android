@@ -3749,3 +3749,23 @@ sed -n '117,123p' careerseeker-android/.github/workflows/ci.yml
 **This is inference from config plus a green job, not an artifact I downloaded** — the sandbox
 cannot list Actions artifacts. It is **debug-signed**, so it is for the owner's own device and not
 for testers.
+
+### C-IOS-3 — Do not poll GitHub CI with `curl` from this sandbox; it fails silently
+
+> **Claim.** `curl` against `api.github.com/repos/.../check-runs` and `.../actions/artifacts` returns
+> **403 `Resource not accessible by integration`** here (the artifacts call was measured directly;
+> the check-runs call returned an empty parse). A `Monitor` poll loop built on it therefore **ran its
+> full 24 iterations and exited with no output** — and *no output looked exactly like "CI is still
+> running"*. Two waits were spent on a watch that never worked. **The MCP tools do work**:
+> `pull_request_read method=get_check_runs` and `get_job_logs` returned correct data throughout.
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $GITHUB_TOKEN" \
+  "https://api.github.com/repos/ShivaClaw/careerseeker-android/actions/runs/31495754391/artifacts"
+```
+
+*Expected:* `403`. **The lesson generalises past this API:** a poll loop whose failure mode is
+silence is indistinguishable from a poll loop that is still waiting, so a watch must emit on the
+*error* path too, not only on success. Use the MCP tools for CI state and keep `curl` for nothing
+that a decision depends on. Precedent: **C-S4P-12** recorded the same 403 class for the Actions REST
+API and this iteration rediscovered it the expensive way.
