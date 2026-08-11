@@ -3428,3 +3428,130 @@ cd <android> && grep -rn "SyncPump" app/src ; echo "callers exit=$?"
 
 *Expected:* the C# reader still takes its per-element `seq` with no `latest` ceiling; the `grep` over
 `app/src` prints **nothing** (exit 1).
+
+---
+
+## S6C — counter symmetry, the push response body, and two findings (fifteenth cloud iteration, 2026-08-11)
+
+### C-S6C-1 — The stored prompt's slice was already landed, so it was not redone
+
+> **Claim.** The scheduled prompt assigned S5's spec half (amend §4.3 for `entitlement_ack`, close
+> PQ-A6-1/A2-1/A2-2, add vectors) and stated S5 was "NOT STARTED". **All of it except PQ-A2-3 landed
+> 2026-08-09** on `claude/s5-entitlement-ack-spec` (draft PR #32), and PQ-A2-3 is **B-6** — the
+> engine has no inbound wire-JSON parser, so the vector would assert a rejection the engine cannot
+> perform and would turn the offline gate red. Redoing it would have produced a duplicate §4.3.3 and
+> a second copy of two vectors. This is the **fourth** iteration to have to check this; `STATE.md`'s
+> fourth and sixth corrections say so.
+
+```bash
+cd <main>
+git fetch --all --prune
+git log --oneline origin/main..origin/claude/s5-entitlement-ack-spec
+grep -n "^### 4.3.3" docs/Sync-Protocol.md
+ls docs/sync-vectors/v1/ | grep -i entitlement-ack
+```
+
+*Expected:* four S5 commits; §4.3.3 present; the two ack vectors already on that branch. **Records,
+not the prompt, are the state** — the prompt is a stored snapshot and does not re-read itself.
+
+### C-S6C-2 — §2.2's four push responses, measured under miniflare rather than read off the source
+
+> **Claim.** `POST /push` answers `201 {"ok":true,"seq":N}` · `409
+> {"error":"replay_rejected","latest":N}` with keys **exactly** `error|latest` · `400
+> {"error":"bad_request"}` · `413 {"error":"too_large"}`. The 409's `latest` is **per direction, not
+> per pairing** — with `e2p` at 90, a replayed `p2e` seq 4 answers `latest: 4`. 400 and 413 carry
+> **no** `latest`. A direction holding nothing answers **201 to seq 1**, not 409. An empty direction
+> pulls as `{"envelopes":[],"latest":0}`.
+
+Reproduce with the eleventh run's probe trick — throwaway tests asserting deliberately **wrong**
+values so vitest prints the measured one in its diff (`console.log` does not escape the Workers
+pool). Keep the measured string short; vitest truncates long diffs mid-value, which cost this
+session two runs:
+
+```bash
+cd <main>/relay && npm ci
+# write test/probe.test.ts: bootstrap a pairing, push, and assert
+#   expect(`L=${b.latest} K=${Object.keys(b).join('|')} S=${res.status}`).toBe('PROBE')
+npx vitest run test/probe.test.ts 2>&1 | grep AssertionError
+rm test/probe.test.ts        # NOT a suite member — delete before committing
+```
+
+*Expected:* `L=7 K=error|latest S=409` (replayed seq 7), `L=50 …` (regressed 3 against high-water
+50), `L=4 …` (the per-direction case). **The probe was deleted; the suite is unchanged** — see
+C-S6C-6.
+
+### C-S6C-3 — The engine implements only the persisted half of §6.1's resume rule (PQ-S6-3)
+
+> **Claim.** `src/Engine/Program.cs:288` constructs the publisher with `startSeq: paired.LastE2pSeq`
+> — the persisted term **only**. The `max(…)` is never computed and the relay is never consulted on
+> the startup path, although the comment block at `src/Engine/Program.cs:239-243` states the rule
+> verbatim. **The comment and the code below it disagree, and the comment is right.**
+
+```bash
+cd <main>
+sed -n '239,243p;286,290p' src/Engine/Program.cs
+grep -n "PullAsync" src/Engine/Program.cs ; echo "startup-path pulls exit=$?"
+```
+
+*Expected:* the comment states `startSeq = max(vault.last_e2p_seq, relay latest e2p)`; the code
+passes one term; **no `PullAsync` call exists in `Program.cs`** (exit 1). Not fixed here — C#, no
+.NET in this sandbox. **Unblocked and merely unwritten; do not file it as a blocker.**
+
+### C-S6C-4 — `PushAsync` returns `bool`, so the 409's `latest` is discarded unread (PQ-S6-3)
+
+> **Claim.** `src/Sync/RelayClient.cs:51-60` returns `res.StatusCode is HttpStatusCode.Created`. A
+> 409 `replay_rejected` is therefore indistinguishable from a timeout, a 400 or a 413, and the
+> reconciliation value the relay puts in that body is never read. **The phone does read it** —
+> `RelayClient.conflictLatest` — which is the inversion worth noting: §6.1 asked the engine to
+> reconcile and the engine is the one that cannot.
+
+```bash
+cd <main>    && sed -n '50,60p' src/Sync/RelayClient.cs
+cd <android> && grep -n "conflictLatest" core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+```
+
+*Expected:* the C# reads no response body at all on push; the Kotlin has a total `conflictLatest`
+returning `Long?`.
+
+### C-S6C-5 — The relay's transport error vocabulary is undocumented, and two names collide with §7.2's (PQ-S2-3)
+
+> **Claim.** The relay emits **eight** distinct HTTP error codes. `bad_request`, `unauthorized`,
+> `not_found`, `method_not_allowed` and `upgrade_required` appeared **zero** times in
+> `Sync-Protocol.md` before §2.2. `replay_rejected`, `too_large` and `pairing_unknown` do appear —
+> but as **payload** codes in §7.2, a different key (`code`, not `error`) and a different party.
+
+```bash
+cd <main>
+grep -rho "error: '[a-z_]*'" relay/src/*.ts | sort -u
+git show aa305de~1:docs/Sync-Protocol.md | grep -c "bad_request"      # before §2.2
+```
+
+*Expected:* eight codes; `0` occurrences of `bad_request` before the amendment. v1 pins **push's**
+mapping and no other route's — the rest are observed, not normative, deliberately.
+
+### C-S6C-6 — No vector moved, no relay code moved, the drift trap is not armed, and neither gate ran
+
+> **Claim.** This slice wrote **two Markdown files** — `docs/Sync-Protocol.md` (main) and
+> `docs/protocol-questions.md` (android) — plus the records and the bus. **No `.cs`, no `.kt`, no
+> `.ts`, no vector byte, no `generate.mjs`, no harness, no `Verify-Alpha.ps1`.** The relay suite is
+> **36 / 0 measured both before and after** on this branch, and the probe file was deleted.
+> `$ExpectedOfflineTotal` (598) is untouched **by construction**. Neither gate ran and neither can:
+> no .NET, no Android SDK.
+
+```bash
+cd <main>
+node docs/sync-vectors/generate.mjs --check ; echo "exit=$?"
+grep -c "Sync-Protocol" scripts/Verify-Alpha.ps1
+grep -n 'ExpectedOfflineTotal\s*=' scripts/Verify-Alpha.ps1
+git diff --stat origin/claude/s4-pull-request-semantics@{1}..HEAD   # this slice's two commits
+cd relay && npx vitest run 2>&1 | grep -E "Tests "
+git status --porcelain                                              # probe left no trace
+which dotnet
+```
+
+*Expected:* `OK: 28 vector files match the generator.` exit 0 — **28 is the branch figure**, `main`
+is 26, and reading it as a `main` figure is the drift trap one repo over. `0` Sync-Protocol
+references in the verifier. `$ExpectedOfflineTotal = 598`. The diff touches
+`docs/Sync-Protocol.md` and nothing else. `Tests 36 passed (36)` — **not 42**, which is
+`claude/s2-relay-retention`'s figure and belongs to a different branch. Clean tree. `dotnet` not
+found. **CI is the gate.**

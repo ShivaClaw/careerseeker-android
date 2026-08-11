@@ -4007,3 +4007,226 @@ file were neither read nor referenced beyond their paths. **No secrets read, wri
 Terra's state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged
 at 2026-08-07T21:18, **claims no files** — no collision. This slice's only main-repo territory is
 `docs/Sync-Protocol.md`, already claimed via #32/#33, so no new claim was taken.
+
+---
+
+## S6C — the relay refuses both senders, and §6.1 asked only one (fifteenth cloud iteration, 2026-08-11)
+
+Linux cloud sandbox. Main repo: **one Markdown file** on `claude/s4-pull-request-semantics`.
+Android repo: **records and `docs/protocol-questions.md`** — **zero `:core` files, zero `:app`
+files, zero vectors, zero relay code**. Spec-first, as every slice in this window has been.
+
+### S6C-1 Slice choice, and the prompt was a stale snapshot for the fifth time
+
+The stored prompt assigned S5's spec half — amend §4.3 for `entitlement_ack`, close
+PQ-A6-1/PQ-A2-1/PQ-A2-2, add the ack vector and PQ-A2-3's `invalid-unknown-field` — and stated S5
+was "NOT STARTED and genuinely NOT blocked". Measured after the mandatory
+`git fetch --all --prune` in both checkouts:
+
+```
+$ git log --oneline origin/main..origin/claude/s5-entitlement-ack-spec
+9c05ef7 S5: correct 3.1's relay paragraph -- it reasoned in one direction only
+a564c0c S5: the relay refused envelopes the protocol declares legal -- derive its cap
+22b028e S5: pin section 4.3.3 with two entitlement_ack vectors, generated not hand-written
+8575539 S5: define the entitlement_ack body, and say what the size cap actually measures
+```
+
+All of it landed 2026-08-09 (draft PR #32), four iterations before this one. The remaining piece,
+PQ-A2-3's vector, is **B-6**: the engine has no inbound wire-JSON parser, so the vector would assert
+a rejection the engine cannot perform and would turn the offline gate red for whoever pushed next.
+Parser first, vector second, and the parser is C#. **S5's remaining surface in this environment is
+empty: C# or blocked.** Re-verify: C-S6C-1.
+
+`STATE.md`'s fourth and sixth corrections both already say this. The prompt does not re-read itself;
+the records are the state.
+
+**Also checked before picking:** the fourteenth run closed PQ-S4-3, which `STATE.md` listed as the
+topmost remaining sandbox-reachable item. That left `relay/` (PQ-S2-1, PQ-S2-2 — both carrying an
+explicit *do not close either from a sandbox*) and "whatever `:core` decision layers remain
+unenumerated". **Picked PQ-S6-2** instead: opened 2026-08-10, deferred that day for a reason worth
+re-reading rather than inheriting — "a third stacked spec edit, made from a sandbox that cannot run
+`Verify-Alpha.ps1`, is a poor trade for a paragraph that changes no behaviour". That judgement was
+about *cost*, and it undercounted the finding sitting inside the question.
+
+### S6C-2 The gap, and it is two gaps stacked
+
+§6.1's first sentence binds **both** senders to persist their counter. The paragraph then spells out
+the *recovery* rule for exactly one:
+
+> The engine MUST therefore resume its e2p counter above `max(persisted_seq, relay_latest_e2p_seq)`
+
+**The relay does not care who is sending.** `POST /push` refuses `seq <= last` per direction
+(`relay/src/channel.ts:171`) whichever end pushed it. A phone whose persisted p2e counter has fallen
+behind — a restore from backup, a rolled-back store, a counter persisted only after a push whose
+response was lost — builds envelopes refused at the door until the counter climbs back, with no rule
+in the document telling it what to do about that.
+
+**And the deferral note contained the second gap, stated as an aside.** PQ-S6-2's "to close"
+paragraph observed that the 409 body carries `latest`, and that the field "is currently documented
+nowhere in `Sync-Protocol.md` despite being implemented and relied upon". **A §6.1 rule that points
+at an undocumented field is not closed.** That is PQ-S4-2's defect one level down: normative text
+depending on a response body no section defines. So §2.2 was written first.
+
+### S6C-3 What was measured, and the probe trick earned its keep again
+
+The eleventh run's method, reused verbatim: throwaway vitest tests under miniflare asserting
+deliberately **wrong** values so the runner prints the measured one in its diff (`console.log` does
+not escape the Workers pool). Nine probes:
+
+| probe | measured |
+| --- | --- |
+| first accepted push | `201 {"ok":true,"seq":1}` |
+| replayed seq 7 | `409 {"error":"replay_rejected","latest":7}`, keys exactly `error\|latest` |
+| regressed seq 3, high-water 50 | `409 … latest=50` |
+| `p2e` seq 4 replayed while `e2p` holds 90 | `409 … latest=4` — **per direction, not per pairing** |
+| unparseable body | `400 {"error":"bad_request"}` |
+| `seq: 0` (header shape) | `400 {"error":"bad_request"}` |
+| oversize ciphertext | `413 {"error":"too_large"}` |
+| first push on a direction holding nothing | `201`, even at seq 1 |
+| `GET /pull?dir=p2e&since=0`, empty direction | `200 {"envelopes":[],"latest":0}` |
+
+**A practical note that cost two runs:** vitest truncates long diff values mid-string
+(`'409 {"error":"replay_rejected","lates…'`), so the first two probe passes measured nothing useful.
+Put the value being measured **first and short** — `L=4 K=error|latest S=409`. Written into C-S6C-2
+so the next session does not pay it again.
+
+**The probe file was deleted before committing.** The relay suite measured **36 / 0 both before and
+after**, so this is a measurement and not a suite member, and `git status --porcelain` was empty
+after the delete. **36 is this branch's figure**; `STATE.md`'s 42 belongs to
+`claude/s2-relay-retention` and reading one as the other is the count-drift trap one branch over.
+
+**Two results contradicted nothing and were pinned anyway.** `latest` is per-direction — a sender
+reading it as a pairing-wide position would resume far too high, skipping seqs and creating gaps the
+receiver reads as legitimate under §6.2. And a direction holding nothing accepts seq 1 rather than
+answering 409 with `latest: 0`, because the monotonicity check has no prior value to compare
+against.
+
+### S6C-4 §2.2, and the namespace collision underneath it
+
+New **§2.2** pins all four push responses, the 409's `latest` as REQUIRED on that status and
+explicitly per-direction, 400/413 as carrying no counter evidence at all, and 201 as meaning
+*appended* and nothing more — not that any receiver accepted, decrypted or applied anything.
+
+The part that is more than bookkeeping: **§7.2's error codes and the relay's HTTP error codes are
+different namespaces, and two names overlap with identical meanings.** §7.2 defines the sealed
+`error` *payload*, `{code, detail?, ref_seq?}`, invisible to the relay. The relay answers HTTP with
+`{"error": …}`. Measured — `grep -rho "error: '[a-z_]*'" relay/src/*.ts | sort -u` yields **eight**
+transport codes, of which `bad_request`, `unauthorized`, `not_found`, `method_not_allowed` and
+`upgrade_required` appeared **zero times** anywhere in `Sync-Protocol.md` before this commit.
+
+**The overlap is the dangerous half, not the gap.** An implementer who reads §7.2, sees
+`replay_rejected`, then receives `{"error":"replay_rejected","latest":7}` has every reason to parse
+it as a payload error — look for `code`, find none, fall through to a generic failure. **That is
+exactly how the engine came to discard it** (S6C-6). Recorded as **PQ-S2-3**; v1 pins push's mapping
+and no other route's, because inventing five more from a sandbox that cannot run `Verify-Alpha.ps1`
+is the size-cap mistake's shape.
+
+### S6C-5 §6.1, generalised — and why this is not the §2.1 mistake
+
+The rule now reads: a sender MUST resume above
+`max(persisted_seq, relay_latest_seq_for_that_direction)`, with **both** sources of the relay's
+number named (§2.1's pull `latest`, §2.2's 409 `latest`). The engine's e2p case is kept as the
+worked example because its consequence is the severe one — the recovery `snapshot` itself rejected,
+"a silent, total, one-sided sync death" — and the phone's p2e obligation is stated, with its milder
+consequence stated too: **marks and entitlements stall rather than the dashboard dying, and that is
+why the asymmetry was easy to write rather than why it is optional.**
+
+**This writes a MUST that neither shipping sender meets, which is normally the thirteenth run's
+defect** — §2.1's first draft required an error *type* the engine does not use, and the eighth
+correction names "a spec tightening ahead of its implementations" as the same bug as an
+implementation tightening ahead of its spec. Three things separate this from that, and they are in
+the section rather than only here:
+
+1. **The rule was already normative for one of the two senders.** Generalising it did not invent an
+   obligation; it removed an exemption the document never argued for.
+2. **Persistence was already required of both** by §6.1's own first sentence. Only the *recovery*
+   half was engine-only.
+3. **It is a safety property, not error-reporting style.** §2.1's over-reach was about which error
+   type to raise, where both behaviours were safe and the two receivers could reasonably differ.
+   Nothing here is a matter of taste.
+
+And the section says out loud that neither sender conforms, in a measured conformance note naming
+both gaps by ID. **A spec that quietly outruns its implementations is a defect in the spec; one that
+states the gap is a work item.**
+
+### S6C-6 The finding, and it inverts the section it came from
+
+Checking the engine against the rule *before* writing it — the method the eighth correction
+prescribes — found that **the engine implements half of §6.1 and its own comment states the other
+half.** `src/Engine/Program.cs:288`:
+
+```csharp
+        startSeq: paired.LastE2pSeq);
+```
+
+The persisted term only. No `max(…)`, and `grep -n "PullAsync" src/Engine/Program.cs` prints
+**nothing** — the relay is never consulted on the startup path. Ten lines above, at
+`src/Engine/Program.cs:239-243`, the comment states the rule verbatim: *"this method MUST construct
+the publisher with `startSeq = max(vault.last_e2p_seq, relay latest e2p)` — Sync-Protocol.md §6.1"*.
+**The comment and the code disagree, and the comment is right.**
+
+**The second half compounds it.** `RelayClient.PushAsync` (`src/Sync/RelayClient.cs:51-60`) returns
+`res.StatusCode is HttpStatusCode.Created` — a bare `bool`. A 409 is indistinguishable from a
+timeout, a 400 or a 413, and the `latest` the relay puts in that body is discarded unread. **So the
+engine can neither reconcile up front nor recover from the refusal that tells it to** — while the
+phone, which §6.1 never asked, reads the number and reconciles through `OutboundQueue`. The section
+asked the wrong sender.
+
+**Stated precisely, because it is milder than it first looks and overstating it would be this
+window's recurring error.** `SyncPublisher` assigns `seq` with `Interlocked.Increment` *before* the
+sink runs (`src/Sync/SyncPublisher.cs:90`) and the vault records the mark only on success
+(`Program.cs:285`). So a stale vault does not deadlock: each refused push burns one seq, the next
+attempt is one higher, and the counter climbs back on its own. **The cost is one dropped envelope
+per burned seq.** If the vault is behind by N, that is N envelopes silently discarded — *including
+the recovery `snapshot`* if it falls in the run — each returning `false` to a caller with no retry.
+§6.1's named catastrophe is **mitigated into a window rather than prevented**, and nothing reports
+the window. Recorded as **PQ-S6-3**, with the two-commit fix written out.
+
+**Not fixed here: it is C#, and `which dotnet` prints nothing.** Unblocked and merely unwritten — a
+local session's, not a phantom blocker, and deliberately **not** filed in `BLOCKED.md`.
+
+### S6C-7 Ladder effect, stated narrowly
+
+**S6 stays PARTIAL and this slice does not move it toward DONE.** It closed a *protocol question*
+against S6's send path, not the path itself: the remainder is still the Keystore key (**B-4**) and
+the `:app` wiring (**B-7**), and neither was touched. `OutcomeMarkPolicy` and `OutboundQueue` still
+have no production caller. **A rung does not advance because work happened in its neighbourhood** —
+the fifth iteration in a row to write that sentence, which is itself worth noticing.
+
+What did move: **B-8 is now a smaller and better-specified hole.** Its spec half is closed — §6.1
+states the rule this sender must satisfy — and the measurement sharpened: `SeqSource`'s only
+implementation in the tree is a **test double** (`OutboundQueueTest.kt:30`), with zero `:app`
+references, so there is no production counter to persist rather than an in-memory one to replace.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** Android PR #6 stays a draft; main-repo PRs #32 and #33 stay
+drafts and were neither merged, retargeted, rebased nor force-pushed. Both branches were pushed
+**forward-only** — no force-push, no history rewrite, no branch deleted, in either repo.
+
+**Main repo: one file written** (`docs/Sync-Protocol.md`, on `claude/s4-pull-request-semantics`),
+plus the coordination bus. **No `.cs`** — the engine finding is recorded, not fixed. **No `relay/`
+source file**: the probe was a throwaway test, deleted before committing, and `git status` was clean
+after. No harness, no `Verify-Alpha.ps1`, no `$ExpectedOfflineTotal`, no count-reporting doc, **no
+vector byte and no `generate.mjs` change** — `node docs/sync-vectors/generate.mjs --check` →
+`OK: 28 vector files match the generator.`, exit 0.
+
+**Android repo: `docs/protocol-questions.md` plus these records. Zero `:core` files, zero `:app`
+files, zero Kotlin of any kind**, no Gradle or version-catalog file, no emulator, no `sdkmanager`,
+no AVD, and no attempt to route around the `dl.google.com` denial. The vendored vector pin stays
+`679a317` and **no vendored byte was touched**.
+
+**Neither gate ran and neither could.** `Verify-Alpha.ps1` needs .NET (`which dotnet` → nothing);
+the android gate needs an SDK (B-7). **CI is the gate**, and nothing here asserts otherwise.
+
+**No deploy of any kind** (Cloudflare, Workers, relay, site, Pages) and **no `wrangler` invocation at
+all** — the relay ran only under `vitest`/miniflare inside the test runner. **The production relay
+was contacted zero times, not even `GET /v1/health`.**
+
+No Google, Play, OAuth or Console action; no accounts, no purchases, no Play Billing code; no email
+or Gmail anything; no cert-store, MSIX or keystore action — the upload keystore and its password
+file were neither read nor referenced beyond their paths. **No secrets read, written or printed.**
+
+Terra's state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged
+at 2026-08-07T21:18, **claims no files** — no collision. This slice's only main-repo territory is
+`docs/Sync-Protocol.md`, already claimed via #32/#33, so no new claim was taken.

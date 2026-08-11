@@ -613,6 +613,17 @@ test is an in-memory counter. `OutboundQueue.reconciled()` is written to be call
 has lifted that persisted counter above the relay's reported `latest` — a caller that does not exist
 yet.
 
+> **Sharpened 2026-08-11 (fifteenth iteration), and the earlier wording undersold it.** The line
+> above says every `SeqSource` is "an in-memory counter", which implies production code holding a
+> counter in memory. Measured: `grep -rn "SeqSource" core/src app/src --include=*.kt` returns the
+> `fun interface` declaration, one KDoc reference, one constructor parameter — and **exactly one
+> implementation, a test double at `OutboundQueueTest.kt:30`**. There is no production counter to
+> persist, in memory or otherwise, and **zero `:app` references**. That is a smaller hole to fill
+> than "replace the in-memory one" suggests, and a larger one than "add persistence" suggests: the
+> owner does not exist yet. The spec half is now closed — §6.1 states the resume rule for **both**
+> senders as of 2026-08-11 (PQ-S6-2), so the rule this must satisfy is written down, and §6.1's
+> conformance note names this gap by ID.
+
 **Why it is not fixed here.** The counter belongs in Room, which is `:app`, which needs the Android
 SDK this sandbox cannot fetch (**B-7**). Writing it as a `:core` interface with no implementation
 would add a type without adding a guarantee, and the guarantee is the whole point: an in-memory
@@ -626,8 +637,11 @@ C-S6S-5). A phone with a resetting counter now stalls visibly instead of droppin
 **Smallest unblock:** a machine with an Android SDK. Then: a Room-backed `SeqSource` that persists
 **before** the envelope is handed to the transport (persisting after a successful push reintroduces
 the same lag on a lost response), and a startup reconciliation against
-`GET /pull?dir=p2e&since=0`'s `latest`, per §6.1's own recipe for the engine side. See **PQ-S6-2**
-for the spec half — §6.1 states that recipe for the engine's counter only.
+`GET /pull?dir=p2e&since=0`'s `latest`, per §6.1's own recipe — which, **as of 2026-08-11, is
+stated for this sender too** rather than for the engine only (**PQ-S6-2**, closed). §2.2 also now
+pins a second, cheaper source of the same number: the 409 body's `latest`, which
+`RelayClient.conflictLatest` already reads and `OutboundQueue` already surfaces. So the persisted
+counter is the only missing piece, not the reconciliation logic around it.
 
 ---
 
