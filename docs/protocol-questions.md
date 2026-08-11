@@ -771,3 +771,44 @@ belongs in a slice whose title says so.
 cursor, then the same rule in `SyncPump` and in the engine's reader. Spec first, again.
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-S4S-6**.
+
+### CLOSED 2026-08-11 (fourteenth cloud iteration) — bounded by `latest`, spec first
+
+**Decided: the third option**, as the entry above predicted it would be. New **§6.4** in
+`docs/Sync-Protocol.md` (main repo, `claude/s4-pull-request-semantics`, PR #33) defines the
+**transport cursor** — a thing this protocol had never named, because §6.2 governs
+`highest_accepted` and stops there — and caps how far an element with no authenticated `seq` may
+move it: it MAY advance by the element's claimed number, and MUST NOT advance past the page's own
+`latest`. `SyncPump` then implements exactly that (`minOf(envelope.seq, page.latest)`), **in that
+order**.
+
+**Bounded rather than refused,** because refusing stalls the direction permanently on one corrupt
+byte and §6.2 forbids that in as many words. The tie is broken by an asymmetry the original entry
+did not state: a stall is **recoverable and loud** — `latest` still exceeds the cursor, the receiver
+still reports more available, and the stream resumes on the next readable page — while truncation is
+silent, permanent, and presents as a healthy fully-caught-up sync. When a receiver must choose
+between them, it stalls.
+
+**One correction to this entry's own framing, found while writing the test.** The original text said
+bounding by `latest` "caps how far one bad element can move the cursor at a value the client was
+going to compare against regardless", which overstates the protection. The bound does **not** stop a
+hostile relay from skipping a receiver past envelopes it *currently holds* — `latest` is the relay's
+own claim, and it could withhold those rows without any malformed element. What the bound stops is
+the part that outlives the attack: an **unbounded** claim parks the cursor in the *future*, past
+sequence numbers not yet issued, so every envelope the engine publishes from now until that number
+arrives at a receiver that believes it is already past them. That is the forward-going, permanent
+data loss, and it is what §6.4 removes. The spec states the distinction explicitly rather than
+letting the stronger reading stand.
+
+**Evidence.** `:core` 187 → **190 / 0 / 0** across 14 classes, both ends measured on the reduced
+probe this session; `SyncPumpTest` 19 → **22**, no class added or renamed. **Two of the three new
+cases fail against the pre-change source** while all 19 pre-existing cases pass. The third
+(`an authenticated seq above latest still moves the cursor`) **passes on both sides by design** — it
+pins that the bound applies to the unauthenticated path only, so that nobody "simplifies" the fix
+into clamping every `seq` to `latest`, which would hand the relay the opposite lever.
+
+**The engine half is NOT done.** `src/Sync/RelayClient.cs` has the same structure and no .NET exists
+in this sandbox, so it is unwritten, not verified-absent. It is **unblocked and merely unwritten** —
+see `BLOCKED.md`'s note; do not file it as a blocker.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S4C-1…6**.

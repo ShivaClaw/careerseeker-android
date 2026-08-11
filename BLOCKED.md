@@ -706,3 +706,47 @@ reasonably differ on). Filing it would have manufactured a blocker out of my own
 about how far an unparseable element may move a cursor, and both the decision and the `:core` half
 are reachable from a sandbox. It is queued as a slice, not filed here, and calling it BLOCKED would
 be exactly the mislabel this file's history is full of corrections for.
+
+---
+
+## No new blocker arose 2026-08-11 (S4 cursor bound, fourteenth cloud iteration)
+
+Recorded explicitly, because "nothing blocked" is a finding and its absence is indistinguishable
+from an omission.
+
+**The slice completed both halves it set out to do.** §6.4 landed in the main repo and the bound
+landed in `:core`, and neither needed a machine this sandbox is not. The spec half is doc-only; the
+phone half is `:core` Kotlin, which the reduced probe runs (C-S4C-4).
+
+**The engine half is NOT a blocker and must not be filed as one.** `src/Sync/RelayClient.cs` reads
+pull pages with the same structure and needs the same `latest` ceiling. It did not get it because
+there is no .NET in this sandbox — which makes it **unwritten**, exactly like B-6's parser is
+unwritten, but *unlike* B-6 nothing prevents a local session doing it today. There is no missing
+tool, no unanswered gate, and no upstream defect. A session handed "port §6.4 to the engine" should
+find no obstruction, and filing this here would send it hunting for one.
+
+**One thing that looks like a blocker and is not: the two pre-existing cursor assertions did not
+change.** `a wrapped envelope is never applied…` still asserts `cursor == 999` and `an envelope that
+does not parse…` still asserts `cursor == 6`, after a commit whose entire purpose was to bound that
+advance. That is correct, not a missed case: on both pages the claimed `seq` equals `latest`, so the
+ceiling does not bind. It is the demonstration that §6.4 is a ceiling rather than a behaviour change
+(C-S4C-5). Do not "fix" those numbers.
+
+**What remains unverified here, and it is the standing pair, not something new:**
+
+- The **android gate** did not run and cannot — no SDK, no JBR, `dl.google.com` egress-denied
+  (**B-7**, re-measured this session: `CONNECT tunnel failed, response 403`). CI is the gate.
+- **`Verify-Alpha.ps1`** did not run and cannot — no .NET. It is also unaffected: the main-repo half
+  is one Markdown file, so `$ExpectedOfflineTotal` (598) is untouched **by construction**, and
+  `grep -c "Sync-Protocol" scripts/Verify-Alpha.ps1` → `0`, run before the edit, so the drift trap is
+  not armed against this file at all.
+
+**B-4, B-5, B-6, B-7, B-8 are unchanged and were not re-tested** beyond B-7's egress probe above.
+Nothing in this slice touched any of them, and re-asserting an untested blocker as current would be
+the overclaiming these records correct elsewhere.
+
+**PQ-S4-3 is now CLOSED** (`docs/protocol-questions.md`), including a correction against its own
+original framing — it claimed the `latest` bound capped the attack outright, and it does not: it
+confines the damage to envelopes the relay already holds, which it could withhold regardless, and
+removes only the forward-going part. That is a smaller claim than the one it opened with, and the
+spec states the smaller one.

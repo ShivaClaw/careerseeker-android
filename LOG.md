@@ -3810,3 +3810,200 @@ than quietly dropped.
 
 **One commit follows the measured head** — this records update — and it is **records-only, no code**,
 so the green above still describes the code as it stands.
+
+---
+
+## S4C — The cursor advanced on a number the relay made up (2026-08-11, fourteenth cloud iteration)
+
+### S4C-1 Why this rung, when the stored prompt nominated another
+
+**The stored prompt's slice was already done, and checking that first is the whole of this
+section.** It assigned S5's spec half: amend §4.3 to define the `entitlement_ack` body, close
+PQ-A6-1/PQ-A2-1/PQ-A2-2, add the ack vector and PQ-A2-3's `invalid-unknown-field`. It also stated
+S5 was "NOT STARTED and genuinely NOT blocked".
+
+Measured after the mandatory `git fetch --all --prune` in both checkouts:
+
+```
+$ git log --oneline origin/main..origin/claude/s5-entitlement-ack-spec
+9c05ef7 S5: correct 3.1's relay paragraph -- it reasoned in one direction only
+a564c0c S5: the relay refused envelopes the protocol declares legal -- derive its cap
+22b028e S5: pin section 4.3.3 with two entitlement_ack vectors, generated not hand-written
+8575539 S5: define the entitlement_ack body, and say what the size cap actually measures
+```
+
+So §4.3.3 exists, both ack vectors exist, and PQ-A6-1/A2-1/A2-2 are closed — draft PR #32, four
+iterations ago. `EntitlementAckApplier` (9 tests) is the phone half. The one piece of that prompt
+still open is PQ-A2-3's vector, which is **B-6**: the engine has no inbound wire-JSON parser, so the
+vector would assert a rejection the engine cannot perform and would turn the offline gate red for
+whoever pushed next. B-6 says parser first, vector second, and the parser is C#.
+
+**Redoing it would have produced a duplicate spec section and a second copy of two vectors** — and
+adding B-6's vector would have shipped a known-red pin from a machine with no way to observe it.
+S5's remaining surface in this environment is therefore empty: C# or blocked.
+
+Picked instead: **PQ-S4-3**, opened by the previous iteration, explicitly queued there as "a slice
+whose title says so, spec first again", and the topmost open item that is genuinely verifiable here
+— a spec decision plus `:core` Kotlin, no .NET, no Android SDK, no emulator.
+
+### S4C-2 The gap, stated
+
+`SyncPump.pump` advanced its transport cursor per element:
+
+```kotlin
+val seq = header?.seq ?: envelope.seq      // SyncPump.kt:245, before
+if (seq > cursorValue) cursorValue = seq
+```
+
+When the strict §3 parse fails there is no authenticated `seq`, so it fell back to the one the
+element **claims** at its top level — read leniently by `parsePullPage` (`RelayClient.kt:237`,
+anything unusable reads `0`) and authenticated by nothing. The KDoc justified this as "safe because
+the item is discarded either way".
+
+**The item is discarded; the cursor is not.** A blind relay that appends one unparseable element
+carrying `"seq": 1000000` moves the cursor past every envelope below it, and the cursor never moves
+backwards, so they are never requested again. That is history truncation performed by a party that
+cannot decrypt a byte of what it removed from the receiver's view.
+
+**And the protocol had nothing to say about it.** §6.2 governs `highest_accepted` — the
+authenticated, persisted mark that drives replay rejection. The transport cursor is a *different*
+number, the `since` the next pull sends, and `docs/Sync-Protocol.md` had never named it. The bug was
+downstream of a hole in the spec, which is why the spec moved first.
+
+### S4C-3 What §6.4 says, and why bounded
+
+New **§6.4** (main repo, `claude/s4-pull-request-semantics`): the cursor MUST NOT move backwards;
+it advances only to a `seq` recovered from the sealed bytes; and an element failing the §3 parse MAY
+advance it by its claimed number but **MUST NOT** advance it past the page's own `latest`.
+
+Both obvious repairs have a wrong version that compiles, which is what PQ-S4-3 recorded:
+
+- **Refuse to advance.** One corrupt byte then stalls the direction forever, which §6.2 forbids by
+  name ("a gap MUST NOT stall the stream").
+- **Advance by one.** Desynchronises the cursor from real sequence numbers, and nothing says the
+  next `seq` is `n+1` — the TTL purge makes gaps legitimate.
+
+The bound settles it on an asymmetry PQ-S4-3 had not stated: **a stall is recoverable and loud** —
+the cursor holds, `latest` still exceeds it, `moreAvailable` stays true, and the stream resumes
+exactly where it stopped on the next readable page — **while truncation is silent, permanent, and
+looks like a healthy caught-up sync**. When a receiver must choose, it stalls.
+
+### S4C-4 A claim in my own source entry that was too strong, corrected in the spec
+
+PQ-S4-3 argued the bound "caps how far one bad element can move the cursor at a value the client was
+going to compare against regardless". **Writing the test showed that overstates it**, and the
+overstatement is the kind that matters — it would have let a reader believe the attack was closed.
+
+The bound does **not** protect envelopes the relay *currently holds*. `latest` is the relay's own
+claim; a relay willing to lie about an element's `seq` can serve a page whose `latest` already
+covers the rows it wants withheld — and it never needed a malformed element for that, since it could
+simply not serve them.
+
+What the bound removes is the part that **outlives the attack**: unbounded, the claim parks the
+cursor in the *future*, past sequence numbers not yet issued, so every envelope the engine publishes
+from that moment until the claimed number arrives at a receiver that believes it is already past
+them. One malformed element becomes permanent, forward-going, silent data loss against an engine and
+a relay that are both behaving. §6.4 states this distinction explicitly rather than letting the
+stronger reading stand, and PQ-S4-3's closing note records the correction against itself.
+
+### S4C-5 The phone half, after the spec
+
+`SyncPump.kt:260`, now `minOf(envelope.seq, page.latest)`. Rule 4 in the class KDoc was rewritten to
+match — it described only the wrapper hazard, which §2.1 closed last iteration, and said nothing
+about the unparsed case that is now the whole of the rule.
+
+**Against an honest relay this is a no-op**, which is the claim the two unchanged tests below
+demonstrate rather than assert: its `latest` covers every row it serves, so the ceiling never binds.
+
+### S4C-6 Evidence, and the red run was deliberate
+
+Baseline on the reduced probe (C-S6A-1 recipe, JDK 21) **before any edit**: **187 / 0 / 0 across 14
+classes**, re-derived here rather than copied from `STATE.md` — and it matched. After:
+**190 / 0 / 0 across 14**. `SyncPumpTest` 19 → **22**. No class added, deleted or renamed.
+
+The three new cases were run against the **pre-change** `SyncPump.kt`:
+
+```
+SyncPumpTest > an unparseable element cannot move the cursor past the page's latest() FAILED
+SyncPumpTest > after a bounded skip the stream still delivers envelopes issued later() FAILED
+SyncPumpTest > an authenticated seq above latest still moves the cursor() PASSED
+22 tests completed, 2 failed
+BUILD FAILED
+```
+
+**Two fail, and the third passing is the point, not a gap.** `an authenticated seq above latest
+still moves the cursor` pins existing behaviour: the bound applies to the unauthenticated path only.
+Without it, the obvious "simplification" — clamp every `seq` to `latest` — compiles, passes the two
+new tests, and hands the relay the opposite lever, letting an understated `latest` hold the cursor
+below envelopes the phone has already read. It is labelled a regression guard here and in its own
+KDoc rather than counted as evidence of the fix.
+
+**All 19 pre-existing `SyncPumpTest` cases passed in the red run.** Two of them assert cursor
+positions on unparseable elements (`a wrapped envelope is never applied…` at claimed 999 / latest
+999, and `an envelope that does not parse…` at claimed 6 / latest 6) and both are **unchanged by
+this diff**, because on each the ceiling equals the claim. That is the honest demonstration that
+§6.4 is a ceiling and not a behaviour change; the stale comment on the first — which called the
+unbounded advance "the residual hazard recorded as PQ-S4-3" — was rewritten, since that hazard is
+now the thing this commit bounds.
+
+**Main repo:** `node docs/sync-vectors/generate.mjs --check` → `OK: 28 vector files match the
+generator.`, exit 0 (28 is the **branch** figure; `main` is 26). `grep -c "Sync-Protocol"
+scripts/Verify-Alpha.ps1` → **0**, run before the edit, so the doc/verifier drift trap is not armed
+against this file.
+
+**This is the reduced probe, not the verification command of record.** `:app`, `lintDebug`,
+`assembleDebug` and `checkCoreIsAndroidFree` are absent from it and the toolchain is substituted
+17 → 21 (`api.foojay.io` egress-denied, B-7). **The gate is CI.** The android gate did not run and
+cannot here; **`Verify-Alpha.ps1` did not run and cannot** — no .NET — and is also unaffected: the
+main-repo half is one Markdown file, so `$ExpectedOfflineTotal` (598) is untouched by construction,
+not by assertion.
+
+### S4C-7 What this deliberately did not do
+
+**The engine half is not written.** `src/Sync/RelayClient.cs` reads pages with the same structure
+and needs the same ceiling. It is `.cs`, there is no .NET here (`which dotnet` → nothing), and a
+parser written against an unrun compiler is the drift these records exist to prevent. It is
+**unblocked and merely unwritten** — a local session's, not a phantom blocker.
+
+**No vector was added or changed.** A pull *page* is not an envelope, so no §3 vector can express
+this rule at all — and `SyncHarness` enumerates `docs/sync-vectors/v1/*.json`
+(`tests/SyncHarness/Program.cs:50`), so adding a file moves `$ExpectedOfflineTotal`, a number no
+.NET-less machine can measure. The vendored pin stays `679a317` and **no vendored byte was touched**.
+
+**No relay change.** The relay already publishes `latest` on every page; §6.4 was written to consume
+what it emits, not to move it.
+
+### S4C-8 Ladder effect, stated narrowly
+
+**S4 stays PARTIAL and this slice does not move it toward DONE.** Its remainder is the `:app` wiring
+— the `ApplyResult` adapter, the Room-backed position source, the Ktor engine — and none of it was
+touched. **`SyncPump` still has no production caller**: `grep -rn SyncPump app/src` prints nothing,
+so the truncation this prevents is prospective, not a field fix. **A rung does not advance because
+work happened in its neighbourhood** — the fourth iteration in a row that has had to write this.
+
+### Boundary — what was not touched
+
+**Nothing was merged, in either repo.** Android PR #6 stays a draft; main-repo PRs #32 and #33 stay
+drafts and were neither merged, retargeted, rebased nor force-pushed. Both branches were pushed
+**forward-only** — no force-push, no history rewrite, no branch deleted, in either repo.
+
+**Main repo: one file written** (`docs/Sync-Protocol.md`, on `claude/s4-pull-request-semantics`),
+plus the coordination bus. No `.cs`, no `relay/` file, no harness, no `Verify-Alpha.ps1`, no
+`$ExpectedOfflineTotal`, no count-reporting doc, no vector and no `generate.mjs` change.
+
+**Android repo: two `:core` files** (`SyncPump.kt`, `SyncPumpTest.kt`) plus these records. **No
+`:app` file**, no Gradle or version-catalog file, no emulator, no `sdkmanager`, no AVD, and no
+attempt to route around the `dl.google.com` denial (re-measured this session: `CONNECT tunnel
+failed, response 403`).
+
+**No deploy of any kind** (Cloudflare, Workers, relay, site, Pages) and no `wrangler` invocation at
+all. **The production relay was contacted zero times, not even `GET /v1/health`** — every relay in
+this slice is a Ktor `MockEngine` inside the test runner, and no test opens a socket.
+
+No Google, Play, OAuth or Console action; no accounts, no purchases, no Play Billing code; no email
+or Gmail anything; no cert-store, MSIX or keystore action — the upload keystore and its password
+file were neither read nor referenced beyond their paths. **No secrets read, written or printed.**
+
+Terra's state was read at iteration start: still R6(b) BLOCKED on draft PR #26, heartbeat unchanged
+at 2026-08-07T21:18, **claims no files** — no collision. This slice's only main-repo territory is
+`docs/Sync-Protocol.md`, already claimed via #32/#33, so no new claim was taken.

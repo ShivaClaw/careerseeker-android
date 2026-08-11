@@ -3288,3 +3288,143 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://dl.google.com/ ; echo "exit=$?
 *Expected:* `dotnet` not found; a CONNECT tunnel failure / 403 from the proxy. **The main-repo half
 of this slice is doc-only**, so `$ExpectedOfflineTotal` (598) is untouched by construction — no
 `.cs`, no harness, no vector and no count-reporting doc was written. CI is the gate for both halves.
+
+---
+
+## S4C — bounding the cursor advance (2026-08-11, fourteenth cloud iteration)
+
+Every claim this slice makes, with the command that re-verifies it. `<android>` and `<main>` are the
+two checkouts. Test numbers come from the **reduced** probe (C-S6A-1); the gate is CI (C-S4C-6).
+
+### C-S4C-1 — The stored prompt's slice was already landed, which is why a different rung was picked
+
+> **Claim.** The prompt assigned S5's spec half and stated S5 was "NOT STARTED". §4.3.3, both
+> `entitlement_ack` vectors and the closes of PQ-A6-1/A2-1/A2-2 already exist on
+> `claude/s5-entitlement-ack-spec` (draft PR #32), landed four iterations earlier. Redoing it would
+> have duplicated a spec section and two vectors.
+
+```bash
+cd <main>
+git fetch --all --prune
+git log --oneline origin/main..origin/claude/s5-entitlement-ack-spec
+git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md | grep -n "4.3.3 Entitlement acknowledgement"
+git show origin/claude/s5-entitlement-ack-spec --stat --oneline | grep entitlement-ack
+```
+
+*Expected:* four `S5:` commits; a §4.3.3 heading; `entitlement-ack.json` and
+`entitlement-ack-no-order-id.json`. The one remaining piece of that prompt is PQ-A2-3's vector,
+which is **B-6** (engine has no inbound wire-JSON parser) — read `BLOCKED.md` B-6 before picking it.
+
+### C-S4C-2 — §6.4 exists, defines the transport cursor, and bounds the unauthenticated advance
+
+> **Claim.** `docs/Sync-Protocol.md` gains **§6.4**, which names the transport cursor (a number §6.2
+> never governed — §6.2 is about `highest_accepted`) and caps an unparseable element's advance at
+> the page's `latest`. §6.2 gains a pointer to it, and §9's amendment table gains a row.
+
+```bash
+cd <main> && git checkout claude/s4-pull-request-semantics
+grep -n "### 6.4 The transport cursor" -A 24 docs/Sync-Protocol.md
+grep -n "not the same number as the pulling receiver" docs/Sync-Protocol.md
+grep -n "the \*\*transport cursor\*\* was not described at all" docs/Sync-Protocol.md
+```
+
+*Expected:* §6.4 with three bullets — cursor MUST NOT move backwards, MUST advance only to a `seq`
+recovered from the sealed bytes, MUST NOT advance an unparsed element past `latest`; the §6.2
+pointer; the §9 row citing PQ-S4-3.
+
+### C-S4C-3 — The phone implements exactly that, and only on the unauthenticated path
+
+> **Claim.** `SyncPump.kt` is now `minOf(envelope.seq, page.latest)`. An **authenticated** `seq` is
+> never clamped.
+
+```bash
+cd <android>
+grep -n "val seq = header?.seq" core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+git log -1 --format=%H -- core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+git show HEAD~1 -- core/src/main/kotlin/app/careerseeker/core/SyncPump.kt | head -1
+```
+
+*Expected:* `val seq = header?.seq ?: minOf(envelope.seq, page.latest)` — the `header?.seq` branch is
+outside the `minOf`, which is the whole distinction.
+
+### C-S4C-4 — `:core` went 187 → 190, and two of the three new tests fail against the pre-change source
+
+> **Claim.** Baseline **187 / 0 / 0 across 14 classes**, measured here before any edit; after,
+> **190 / 0 / 0 across 14**. `SyncPumpTest` 19 → **22**, no class added, deleted or renamed. The two
+> truncation tests **fail** on the pre-change `SyncPump.kt` while all 19 pre-existing cases pass.
+
+```bash
+# after the C-S6A-1 probe recipe:
+python3 - <<'PY'
+import glob, xml.etree.ElementTree as ET
+t=f=s=0; c=0
+for p in sorted(glob.glob('<android>/core/build/test-results/test/TEST-*.xml')):
+    r=ET.parse(p).getroot(); c+=1
+    t+=int(r.get('tests')); f+=int(r.get('failures'))+int(r.get('errors')); s+=int(r.get('skipped'))
+print(t,f,s,c)
+PY
+# the red run — revert only the source, keep the tests:
+cd <android> && git stash push core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+# re-run the probe with --tests 'app.careerseeker.core.SyncPumpTest'
+git stash pop
+```
+
+*Expected:* `190 0 0 14` after; `187 0 0 14` with both files reverted. In the red run, exactly
+`an unparseable element cannot move the cursor past the page's latest` and `after a bounded skip the
+stream still delivers envelopes issued later` FAIL — `22 tests completed, 2 failed`.
+
+### C-S4C-5 — The third new test passes on both sides, deliberately, and two old ones are unchanged
+
+> **Claim.** `an authenticated seq above latest still moves the cursor` passes **before and after**.
+> It is a regression guard, not evidence of the fix: it forbids the "simplification" of clamping
+> every `seq` to `latest`, which would let an understated `latest` hold the cursor below envelopes
+> the phone already read. Separately, the two pre-existing cursor assertions on unparseable elements
+> are **unchanged by this diff**, because on each the ceiling equals the claim — which is the
+> demonstration that §6.4 is a ceiling and not a behaviour change.
+
+```bash
+cd <android>
+git show HEAD -- core/src/test/kotlin/app/careerseeker/core/SyncPumpTest.kt | grep -n "^[-+]" | grep -i "assertEquals(999L\|assertEquals(6L"
+grep -n "latest = 999\|latest = 6" core/src/test/kotlin/app/careerseeker/core/SyncPumpTest.kt
+```
+
+*Expected:* **no** `+`/`-` line changes either cursor assertion — only the stale comment above the
+999 one moves. The `grep` shows why: claimed 999 on a page whose `latest` is 999, claimed 6 on a page
+whose `latest` is 6, so `minOf` binds on neither.
+
+### C-S4C-6 — No vector moved, the drift trap is not armed against this doc, and neither gate ran
+
+> **Claim.** No vector was added or changed and the vendored pin stays `679a317`.
+> `scripts/Verify-Alpha.ps1` makes **zero** assertions against `Sync-Protocol.md`, so the
+> doc/verifier drift trap is not armed against this file. `$ExpectedOfflineTotal` (598) is untouched
+> **by construction** — the main-repo half is one Markdown file. Neither gate ran here and neither
+> can: no .NET, no Android SDK, `dl.google.com` egress-denied (B-7).
+
+```bash
+cd <main>
+node docs/sync-vectors/generate.mjs --check ; echo "exit=$?"
+grep -c "Sync-Protocol" scripts/Verify-Alpha.ps1
+grep -n 'ExpectedOfflineTotal\s*=' scripts/Verify-Alpha.ps1
+git diff --stat origin/main..claude/s4-pull-request-semantics -- docs/sync-vectors/
+which dotnet ; curl -sS -o /dev/null -w '%{http_code}\n' https://dl.google.com/
+```
+
+*Expected:* `OK: 28 vector files match the generator.` exit 0 (28 is the **branch** figure — #32's
+two ack vectors are not on `main`, where it is 26; reading it as a `main` figure is the drift trap
+one repo over). `0` Sync-Protocol references. `$ExpectedOfflineTotal = 598`. The `docs/sync-vectors/`
+diff shows **only #32's** two ack vectors plus `index.json`/`generate.mjs` — nothing from this slice.
+`dotnet` not found; a CONNECT tunnel failure / 403. **CI is the gate for both halves.**
+
+### C-S4C-7 — The engine half is unwritten, not blocked, and `SyncPump` still has no caller
+
+> **Claim.** `src/Sync/RelayClient.cs` needs the same ceiling and did not get it — no .NET here. It
+> is **unblocked and merely unwritten**; do not file it as a blocker. And `SyncPump` has no
+> production caller, so the truncation this prevents is prospective.
+
+```bash
+cd <main>  && grep -n "PullAsync" -A 20 src/Sync/RelayClient.cs | grep -n "seq"
+cd <android> && grep -rn "SyncPump" app/src ; echo "callers exit=$?"
+```
+
+*Expected:* the C# reader still takes its per-element `seq` with no `latest` ceiling; the `grep` over
+`app/src` prints **nothing** (exit 1).
