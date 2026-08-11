@@ -3769,3 +3769,44 @@ file were neither read nor referenced beyond their paths. **No secrets read, wri
 Terra's state was read at iteration start and again before writing this: still R6(b) BLOCKED on
 draft PR #26, heartbeat unchanged at 2026-08-07T21:18, **claims no files** — no collision. This
 slice's only main-repo territory is `docs/Sync-Protocol.md`, already claimed via #32/#33.
+
+### S4S-10 CI reported green on both heads, and the offline pin was read rather than argued
+
+**Main repo** — run [31448717897](https://github.com/ShivaClaw/careerseeker/actions/runs/31448717897) on
+`claude/s4-pull-request-semantics` head `10696d2`. Both jobs `success`. **The job log was read, not
+just its conclusion**, and it prints:
+
+```
+=== 130 passed, 0 failed ===          (SyncHarness)
+=== Offline total: 598 passed, 0 failed ===
+CareerSeeker alpha verification complete.
+```
+
+**This discharges a caveat that had stood since the tenth iteration.** Previous entries argued the
+pin was intact *by construction* (a doc-only change cannot move it) and corroborated that with
+"`Verify-Alpha.ps1` exits 0 and the script throws on drift". Both are sound arguments, and neither
+is a measurement. **The number was sighted directly this time** — which matters more than usual
+here, because this slice is the first to edit `docs/Sync-Protocol.md` in a way that could in
+principle have tripped a content assertion, and `CLAUDE.md`'s doc/verifier drift trap is exactly
+about that class of failure. It did not: the verifier makes **no** assertion against
+`Sync-Protocol.md` (`grep -c "Sync-Protocol" scripts/Verify-Alpha.ps1` → `0`, run here before the
+edit), and CI confirms the total is unmoved.
+
+**Android** — run [31448716435](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31448716435)
+(run #75, event `push`), job *Build and test* (`93648385242`), **`success`**, 01:15:02 → 01:22:28 UTC.
+**`head_sha` `782f9bbe951eb32fe09474c4bd3b04172db205a4`, read from the run's own field and matched
+against `git rev-parse HEAD`** rather than taken from the PR's check list, which follows the head.
+Single job, so green covers `checkCoreIsAndroidFree`, the vendored-vector diff against `679a317`,
+`:core:test`, `:app:test`, `:app:assembleDebug`, `:app:lintDebug` and the tracker check — **including
+the only check that the wrapper removal compiles under the real toolchain** instead of the probe's
+substituted JDK 21, which is the one thing the reduced probe structurally cannot tell anyone.
+
+**What it still does not prove, stated plainly.** CI prints no totals for `:core` and **I did not
+count the per-case `PASSED` lines**, so **187** remains the probe's number, gate-corroborated as
+*green* and not as a count. That is the same gap C-S4P-11 recorded last iteration and it is
+unchanged; the only honest channel for counting is pulling the entire job log, and I judged that
+cost not worth paying for a number two independent probe runs already agree on. Recorded rather
+than quietly dropped.
+
+**One commit follows the measured head** — this records update — and it is **records-only, no code**,
+so the green above still describes the code as it stands.
