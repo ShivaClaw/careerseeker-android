@@ -4940,6 +4940,30 @@ blocked; the engine's C# stays blocked. The unblocked surface is `:core`, and it
 citing it must say `:core:test, via scripts/core-probe.sh` and name what did not run. It is not the
 android gate and must never be reported as one.
 
+### CP-8 CI on this branch tip, added after the records were written
+
+Run **31537144947**, job **93930962727**, on `d25c615` — **every step `success`**, whole job
+**21:17:32 → 21:23:29 = 5 m 57 s**, which is *faster* than the 7 m 26 s baseline. The steps that
+matter to this iteration's claims:
+
+| step | result | duration |
+| --- | --- | --- |
+| `Assert :core has no Android dependency` | ✓ | 70 s |
+| `Assert vendored sync vectors match the pinned main-repo commit` | ✓ | 9 s |
+| `Unit tests (:core)` | ✓ | **41 s** (baseline 50 s) |
+| `Unit tests (:app, Robolectric)` | ✓ | **85 s** (baseline 93 s) |
+| `Assemble debug APK` · `Lint` | ✓ · ✓ | 72 s · 32 s |
+
+**Two things this confirms and one it does not.** It confirms the **`679a317` vendored pin is
+intact** — no cross-repo drift from anything here — and that **the hang did not recur**, which is
+the observation CP-6's closure rests on; a third occurrence would have made that closure premature
+and it is the thing to watch. It does **not** re-prove the lane: CI runs the repository's build with
+an SDK, so its `:core` step and `scripts/core-probe.sh` are two independent routes to the same
+suite, which is the entire point of comparing them.
+
+**No count-reporting doc moved**, because no test was added: the suite is still the repository's own
+190.
+
 ### Boundary — what was not touched
 
 **Nothing was merged, in either repo.** Android PR #6 stays a draft; main-repo PRs #32, #33, #34,
