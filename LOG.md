@@ -4687,6 +4687,41 @@ in the *document*, and the fix is the document plus a test. Relaxing the regex w
 mistake pointing the other way — loosening what the relay accepts from a sandbox that cannot run the
 engine's gate.
 
+### S2T-10 The android CI job hung on a docs-only commit, measured against its own baseline
+
+Not part of the slice, and recorded because it is the kind of thing that reads as normal slowness
+until someone compares it to a number.
+
+The android records push (`c68ef07`, **five Markdown files and nothing else**) triggered run
+**31517760672**. Its `Unit tests (:app, Robolectric)` step started **17:32:31** and was **still
+`in_progress` 25 minutes later**, with `Assemble debug APK`, `Lint` and the tracker check all still
+`pending`.
+
+**The baseline is the same branch four hours earlier**, run **31498538679** on `3bf152c` —
+`success`, and the only difference between the two heads is this iteration's Markdown:
+
+| step | `3bf152c` (success) | `c68ef07` |
+| --- | --- | --- |
+| `Unit tests (:app, Robolectric)` | 13:56:15 → 13:57:48 = **93 s** | 17:32:31 → **still running at 25+ min** |
+| whole job | 13:53:14 → 14:00:40 = **7 m 26 s** | not reached |
+
+**So it is ~16× the previous duration on a diff that cannot have caused it.** Everything before that
+step passed, including the two that matter most here: **`Assert vendored sync vectors match the
+pinned main-repo commit` ✓** (so the `679a317` pin is intact and there is no cross-repo drift) and
+`:core:test` ✓.
+
+**What this is not:** it is not evidence about any code in this iteration, which touched no Kotlin.
+**What it might be:** a stuck runner, or the Robolectric fragility **B-5** already records for this
+project (Room 2.8.4 cannot open a file-backed DB under Robolectric). **Which of those it is, is not
+determined here** — one observation is not a pattern, and I did not re-run it to find out.
+
+**Also worth knowing, because it cost three runs this iteration.** The workflow cancels in-progress
+runs on a new push to the same branch, so runs on `b394583`, `10e99c0` and `16f2451` all show
+`cancelled` — each superseded by the next records commit. That is expected behaviour and not a
+failure, but **a reader scanning conclusions will see three `cancelled` in a row and should not read
+them as red**. The pattern was recorded once before (fourteenth run) and is recorded again because it
+recurred.
+
 ### Boundary — what was not touched
 
 **Nothing was merged, in either repo.** PR #36 was opened as a **draft**; #32, #33, #34 and #35 stay
