@@ -72,8 +72,9 @@ class SyncPumpTest {
         """{"envelopes":[${wires.joinToString(",")}],"latest":$latest}"""
 
     /**
-     * The other page shape [RelayClient.parsePullPage] accepts — `{seq, envelope}` — which is the
-     * only one in which the transport's `seq` and the envelope's own `seq` can disagree.
+     * The `{seq, envelope}` wrapper — a shape **no implementation emits and §2.1 now forbids**
+     * (PQ-S4-2). Kept only so a test can prove the pump refuses it; it used to be the one shape in
+     * which the transport's `seq` and the envelope's own could disagree.
      */
     private fun wrappedPage(seq: Long, wire: String, latest: Long) =
         """{"envelopes":[{"seq":$seq,"envelope":${json.encodeToString(kotlinx.serialization.json.JsonPrimitive.serializer(), kotlinx.serialization.json.JsonPrimitive(wire))}}],"latest":$latest}"""
@@ -435,7 +436,30 @@ class SyncPumpTest {
      * touching a byte it is able to read.
      */
     @Test
-    fun `the cursor follows the envelope's authenticated seq, not the relay's page wrapper`() = runTest {
+    fun `the cursor follows the envelope's authenticated seq, and nothing else can supply one`() = runTest {
+        // Rule 4 still holds — `header?.seq ?: envelope.seq` prefers the authenticated number —
+        // but as of §2.1 (PQ-S4-2) it is defence in depth rather than the load-bearing check.
+        // The wrapper was the only shape in which a page could carry a *second*, unauthenticated
+        // sequence number beside the envelope's own. With it refused at the parser, an element IS
+        // the envelope, so the two numbers are read off the same field and cannot disagree.
+        val relay = FakeRelay(listOf(page(e2p(5, "snapshot"), latest = 999), page(latest = 999)))
+        val replica = FakeReplica(cold()) { _, _ -> ApplyDisposition.APPLIED_SNAPSHOT }
+        val pump = pumpOver(relay, replica)
+
+        val report = pump.pump()
+        // `latest` is 999 and the envelope says 5. The cursor takes the envelope's, never the
+        // relay's high-water mark.
+        assertEquals(5L, report.cursor, "999 came from the relay and is authenticated by nothing")
+        assertEquals(listOf(5L), replica.applied.map { it.first })
+
+        pump.pump()
+        assertEquals(5L, sinceOf(relay.pullUrls[1]))
+    }
+
+    @Test
+    fun `a wrapped envelope is never applied, because the wrapper is not an envelope`() = runTest {
+        // The shape the pump used to unwrap and apply. §2.1 refuses it, so it reaches the receiver
+        // as an unrecognised envelope and is discarded like any other garbled item.
         val relay = FakeRelay(
             listOf(wrappedPage(seq = 999, wire = e2p(5, "snapshot"), latest = 999), page(latest = 999)),
         )
@@ -443,11 +467,14 @@ class SyncPumpTest {
         val pump = pumpOver(relay, replica)
 
         val report = pump.pump()
-        assertEquals(5L, report.cursor, "999 came from the relay and is authenticated by nothing")
-        assertEquals(listOf(5L), replica.applied.map { it.first })
+        assertEquals(0, replica.applied.size, "a wrapper must not reach the replica")
+        assertEquals(listOf(ErrorCode.DECRYPT_FAILED), report.rejections)
 
-        pump.pump()
-        assertEquals(5L, sinceOf(relay.pullUrls[1]))
+        // Stated rather than hidden: the discarded item still advances the cursor, and with no
+        // authenticated seq to use it advances to the element's *claimed* 999. That is the same
+        // don't-stall-on-one-bad-byte rule as the test below, and it is the residual hazard
+        // recorded as PQ-S4-3 — this slice narrowed the wrapper hole, it did not close that one.
+        assertEquals(999L, report.cursor)
     }
 
     @Test
@@ -469,7 +496,10 @@ class SyncPumpTest {
     fun `an envelope that does not parse is discarded and does not stall the cursor`() = runTest {
         val malformed = """{"v":1,"pairing":"$pairing","dir":"e2p","seq":6,"ts":"2026-08-10T09:00:00Z",""" +
             """"key_id":"$keyId","nonce":"AAAAAAAAAAAAAAAA","ciphertext":"AAAA","surprise":"v2"}"""
-        val relay = FakeRelay(listOf(wrappedPage(seq = 6, wire = malformed, latest = 6), page(latest = 6)))
+        // A bare malformed envelope, not a wrapped one: §2.1 elements are bare, and wrapping this
+        // would have tested the wrapper's rejection rather than the unknown-field rule it is here
+        // for. Its own top-level `seq` (6) is what the cursor falls back to.
+        val relay = FakeRelay(listOf(page(malformed, latest = 6), page(latest = 6)))
         val replica = FakeReplica(warm(1)) { _, _ -> ApplyDisposition.APPLIED }
         val pump = pumpOver(relay, replica)
 

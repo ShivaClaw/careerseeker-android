@@ -51,7 +51,17 @@ sealed interface RelayResult<out T> {
     data class Conflict(val latest: Long? = null) : RelayResult<Nothing>
 }
 
-/** One envelope as the relay hands it back, still sealed. */
+/**
+ * One envelope as the relay hands it back, still sealed.
+ *
+ * @property wire the envelope's own JSON (§2.1: page elements are bare envelopes), untouched and
+ *   unparsed. Every trust decision belongs to the receiver.
+ * @property seq the `seq` **claimed** by that JSON, read leniently, `0` when it is absent or
+ *   unusable. It is not authenticated — the tag covers the `seq` inside the sealed bytes (§4.1),
+ *   and that is the one [SyncPump] acts on. This one exists for exactly one case: an envelope that
+ *   fails the strict parse has no authenticated `seq`, and the cursor still has to clear it or one
+ *   malformed byte stalls the direction forever.
+ */
 data class PulledEnvelope(val seq: Long, val wire: String)
 
 data class PullPage(val envelopes: List<PulledEnvelope>, val latest: Long)
@@ -202,21 +212,33 @@ class RelayClient(
      * does not look at a per-element `seq` at all. Rejecting a page over it would be *stricter*
      * than the engine on a field no trust decision reads, which is the wrong direction under the
      * interpretation rule.
+     *
+     * **5. An element is a bare envelope, and the `{"seq":N,"envelope":…}` wrapper is refused**
+     * (§2.1, decided 2026-08-11 — PQ-S4-2). This client used to accept both, and it was the only
+     * party anywhere that did: the relay splices bare envelope JSON, the engine's `PullAsync` has
+     * no branch for a wrapper, no shared vector contains a page, and until §2.1 the spec described
+     * no response body at all. Accepting a shape nothing emits is not free tolerance — it made the
+     * meaning of an element depend on whether it happened to contain a key named `envelope`, which
+     * the relay controls, and it read a sequence number **the relay authenticates with nothing**
+     * from beside one the AAD covers. Cursor arithmetic on the former is how a blind relay
+     * truncates history without decrypting a byte (the other half of that attack is C-S4T-4, in
+     * [SyncPump]). A wrapper now simply fails the receiver's strict §3 parse, which is where an
+     * unrecognised envelope shape belongs.
      */
     private fun parsePullPage(body: String): RelayResult<PullPage> = runCatching {
         val root = json.parseToJsonElement(body).jsonObject
         val latest = root["latest"].strictLong("latest")
         val envelopes = root["envelopes"].requiredArray("envelopes").map { element ->
+            // §2.1: an element IS a bare envelope. Not a wrapper around one — see (5) above.
             val o = element.jsonObject
             PulledEnvelope(
                 // Lenient by design — see (4) above. Anything unusable reads as 0, which no
                 // trust decision consumes.
                 seq = (o["seq"] as? JsonPrimitive)?.takeIf { !it.isString }?.longOrNull ?: 0L,
-                // The relay may hand back the envelope as a nested object or as an opaque
-                // string; either way it is forwarded verbatim to the receiver's strict parser.
-                wire = o["envelope"]?.let {
-                    if (it is JsonPrimitive && it.isString) it.content else it.toString()
-                } ?: o.toString(),
+                // Forwarded verbatim to the receiver's strict parser, which owns every trust
+                // decision. This client re-serialises rather than slicing the original text, so
+                // the bytes the receiver parses are this object and nothing around it.
+                wire = o.toString(),
             )
         }
         PullPage(envelopes, latest)

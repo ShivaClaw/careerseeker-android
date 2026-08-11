@@ -96,12 +96,13 @@ class RelayClientTest {
 
     @Test
     fun `pull returns envelopes unparsed, plus the relay's high-water mark`() = runTest {
-        // The client is a dumb pipe by design: it hands wire text to the receiver, which owns
-        // every trust decision. Note the payload below is nonsense — the client must not care.
+        // §2.1: an element IS a bare envelope. The client is a dumb pipe by design — it hands wire
+        // text to the receiver, which owns every trust decision. The payloads below are nonsense
+        // on purpose; the client must not care.
         val body = """
             {"latest":48,"envelopes":[
-              {"seq":47,"envelope":{"v":1,"pairing":"$pairing","dir":"e2p","seq":47}},
-              {"seq":48,"envelope":{"v":1,"pairing":"$pairing","dir":"e2p","seq":48}}]}
+              {"v":1,"pairing":"$pairing","dir":"e2p","seq":47},
+              {"v":1,"pairing":"$pairing","dir":"e2p","seq":48}]}
         """.trimIndent()
 
         val result = clientOver(json(body)).pull(Direction.ENGINE_TO_PHONE, 46)
@@ -110,7 +111,40 @@ class RelayClientTest {
         assertEquals(48L, page.latest)
         assertEquals(listOf(47L, 48L), page.envelopes.map { it.seq })
         assertTrue(page.envelopes[0].wire.contains("\"seq\":47"))
+        // Forwarded whole, not sliced or re-shaped: the receiver parses this object and nothing
+        // around it.
+        assertTrue(page.envelopes[0].wire.contains("\"pairing\":\"$pairing\""))
     }
+
+    @Test
+    fun `a wrapped envelope is refused end to end, even when the envelope inside it is valid`() =
+        runTest {
+            // PQ-S4-2, and the inner envelope below is deliberately *structurally valid* — that is
+            // the whole point. Under the old client this element was unwrapped and the receiver
+            // got a page it could parse, so the shape worked and nobody could see that no
+            // implementation emits it. It now fails at the receiver's strict §3 parse, where an
+            // unrecognised envelope shape belongs.
+            val inner = """
+                {"v":1,"pairing":"$pairing","dir":"e2p","seq":47,"ts":"2026-06-11T14:02:11Z",
+                 "key_id":"k-2026-06-01","nonce":"AAAAAAAAAAAAAAAA","ciphertext":"AAAA"}
+            """.trimIndent().replace("\n", "").replace(" ", "")
+            // The inner object on its own is what a conforming relay would have sent, and it parses.
+            assertTrue(EnvelopeJson.parse(inner).ok)
+
+            val page = (clientOver(json("""{"latest":48,"envelopes":[{"seq":999,"envelope":$inner}]}"""))
+                .pull(Direction.ENGINE_TO_PHONE, 46) as RelayResult.Ok).value
+
+            // The whole element is the wire, wrapper and all — the inner object is NOT extracted.
+            assertTrue(page.envelopes[0].wire.contains("\"envelope\""), page.envelopes[0].wire)
+            assertEquals(null, EnvelopeJson.parse(page.envelopes[0].wire).envelope)
+
+            // `seq` is read off the element's own top level, always — there is no second number
+            // to disagree with it now. Stated exactly: this 999 is unauthenticated and no trust
+            // decision consumes it, but it IS what SyncPump falls back to for an envelope that
+            // does not parse, and that fallback is its own open question (PQ-S4-3), not this
+            // test's subject.
+            assertEquals(999L, page.envelopes[0].seq)
+        }
 
     @Test
     fun `pull sends the direction and cursor the caller asked for`() = runTest {
