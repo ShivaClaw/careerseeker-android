@@ -4711,9 +4711,34 @@ pinned main-repo commit` ✓** (so the `679a317` pin is intact and there is no c
 `:core:test` ✓.
 
 **What this is not:** it is not evidence about any code in this iteration, which touched no Kotlin.
-**What it might be:** a stuck runner, or the Robolectric fragility **B-5** already records for this
-project (Room 2.8.4 cannot open a file-backed DB under Robolectric). **Which of those it is, is not
-determined here** — one observation is not a pattern, and I did not re-run it to find out.
+
+**It recurred, on a different step, and that is what makes it diagnosable.** The records push that
+recorded the first hang (`f49290e`, also Markdown-only) started run **31518284889**, which then hung
+on **`Unit tests (:core)`** — baseline **50 s** (13:55:25 → 13:56:15), observed still `in_progress`
+past **7 minutes**. So:
+
+| run | head | hung on | that step's baseline |
+| --- | --- | --- | --- |
+| 31517760672 | `c68ef07` | `Unit tests (:app, Robolectric)` | 93 s |
+| 31518284889 | `f49290e` | `Unit tests (:core)` | 50 s |
+
+**Two different steps, two different runners, both docs-only commits** — so this is **not** the
+Robolectric fragility **B-5** records (that would not touch `:core`, which has no Android
+dependency by construction and is asserted so in the step before it).
+
+**The sharper cut: everything that is not a test task ran at baseline speed.** On run 2, `Set up
+Android SDK` took **27 s** against a 23 s baseline, `Assert :core has no Android dependency` **101 s**
+against 97 s, and the vendored-vector assertion **5 s** against 5 s. `checkCoreIsAndroidFree` is
+itself a Gradle task and it completed normally, so **Gradle is not broadly wedged** — it is the
+**test-executing** tasks that hang, which points at forked test JVMs or the runner, not at the build.
+
+**A correction to my own first reading, recorded because it was wrong in the record before it was
+wrong anywhere else.** I initially called run 2 "slow at `Set up Android SDK`" — it was not; I read
+an in-flight step as a slow one. It finished in 27 s. The conclusion (infrastructure rather than this
+iteration's code) survives; the reason I first gave for it does not.
+
+**Still not diagnosed, and deliberately not chased.** Two observations make a pattern, not a root
+cause, and nothing here can attach a debugger to a GitHub runner.
 
 **Also worth knowing, because it cost three runs this iteration.** The workflow cancels in-progress
 runs on a new push to the same branch, so runs on `b394583`, `10e99c0` and `16f2451` all show
