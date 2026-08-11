@@ -3555,3 +3555,23 @@ references in the verifier. `$ExpectedOfflineTotal = 598`. The diff touches
 `docs/Sync-Protocol.md` and nothing else. `Tests 36 passed (36)` — **not 42**, which is
 `claude/s2-relay-retention`'s figure and belongs to a different branch. Clean tree. `dotnet` not
 found. **CI is the gate.**
+
+### C-S6C-7 — Main-repo CI green on this head, and the 598 pin confirmed by measurement
+
+> **Claim.** Run **31476875538** (event `push`, `head_sha` **`b114d11`** read from the run's own
+> field, not from the PR's check list, which follows the head). **Both jobs `success`.** From the
+> *Build and offline harnesses* job log: `=== 130 passed, 0 failed ===` (SyncHarness) and
+> **`=== Offline total: 598 passed, 0 failed ===`**, then `CareerSeeker alpha verification
+> complete.` So `Verify-Alpha.ps1` ran in full — the 82-second duration is a warm build, not a
+> skipped run; every harness section prints in the log.
+
+```bash
+# MCP, not curl -- the Actions REST API is 403 to curl from this sandbox (C-S4P-12)
+#   actions_get      method=get_workflow_run  resource_id=31476875538   -> read head_sha
+#   get_job_logs     job_id=93732493711  return_content=true  tail_lines=400
+```
+
+*Expected:* `head_sha` equal to `b114d11`; conclusion `success` on both *Blind relay (Worker)* and
+*Build and offline harnesses*; the two totals above present verbatim. **This upgrades C-S6C-6's
+"unchangeable by construction" from an argument to an observation** — the pin was measured at 598
+after this iteration's commits, not merely argued to be untouched.
