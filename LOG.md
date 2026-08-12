@@ -5487,3 +5487,181 @@ unblock**, not as a blocker on this slice — nothing here was blocked.
 shows `cancelled`. It was superseded by the records-only push that produced `d8ae5da`; it did not
 fail. Since `d8ae5da` differs from `49bbe25` only in `BLOCKED.md`, **attempt 2's green covers this
 slice's code in full.**
+
+---
+
+## SC — The AEAD codec was every test's tool and no test's subject (2026-08-12, twenty-first cloud iteration)
+
+**Rung: none moved, and none was attempted.**
+
+**First, the correction this record has now made for the fourth consecutive run.** The iteration
+prompt again assigned **S5** on the basis that it is "NOT STARTED and genuinely NOT blocked."
+**Both halves are still wrong**, and the seventeenth, nineteenth and twentieth runs each said so.
+Verified again after the mandatory fetch, not carried from the previous record:
+`origin/claude/s5-entitlement-ack-spec` carries **four commits** above `origin/main` (`00b3705`)
+as draft **PR #32** — `9c05ef7`, `a564c0c`, `22b028e`, `8575539` — and
+`git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md` contains **§4.3.3** at line
+307 defining the body as `{product_id, acknowledged_at, order_id?}`, with both
+`entitlement-ack*.json` vectors present and `generate.mjs` amended. **PQ-A6-1, PQ-A2-1 and PQ-A2-2
+are closed.** The one remaining piece the prompt names — **PQ-A2-3's `invalid-unknown-field`
+vector — is blocked by B-6**, re-read this session rather than assumed.
+
+The prompt also directs that the Kotlin applier not be written "unless you can compile them — you
+cannot." **Two things are wrong with that.** `:core` Kotlin *can* be compiled and run here (B-7's
+scope was corrected in the eighteenth iteration), and the applier **already exists**:
+`core/…/EntitlementAck.kt` ships `EntitlementAck` + `EntitlementAckApplier`, with
+`EntitlementAckTest` beside it. **Four identical corrections is itself the finding**, and it is
+now the first line of `STATE.md`: a session handed S5 should verify PR #32 and read B-6 *before
+writing anything*.
+
+So this run took the prompt's escape clause and went to the bottom of the stack, continuing the
+twentieth iteration's sweep of `core/…/crypto/`.
+
+### SC-1 The gap, and why it is not the same gap as the last two
+
+`Hkdf` and `Base64Url` were *unreferenced* by any test. [SyncCrypto] never was —
+`grep -rl SyncCrypto core/src/test` printed **six** files. The gap is narrower and easier to miss:
+**referenced everywhere as a tool, asserted about nowhere.** All six (`SyncPumpTest`,
+`EnvelopeReceiverTest`, `PairingSessionTest`, `OutboundEnvelopesTest`, `EntitlementVectorsTest`,
+`ProtocolVectorsTest`) use it to build or open a fixture on the way to testing something else. A
+codec exercised only as scaffolding is tested exactly on the inputs its scaffolding happens to
+produce — and two consequences were measured before a line was written.
+
+**One: `verifySignature` has exactly one pre-existing test call** (`ProtocolVectorsTest.kt:146`)
+and one production caller (`EnvelopeReceiver.kt:98`). The vendored set carries **eight** distinct
+64-byte signatures, and **all eight have a non-zero leading byte in both `r` and `s`** — so
+`toDerInteger`'s strip loop had never taken an iteration, in the product or the suite. Same shape
+as CR's HKDF finding. **Two: no vector puts a non-ASCII byte in the AAD** — 26 files, 23 with an
+`aad` field, **zero**. Re-verify: **C-SC-1**, **C-SC-2**.
+
+### SC-2 The finding: the AAD is not an injective encoding of the header
+
+`EnvelopeHeader.aad()` joins six fields with `|` and `=`; `SyncCrypto.gcm()` encodes the result
+`US_ASCII`. `EnvelopeJson.parse` regex-checks `pairing` and types `v`/`seq`/`dir`, but takes
+**`ts` and `key_id` as arbitrary JSON strings with no charset or content check** — and those two
+are the last, adjacent fields. Two independent collisions follow.
+
+**Half 1, the charset.** Java's `US_ASCII` encoder maps every unmappable character to `?` (0x3F).
+Measured: `é`, `è`, `Ж` and `😀` all become the **single** byte 0x3F — a surrogate pair collapses
+to one, not two — and all four collide with a literal `?`. An envelope sealed under `ts=…Zé` opens
+under `…Zè`, `…Z😀` and `…Z?`. §5.4's signature input uses the same encoder, so command signatures
+inherit it.
+
+**Half 2, the framing, and it needs no non-ASCII at all.** `(ts="T", key_id="K|key_id=Z")` and
+`(ts="T|key_id=K", key_id="Z")` produce a byte-identical AAD, and each opens the other's envelope.
+
+**Both are latent, and the tests say so at their own sites rather than in a footnote.** A rewrite
+only survives authentication if the *original* bytes and the rewritten bytes agree after encoding;
+conforming senders emit RFC 3339 timestamps and generated key ids, so every mutation of a real
+envelope changes a byte and fails the tag. Half 2 is self-limiting twice over, since `key_id`
+selects the key before the AAD is built. **Calling either a bypass would be the phantom these
+records exist to prevent.**
+
+**What is genuinely open is the cross-implementation half, and it is unmeasured.** If `src/Sync/`
+builds its AAD with UTF-8, the two sides agree on every all-ASCII header and each answers
+`decrypt_failed` on the other's traffic for everything else — the shape of **PQ-B64-1**, one field
+over. **Deliberately not fixed:** tightening the Kotlin makes the phone stricter than an unmeasured
+engine, the field bug the mission's interpretation rule names. Filed as **PQ-AAD-1**; the
+resolution is one `grep` on a machine with .NET. Re-verify: **C-SC-5**, **C-SC-6**.
+
+### SC-3 Why the vector suite could never have caught it
+
+`heartbeat-unicode.json` looks like exactly the vector that would — its own note says it "catches
+implementations that treat UTF-8 as Latin-1 or mangle surrogate pairs." **It puts its non-ASCII in
+the `plaintext_json`, and its `aad` field is plain ASCII.** The body is length-delimited bytes and
+round-trips; the AAD is a string that gets re-encoded, and does not. `SyncCryptoTest` ships the
+plaintext case as the deliberate contrast to the header case sitting next to it.
+
+### SC-4 The mutation battery, and the split inside the four that survived
+
+Eight mutations applied to `SyncCrypto.kt` and reverted; **`git diff --stat -- core/src/main/` is
+empty**. **Four caught** — M1 (by two tests), M3, M4, M5. Four survived, and they do **not** all
+survive for the same reason, which is the part worth reading.
+
+**M6 is semantically redundant, not a gap.** The explicit 64-byte gate duplicates an
+`IndexOutOfBoundsException` that `rawToDer` throws inside the `try` and the catch converts to
+`false`. Checked, not excused.
+
+**M2, M7 and M8 survive because they are only observable under a stricter JCA provider than the
+one the tests run on**, measured directly rather than inferred: `SunEC` **accepts** an unpadded
+negative DER INTEGER (while rejecting the non-minimal encoding M1 produces); `generateSecret()`
+returns a **fixed-width 32-byte** array even when the secret's top byte is `0x00`, so `leftPad`
+never fires; and `generatePublic` **returns without throwing** for an off-curve point *and* for
+coordinates above the field prime, so `verifySignature`'s entire `catch` is unreached.
+Re-verify: **C-SC-7**, **C-SC-8**.
+
+### SC-5 That split is the iteration's second finding, and it bounds this whole lane
+
+`:core` is a pure-JVM module, so `:core:test` runs on the JDK's **`SunEC`** — here *and* on
+`windows-latest` in CI. The phone runs on Android, where the provider is **Conscrypt**. The three
+lines M2/M7/M8 delete are precisely the ones that matter when a provider differs from `SunEC`, and
+they are the three no JVM test can exercise. **A green `:core:test` is not evidence about the
+codec's behaviour on a device**, and no record before this one said so.
+
+**The risk is deleting them, not keeping them.** All three are defensive — they make the encoding
+conform to DER/§5.2 and convert provider exceptions into the `false` §7.2 expects — so the entry
+exists mainly so a future session running a coverage tool does not read them as dead code. Worst
+case, stated concretely: if Conscrypt returned the BigInteger-minimal ECDH secret, `leftPad` is the
+only thing stopping a 31-byte IKM reaching HKDF — a *different* IKM, so the two ends derive
+different directional keys for roughly **1 pairing in 256**. Filed as **PQ-SC-1**, explicitly
+**not** as a blocker: nothing was obstructed and no rung depends on it.
+
+### SC-6 Two of this file's own claims were wrong, and the mutation run is what caught them
+
+Both were written before the battery ran, and both shipped corrected.
+
+**The leading-zero characterisation was too coarse.** A `0x00` whose *next* byte has the high bit
+set is a strip-then-pad **no-op** — the encoding is identical either way — so the `r` fixture
+(`00a3…`) does **not** reach the branch. Only the `s` fixture (`0051…`, high bit clear) does, and
+M1 fails exactly the two tests that use it. The test is now named *for the no-op*, and kept
+deliberately: a future reader picking a leading-zero fixture at random would most likely pick this
+shape and conclude the branch was covered. The frequency claim was corrected with it — a strip is
+needed ~1 time in 512 per component, so **~1 signature in 256**, not the "1 in 128" first written.
+
+**The ECDH test was labelled a regression catcher and is a pin.** The first draft said "verified as
+a real catcher by mutation M7"; M7 then left the suite green, because `SunEC` never returns a short
+secret. The docstring now says that, and says why the fixture is still worth having.
+
+**A third correction, in the audit commands rather than the tests.** Three of the nine C-SC entries
+did not reproduce their stated output on the standing re-run step: C-SC-1's expectation named a
+declaration line the pattern cannot match (**the same transcription shape as CR-6 and C-CR-3**,
+third recurrence), C-SC-3 claimed three `PASSED` lines where the pattern returns **four**, and
+C-SC-4's JWK paired one key's `d` with the *other* key's public coordinates. All three were fixed
+and re-run before commit.
+
+### SC-7 Counts, and one machine change
+
+`:core:test` via `scripts/core-probe.sh`: **244 → 270, 17 → 18 classes, 0 failed**. The 244/17
+baseline was **re-measured this session** before any edit rather than quoted from CR. The +26 is
+one new class, `SyncCryptoTest`; **no existing class was added, deleted, renamed or edited**, and
+no production file changed at all.
+
+One machine change, logged as such: `apt-get update -qq && apt-get install -y --no-install-recommends
+openjdk-17-jdk-headless`, exactly as `core-probe.sh`'s header prescribes (`:core` pins
+`jvmToolchain(17)`; `api.foojay.io` is denied by B-7's policy, so Gradle cannot auto-provision).
+
+The scratch Java probes behind C-SC-5 and C-SC-8 were written under the session scratchpad and
+**never inside the repository** — `git status --porcelain` showed only the intended files
+throughout.
+
+### SC-8 What was NOT touched
+
+**No vector byte.** `git diff 27b28bb..HEAD -- core/src/test/resources/sync-vectors/` is **empty**,
+so the vendored pin **`679a317`** is intact by construction and no cross-repo drift event occurred.
+**No production Kotlin** — all eight mutations reverted, `git diff --stat -- core/src/main/` empty.
+**No `:app` file.** **Nothing in the main repo except the coordination bus** — no
+`docs/Sync-Protocol.md`, no `relay/` file, no `generate.mjs` run that wrote anything, no `.cs`, no
+harness, no `Verify-Alpha.ps1`, no `$ExpectedOfflineTotal`; **the offline pin stays 598 and could
+not have moved.** **Draft PRs #32–#36 were not touched** — not merged, retargeted, rebased or
+force-pushed. **No merge in either repo**, no force-push, no history rewrite, no branch deletion,
+**no deploy of any kind**, no contact with the production relay (not even `GET /v1/health`), no
+Google/Play/OAuth console, no accounts, no purchases, no Gmail, and **no secret printed or read**.
+**B-1, B-2, B-4, B-5, B-6, B-8 untouched**; B-6 was re-read and is unchanged, which is why PQ-A2-3
+was again not attempted despite the prompt naming it.
+
+**And the standing limit, repeated because every record citing this lane must repeat it:**
+`core-probe.sh` runs **one** of the android gate's four tasks. `checkCoreIsAndroidFree`,
+`:app:assembleDebug` and `:app:lintDebug` need the Android SDK and **did not run**;
+`scripts/Verify-Alpha.ps1` needs .NET and **did not run** (`which dotnet` is empty). **CI is still
+the gate**, and citing this entry as "the android gate passed" would be the exact failure these
+records exist to prevent. Re-verify: **C-SC-9**.

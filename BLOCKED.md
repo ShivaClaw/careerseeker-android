@@ -1056,3 +1056,54 @@ by re-reading this entry's attempt-1/attempt-2 evidence before declaring it fixe
 **Deliberately not attempted here.** The repair is an `:app` edit, `:app` cannot be compiled, run or
 gated in this sandbox, and shipping an `:app` change whose only verification is another CI roll is
 exactly what these records exist to prevent.
+
+---
+
+## Twenty-first cloud iteration (2026-08-12) — no new blocker, and two deliberate non-blockers
+
+**Nothing this iteration attempted was obstructed.** One test file was written, run, and mutated
+eight times in the sandbox; the slice completed.
+
+**B-7's narrowed scope exercised a third time, and holding.** The eighteenth iteration corrected
+B-7 from "no Kotlin runs here" to its actual measurement; the nineteenth, twentieth and this one
+have now written 26, 28 and 26 tests on the strength of it. **What remains blocked is exactly what
+B-7 says:** `:app` entirely, plus `checkCoreIsAndroidFree`, `:app:assembleDebug` and
+`:app:lintDebug`. CI is still the gate for those.
+
+**One machine change, which is not a blocker and is logged as a machine change:**
+`apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless`, exactly
+as `scripts/core-probe.sh`'s header prescribes. A sandbox without it fails the probe's precondition
+check with the fix in the message, which is the intended behaviour.
+
+**B-1, B-2, B-4, B-5, B-6, B-8 untouched.** **B-6 was re-read and is unchanged**, and it is why
+PQ-A2-3 was again not attempted despite the iteration prompt naming it — for the fourth
+consecutive run. The engine still has no inbound wire-JSON parser, so the vector would turn the
+offline gate red for whoever pushes next while proving nothing.
+
+**Two open questions raised, both deliberately NOT filed as blockers.**
+
+**PQ-AAD-1** — the AAD is not an injective encoding of the header, in two independent ways
+(`US_ASCII` is lossy; the `|`/`=` framing is ambiguous across the `ts`/`key_id` boundary). **Nothing
+is blocked:** both halves are latent against conforming senders, and the one genuinely open
+question — whether the C# engine encodes its AAD as UTF-8 — is settled by a single `grep` on any
+machine with .NET. Filing it as a blocker would send the next session hunting a fault nobody has
+established exists.
+
+**PQ-SC-1** — `:core:test` runs only on the JDK's `SunEC`, and three of `SyncCrypto`'s defences
+(the DER positive pad, the ECDH left-pad, and `verifySignature`'s `catch`) are **unobservable on
+that provider**, so no test written here can cover them. **Nothing is blocked and nothing is known
+to be wrong:** all three are insurance against a stricter provider, and the record exists chiefly
+so a future session running a coverage tool does not read them as dead code and delete them. The
+resolution — running the three assertions as an instrumented `androidTest` case against Conscrypt —
+needs the emulator lane that **B-4** already covers, and adds no new obstruction of its own.
+
+**Deliberately not filed, and stated so it is not mistaken for an oversight:** four of the eight
+mutations were caught by no test. **One (M6) is not a coverage gap** — it is a semantically
+redundant guard duplicating a throw the `try` already converts, checked rather than excused. The
+other three are PQ-SC-1's subject and are recorded there rather than here, because a question about
+the evidence's reach is not the same thing as an obstruction.
+
+**The standing gate hazard from the twentieth iteration is unchanged.**
+`ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab` is still flaky and still
+unrepairable from a cloud sandbox (`:app` needs the SDK). This iteration touched no `:app` file, so
+a red on that test against this branch is still the hazard and not this slice.

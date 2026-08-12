@@ -4668,3 +4668,239 @@ Corroborating, from attempt 1's own log:
 *Expected:* present. **`:app` cannot be built or run in a cloud sandbox (B-7)**, so this diagnosis
 is explicitly a reading of the failing line plus the run's own warning — **not** a reproduction. The
 repair is named in `BLOCKED.md`; it was deliberately not attempted here.
+
+---
+
+## C-SC — The AEAD codec as a subject, and the provider bound (twenty-first cloud iteration, 2026-08-12)
+
+Every command below runs in a Linux sandbox with **no Android SDK and no .NET**. `core-probe.sh`
+runs **one** of the android gate's four tasks; see **C-SC-9** for what did not run.
+
+### C-SC-1 — No vector signature reaches the DER strip branch
+
+```bash
+cd <android>
+node -e '
+const fs=require("fs"),path=require("path");
+const dir="core/src/test/resources/sync-vectors/v1";
+const seen=new Map();
+for(const f of fs.readdirSync(dir)){
+  if(!f.endsWith(".json"))continue;
+  const j=JSON.parse(fs.readFileSync(path.join(dir,f),"utf8"));
+  (function walk(o){ if(o&&typeof o==="object") for(const[k,v] of Object.entries(o)){
+    if(k==="sig"&&typeof v==="string"&&v.length>80){ if(!seen.has(v))seen.set(v,[]); seen.get(v).push(f); } else walk(v); } })(j);
+}
+console.log("distinct sigs:",seen.size);
+for(const [sig,files] of seen){
+  const b=Buffer.from(sig.replace(/-/g,"+").replace(/_/g,"/"),"base64");
+  if(b.length!==64) continue;
+  console.log("  r[0]=0x"+b[0].toString(16).padStart(2,"0"),"s[0]=0x"+b[32].toString(16).padStart(2,"0"),files.join(","));
+}'
+```
+
+*Expected:* `distinct sigs: 8`, and **every** line has `r[0]` and `s[0]` non-zero. That is the
+claim: `toDerInteger`'s `while (i < v.size - 1 && v[i].toInt() == 0) i++` has never taken an
+iteration in the product or the suite.
+
+Corroborating, that `verifySignature` had exactly one call site in the whole module:
+
+```bash
+cd <android> && grep -rn "SyncCrypto.verifySignature" core/src/ app/src/
+```
+
+*Expected:* exactly **one** production call — `EnvelopeReceiver.kt:98`, the signature step — and
+exactly **one** pre-existing test call, `ProtocolVectorsTest.kt:146`, plus the new calls in
+`SyncCryptoTest.kt`. (The pattern is `SyncCrypto.verifySignature`, so it does **not** match the
+declaration inside `SyncCrypto.kt` itself; an earlier draft of this entry said it did, which is the
+same transcription error C-CR-3 caught in the twentieth iteration.)
+
+### C-SC-2 — No vector puts a non-ASCII byte in the AAD
+
+```bash
+cd <android>
+node -e '
+const fs=require("fs"),path=require("path");
+const dir="core/src/test/resources/sync-vectors/v1";
+let total=0,withAad=0,badAad=0,badPlain=0;
+for(const f of fs.readdirSync(dir)){
+  if(!f.endsWith(".json"))continue; total++;
+  const j=JSON.parse(fs.readFileSync(path.join(dir,f),"utf8"));
+  if(typeof j.aad==="string"){ withAad++; if(/[^\x00-\x7F]/.test(j.aad)) badAad++; }
+  if(/[^\x00-\x7F]/.test(JSON.stringify(j.plaintext_json||""))) badPlain++;
+}
+console.log({total,withAad,nonAsciiAad:badAad,nonAsciiPlaintext:badPlain});'
+```
+
+*Expected:* `{ total: 26, withAad: 23, nonAsciiAad: 0, nonAsciiPlaintext: 1 }`. The single
+non-ASCII plaintext is `heartbeat-unicode.json`, and its own `aad` field is plain ASCII — so the
+suite tests the body's charset and has never tested the header's. This is PQ-AAD-1's motivation.
+
+### C-SC-3 — The hard-coded ECDSA fixtures are reproducible
+
+The two signatures in `SyncCryptoTest`'s section D were produced with `node:crypto` by signing
+`careerseeker/v1/cmd|probe|N` for increasing `N` under one generated P-256 key and keeping the
+first `N` whose `r` (respectively `s`) begins `0x00`. They are hard-coded rather than searched at
+test time because ECDSA's nonce is random and a retry loop in the suite would be a second flaky
+test (`BLOCKED.md`, twentieth iteration).
+
+They do not need re-deriving to be checked — they are self-verifying against the pinned public key:
+
+```bash
+cd <android>
+scripts/core-probe.sh 2>&1 | grep -E "leading zero|high bit set|strip-then-pad"
+```
+
+*Expected:* **four** `PASSED` lines — the three ECDSA cases plus
+`an ecdh shared secret with a leading zero byte is left-padded to 32 bytes`, which the pattern also
+matches and which belongs to C-SC-4 rather than here. If the ECDSA fixtures were wrong,
+`verifySignature` would return `false` and those three would fail — a bad fixture cannot pass.
+
+### C-SC-4 — The ECDH fixture really does have a leading-zero shared secret
+
+```bash
+cd <android>
+node -e '
+const c=require("crypto");
+const ss=c.diffieHellman({
+  privateKey:c.createPrivateKey({key:{kty:"EC",crv:"P-256",
+    d:Buffer.from("ef05145101f1f7ac0c32401997d46a1fa98c43f7a740ef097c5563a66a783e0c","hex").toString("base64url"),
+    x:Buffer.from("c140b3d8632fe4b65f954fd528787a8d49cc3edaedb4d178ca8b0ca9effcde83","hex").toString("base64url"),
+    y:Buffer.from("f30bc7c87cd732dcae18040e339391c177cd966c86ec3956ad91cd45f37d11bb","hex").toString("base64url")},
+    format:"jwk"}),
+  publicKey:c.createPublicKey({key:{kty:"EC",crv:"P-256",
+    x:Buffer.from("f49624aba444bc99079d23b15a0a4bae6f117bc2056131a71e74861a21fbf72b","hex").toString("base64url"),
+    y:Buffer.from("67416a7d1dd5a1c5d4b7b66db43a1bfdeba7f997f5943cf43d8aa52ff15845dd","hex").toString("base64url")},
+    format:"jwk"})});
+console.log(ss.toString("hex"));'
+```
+
+*Expected (note the leading `00`):* `00e34c6ffb3bbdcde790ef53a42850107a3005b88f6fd9dc3c602225153ea250`.
+The Kotlin test asserts the same value from both directions. **This does not prove `leftPad` is
+exercised** — see **C-SC-7**, which measures that it is not.
+
+### C-SC-5 — The AAD encoder is lossy: the measurement behind PQ-AAD-1's first half
+
+```bash
+cd <scratch> && cat > P.java <<'EOF'
+import java.nio.charset.StandardCharsets; import java.util.Arrays;
+public class P { public static void main(String[] a){
+  String[] xs = {"Zé","Zè","ZЖ","Z😀","Z?"};
+  for(String s: xs) System.out.println(s.length()+" "+Arrays.toString(s.getBytes(StandardCharsets.US_ASCII))
+     +" utf8="+Arrays.toString(s.getBytes(StandardCharsets.UTF_8)));
+}}
+EOF
+java -Dfile.encoding=UTF-8 P.java
+```
+
+*Expected:* every one of the five prints `US_ASCII` bytes `[90, 63]` — including the surrogate
+pair, which collapses to **one** `0x3F`, and the literal `?`. Under UTF-8 all five differ. So the
+choice of charset, not the delimiter design, is what creates this collision class.
+
+The end-to-end consequence is asserted in Kotlin:
+
+```bash
+cd <android> && scripts/core-probe.sh 2>&1 | grep "aad encoder is lossy"
+```
+
+*Expected:* `PASSED` — an envelope sealed under `ts=…Zé` opens under `…Zè`, `…Z😀` and `…Z?`.
+
+### C-SC-6 — The AAD framing is ambiguous, with no non-ASCII involved
+
+```bash
+cd <android> && scripts/core-probe.sh 2>&1 | grep "aad framing is ambiguous"
+```
+
+*Expected:* `PASSED`. The two header tuples are
+`(ts="T", key_id="K|key_id=Z")` and `(ts="T|key_id=K", key_id="Z")`; the test asserts the AAD
+**strings** are equal and that an envelope sealed under one opens under the other.
+
+The unvalidated-fields half, which is why it is reachable at all:
+
+```bash
+cd <android> && sed -n '51,73p' core/src/main/kotlin/app/careerseeker/core/EnvelopeJson.kt
+```
+
+*Expected:* `pairing` is checked with `isValidPairingId`, `v`/`seq` are typed, `dir` is parsed —
+and **`ts` and `key_id` get `stringField` and nothing else**.
+
+### C-SC-7 — The mutation battery, and the four that survive for two different reasons
+
+```bash
+cd <android>
+# For each mutation: apply to core/src/main/.../crypto/SyncCrypto.kt, run, revert.
+#   M1 delete  `while (i < v.size - 1 && v[i].toInt() == 0) i++`
+#   M2 delete  `if (v[0].toInt() and 0x80 != 0) v = byteArrayOf(0) + v`
+#   M3 change  Charsets.US_ASCII -> Charsets.UTF_8 in gcm()
+#   M4 delete  require(key.size == Protocol.KEY_BYTES)
+#   M5 delete  require(nonce.size == Protocol.NONCE_BYTES)
+#   M6 delete  if (rawSignature.size != 64) return false
+#   M7 change  return leftPad(ka.generateSecret(), 32) -> return ka.generateSecret()
+#   M8 change  catch (_: Exception) { false } -> catch (e: Exception) { throw e }
+scripts/core-probe.sh 2>&1 | grep -E "^[A-Za-z]+ > .* FAILED"
+git checkout -- core/src/main/kotlin/app/careerseeker/core/crypto/SyncCrypto.kt
+```
+
+*Expected, per mutation:*
+
+| | failing tests | why |
+| --- | --- | --- |
+| **M1** | **2** — `s has a leading zero and a low next byte`, `r has the high bit set` | both use the `leadingZeroS` fixture |
+| **M2** | **0** | `SunEC` accepts an unpadded negative INTEGER |
+| **M3** | **1** — `the aad encoder is lossy…` | UTF-8 makes the AADs distinct again |
+| **M4** | **1** — `key and nonce sizes are enforced…` | |
+| **M5** | **1** — `key and nonce sizes are enforced…` | |
+| **M6** | **0** | redundant with `rawToDer`'s throw inside the `try` |
+| **M7** | **0** | `SunEC` never returns a short ECDH secret |
+| **M8** | **0** | nothing in the `try` throws on `SunEC` |
+
+**M1 failing the `r`-leading-zero test is NOT expected** — a `0x00` followed by a high-bit byte is
+a strip-then-pad no-op, which is why that test is named for the no-op and not for the branch.
+
+Then, the property that makes the whole battery trustworthy:
+
+```bash
+cd <android> && git diff --stat -- core/src/main/
+```
+
+*Expected:* **empty.** Every mutation was reverted; no production file changed this iteration.
+
+### C-SC-8 — The provider facts behind PQ-SC-1, measured rather than assumed
+
+```bash
+cd <scratch>   # full source in the iteration's LOG entry, §SC-7
+java Probe3.java
+```
+
+*Expected:* `JCA provider for ECDSA: SunEC`; the unpadded-negative DER encoding verifies `true`;
+`generateSecret()` reports `RAW LENGTH FROM JCA = 32` for a secret whose first byte is `0x00`; and
+`generatePublic` **returns without throwing** for both an off-curve point and coordinates of all
+`0xFF`. Those three facts are exactly why M2, M7 and M8 cannot be caught on this JVM.
+
+### C-SC-9 — The suite count, and what did NOT run
+
+```bash
+cd <android>
+git stash push -- core/src/test/kotlin/app/careerseeker/core/crypto/SyncCryptoTest.kt
+scripts/core-probe.sh | tail -1
+git stash pop
+scripts/core-probe.sh | tail -1
+```
+
+*Expected:* `244 tests, 0 failed, 0 skipped, across 17 classes` then
+`270 tests, 0 failed, 0 skipped, across 18 classes`. The baseline was **re-measured this session**
+rather than quoted from the twentieth run's record.
+
+**What did not run, stated so no reader promotes this to a gate result.** `core-probe.sh` runs
+**one** of the android gate's four tasks. `checkCoreIsAndroidFree`, `:app:assembleDebug` and
+`:app:lintDebug` need the Android SDK and **did not run** (B-7). `scripts/Verify-Alpha.ps1` needs
+.NET and **did not run** — `which dotnet` is empty — so **nothing here is main-repo gate-backed**,
+and the offline pin of **598** was not measured by me. **CI is the gate.** Note also that a green
+`:core:test` says nothing about Conscrypt (**PQ-SC-1**), and this iteration touched **no vector
+byte**, so the vendored pin `679a317` is intact by construction:
+
+```bash
+cd <android> && git diff --stat 27b28bb..HEAD -- core/src/test/resources/sync-vectors/
+```
+
+*Expected:* **empty.** `27b28bb` is this branch's tip before the iteration; the range is pinned to
+it rather than to `HEAD~N`, which drifts as commits are added.
