@@ -6111,3 +6111,41 @@ purchases, no Play Billing code, no Gmail, no `.appdata`, and **no secret printe
 **`scripts/Verify-Alpha.ps1` did not run in this session. CI is the gate for 625**, exactly as it
 was for 610. Citing this entry as "the engine gate passed" would be the precise failure these
 records exist to prevent. Re-verify: **C-AK-1…14**.
+
+### AK-9 (added same day) — CI ran the gate I could not, and it is GREEN
+
+Recorded because the entry above was written **before** the gate could answer, and leaving it at
+"unverified" would now understate the evidence.
+
+Run **`31621352429`** on draft PR **#38**, both jobs **success**:
+
+| job | result |
+| --- | --- |
+| **Build and offline harnesses** (`windows-latest`, runs `./scripts/Verify-Alpha.ps1`) | **success** |
+| **Blind relay (Worker)** — includes *"Assert sync vectors match their generator"* | **success** |
+
+From the job log, verbatim:
+
+```
+  PASS  entitlement-ack: SyncPayloads.EntitlementAck reproduces the vector plaintext byte for byte
+  PASS  entitlement-ack-no-order-id: SyncPayloads.EntitlementAck reproduces the vector plaintext byte for byte
+  PASS  dispatch: an applied entitlement publishes exactly one entitlement_ack
+  PASS  dispatch: a REJECTED entitlement publishes no ack at all (§4.3.3 has no negative form)
+=== 157 passed, 0 failed ===                        (SyncHarness)
+=== Offline total: 625 passed, 0 failed ===
+CareerSeeker alpha verification complete.
+```
+
+**Three claims move from corroborated to confirmed.** (1) The **625 pin is right** — the verifier's
+own drift check (`throw` on mismatch) passed, so the measured sum equals the pinned value, and every
+`Assert-Contains` literal I swept matched its doc. (2) **`EngineHarness` is still 217**: I measured
+**408** across nine harnesses and carried 217; 625 − 408 = 217 is now measured on Windows, so the
+one number I could not check here was correct — and, usefully, it is unchanged from the run that
+settled 610, which is what a *carried* number is supposed to be. (3) The **byte-equality and
+no-negative-form assertions pass on a second OS**, against the same Node-generated vectors.
+
+**What this does NOT change.** `Verify-Alpha.ps1` still **did not run in this session** — every "did
+not run" statement above stands as written about the sandbox. **The PR remains a DRAFT and was not
+merged**: the merge policy requires a *local* full gate, which is a different condition from CI being
+green, and it is still out of reach here. PQ-A2-5 is also untouched by this: CI running the engine's
+vector assertions says nothing about the phone, which still transcribes rather than reads.

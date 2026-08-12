@@ -5330,3 +5330,25 @@ PowerShell, absent and **not in the Ubuntu archive** — so `Verify-Alpha.ps1` w
 not even be parse-checked. `:core:test` was not run and did not need to be: nothing in `:core`
 changed. **CI on `windows-latest` is the gate for the 625 pin**, exactly as it was for 610. Citing
 this section as "the engine gate passed" is the precise failure these records exist to prevent.
+
+### C-AK-15 — CI ran the gate and confirmed the 625 pin (added after the section above was written)
+
+```bash
+gh run view 31621352429 --repo ShivaClaw/careerseeker
+gh run view 31621352429 --repo ShivaClaw/careerseeker --log \
+  | grep -E "Offline total|157 passed|no ack at all|byte for byte"
+```
+
+*Expected:* both jobs **success**, and the log contains `=== 157 passed, 0 failed ===`,
+**`=== Offline total: 625 passed, 0 failed ===`**, both "byte for byte" PASS lines and
+`dispatch: a REJECTED entitlement publishes no ack at all`.
+
+This is the evidence **C-AK-9 could not produce in-session**. `Verify-Alpha.ps1` throws on a pin
+mismatch, so a green run *is* the pin check — which also confirms `EngineHarness = 217`
+(625 − the 408 measured locally), the one number carried rather than measured, and unchanged from
+the run that settled 610. The relay job's *"Assert sync vectors match their generator"* step passing
+independently confirms **C-AK-8**.
+
+**This does not retire C-AK-14**, and it does not touch **PQ-A2-5**. `Verify-Alpha.ps1` still cannot
+run in a cloud sandbox; the gate ran on `windows-latest`, as it always must. And CI exercising the
+*engine's* vector assertions says nothing about the phone, which still transcribes rather than reads.
