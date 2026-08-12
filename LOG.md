@@ -6149,3 +6149,178 @@ not run" statement above stands as written about the sandbox. **The PR remains a
 merged**: the merge policy requires a *local* full gate, which is a different condition from CI being
 green, and it is still out of reach here. PQ-A2-5 is also untouched by this: CI running the engine's
 vector assertions says nothing about the phone, which still transcribes rather than reads.
+
+---
+
+## VR — §10 promised both sides read the vectors; one side was reading a snapshot (2026-08-12, twenty-fourth cloud iteration)
+
+**Rung:** S5, its last verifiable half. **Branch:** `claude/android-a0-probe`. **Question closed:**
+**PQ-A2-5**, on the phone side. **Question opened:** none.
+
+This slice was chosen after measuring that the mission's suggested one was already done: the
+`entitlement_ack` spec, both vectors, and the engine emitter landed in the twenty-second and
+twenty-third iterations (PRs #32/#37/#38). What the previous session filed **against its own work**
+was PQ-A2-5, and that is what was open.
+
+### VR-1 — the finding: "transcribed verbatim" was not verbatim
+
+§10 promises that "**both** the C# `SyncHarness` and the Kotlin `:core` tests read these same files,
+so a divergence between the two implementations fails CI instead of surfacing as a pairing bug in
+the field". For `entitlement_ack` the engine read the files and the phone pasted the two bodies into
+`EntitlementAckTest` as string literals, because the vectors postdated the `679a317` vendor pin.
+
+The literals were documented as "transcribed **verbatim**" and as proving the applier obeys §4.3.3
+"against the real bytes". Measured against the bytes the generator actually seals:
+
+| body | transcribed | sealed in the vector | difference |
+| --- | ---: | ---: | --- |
+| `entitlement-ack` | **142** bytes | **140** bytes | `,\n ` where the vector has `,` |
+| `entitlement-ack-no-order-id` | **104** bytes | **102** bytes | same |
+
+`generate.mjs` seals `JSON.stringify(plaintext)` — compact — while the literals were wrapped across
+two lines to fit the margin. **Every test passed anyway**, because JSON parsing ignores whitespace.
+That is the whole of PQ-A2-5 in one artifact: a transcription is a snapshot, it agrees with the
+vector at the moment someone copied it, and it **cannot fail when the vector moves**. The nine tests
+in that file were evidence about a string in that file, not about the shared vector.
+
+### VR-2 — the second finding, which the first one uncovered: the suite could not fail on §3's rule
+
+`invalid-unknown-field` has `type: envelope`, so vendoring it put it straight into the existing
+receiver test. It did not pass. Before any source change, with only the vectors vendored:
+
+```
+ProtocolVectorsTest > the receiver classifies every envelope vector exactly as the engine does FAILED
+    invalid-unknown-field should reject as decrypt_failed ==> expected: <decrypt_failed> but was: <null>
+```
+
+**The phone ACCEPTED an envelope the engine rejects.** Not because the rule was unimplemented —
+`EnvelopeJson` has enforced it since it was written, and `EnvelopeJsonTest` covers it with
+hand-written strings — but because the vector suite built `ReceivedEnvelope` **field by field**,
+reading the nine keys §3 defines and dropping everything else. That is precisely the permissive
+parser §3's closing rule forbids, sitting inside the one suite whose stated purpose is proving the
+two implementations agree. The rule was enforced everywhere except on the shared path.
+
+Worth stating plainly: **this defect was invisible while the vector that exercises it was
+unvendored.** The vendor gap was not only hiding the ack property, it was hiding this.
+
+### VR-3 — what landed (four commits, `claude/android-a0-probe`)
+
+| file | change |
+| --- | --- |
+| `core/src/test/resources/sync-vectors/v1/` | **+3 files** (`entitlement-ack`, `entitlement-ack-no-order-id`, `invalid-unknown-field`); `index.json` **+18/−0** |
+| `core/src/test/resources/sync-vectors/VECTORS.lock` | pin `679a317` → `7328a0b`, with the off-main caveat and the merge-day re-pin action written down |
+| `ProtocolVectorsTest.kt` | envelope vectors delivered as **wire text** through `EnvelopeReceiver.receiveWire`; new `entitlement_ack` type-filtered section |
+| `EntitlementAckTest.kt` | two bodies now **decrypted from the vectors**; header corrected; **+1** guard test |
+
+`:core` test count **270 → 272**, 0 failed.
+
+### VR-4 — the pin moved to a commit that is not on main, deliberately and out loud
+
+`7328a0b` sits on the unmerged draft stack (#38 → #37 → #32). Three things make that the honest
+choice rather than a shortcut:
+
+1. **It is not a new posture.** `679a317` was *also* not an ancestor of `main` — verified this
+   session, not assumed (`git merge-base --is-ancestor` exit 1). The vendored copy has been pinned
+   off-main the entire time.
+2. **The content is anchored to the generator, not to the branch.** `node docs/sync-vectors/
+   generate.mjs --check` reports `OK: 29 vector files match the generator` at that commit. A
+   deterministic generator is what makes the bytes stable; the ref is only where they are stored.
+3. **It is the last commit that touches the vector directory**, chosen over the branch tip so later
+   work on that branch cannot change what the pin points at.
+
+And the additive property is measured, not asserted: all **26** previously-vendored files are
+byte-identical across `679a317`, `origin/main`, and `7328a0b`. **No existing vector byte moved**, so
+this is **not a cross-repo drift event**. `index.json` gained 18 lines and lost none.
+
+### VR-5 — evidence: commands run in this session, with their actual output
+
+```
+$ scripts/core-probe.sh --rerun
+core-probe: 272 tests, 0 failed, 0 skipped, across 18 classes      (baseline: 270)
+
+$ node docs/sync-vectors/generate.mjs --check      (at 7328a0b)
+OK: 29 vector files match the generator.
+
+$ diff -r core/src/test/resources/sync-vectors/v1  <7328a0b's docs/sync-vectors/v1>
+(no output — all 29 byte-identical)
+
+$ git diff --numstat -- core/src/test/resources/sync-vectors/v1/index.json
+18      0
+
+$ <CI's own drift loop, run locally against all 29 files>
+checked=29  drift=0  fetch-failures=0
+OK: all vendored vectors match 7328a0bc043335491cd96a67d634e8eea2a13af9
+```
+
+That last one matters more than it looks: the pin now points off-main, and the CI step fetches each
+file with `?ref=$PIN` through the contents API. Running **CI's exact loop** here proves the API
+serves a draft-branch SHA, so the step this change was most likely to break is verified rather than
+hoped for.
+
+**On the probe, and a correction to how this slice was first run.** The tests were initially run in a
+scratchpad harness built from scratch — Gradle 8.14.3, toolchain overridden 17 → 21. That was
+unnecessary: `scripts/core-probe.sh` already exists for exactly this, written in the eighteenth
+iteration, and the number above is **its** output. It is the better instrument on two counts: it
+honours `:core`'s pinned `jvmToolchain(17)` (installed per the script's own message) instead of
+overriding it, and it runs the wrapper's **Gradle 9.6.1** rather than a different major version. Its
+figure is also directly comparable to the recorded 270 baseline, which was measured the same way.
+The ad-hoc harness agreed — 272/0 — but agreement is not a reason to have built it.
+
+**What the probe still is not.** It is **not the android gate**. `dl.google.com` and `api.foojay.io`
+both answer `CONNECT tunnel failed, response 403` (**B-7**, reproduced verbatim this session), so AGP
+cannot resolve here at all. The probe runs exactly one of the gate's five tasks:
+**`checkCoreIsAndroidFree`, `:app:assembleDebug`, `:app:lintDebug` and `:app:test` did not run.
+CI is the gate.**
+
+### VR-6 — proven by mutation, not assumed
+
+Everything was committed before mutating, and only `src/main` was touched — AK-7's lesson, applied.
+
+| mutation | tests failed | the one that matters |
+| --- | ---: | --- |
+| `EnvelopeJson` stops rejecting unknown top-level fields | **6** | `ProtocolVectorsTest.the receiver classifies every envelope vector` — **it could not fail before this slice** |
+| applier treats an absent `order_id` as present | **4** | `ProtocolVectorsTest.entitlement ack vectors decrypt to the exact bytes` |
+| applier returns a fixed `acknowledged_at` | **1** | `EntitlementAckTest.acknowledged_at is advisory` |
+| **the original defect re-introduced** — bodies re-wrapped exactly as they were | **1** | `the grant bodies are the vectors' own bytes and not a re-wrapped copy` |
+
+The fourth is the sharpest result in this entry. Re-wrapping the bodies the way the file used to have
+them fails **exactly one** test — the new byte-level guard — and passes the other nine. That is the
+direct measurement of what the transcription was worth: nine tests that could not see it.
+
+### VR-7 — what is left, stated so nobody hunts a phantom
+
+**PQ-A2-5's main-repo half is NOT done, and was deliberately not attempted.** `Sync-Protocol.md`
+§10.2 still says the ack vectors are evidence about **one** implementation, and PQ-A2-5 is still
+open in `docs/protocol-questions.md`. Both statements are **true until this android PR merges**, and
+amending them now would put a claim in the engine repo whose truth depends on an unmerged PR in a
+different repo — with no control over which merges first. That is the exact drift these records
+exist to prevent, so it is recorded as the follow-up rather than pre-emptively written.
+
+**Nothing here is E2E.** No relay was contacted, no phone exists, no ack has crossed a network. The
+`IEntitlementAckPublisher` seam still has **no production caller** — that is host wiring, unchanged
+by this slice and still waiting on the same S2/S4 work.
+
+### Boundary — what this iteration did not touch
+
+**No merge in either repo**, and no PR of any kind was merged, retargeted, rebased or force-pushed.
+**Nothing in the engine repo was modified** — no commit, no branch, no push there except the
+`autonomy/claude-state` heartbeat, which is docs-only and never merged. Draft PRs **#32–#38 were not
+touched**.
+
+**No existing vector byte changed** — `diff -r` over all 26 pre-existing files against three separate
+commits, and `index.json` measured at **+18/−0**. Adding files is explicitly allowed; changing one
+would have been a drift event and did not happen.
+
+**No `:core` main-source file changed.** The two `src/main` edits in this entry were **mutations,
+reverted** — `git status` is clean and the final 272/0 run is post-revert. **No `:app` file, no
+Kotlin UI, no Room, no Gradle build file, no CI workflow.** The android gate
+(`checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug`) **did not run** — B-7/B-4
+unchanged — and **`scripts/Verify-Alpha.ps1` did not run**: there is still no PowerShell here.
+
+**No force-push, no history rewrite, no branch deletion, no deploy of any kind**, no contact with the
+production relay (**not even `GET /v1/health`**), no Google/Play/OAuth console, no accounts, no
+purchases, no Play Billing code, no Gmail, no `.appdata`, and **no secret printed or read**. The only
+network reads were Maven Central (dependencies) and the public GitHub contents API (the drift loop).
+**B-1, B-2, B-4, B-5, B-7, B-8 untouched**; **B-6 stays RESOLVED**. The Fabrication Gate, the
+`Stage.VerifierEntailment` pin, `Dispatcher.SubmitAsync`'s throw and the `gmail.compose` scope are
+untouched — nothing in this slice can transmit anything. Re-verify: **C-VR-1…10**.

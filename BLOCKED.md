@@ -1256,3 +1256,37 @@ here** (it throws on Linux: `Refusing full-data deletion for a volume root`,
 was for 610. If a full local gate measures a different `EngineHarness`, the 625 pin is wrong and the
 fix is the standing one: re-run, write the measured number, sweep every count-reporting doc in the
 same commit.
+
+---
+
+### B-7 status 2026-08-12 (twenty-fourth run, S5/PQ-A2-5) — reproduced verbatim, and nothing new is blocked
+
+**No new blocker.** Recorded so the next session does not re-derive the measurement, and to say
+plainly that this iteration finished what it set out to do.
+
+**B-7 reproduced, not inherited.** Measured again this session:
+
+```
+$ curl -sS -o /dev/null https://dl.google.com/dl/android/maven2/.../gradle-9.3.0.pom
+curl: (56) CONNECT tunnel failed, response 403
+
+$ curl -sS -o /dev/null https://api.foojay.io/disco/v3.0/packages
+curl: (56) CONNECT tunnel failed, response 403
+```
+
+Both hosts still denied, so AGP cannot resolve and the JDK 17 that `:core` pins cannot be
+auto-provisioned. `/root/.ccr/README.md` is explicit that a 403 from the proxy is a policy denial —
+no mirror, no vendored AGP, no `ANDROID_HOME` fabrication was attempted.
+
+**What is NOT blocked, stated positively.** `scripts/core-probe.sh` runs `:core:test` here (272/0
+this iteration). The JDK 17 it needs installs from the Ubuntu archive in seconds —
+`apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless` — which
+the script's own failure message tells you. The remaining four gate tasks
+(`checkCoreIsAndroidFree`, `:app:assembleDebug`, `:app:lintDebug`, `:app:test`) still need the SDK.
+**CI is the unblock and always was.**
+
+**PQ-A2-5's main-repo half is NOT recorded here, deliberately.** Amending `Sync-Protocol.md` §10.2
+and the question itself is **unblocked and merely undone** — it was left because those statements
+stay *true* until this android PR merges, and writing them early would put a claim in the engine
+repo whose truth depends on an unmerged PR in another repo. Filing that under BLOCKED would send the
+next session hunting a phantom, which is the failure this file exists to prevent.

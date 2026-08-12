@@ -5352,3 +5352,174 @@ independently confirms **C-AK-8**.
 **This does not retire C-AK-14**, and it does not touch **PQ-A2-5**. `Verify-Alpha.ps1` still cannot
 run in a cloud sandbox; the gate ran on `windows-latest`, as it always must. And CI exercising the
 *engine's* vector assertions says nothing about the phone, which still transcribes rather than reads.
+
+---
+
+## C-VR — the phone reads the ack vectors (twenty-fourth cloud iteration, 2026-08-12)
+
+Every claim in `LOG.md` §VR. `<android>` is this repo; `<engine>` is a `ShivaClaw/careerseeker`
+clone. Run `git fetch --all --prune` in both first.
+
+Commits referenced below, so these commands keep working as the branch grows:
+`e007e07` the base this slice started from · `056a1dd` re-vendor · `c714570` wire-text delivery ·
+`60a20d5` the phone reads the ack vectors · `ae799c8` call the shipped `receiveWire` seam.
+
+### C-VR-1 — The transcription was not verbatim: 142/140 and 104/102 bytes
+
+```bash
+cd <android> && git show e007e07:core/src/test/kotlin/app/careerseeker/core/EntitlementAckTest.kt \
+  | sed -n '/ackWithOrderId = /,/toByteArray()/p'
+cd <engine> && node -e '
+const {execSync}=require("child_process"),{createDecipheriv}=require("crypto");
+const d=s=>Buffer.from(s.replace(/-/g,"+").replace(/_/g,"/"),"base64");
+for (const n of ["entitlement-ack","entitlement-ack-no-order-id"]) {
+  const v=JSON.parse(execSync(`git show 7328a0b:docs/sync-vectors/v1/${n}.json`));
+  const c=d(v.ciphertext_b64u), x=createDecipheriv("aes-256-gcm",Buffer.from(v.key_hex,"hex"),d(v.nonce_b64u));
+  x.setAAD(Buffer.from(v.aad)); x.setAuthTag(c.subarray(c.length-16));
+  const p=Buffer.concat([x.update(c.subarray(0,c.length-16)),x.final()]);
+  console.log(n, p.length, JSON.stringify(p.toString()));
+}'
+```
+
+*Expected:* the old literals are wrapped across two lines (a newline plus a leading space before
+`"acknowledged_at"`), and the sealed bytes are **140** and **102** with no whitespace. The literals
+measure **142** and **104**. They parse identically, which is why nine tests passed over the
+difference.
+
+### C-VR-2 — Before the fix, the phone ACCEPTED an envelope the engine rejects
+
+The measurement in `LOG.md` §VR-2. Vendor the vectors at the parent of the source change and run the
+suite:
+
+```bash
+cd <android> && git checkout -b tmp-c-vr-2 056a1dd && \
+  gradle :core:test --tests '*ProtocolVectorsTest*'   # or ./gradlew, with an SDK present
+```
+
+*Expected:* **FAILS** with
+`invalid-unknown-field should reject as decrypt_failed ==> expected: <decrypt_failed> but was: <null>`.
+`056a1dd` is the re-vendor commit, which adds the vector but predates routing envelopes through the
+strict parser. Delete the branch afterwards; it exists only to reproduce the defect.
+
+### C-VR-3 — The rule was implemented all along; only the vector path bypassed it
+
+```bash
+cd <android> && grep -n "KNOWN_FIELDS" core/src/main/kotlin/app/careerseeker/core/EnvelopeJson.kt
+cd <android> && git show 056a1dd:core/src/test/kotlin/app/careerseeker/core/ProtocolVectorsTest.kt \
+  | sed -n '/private fun received(/,/^    )/p'
+```
+
+*Expected:* `EnvelopeJson` rejects any key outside the nine §3 defines — it always did. The old
+`received()` helper reads exactly those nine keys off `envelope_json` and drops the rest, so no
+unknown field could ever reach the rule. The defect was the delivery path, not the parser.
+
+### C-VR-4 — The re-vendor is additive; no existing vector byte moved
+
+```bash
+cd <engine>  && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pin
+cd <android> && diff -r core/src/test/resources/sync-vectors/v1 /tmp/pin/docs/sync-vectors/v1
+cd <android> && git diff --numstat e007e07 ae799c8 -- core/src/test/resources/sync-vectors/v1/index.json
+cd <android> && git diff --name-status e007e07 ae799c8 -- core/src/test/resources/sync-vectors/v1/
+```
+
+*Expected:* `diff -r` silent (all 29 identical); `index.json` **18 added, 0 removed**; the name-status
+list shows **`A`** for exactly three files and **`M`** for `index.json` only. No other `M`.
+
+### C-VR-5 — The 26 pre-existing vectors are identical across all three commits
+
+```bash
+cd <engine> && for r in 679a317 origin/main 7328a0b; do git archive $r docs/sync-vectors/v1 \
+  | tar -x -C /tmp/$r; done && diff -r /tmp/679a317 /tmp/origin_main
+```
+
+*Expected:* identical. This is what makes the off-main pin safe to rely on: the content the pin
+names has been stable across the merge that landed the sync track.
+
+### C-VR-6 — The pin is not on main, and that is not new
+
+```bash
+cd <engine> && git merge-base --is-ancestor 679a317 origin/main; echo "679a317 on main? $?"
+cd <engine> && git merge-base --is-ancestor 7328a0b origin/main; echo "7328a0b on main? $?"
+cd <engine> && git log --oneline origin/main..origin/claude/s5-entitlement-ack-emitter -- docs/sync-vectors/
+```
+
+*Expected:* **both print 1** (neither is an ancestor). The vendored copy has been pinned off-main
+since it was first vendored. The log shows exactly two commits touching the vector directory, the
+later being `7328a0b` — which is why the pin names it rather than the branch tip.
+
+### C-VR-7 — The content is anchored to the generator, not to the branch
+
+```bash
+cd <engine> && git worktree add --detach /tmp/wt 7328a0b && cd /tmp/wt && \
+  node docs/sync-vectors/generate.mjs --check
+```
+
+*Expected:* `OK: 29 vector files match the generator.`
+
+### C-VR-8 — CI's drift step works against an off-main pin
+
+This is the step the re-pin was most likely to break. Run CI's own loop:
+
+```bash
+cd <android> && PIN=$(grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1)
+for f in core/src/test/resources/sync-vectors/v1/*.json; do n=$(basename $f); \
+  curl -fsSL -H "Accept: application/vnd.github.raw+json" \
+    "https://api.github.com/repos/ShivaClaw/careerseeker/contents/docs/sync-vectors/v1/$n?ref=$PIN" \
+    -o /tmp/u.json && diff -q "$f" /tmp/u.json >/dev/null || echo "DRIFT/FAIL: $n"; done; echo done
+```
+
+*Expected:* no `DRIFT/FAIL` lines — 29 fetched, 0 drift. Confirms the contents API serves a
+draft-branch SHA, so the pin being off-main does not break CI.
+
+### C-VR-9 — The new assertions have teeth (mutation)
+
+Commit first, then mutate only `core/src/main`:
+
+```bash
+# (a) drop the unknown-field rule
+sed -i 's|if (root.keys.any { it !in KNOWN_FIELDS }) return fail()|if (false) return fail()|' \
+  core/src/main/kotlin/app/careerseeker/core/EnvelopeJson.kt
+# (b) make an absent order_id present
+sed -i 's|val orderId = if (orderIdField == null) {|val orderId = if (false) {|' \
+  core/src/main/kotlin/app/careerseeker/core/EntitlementAck.kt
+# (c) re-introduce the transcription defect, in the test:
+#     append to ackPlaintext's return:
+#     .toString(Charsets.UTF_8).replace(",\"acknowledged_at", ",\n \"acknowledged_at").toByteArray()
+```
+
+*Expected:* (a) **6** failures including `ProtocolVectorsTest.the receiver classifies every envelope
+vector` — which could not fail before this slice; (b) **4** including `entitlement ack vectors
+decrypt to the exact bytes`; (c) **exactly 1** — `the grant bodies are the vectors' own bytes and not
+a re-wrapped copy` — and the other nine pass, which is the measurement of what the transcription was
+worth. `git checkout --` each file afterwards.
+
+### C-VR-10 — What did NOT run, and what remains the gate
+
+```bash
+cd <android> && scripts/core-probe.sh --rerun
+cd <android> && ./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug
+cd <engine>  && pwsh -File scripts/Verify-Alpha.ps1
+curl -sS -o /dev/null https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/9.3.0/gradle-9.3.0.pom
+```
+
+*Expected:* the probe prints `core-probe: 272 tests, 0 failed, 0 skipped, across 18 classes` (it
+needs a JDK 17 present — it says so and gives the apt line if missing). The **gate** command fails
+during plugin resolution: AGP is on `dl.google.com`, and the curl prints
+`CONNECT tunnel failed, response 403` (**B-7**). `Verify-Alpha.ps1` fails — no PowerShell here.
+
+**The probe is one of the gate's five tasks.** `checkCoreIsAndroidFree`, `:app:assembleDebug`,
+`:app:lintDebug` and `:app:test` **did not run**. **CI is the gate.** Citing C-VR as "the android
+gate passed" is the precise failure these records exist to prevent.
+
+### C-VR-11 — PQ-A2-5's main-repo half is still open
+
+```bash
+cd <engine> && git show origin/claude/s5-entitlement-ack-emitter:docs/protocol-questions.md \
+  | sed -n '/## PQ-A2-5/,/^## /p' | tail -6
+cd <engine> && git show origin/claude/s5-entitlement-ack-emitter:docs/Sync-Protocol.md \
+  | grep -n "one implementation" | head
+```
+
+*Expected:* both still say the ack vectors are evidence about **one** implementation. That is
+**correct and deliberate** — it stays true until this android PR merges, and amending it early would
+make the engine repo assert something whose truth depends on an unmerged PR in another repo.
