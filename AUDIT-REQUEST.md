@@ -4904,3 +4904,211 @@ cd <android> && git diff --stat 27b28bb..HEAD -- core/src/test/resources/sync-ve
 
 *Expected:* **empty.** `27b28bb` is this branch's tip before the iteration; the range is pinned to
 it rather than to `HEAD~N`, which drifts as commits are added.
+
+---
+
+## C-WP — The engine's wire parser, and the toolchain that made it possible (twenty-second cloud iteration, 2026-08-12)
+
+Unlike every C- section before it, these commands need **.NET**, and **C-WP-1 is how you get it**
+in a sandbox that does not ship it. There is still **no Android SDK and no PowerShell**; see
+**C-WP-12** for what did not run. `<engine>` is a checkout of `ShivaClaw/careerseeker` at branch
+`claude/s5-engine-wire-parser` (draft PR **#37**, stacked on **#32**).
+
+### C-WP-1 — .NET 8 is in the Ubuntu archive, and the whole engine builds on Linux
+
+```bash
+apt-cache policy dotnet-sdk-8.0
+apt-get update -qq && apt-get install -y --no-install-recommends dotnet-sdk-8.0
+dotnet --version
+cd <engine> && dotnet build CareerSeeker.sln -c Release
+```
+
+*Expected:* candidate `8.0.125-0ubuntu1~24.04.1` from `noble-updates/main`; `dotnet --version`
+prints `8.0.129`; the build reports **0 Warning(s), 0 Error(s)**. This is the claim that retires
+B-6's stated reason. Note the *installed* version (`8.0.129`) differs from the apt *candidate*
+string — both are correct, they are SDK vs package versions.
+
+Corroborating that the match is exact rather than lucky:
+
+```bash
+cd <engine> && grep -rh "TargetFramework" src/*/*.csproj tests/*/*.csproj | sort -u; ls global.json
+```
+
+*Expected:* only `<TargetFramework>net8.0</TargetFramework>`, and **no** `global.json`.
+
+### C-WP-2 — The gap: at the base commit the engine had no inbound wire parser
+
+```bash
+cd <engine>
+git show origin/claude/s5-entitlement-ack-spec:src/Sync/EnvelopeReceiver.cs | sed -n '6,10p'
+git grep -n "Deserialize\|JsonNode.Parse\|JsonSerializer" origin/claude/s5-entitlement-ack-spec -- src/Sync/
+```
+
+*Expected:* `ReceivedEnvelope` is a record of nine already-typed fields, and every JSON call site
+in `src/Sync` at that commit is **outbound** serialisation (`PairingManager.ToQrJson`,
+`SyncPayloads`, `SyncPublisher`). No inbound parser exists, which is why an unknown top-level field
+was accepted.
+
+### C-WP-3 — The parser exists and covers exactly §3's nine fields
+
+```bash
+cd <engine> && sed -n '/KnownFields/,/};/p' src/Sync/EnvelopeJson.cs
+```
+
+*Expected:* `v, pairing, dir, seq, ts, key_id, nonce, ciphertext, sig` — the same set as the
+phone's `EnvelopeJson.KNOWN_FIELDS` (`core/src/main/kotlin/app/careerseeker/core/EnvelopeJson.kt`),
+which is the comparison that matters. Diff the two field sets by eye; they must not drift.
+
+### C-WP-4 — Routing the vectors through the parser changed no existing verdict
+
+```bash
+cd <engine> && git checkout 274ea6b
+dotnet build tests/SyncHarness/SyncHarness.csproj -c Release
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -2
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build \
+  | sed -n '/the strict section-3 wire parser/,/^$/p' | grep -c PASS
+```
+
+*Expected:* **`141 passed, 0 failed`**, and the parser block contributes exactly **11**. 141 − 11 =
+**130** — the pre-existing count — so all 24 envelope vectors classify identically through the
+strict parser. This is the compatibility claim: the parser refuses nothing the vectors declare
+legal. (`274ea6b` is the reroute commit, before the vector was added.)
+
+### C-WP-5 — SyncHarness 130 → 142, measured on both sides of the change
+
+```bash
+cd <engine>
+git checkout origin/claude/s5-entitlement-ack-spec && dotnet build CareerSeeker.sln -c Release \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -2
+git checkout claude/s5-engine-wire-parser && dotnet build CareerSeeker.sln -c Release \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -2
+```
+
+*Expected:* **`130 passed, 0 failed`** on the base, **`142 passed, 0 failed`** after. The baseline
+was **re-measured this session**, not quoted from a previous record.
+
+### C-WP-6 — The vector is additive; no existing vector's bytes moved
+
+```bash
+cd <engine> && node docs/sync-vectors/generate.mjs --check
+git diff --stat origin/claude/s5-entitlement-ack-spec..claude/s5-engine-wire-parser -- docs/sync-vectors/v1/
+git diff --name-only origin/claude/s5-entitlement-ack-spec..claude/s5-engine-wire-parser \
+  -- docs/sync-vectors/v1/ | grep -v index.json | grep -v invalid-unknown-field | wc -l
+```
+
+*Expected:* `OK: 29 vector files match the generator.` (28 on the base); the stat shows
+`index.json` **+6** and the one new file; the third command prints **0**. That zero is the
+cross-repo drift claim.
+
+### C-WP-7 — The vendored pin cannot be moved by this change
+
+```bash
+cd <android> && sed -n '53,86p' .github/workflows/ci.yml
+```
+
+*Expected:* the drift step fetches each vendored file at `?ref=$PIN` where `$PIN` comes from
+`core/src/test/resources/sync-vectors/VECTORS.lock` (`679a317`). It compares **vendored copy vs the
+pinned commit** — never against main's tip — so adding a vector on a branch cannot affect it, and
+nothing under `core/src/test/resources/sync-vectors/` was touched this iteration.
+
+### C-WP-8 — M1: without the rule the vector is ACCEPTED, not rejected differently
+
+```bash
+cd <engine>
+python3 - <<'EOF'
+p='src/Sync/EnvelopeJson.cs'; s=open(p).read()
+s=s.replace("""            foreach (var prop in root.EnumerateObject())
+                if (!KnownFields.Contains(prop.Name)) return Fail();""","")
+open(p,'w').write(s)
+EOF
+dotnet build tests/SyncHarness/SyncHarness.csproj -c Release >/dev/null \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep -E "FAIL|passed,"
+git checkout -- src/Sync/EnvelopeJson.cs
+```
+
+*Expected:* **`128 passed, 3 failed`**, the first being
+`FAIL invalid-unknown-field -> decrypt_failed -- got accepted`. **The other two are not a separate
+finding** — accepting the envelope commits its `seq`, moving the e2p high-water mark to 12, so
+`invalid-unknown-kind` (seq 8) reports `replay_rejected` and the tracker assertion fails. §10.1 of
+`docs/Sync-Protocol.md` documents that the suite's `seq` space is packed by design; this is that
+property working, not a new one. **Restore the file** — the last line is not optional.
+
+### C-WP-9 — M5: the root-object guard is load-bearing, and its failure mode is an escape
+
+```bash
+cd <engine>
+sed -i 's|            if (root.ValueKind != JsonValueKind.Object) return Fail();|            // M5|' src/Sync/EnvelopeJson.cs
+dotnet build tests/SyncHarness/SyncHarness.csproj -c Release >/dev/null \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -5
+git checkout -- src/Sync/EnvelopeJson.cs
+```
+
+*Expected:* **not** a `FAIL` line — an `Unhandled exception. System.InvalidOperationException: The
+requested operation requires an element of type 'Object', but the target element has type 'Array'`
+thrown from `EnvelopeJson.Parse`, i.e. straight out through the `ParseResult` contract. Same shape
+as the twelfth iteration's `parsePullPage` finding. **Restore the file.**
+
+### C-WP-10 — The offline pin: 393 + 217 = 610
+
+```bash
+cd <engine>
+for h in Slice EngineHarness ResearcherHarness HookHarness StoreParityHarness GatewayGateHarness \
+         DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  echo -n "$h: "; dotnet run --project tests/$h/$h.csproj -c Release --no-build 2>&1 \
+    | grep -oE "=== [0-9]+ passed" | tail -1
+done
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1
+```
+
+*Expected:* nine harnesses summing to **393** (`28+57+16+28+36+35+45+6+142`), **EngineHarness
+producing no summary** — it dies at `FullDataDeletion.ResolveAllowedWorkspace`
+(`src/Engine/FullDataDeletion.cs:81`) because a Windows install path resolves to `/` on Linux and
+the guard **correctly refuses a volume root** — and the pin reading **610**. EngineHarness's
+**217** is quoted from `Verify-Alpha.ps1`'s own comment block, **not re-measured**. This is
+arithmetic corroborated by measurement, **not** a verifier run.
+
+### C-WP-11 — PQ-AAD-1: the two encoders agree except on surrogate pairs
+
+```bash
+cd <engine> && grep -n "Encoding.ASCII" src/Sync/EnvelopeCodec.cs src/Sync/DeviceSignature.cs
+mkdir -p /tmp/aad && cd /tmp/aad && cat > P.java <<'EOF'
+import java.nio.charset.StandardCharsets;
+public class P { public static void main(String[] a){
+  for (String s : new String[]{"Té","Tè","TЖ","T😀","T?"}) {
+    byte[] b = s.getBytes(StandardCharsets.US_ASCII); StringBuilder sb=new StringBuilder();
+    for (byte x: b) sb.append(String.format("%02X",x));
+    System.out.println(sb+" (len "+b.length+")"); } } }
+EOF
+javac P.java && java P
+```
+
+…and the .NET half (a throwaway console project referencing nothing):
+
+```bash
+cd /tmp/aad && dotnet new console -o net --force >/dev/null && cat > net/Program.cs <<'EOF'
+using System.Text;
+foreach (var s in new[]{"Té","Tè","TЖ","T😀","T?"})
+  Console.WriteLine(Convert.ToHexString(Encoding.ASCII.GetBytes(s)) + $" (len {Encoding.ASCII.GetBytes(s).Length})");
+EOF
+dotnet run --project net
+```
+
+*Expected:* the engine encodes the AAD and the §5.4 signature input with `Encoding.ASCII`; both
+runtimes give `543F` for `é`, `è`, `Ж` and a literal `?`; and **they differ on the emoji** — Java
+`543F` (one byte, the surrogate pair collapses) vs .NET `543F3F` (**two**). That difference is the
+whole of PQ-AAD-1's answer. It **fails closed** (tag mismatch → `decrypt_failed`), is unreachable
+for a conforming sender, and is **deliberately not fixed** — see `docs/protocol-questions.md`.
+
+### C-WP-12 — What did NOT run, and what remains the gate
+
+```bash
+cd <android> && ./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug --rerun-tasks
+cd <engine>  && pwsh -File scripts/Verify-Alpha.ps1
+```
+
+*Expected:* **both fail to start here.** The first needs the Android SDK (B-7: `dl.google.com`
+denied); the second needs PowerShell, which is absent and **not in the Ubuntu archive**
+(`apt-cache policy powershell` returns nothing) — so `Verify-Alpha.ps1` was not run and could not
+even be parse-checked. `:core:test` was **not** run this iteration either, and did not need to be:
+nothing in `:core` changed. **CI on `windows-latest` is the gate for the 610 pin and for every
+claim in this section that depends on it.**

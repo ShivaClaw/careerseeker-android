@@ -1107,3 +1107,94 @@ the evidence's reach is not the same thing as an obstruction.
 `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab` is still flaky and still
 unrepairable from a cloud sandbox (`:app` needs the SDK). This iteration touched no `:app` file, so
 a red on that test against this branch is still the hazard and not this slice.
+
+---
+
+## B-6 RESOLVED — 2026-08-12 (twenty-second cloud iteration)
+
+**Closed by doing exactly what B-6 prescribed, in its order.** Its four steps were: (1) add an
+inbound wire-JSON parser to `src/Sync`; (2) route `SyncHarness`'s vector loop through it; (3) *then*
+add `invalid-unknown-field` via `generate.mjs`; (4) sweep the drift trap. All four are done, on
+draft PR **#37** (stacked on **#32**). Evidence: `LOG.md` §WP, re-verification `AUDIT-REQUEST.md`
+**C-WP-1…12**.
+
+**Its diagnosis was right and survived re-checking.** `src/Sync` genuinely had no inbound wire
+parser, an unknown top-level field genuinely was *accepted* by the engine, and the vector genuinely
+could not be added first — a shared vector is unenforceable if one consumer goes green by accepting
+the envelope the vector exists to refuse. Adding the vector first really was the trap B-6 named.
+**Steps 1–2 were the work; step 3 was two lines**, exactly as written.
+
+**What was wrong was one word of its reason, and it is worth naming precisely** so the next session
+generalises it correctly. B-6 said:
+
+> **Write the engine parser here.** No .NET on this machine (`which dotnet` → nothing), so it could
+> not be compiled, let alone tested.
+
+`which dotnet` is **still empty** on a fresh sandbox — the *measurement* was never wrong. The error
+was treating "not installed" as "not obtainable". `dotnet-sdk-8.0` is in the **Ubuntu archive**
+(`noble-updates/main`), every project pins `net8.0` exactly, there is no `global.json`, and the
+denied hosts under B-7 (`dl.google.com`, `api.foojay.io`) are not involved. One `apt-get install`
+and `dotnet build CareerSeeker.sln -c Release` reports **0 warnings / 0 errors**.
+
+**This is the second time this exact shape has cost the program iterations.** The eighteenth
+iteration found B-7 had never covered `:core`, after seven runs read it wider than it was. This is
+the same failure one toolchain over: a blocker whose *stated symptom* stayed true while the *bound
+it implied* had gone stale, and nobody re-tested the bound because the symptom kept reproducing.
+**The lesson, stated so it is actionable rather than moral:** when a blocker's reason is "tool X is
+absent", the re-test is `apt-cache policy <pkg>`, not `which <tool>`. Both prior blockers would have
+been caught by that one command.
+
+**What this unblocks beyond B-6**, stated as a surface rather than a promise: a cloud iteration can
+now build and run **the entire C# engine** — `src/Sync`, `src/Engine`, the Gateway, the Verifier —
+and **nine of the ten offline harnesses** (`Slice`, `ResearcherHarness`, `HookHarness`,
+`StoreParityHarness`, `GatewayGateHarness`, `DispatcherNoSendHarness`, `LifecycleHarness`,
+`RendererHarness`, `SyncHarness`). The engine-side halves that previous records filed as "unwritten,
+not blocked — no .NET here" are now writable and runnable: the **C# `entitlement_ack` applier**
+(S5's last piece), `RelayClient.cs`'s §6.4 cursor bound (S4, fourteenth run), and the engine half of
+PQ-S2-4.
+
+**Two limits that did NOT move, and no record may blur them.**
+
+1. **`EngineHarness` cannot complete on Linux.** It dies at
+   `FullDataDeletion.ResolveAllowedWorkspace` (`src/Engine/FullDataDeletion.cs:81`) because
+   `PlanInstalledWorkspace()` resolves a Windows install path, which becomes `/` here, and the guard
+   **correctly refuses a volume root**. That is the safety check working, not a regression — but it
+   means its **217 assertions cannot be re-measured in a cloud session**, so the offline pin can be
+   corroborated arithmetically (393 + 217 = 610) and never fully measured here.
+2. **`scripts/Verify-Alpha.ps1` still cannot run.** There is no PowerShell in this sandbox and
+   **none in the Ubuntu archive** — `apt-cache policy powershell` returns nothing, so the trick that
+   solved .NET does not solve this one. The verifier could not even be parse-checked. **CI on
+   `windows-latest` remains the gate**, and the main repo's merge policy (which requires a full local
+   gate) therefore remains out of reach for a cloud iteration. **PR #37 is a draft and was not
+   merged.**
+
+**Smallest human unblock for what remains:** none needed for B-6. For the pin, the ask is unchanged
+and cheap — let CI run. For PowerShell, if a future cloud session ever needs the real verifier, the
+ask is to add the Microsoft package repository to the sandbox image; **it is not needed for the work
+now in reach**, and CI already covers it.
+
+---
+
+## Twenty-second cloud iteration (2026-08-12) — no new blocker, and two deliberate non-blockers
+
+**B-6 closed (above). Nothing new blocked.** B-1, B-2, B-4, B-5 and B-8 were not touched. B-7 is
+unchanged in its own terms — `dl.google.com` and `api.foojay.io` are still denied, `:app` is still
+unbuildable here, and three of the android gate's four tasks still cannot run.
+
+Two findings are filed as **questions, not blockers**, because nothing is blocked by them and
+calling either a blocker would send the next session hunting a phantom:
+
+- **PQ-AAD-1 (now answered, not open).** Java's `US_ASCII` and .NET's `Encoding.ASCII` agree on BMP
+  non-ASCII but **diverge on surrogate pairs** — Java collapses a pair to one `0x3F`, .NET emits
+  two — so a supplementary-plane character in `ts` or `key_id` yields different AAD bytes on the two
+  sides. It **fails closed** (tag mismatch → `decrypt_failed`, an interop failure and not an
+  authentication one) and is unreachable for a conforming sender. The clean fix is a §3 charset
+  constraint, which is **wire-visible and touches both implementations** — a gate for Brandon, not
+  a unilateral edit, and a one-sided tightening would be the mission's named field bug. Nothing is
+  blocked: no code needs it to proceed.
+- **PQ-DUP-1 (new).** §3 says nothing about duplicate top-level keys; .NET takes the **last**. The
+  Kotlin half is **not measured** and is not claimed. Not a bypass — a duplicated `seq` changes the
+  AAD and the envelope then fails to decrypt.
+
+Both are recorded in `docs/protocol-questions.md` with the commands that reproduce them
+(**C-WP-11**).

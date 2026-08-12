@@ -5665,3 +5665,239 @@ was again not attempted despite the prompt naming it.
 `scripts/Verify-Alpha.ps1` needs .NET and **did not run** (`which dotnet` is empty). **CI is still
 the gate**, and citing this entry as "the android gate passed" would be the exact failure these
 records exist to prevent. Re-verify: **C-SC-9**.
+
+---
+
+## WP — .NET was in the Ubuntu archive, and B-6 was never about the rule (2026-08-12, twenty-second cloud iteration)
+
+**Rung: S5. The last open piece is closed** — the first rung-slice a cloud iteration has moved in
+nine runs, and it moved because a blocker's *stated reason* was re-tested instead of re-read.
+
+**The prompt correction, made for the FIFTH consecutive run, and then made irrelevant.** The
+iteration prompt again assigned **S5** as "NOT STARTED and genuinely NOT blocked." Verified again
+after the mandatory fetch rather than carried: `origin/claude/s5-entitlement-ack-spec` carries
+**four commits** above `origin/main` (`00b3705`) as draft **PR #32**, `§4.3.3` is present, and both
+`entitlement-ack*.json` vectors exist — so "not started" is false, as the seventeenth, nineteenth,
+twentieth and twenty-first runs each recorded. What *is* different this time: the remaining piece
+the prompt names — **PQ-A2-3's `invalid-unknown-field` vector, blocked by B-6** — **is now done.**
+The prompt was also right by accident about one thing and wrong about it in detail: it says not to
+write the C# applier because ".NET" is unavailable. **That premise is false in this sandbox**, and
+that is the whole finding below.
+
+### WP-1 The finding: B-6's reason was a measurement, and it had gone stale
+
+B-6 has read the same way since 2026-08-09: *"No .NET on this machine (`which dotnet` → nothing),
+so it could not be compiled, let alone tested."* **That was true and it was never re-tested.**
+`which dotnet` is still empty on a fresh sandbox. But the question B-6 answered was *"is dotnet
+installed"*, and the question that bounds the work is *"can dotnet be obtained"* — and the
+eighteenth iteration had already proved the difference matters, when it found `:core` was never
+covered by B-7 and seven runs had read the blocker wider than it was. **The same shape, one
+toolchain over:**
+
+```
+$ apt-cache policy dotnet-sdk-8.0
+  Candidate: 8.0.125-0ubuntu1~24.04.1
+     500 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages
+```
+
+`src/Sync/SeekerSvc.Sync.csproj` and every other project pin `net8.0` — an **exact** match, not a
+near one, and there is no `global.json` to disagree with. The Ubuntu archive is reachable here;
+`dl.google.com` and `api.foojay.io` (B-7) are the denied hosts, and .NET needs neither.
+
+**One machine change, logged as such** (the precedent is the twentieth run's `openjdk-17-jdk-headless`):
+
+```
+$ apt-get update -qq && apt-get install -y --no-install-recommends dotnet-sdk-8.0
+$ dotnet --version
+8.0.129
+$ dotnet build CareerSeeker.sln -c Release
+Build succeeded.  0 Warning(s)  0 Error(s)
+```
+
+**The entire engine solution builds in a Linux cloud sandbox.** Nine of the ten offline harnesses
+run (WP-6). This is a standing capability for every future cloud iteration, not a one-off.
+
+### WP-2 The gap, measured before anything was written
+
+B-6's *diagnosis* was correct and survived re-checking. `src/Sync` had **no inbound wire-JSON
+parser at all**: `ReceivedEnvelope` is a record that callers construct from already-parsed JSON,
+and `SyncHarness`'s `ToReceived` read the nine names it wanted and dropped everything else. So an
+envelope carrying a tenth top-level field **decrypted and was accepted** by the engine, while the
+phone's `EnvelopeJson.parse` rejected it. §3 has required the opposite since P1:
+
+> Other unknown top-level fields MUST be rejected, not ignored.
+
+**The rule was normative, and enforced on one side.** That is also exactly why the vector could
+not be added first: a shared vector is only enforceable if *both* consumers can fail it, and the
+engine would have gone green by accepting the envelope the vector exists to refuse. B-6's refusal
+to add it anyway was right, and its ordering — parser first, vector second — was followed
+verbatim.
+
+### WP-3 What was written
+
+`src/Sync/EnvelopeJson.cs`, the C# counterpart of `core/…/EnvelopeJson.kt`, **mirrored field for
+field including the parts the phone had already reasoned about**: a present-but-non-string `sig`
+is malformed rather than absent (letting it degrade to "unsigned" turns a broken signature into a
+missing one and changes which check fires), numbers are not coerced from quoted strings, the
+pairing id is shape-checked before it can reach the AAD, and every structural failure reports
+`decrypt_failed` per §3/§7.2.
+
+**Check order matches the phone deliberately, cost included.** The unknown-field check precedes the
+version check, so a v2 sender that also adds a field is told `decrypt_failed` and cannot learn the
+version is the problem — **PQ-ER-1**, opened by the nineteenth run against the phone and now true
+of both. Matching the phone is the point: an engine answering a *different* code for the same bytes
+would be the drift this parser exists to remove. Two assertions pin the pair, because one could not
+distinguish them — the same envelope **without** the extra field still reports `version_unsupported`.
+
+`tests/SyncHarness/Program.cs` now feeds envelope vectors through `EnvelopeJson.Parse` on the
+serialized **wire form**. **The compatibility result is the one that matters:** all 24 pre-existing
+envelope vectors classify identically through the strict parser — 130 → 130 before the new vector
+was added — so the parser refuses nothing the vectors declare legal.
+
+Eleven assertions pin the parser directly, including three cases **no vector file can carry**: a
+vector *is* JSON, so it cannot express "the wire bytes were not JSON at all" or "the root was not
+an object", and `index.json` gives each vector exactly one `expect_error`, so a case whose whole
+interest is *which check fired first* has nowhere to live in the shared suite.
+
+### WP-4 The vector, and the drift that did not happen
+
+`invalid-unknown-field`, generated by `generate.mjs`, never hand-written. **Everything about the
+envelope is valid except the extra field** — a well-formed delta at an unused `seq` (12), sealed
+with the real e2p key — so a receiver that dropped the rule would **accept** it rather than fail
+it some other way. That is what makes it a pin rather than a shape. The field is injected
+**post-seal** and is therefore **not covered by the AAD**, which is precisely why a permissive
+parser is an injection point: anyone on the path can add it and no authentication step notices.
+
+**The cross-repo hazard was checked, not assumed.** The mission forbids changing any existing
+vector's bytes:
+
+```
+$ git diff --name-only docs/sync-vectors/v1/ | grep -v index.json | wc -l
+0
+$ git diff --stat docs/sync-vectors/v1/
+ docs/sync-vectors/v1/index.json | 6 ++++++
+```
+
+**Additive only.** `index.json` gains exactly one entry. The android repo's vendored copies are
+pinned at **`679a317`** and `.github/workflows/ci.yml:70` compares each vendored file against that
+**immutable ref** (`?ref=$PIN`), never against main's tip — so a new vector on a branch cannot move
+that check, and nothing under `core/src/test/resources/sync-vectors/` was touched. **No cross-repo
+drift event.**
+
+### WP-5 Proven live — five mutations, five caught
+
+A suite that has never failed is not evidence, and every new assertion here landed beside the code
+it tests, so all of them are pins by construction. Each was checked against a mutated parser;
+production tree byte-identical afterwards.
+
+| # | mutation | caught by |
+| --- | --- | --- |
+| M1 | unknown-field check removed | **`invalid-unknown-field -> decrypt_failed -- got accepted`** |
+| M2 | non-string `sig` degrades to unsigned | the `sig` assertion |
+| M3 | numbers may be quoted strings | **both** type assertions |
+| M4 | pairing-id shape check removed | the pairing-id assertion |
+| M5 | root need not be an object | **unhandled `InvalidOperationException` out of `Parse`** |
+
+**M1 is the load-bearing row** and it failed in exactly the shape B-6 predicted — *accepted*, not
+"rejected for another reason". **M1 also took two further assertions with it**, and that cascade is
+not a second finding: accepting the envelope commits its `seq`, moving the e2p high-water mark to
+12, so `invalid-unknown-kind` (seq 8) then reported `replay_rejected` and the tracker assertion
+failed. **§10.1 already documents that the suite's `seq` space is packed by design**, so this is
+that documented property doing its job, not a new one. Recording it as an independent discovery
+would be the phantom these records exist to prevent.
+
+**M5 is worth its own sentence** because its failure mode is not a `FAIL` line: without the guard,
+`EnumerateObject()` throws straight out of `Parse`, past the `ParseResult` contract entirely. That
+is the **same shape as the twelfth iteration's `parsePullPage` finding**, one layer down — a
+function whose contract says total and whose implementation is partial. The guard ships; the
+mutation is the argument for it.
+
+### WP-6 The pin moved, and what did not run
+
+`$ExpectedOfflineTotal` **598 → 610**, swept as one unit with every doc the verifier asserts
+against (`README.md`, `src/Engine/README.md`, `docs/CareerSeeker-Project-Summary.md`,
+`docs/External-Audit-Handoff.md`) and the `Assert-Contains` literals themselves, per CLAUDE.md's
+drift trap. SyncHarness **130 → 142** (+11 parser assertions, +1 vector).
+
+**`scripts/Verify-Alpha.ps1` did NOT run, and could not even be parse-checked** — there is no
+PowerShell here and none in the Ubuntu archive. **610 is measured, not guessed, and not measured
+end-to-end.** Nine of its ten offline harnesses run here and sum to **393**:
+
+```
+Slice 28 · ResearcherHarness 57 · HookHarness 16 · StoreParityHarness 28 · GatewayGateHarness 36
+DispatcherNoSendHarness 35 · LifecycleHarness 45 · RendererHarness 6 · SyncHarness 142   = 393
+```
+
+**`EngineHarness` cannot complete on Linux**, and the reason is benign: `PlanInstalledWorkspace()`
+resolves a Windows install path, which on Linux resolves to a volume root, and
+`FullDataDeletion.ResolveAllowedWorkspace` **correctly refuses** it (`src/Engine/FullDataDeletion.cs:81`).
+Its **217** is therefore quoted from `Verify-Alpha.ps1`'s own comment rather than re-measured.
+**393 + 217 = 610.** The drift-trap *pairing* was verified directly — every changed
+`Assert-Contains` literal was confirmed to occur in the doc it targets — but that is a string
+check, not a verifier run. **CI on `windows-latest` is the gate for this pin.**
+
+### WP-7 PQ-AAD-1 is closed, and the answer is a real divergence
+
+The twenty-first run left **PQ-AAD-1** open — whether `src/Sync` encodes its AAD as UTF-8, which
+would make the two ends disagree on every non-ASCII header — and recorded that it needed "one
+`grep` on a machine with .NET". **Both halves are now measured in one session**, and the grep alone
+would have given the wrong answer.
+
+The engine encodes `Encoding.ASCII.GetBytes(aad)` (`src/Sync/EnvelopeCodec.cs:31,45`;
+`DeviceSignature.cs:38`), matching the phone's `US_ASCII`. **So the encodings agree by name.** They
+do not agree in behaviour:
+
+| input | Java `US_ASCII` | .NET `Encoding.ASCII` | |
+| --- | --- | --- | --- |
+| `é`, `è`, `Ж` (BMP) | `543F` | `543F` | agree |
+| **`😀` (surrogate pair)** | **`543F` — one byte** | **`543F3F` — two** | **DIVERGE** |
+| literal `?` | `543F` | `543F` | agree |
+
+**Java collapses a surrogate pair to one `?`; .NET emits one per surrogate.** So a supplementary-plane
+character anywhere in `ts` or `key_id` produces **different AAD bytes on the two sides**, and §5.4's
+signature input inherits it.
+
+**Severity, stated precisely: this fails closed and it is not a bypass.** The sender seals under its
+own AAD and the receiver opens under its own, so the outcome is a tag mismatch → `decrypt_failed`:
+an interop failure, not an authentication one. It is also **unreachable for a conforming sender** —
+`ts` is RFC 3339 and `key_id` is an opaque ASCII id — but **nothing enforces that**, because
+`EnvelopeJson` on *both* sides takes those two fields as arbitrary strings with no charset check.
+That was the twenty-first run's finding; this run supplies the cross-implementation half.
+
+**Deliberately not fixed here.** The clean resolution is to constrain `ts` and `key_id` to ASCII in
+§3, which makes the divergence structurally unreachable — but that is a **wire-visible spec change
+touching both implementations**, so it is a gate for Brandon, not a unilateral edit. Adding a
+charset check to the C# parser alone would make the engine stricter than the phone, which is the
+mission's named field bug pointing the other way. Recorded in `docs/protocol-questions.md`.
+
+### WP-8 One question opened: PQ-DUP-1
+
+Measured while probing parser totality: **§3 says nothing about duplicate top-level keys**, and
+.NET takes the **last** one — `{…,"seq":12,…,"seq":99,"v":7}` parses as `seq=99, v=7`, while
+`EnumerateObject()` still sees all ten properties (so an unknown *duplicate* is still caught by the
+unknown-field check). Kotlin's `JsonObject` is a map and very probably behaves the same, **but the
+phone half was not measured** and is not claimed. Filed rather than fixed, for the same reason as
+WP-7. Not a bypass: a duplicated `seq` changes the AAD and the envelope then fails to decrypt.
+
+### Boundary — what this iteration did not touch
+
+**No merge in either repo**, and PR **#37** is a **draft stacked on #32**, not on `main` — the main
+repo's merge policy is conditional on a full local `Verify-Alpha.ps1` gate **I could not run**, so
+merging was never eligible. **Draft PRs #32–#36 were not touched** — not merged, retargeted,
+rebased or force-pushed. **No existing vector byte changed** (`git diff --name-only` over
+`docs/sync-vectors/v1/` excluding `index.json` printed **0**), so the vendored pin `679a317` is
+intact by construction. **No android file changed at all this iteration except the house records**
+— no Kotlin, no `:app`, no `core/src/`, and **`:core:test` did not run** (the change is engine-side,
+and nothing in `:core` moved). **No `relay/` file.** **No force-push, no history rewrite, no branch
+deletion, no deploy of any kind**, no contact with the production relay (not even `GET /v1/health`),
+no Google/Play/OAuth console, no accounts, no purchases, no Play Billing code, no Gmail, no
+`.appdata`, and **no secret printed or read**. **B-1, B-2, B-4, B-5, B-8 untouched**; **B-6 is
+RESOLVED** and B-7 is unchanged and re-measured in its own terms.
+
+**The standing limit, restated in this run's terms because it changed shape.** The android gate
+(`checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug`) **did not run** — B-7's
+three SDK-dependent tasks are still blocked, and `:core:test` was not exercised because nothing in
+`:core` changed. `scripts/Verify-Alpha.ps1` **did not run** — no PowerShell. What *did* run is the
+full C# solution build and nine of ten offline harnesses. **CI is still the gate**, and citing this
+entry as "the engine gate passed" would be the exact failure these records exist to prevent.
+Re-verify: **C-WP-1…12**.
