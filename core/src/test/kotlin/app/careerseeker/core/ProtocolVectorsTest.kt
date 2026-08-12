@@ -266,12 +266,14 @@ class ProtocolVectorsTest {
      * it. `EnvelopeJson` had enforced the rule since it was written; nothing routed the
      * vectors through it. Re-serialising `envelope_json` keeps the unknown field, so the
      * parser sees what a receiver on the network would see.
+     *
+     * This calls [EnvelopeReceiver.receiveWire] — the shipped seam a production caller uses —
+     * rather than re-implementing parse-then-receive here. A vector suite that reconstructs
+     * the entry point it is meant to be testing is how the gap above survived in the first
+     * place.
      */
-    private fun receiveFromWire(receiver: EnvelopeReceiver, env: JsonObject): ErrorCode? {
-        val parsed = EnvelopeJson.parse(env.toString())
-        val envelope = parsed.envelope ?: return parsed.error
-        return receiver.receive(envelope, ::keyFor).error
-    }
+    private fun receiveFromWire(receiver: EnvelopeReceiver, env: JsonObject): ErrorCode? =
+        receiver.receiveWire(env.toString(), ::keyFor).error
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 }
