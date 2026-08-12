@@ -6324,3 +6324,57 @@ network reads were Maven Central (dependencies) and the public GitHub contents A
 **B-1, B-2, B-4, B-5, B-7, B-8 untouched**; **B-6 stays RESOLVED**. The Fabrication Gate, the
 `Stage.VerifierEntailment` pin, `Dispatcher.SubmitAsync`'s throw and the `gmail.compose` scope are
 untouched — nothing in this slice can transmit anything. Re-verify: **C-VR-1…10**.
+
+### VR-10 (added after the entry above) — CI ran the four tasks the probe cannot, and it is GREEN
+
+Recorded because §VR-5 was written before the gate could answer, and because two claims I published
+in the interim were **wrong** and the retraction belongs next to the evidence.
+
+Run **31642691292** (#111, head `a21cb42`): **attempt 1 `failure`, attempt 2 `success`, identical
+tree, no push between them.** All thirteen steps green on attempt 2, read individually:
+
+| step | result |
+| --- | --- |
+| Assert `:core` has no Android dependency | **success** |
+| **Assert vendored sync vectors match the pinned main-repo commit** | **success** |
+| Unit tests (`:core`) | **success** |
+| Unit tests (`:app`, Robolectric) | **success** |
+| Assemble debug APK · Lint · Assert no analytics SDKs ship | **success** |
+
+**The second row is the one this slice needed.** The pin now points at `7328a0b`, which is **not on
+`main`**, and CI fetches every vendored file with `?ref=$PIN` through the contents API. That step
+passing is the real-CI confirmation of C-VR-8, which until now rested on my local simulation of the
+same loop. **The 272 also stands on the real JDK 17 + SDK toolchain now**, not only on the probe.
+
+**Attempt 1's sole failure was the standing flake**, and the signature matches `BLOCKED.md`'s entry
+exactly: `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab`, `AssertionError at
+ScreensFromFixtureTest.kt:69`, `35 tests completed, 1 failed, 3 skipped`. An `:app` Compose test;
+this slice touched no `:app` file, and `:core` *test* resources are not on `:app`'s classpath. One
+re-run, bounded there deliberately, per that entry's own attempts policy.
+
+**Two retractions, and the second is the useful one.**
+
+**1.** I published that run `31642362893` was "still `in_progress` ~17 minutes later" and read it as
+this branch's hang precedent repeating. The API says `created_at` **21:24:19Z**, `updated_at`
+**21:28:51Z**, `conclusion` **`cancelled`** — **4.5 minutes, cancelled by my own next push.** There
+was no hang. I estimated elapsed time by counting my own poll round-trips rather than running
+`date -u`: an inference published as a measurement, inside the row whose entire job was to report a
+measurement.
+
+**2. The correction for that was already written in `STATE.md`, by an earlier iteration that made
+the same mistake, and I did not read it.** The twenty-first run's row states the rule verbatim —
+*read a run's own `status`/`conclusion`/`created_at`/`updated_at` via `get_workflow_run` before
+characterising it, because the PR check-runs view follows the current head and lags a push.* I had
+read that file at re-entry and still repeated the error, because the row is one cell in a table
+whose cells now run to several hundred words each. **A lesson recorded but unread is not a lesson.**
+These records defend against forgetting; they do not yet defend against being too long to re-read,
+and that is a real and growing hazard of this format rather than a personal lapse.
+
+**Two operational facts worth carrying forward.** Pushing while a run is in flight **cancels it**,
+so a records-only push can destroy the evidence it was written to preserve — wait for the run, then
+push. And the check-runs endpoint **follows the current head**, so after a push it silently reports
+on a newer run than the one you believe you are polling; that is what made "still in progress" look
+plausible for far longer than the first run actually lived.
+
+**What this does not change.** `Verify-Alpha.ps1` still did not run — no PowerShell here — so no
+claim is made about the engine gate or the 625 pin. Every "did not run" statement in §VR-5 stands.
