@@ -970,3 +970,41 @@ next session hunting a fault that is not there.
 **One open question was opened, deliberately not as a blocker:** **PQ-ER-1** (a v2 dialect reads as
 `decrypt_failed` rather than `version_unsupported`). Nothing is blocked; it is a decision that has
 not been made, and it is diagnosability rather than safety.
+
+---
+
+## Twentieth cloud iteration (2026-08-12) — no new blocker, and one deliberate non-blocker
+
+**Nothing this iteration attempted was obstructed.** Both files were written, run and mutated in the
+sandbox; the slice completed.
+
+**B-7's narrowed scope exercised a second time, and holding.** The eighteenth iteration corrected
+B-7 from "no Kotlin runs here" to its actual measurement; the nineteenth wrote 26 tests on the
+strength of it; this one wrote 28 more and ran **eight** mutate-and-revert cycles across two
+production files, needing nothing from `dl.google.com`. **What remains blocked is exactly what B-7
+says:** `:app` entirely, plus `checkCoreIsAndroidFree`, `:app:assembleDebug` and `:app:lintDebug`.
+CI is still the gate for those.
+
+**One machine change, which is not a blocker and is logged as a machine change:**
+`apt-get install openjdk-17-jdk-headless`. `:core` pins `jvmToolchain(17)`; the sandbox shipped only
+JDK 21; `api.foojay.io` is denied by the same egress policy as `dl.google.com`, so Gradle cannot
+auto-provision. `scripts/core-probe.sh`'s header already prescribed this exact command, including
+that `apt-get update` is not optional. **A future sandbox without it will fail the probe's
+precondition check with the fix in the message**, which is the intended behaviour rather than a
+blocker.
+
+**B-4, B-5, B-6, B-8 untouched** — nothing this iteration did bears on the emulator lane, Room under
+Robolectric, the inbound wire-JSON parser, or the persisted p2e counter. **B-6 was re-read and is
+unchanged**, and it is why PQ-A2-3 was again not attempted despite the prompt naming it.
+
+**One open question was opened, deliberately not as a blocker: PQ-B64-1.** The JDK's base64url
+decoder accepts non-canonical trailing bits; whether .NET's does is **unmeasured**, and if it does
+not, the two implementations disagree about whether an envelope is well-formed. **Nothing is
+blocked** — the engine measurement is one line of C# on any machine with .NET, and the *vector* half
+is already B-6's, alongside PQ-A2-3. Filing it as a blocker would send the next session hunting a
+fault nobody has established exists.
+
+**Deliberately not filed, and stated so it is not mistaken for an oversight:** two of the eight
+mutations (M3, M7) were caught by no test. **Neither is a coverage gap** — both are semantically
+equivalent changes, checked rather than assumed (HMAC zero-pads short keys; `+` and `/` are already
+outside the JDK's URL alphabet). Recording them as gaps would have put a phantom in these records.
