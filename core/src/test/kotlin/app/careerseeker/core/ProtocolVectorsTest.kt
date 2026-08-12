@@ -191,6 +191,57 @@ class ProtocolVectorsTest {
         assertEquals(1L, receiver.highestAccepted(Direction.PHONE_TO_ENGINE))
     }
 
+    // ---------------------------------------------------------------- entitlement acks
+
+    private fun ackVectors(): List<JsonObject> =
+        index()["vectors"]!!.jsonArray.map { it.jsonObject }
+            .filter { it.str("type") == "entitlement_ack" }
+            .map { load(it.str("name")) }
+
+    /**
+     * §4.3.3, driven by the shared vectors rather than by constants copied out of them.
+     *
+     * The plaintext here is whatever AES-GCM produces from the vector's own `ciphertext_b64u`
+     * — it is never re-serialised from `plaintext_json`, so no canonicalisation choice on this
+     * side can hide a disagreement about field order or about an omitted-versus-null
+     * `order_id`. That is the difference between reading a vector and transcribing one: a
+     * transcription is a snapshot and cannot fail when the vector moves.
+     */
+    @Test
+    fun `entitlement ack vectors decrypt to the exact bytes that unlock Pro`() {
+        val acks = ackVectors()
+        // The pair IS the optionality proof; one alone would not pin it.
+        assertEquals(2, acks.size, "both ack forms must be vendored")
+        val applier = EntitlementAckApplier(knownProductIds = setOf("pro_unlock"))
+
+        val granted = acks.map { v ->
+            val name = v.str("name")
+            val plaintext = SyncCrypto.open(hex(v.str("key_hex")), b64u(v.str("nonce_b64u")),
+                v.str("aad"), b64u(v.str("ciphertext_b64u")))
+            assertEquals(
+                json.parseToJsonElement(v["plaintext_json"]!!.toString()).canonical(),
+                json.parseToJsonElement(plaintext.toString(Charsets.UTF_8)).canonical(),
+                "$name round-trip",
+            )
+
+            val body = v["plaintext_json"]!!.jsonObject["body"]!!.jsonObject
+            val ack = requireNotNull(applier.parse(plaintext)) { "$name must parse as a grant" }
+            assertEquals(body.str("product_id"), ack.productId, "$name product_id")
+            assertEquals(body.str("acknowledged_at"), ack.acknowledgedAt, "$name acknowledged_at")
+            // Read from the vector, not asserted against a literal: absent stays absent.
+            assertEquals(body["order_id"]?.jsonPrimitive?.content, ack.orderId, "$name order_id")
+
+            val state = applier.apply(ProState.Free, plaintext)
+            assertTrue(state.isPro, "$name is an ack, and an ack means granted (§4.3.3)")
+            state
+        }
+
+        // The two vectors differ in order_id and nothing else, so they must grant identically.
+        // An implementation that required order_id would diverge here rather than in a support
+        // ticket about an unlock that never happened.
+        assertEquals(granted[0], granted[1], "order_id is optional and grants the same entitlement")
+    }
+
     // ---------------------------------------------------------------- protocol invariants
 
     @Test

@@ -1,5 +1,11 @@
 package app.careerseeker.core
 
+import app.careerseeker.core.crypto.Base64Url
+import app.careerseeker.core.crypto.SyncCrypto
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -10,35 +16,67 @@ import kotlin.test.assertTrue
  *
  * ## Where these payloads come from
  *
- * The two grant bodies below are **transcribed verbatim** from the shared vectors
- * `entitlement-ack.json` and `entitlement-ack-no-order-id.json` (`plaintext_json`), which the
- * main repo's `generate.mjs` produces. They are transcribed rather than read out of
- * `core/src/test/resources/sync-vectors/` because the vendored copy is pinned at main-repo
- * commit `679a317` and those two files postdate the pin — they live on the **unmerged** PR #32.
- * Re-vendoring to pick them up would move the pin to an unmerged branch commit, which is
- * exactly the cross-repo drift the `VECTORS.lock` pin exists to prevent.
+ * The two grant bodies are **decrypted out of the shared vectors** `entitlement-ack.json` and
+ * `entitlement-ack-no-order-id.json`, which the main repo's `generate.mjs` produces. They are
+ * read, not copied: [ackWithOrderId] is whatever AES-GCM yields from that vector's own
+ * `ciphertext_b64u`, so it is the same artifact the engine's `SyncHarness` asserts against.
  *
- * So this file proves the applier obeys §4.3.3 against the real bytes, and the formal
- * vector-driven assertion — the one that belongs in `ProtocolVectorsTest` alongside the other
- * `type`-filtered sections — is deliberately deferred to the re-vendor slice that follows
- * PR #32 merging. `Sync-Protocol.md` §10.2 already says no consumer asserts against these
- * vectors yet; this file does not change that, and does not claim to.
+ * ## Why this file used to transcribe them, and what that cost
+ *
+ * Until the vectors were re-vendored, the vendored copy was pinned at main-repo commit
+ * `679a317` and both ack files postdated it, so the bodies were pasted into this file as
+ * string literals and documented as "transcribed verbatim". They were not verbatim. The
+ * generator seals `JSON.stringify(plaintext)` — compact, no whitespace — while the literals
+ * were wrapped across two lines for readability, making them **142 and 104 bytes against the
+ * vectors' 140 and 102**: a `,\n ` where the sealed bytes have a bare `,`. The tests passed
+ * anyway, because JSON parsing ignores whitespace, which is exactly the point — a
+ * transcription cannot fail when the vector moves, so it proves agreement with a snapshot
+ * rather than with the vector. That is the gap PQ-A2-5 recorded, and this is its closure on
+ * the phone side.
+ *
+ * The formal cross-implementation assertion lives in `ProtocolVectorsTest` alongside the other
+ * `type`-filtered sections. This file keeps the *behavioural* half: what the applier does with
+ * bodies that are malformed, foreign, or trying to un-grant.
  */
 class EntitlementAckTest {
 
     private val applier = EntitlementAckApplier(knownProductIds = setOf("pro_unlock"))
 
-    /** `entitlement-ack.json` → `plaintext_json`, verbatim. */
-    private val ackWithOrderId = """
-        {"kind":"entitlement_ack","body":{"product_id":"pro_unlock",
-         "acknowledged_at":"2026-06-11T14:02:11Z","order_id":"GPA.3390-8461-2039-11123"}}
-    """.trimIndent().toByteArray()
+    /** `entitlement-ack.json`, decrypted — not a copy of it. */
+    private val ackWithOrderId = ackPlaintext("entitlement-ack")
 
-    /** `entitlement-ack-no-order-id.json` → `plaintext_json`, verbatim. */
-    private val ackNoOrderId = """
-        {"kind":"entitlement_ack","body":{"product_id":"pro_unlock",
-         "acknowledged_at":"2026-06-11T14:02:11Z"}}
-    """.trimIndent().toByteArray()
+    /** `entitlement-ack-no-order-id.json`, decrypted. */
+    private val ackNoOrderId = ackPlaintext("entitlement-ack-no-order-id")
+
+    private fun ackPlaintext(name: String): ByteArray {
+        val url = requireNotNull(javaClass.classLoader.getResource("sync-vectors/v1/$name.json")) {
+            "shared vector $name not on the test classpath — is core/src/test/resources/sync-vectors vendored?"
+        }
+        val v = Json.parseToJsonElement(File(url.toURI()).readText()).jsonObject
+        fun str(key: String) = v[key]!!.jsonPrimitive.content
+        val key = str("key_hex").let { h -> ByteArray(h.length / 2) { ((h[it * 2].digitToInt(16) shl 4) or h[it * 2 + 1].digitToInt(16)).toByte() } }
+        return SyncCrypto.open(
+            key,
+            requireNotNull(Base64Url.decodeOrNull(str("nonce_b64u"))),
+            str("aad"),
+            requireNotNull(Base64Url.decodeOrNull(str("ciphertext_b64u"))),
+        )
+    }
+
+    @Test
+    fun `the grant bodies are the vectors' own bytes and not a re-wrapped copy`() {
+        // Pins the defect this file used to have. A literal wrapped across two lines parses
+        // identically to the sealed bytes, so every other test here passed while the bodies
+        // were 2 bytes longer than the vectors'. Nothing but a byte-level check sees that.
+        //
+        // No magic lengths: the generator seals `JSON.stringify(plaintext)`, so the sealed
+        // bytes must survive a compact re-serialisation unchanged. Whitespace anywhere
+        // outside a string breaks this and nothing else.
+        for ((name, bytes) in listOf("entitlement-ack" to ackWithOrderId, "no-order-id" to ackNoOrderId)) {
+            val text = bytes.toString(Charsets.UTF_8)
+            assertEquals(text, Json.parseToJsonElement(text).toString(), "$name is not compact JSON")
+        }
+    }
 
     @Test
     fun `the engine ack unlocks Pro and carries the granted product and time`() {
