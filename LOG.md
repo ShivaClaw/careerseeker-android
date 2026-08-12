@@ -5935,3 +5935,179 @@ doc, which is what the string check in this session could only suggest.
 unchanged for the next cloud iteration. What changed is that the gate has now spoken, and it agreed.
 **The PR remains a DRAFT and was not merged**: the merge policy requires a *local* full gate, which
 is a different condition from CI being green, and it is still out of reach here.
+
+---
+
+## 2026-08-12 — twenty-third cloud iteration (Linux sandbox): S5's last piece, the engine can finally answer a receipt
+
+**Rung: S5. One slice: the `entitlement_ack` emitter.** S5 is now spec-complete, vector-complete,
+phone-applier-complete and **engine-emitter-complete**; what remains is host wiring, named in AK-8.
+
+The scheduled prompt assigned the S5 **spec + generator** slice and said the C# applier must not be
+written because "you cannot compile" it. **Both halves of that were stale**, and the records already
+said so before I touched anything — which is why RULE ONE is a fetch. The spec slice landed
+2026-08-09 in PR **#32** (§4.3.3, PQ-A2-1/-2 closed) and PQ-A2-3 landed 2026-08-12 in PR **#37**.
+This is the **sixth consecutive run** whose prompt has mis-stated S5's state. And `dotnet` **is**
+obtainable here — the twenty-second run proved it and wrote it into the bus; I re-proved it in
+30 seconds (`apt-get install -y --no-install-recommends dotnet-sdk-8.0` → SDK **8.0.129**).
+
+### AK-1 — the finding: the kind existed everywhere except where the bytes are made
+
+```
+$ grep -rn "entitlement_ack\|EntitlementAck" src/ tests/ --include=*.cs
+src/Sync/Protocol.cs:34:   "snapshot", "delta", "doc", "evidence", "heartbeat", "conflict", "entitlement_ack",
+```
+
+**One line, and it is a vocabulary entry.** `InboundDispatcher` verified the Play receipt, called
+`EntitlementService.Apply` (which flips the engine's own flag and writes the audit event), and
+returned `EntitlementApplied` **to its caller**. Nothing went to the phone.
+
+§4.3.3 makes the ack **the only thing that may unlock Pro** on the phone, and §4.3.2 makes the phone
+a courier that never rules on its own entitlement. So the purchase path **terminated in engine-local
+state**: the user pays, the engine agrees with itself, and the phone stays locked forever. Every
+other component of that path already existed — the phone's `EntitlementAckApplier` since 2026-08-09,
+the two vectors since PR #32, the body spec since PR #32.
+
+**Why it hid for two rungs.** Each piece was individually DONE and each was honestly recorded as
+DONE. Nothing in the records was false; the gap was *between* the entries, in a producer nobody had
+claimed. §10.2 came closest — "no consumer asserts against them yet" — but it reads as a testing
+gap, not as "nothing on either side emits this".
+
+### AK-2 — what landed (four commits, `claude/s5-entitlement-ack-emitter`, draft PR **#38**)
+
+| file | change |
+| --- | --- |
+| `src/Sync/SyncPayloads.cs` | **new** `EntitlementAck(productId, acknowledgedAt, orderId?)` — §4.3.3's body |
+| `src/Sync/SyncPublisher.cs` | **new** `PublishEntitlementAckAsync` — seals + pushes on e2p |
+| `src/Sync/InboundDispatcher.cs` | **new** `IEntitlementAckPublisher` seam; accepted receipt → ack |
+| `tests/SyncHarness/Program.cs` | **+15** assertions, new §4.3.3 section + 4 dispatcher assertions |
+| `scripts/Verify-Alpha.ps1` | `$ExpectedOfflineTotal` **610 → 625**, and every `Assert-Contains` literal |
+| `README.md`, `src/Engine/README.md`, `docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md` | count sweep 142 → 157, 610 → 625 |
+| `docs/Sync-Protocol.md` | §10.2 rewritten — see AK-6 |
+
+### AK-3 — byte equality, deliberately, not field equality
+
+The vector assertions compare **bytes**: `SyncPayloads.EntitlementAck` must reproduce each vector's
+plaintext byte for byte, and re-sealing under the vector's own key/nonce must reproduce
+`ciphertext_b64u` exactly. Node generated those bytes, so an engine-built ack **is** the artifact
+the phone's applier was written against, not merely something compatible with it.
+
+A field-by-field check would pass while the two implementations disagreed about field order, or
+about whether an absent `order_id` is an omitted key or a literal `null` — **which is the entire
+reason the second vector exists**. Mutation M1' and M2 below are exactly those two disagreements,
+and a field-wise check catches neither.
+
+### AK-4 — the safety property, and where it lives
+
+§4.3.3 has **no negative form**: an ack means granted, full stop. That is enforced by **control
+flow**, not by a comment — `InboundDispatcher` returns on `!verdict.Accepted` *before* the publish,
+so there is no path on which a refused receipt produces an ack. The alternative shape ("ack with a
+failure flag") would put a parser hazard on the one path that turns a paid feature on.
+
+Second rule, same case: the product and order in the ack are read from the **verdict** — i.e. from
+the Play-signed receipt the verifier just checked — and never from the inbound body. Letting the
+phone name the product it gets acknowledged for would hand the unlock decision back to the device.
+
+### AK-5 — evidence: commands run in this session, with their actual output
+
+```
+$ dotnet build CareerSeeker.sln -c Release
+Build succeeded.  0 Warning(s)  0 Error(s)
+
+$ dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build
+=== 157 passed, 0 failed ===                       (was 142)
+
+$ node docs/sync-vectors/generate.mjs --check
+OK: 29 vector files match the generator.
+
+$ git diff --name-only origin/claude/s5-engine-wire-parser -- docs/sync-vectors/
+(0 files)
+```
+
+Nine offline harnesses measured on Linux sum to **408** (was 393): Slice 28, ResearcherHarness 57,
+HookHarness 16, StoreParityHarness 28, GatewayGateHarness 36, DispatcherNoSendHarness 35,
+LifecycleHarness 45, RendererHarness 6, SyncHarness **157**.
+
+**`EngineHarness` still cannot complete here**, for the documented and correct reason:
+
+```
+Unhandled exception. System.InvalidOperationException: Refusing full-data deletion for a volume root.
+   at SeekerSvc.Engine.FullDataDeletion.ResolveAllowedWorkspace(String) in src/Engine/FullDataDeletion.cs:line 81
+```
+
+A Windows install path resolves to `/` on Linux and the safety check correctly refuses it. Its
+**217 is carried from the CI-settled 610 pin, not measured this session**. 408 + 217 = **625**.
+
+**Proven by mutation, not assumed.** Five mutations, each caught:
+
+| mutation | assertions failed |
+| --- | ---: |
+| absent `order_id` written as `""` | 3 |
+| ack body field order swapped | 4 |
+| dispatcher never publishes | 2 |
+| ack **also** published on a REJECTED receipt | 1 |
+| ack drops the receipt's `order_id` | 1 |
+
+### AK-6 — §10.2 was corrected in the direction that costs me, not the one that flatters
+
+§10.2 said "**No consumer asserts against them yet.**" That is no longer true of the engine — but it
+is **still true of the phone**, so the amendment names which side rather than declaring the rung
+cross-verified. `EntitlementAckTest` **transcribes** the two bodies verbatim into the test instead of
+loading the vector files, because the android repo vendors `docs/sync-vectors/` pinned at `679a317`
+and the ack vectors postdate that pin. The test file says so itself and does not claim otherwise.
+
+So: **these vectors are currently evidence about ONE implementation.** The cross-implementation
+property the rest of §10 leans on — Node generates, two independent consumers agree — **does not yet
+hold for `entitlement_ack`**. Recorded as a live gap, not smoothed over. → **PQ-A2-5** (below).
+
+### AK-7 — a process mistake worth writing down, because it destroyed work
+
+Mid-run I ran mutation tests with a helper that reverted via `git checkout -- src/Sync/
+tests/SyncHarness/` — **while the harness edits were still uncommitted**. The first revert deleted
+them. The tell was in the output and I nearly misread it as a result: mutation M2 reported
+`=== 142 passed, 0 failed ===`, i.e. the *baseline* count, which means the new section was not
+merely failing but **absent**. A mutation that "passes at exactly the pre-change total" is not a
+weak mutation, it is a missing test file.
+
+Cost: one re-application of two edits. **The rule that would have prevented it: commit before
+mutating, then mutate only `src/`.** The re-run after committing caught all five mutations. M1's
+original form also mutated the *shared* serializer options rather than the ack builder, so it broke
+two unrelated pre-existing assertions; M1' re-does it precisely (`order_id = orderId ?? ""`).
+
+### AK-8 — what is left, stated so nobody hunts a phantom
+
+**S5's remainder is host wiring, and it is NOT blocked.** `IEntitlementAckPublisher` has **no
+production caller** — `grep -rn IEntitlementAckPublisher src/` outside `src/Sync/` prints nothing —
+so a dispatcher built without it applies the entitlement and emits nothing, exactly as before. There
+is an assertion pinning that inert behaviour deliberately. **The purchase path is closed in the
+library, not in the running engine.** That wiring needs the pairing vault and the device session,
+which is the same host work S2/S4 are waiting on, and B-2 (`/pair` page) still gates the vault end.
+
+**No E2E proof exists.** No relay was contacted, no phone exists, and
+`PublishEntitlementAckAsync` has never sent a byte to a real receiver.
+
+### Boundary — what this iteration did not touch
+
+**No merge in either repo.** PR **#38** is a **draft stacked on #37**, which is stacked on #32 —
+not on `main`. The main repo's merge policy is conditional on a full local `Verify-Alpha.ps1` gate
+**I could not run** (no PowerShell in this sandbox and none in the Ubuntu archive; it could not even
+be parse-checked), so merging was never eligible. **Draft PRs #32–#37 were not touched** — not
+merged, retargeted, rebased or force-pushed.
+
+**No vector file changed and none was added** — `git diff --name-only` over `docs/sync-vectors/`
+against the base printed **0**, so the vendored pin `679a317` is intact by construction and **no
+cross-repo drift event occurred**. **No android file changed except these house records** — no
+Kotlin, no `:app`, no `core/src/`, and **`:core:test` did not run** (nothing in `:core` moved).
+**No `relay/` file.** The android gate (`checkCoreIsAndroidFree :core:test :app:assembleDebug
+:app:lintDebug`) **did not run** — B-7/B-4 unchanged.
+
+**No force-push, no history rewrite, no branch deletion, no deploy of any kind**, no contact with
+the production relay (**not even `GET /v1/health`**), no Google/Play/OAuth console, no accounts, no
+purchases, no Play Billing code, no Gmail, no `.appdata`, and **no secret printed or read**.
+**B-1, B-2, B-4, B-5, B-7, B-8 untouched**; **B-6 stays RESOLVED**. The Fabrication Gate, the
+`Stage.VerifierEntailment` `StrongCloud` pin, `Dispatcher.SubmitAsync`'s throw, and the
+`gmail.compose` scope are **untouched** — and no kind added here can transmit anything.
+
+**`scripts/Verify-Alpha.ps1` did not run in this session. CI is the gate for 625**, exactly as it
+was for 610. Citing this entry as "the engine gate passed" would be the precise failure these
+records exist to prevent. Re-verify: **C-AK-1…14**.

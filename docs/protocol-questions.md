@@ -1522,3 +1522,43 @@ last-wins (or first-wins) so it is a decision rather than an accident, with a sh
 they disagree, that is a real divergence and it takes priority over (b).
 
 **Do not** tighten one side alone before (a).
+
+---
+
+## PQ-A2-5 — The `entitlement_ack` vectors are enforced on one side only
+
+Not a spec defect. A **conformance** gap, filed because §10 states a property that does not
+currently hold for this kind, and the shortfall is invisible from either codebase alone.
+
+**What §10 promises.** "**Both** the C# `SyncHarness` and the Kotlin `:core` tests read these same
+files, so a divergence between the two implementations fails CI instead of surfacing as a pairing
+bug in the field." That is the whole reason the generator is Node: a generator written in the same
+language as its verifier proves only that the language agrees with itself.
+
+**What is actually true for `entitlement_ack`, as of 2026-08-12.**
+
+| side | how it consumes the two ack vectors |
+| --- | --- |
+| engine (`tests/SyncHarness/Program.cs`) | **reads the files**, and asserts the built body is **byte-identical** to each vector's plaintext, and that re-sealing reproduces `ciphertext_b64u` exactly |
+| phone (`core/.../EntitlementAckTest.kt`) | **transcribes** the two bodies verbatim into the test source; the vector files are never opened |
+
+The Kotlin file states this itself and does not claim otherwise. The reason is structural, not
+sloppiness: the android repo vendors `docs/sync-vectors/` **pinned at main-repo commit `679a317`**,
+and both ack vectors postdate that pin, so they are not present in
+`core/src/test/resources/sync-vectors/` to be read.
+
+**Why it matters despite both sides currently agreeing.** A transcription is a snapshot of the
+vector at the moment someone copied it. It cannot fail when the vector changes, because it is not
+reading the vector — so the divergence §10 exists to catch (engine and phone drifting apart on
+field order, on optionality, on an omitted-vs-null `order_id`) would be caught on the engine side
+and **silently pass on the phone side**. The two implementations agree today; nothing enforces that
+they still will.
+
+**To close:** re-vendor `docs/sync-vectors/` into the android repo at a commit that includes the ack
+vectors, then convert `EntitlementAckTest`'s transcribed constants into a vector-driven assertion in
+`ProtocolVectorsTest` alongside the other kinds. That is a re-vendor plus a test rewrite — both
+cheap, and neither doable in a session that cannot run `:core:test` (B-7). Nothing prevents the work;
+this is not a blocker.
+
+**Until it closes**, `docs/Sync-Protocol.md` §10.2 says in the document itself that these vectors are
+evidence about **one** implementation. Do not cite the ack vectors as cross-implementation evidence.

@@ -5133,3 +5133,200 @@ mismatch, so a green run *is* the pin check — which also settles `EngineHarnes
 
 **This does not retire C-WP-12.** `Verify-Alpha.ps1` still cannot run in a cloud sandbox; the gate
 ran on `windows-latest`, as it always must.
+
+---
+
+## C-AK — S5 entitlement_ack emitter (2026-08-12, twenty-third cloud iteration, draft PR #38)
+
+Every command below was run in-session unless the entry says otherwise. Branch:
+`claude/s5-entitlement-ack-emitter` in the **engine** repo, stacked on `claude/s5-engine-wire-parser`.
+
+### C-AK-1 — The finding: the kind existed only as a vocabulary string
+
+```bash
+cd <engine> && git checkout origin/claude/s5-engine-wire-parser
+grep -rn "entitlement_ack\|EntitlementAck" src/ tests/ --include=*.cs
+```
+
+*Expected:* **exactly one line**, `src/Sync/Protocol.cs:34`, the `ShippingKinds` entry. No builder,
+no publisher, no dispatch arm. This is the state the branch replaces: the engine verified a Play
+receipt, flipped its own Pro flag, and sent the phone nothing — while §4.3.3 makes the ack the only
+thing that may unlock Pro there.
+
+### C-AK-2 — Toolchain: .NET is obtainable, and this is a 30-second re-test
+
+```bash
+apt-cache policy dotnet-sdk-8.0
+apt-get install -y --no-install-recommends dotnet-sdk-8.0 && dotnet --version
+```
+
+*Expected:* a candidate from `noble-updates/main`, and **8.0.129**. `which dotnet` returning nothing
+on a fresh sandbox is **not** evidence the toolchain is unavailable — that mistake cost this program
+eight iterations (B-6). When a blocker's reason is "tool X is absent", the re-test is
+`apt-cache policy <pkg>`.
+
+### C-AK-3 — Build baseline
+
+```bash
+cd <engine> && dotnet build CareerSeeker.sln -c Release
+```
+
+*Expected:* `Build succeeded.  0 Warning(s)  0 Error(s)` — both before and after the change.
+
+### C-AK-4 — SyncHarness moved 142 → 157
+
+```bash
+cd <engine> && git checkout origin/claude/s5-engine-wire-parser \
+  && dotnet build tests/SyncHarness/SyncHarness.csproj -c Release \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -1
+git checkout origin/claude/s5-entitlement-ack-emitter \
+  && dotnet build tests/SyncHarness/SyncHarness.csproj -c Release \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -1
+```
+
+*Expected:* `=== 142 passed, 0 failed ===` then `=== 157 passed, 0 failed ===`.
+
+### C-AK-5 — The ack is byte-identical to the shared vectors
+
+```bash
+cd <engine> && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build \
+  | grep -A 12 "entitlement_ack: the engine builds"
+```
+
+*Expected:* 11 PASS lines, including for **each** of `entitlement-ack` and
+`entitlement-ack-no-order-id`: "reproduces the vector plaintext byte for byte" and "re-sealing the
+built body reproduces the vector ciphertext exactly". Byte equality is the claim — a field-by-field
+check passes while the implementations disagree about field order or about an omitted vs. null
+`order_id`, which is what C-AK-7's M1'/M2 demonstrate.
+
+### C-AK-6 — An accepted receipt acks; a rejected receipt does not
+
+```bash
+cd <engine> && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build \
+  | grep -E "dispatch: (an applied|the ack names|a REJECTED|a null ack)"
+```
+
+*Expected:* four PASS lines. The load-bearing one is **"a REJECTED entitlement publishes no ack at
+all (§4.3.3 has no negative form)"** — the ack means granted, full stop, and the rejection returns
+*before* the publish in `src/Sync/InboundDispatcher.cs`. Also pinned: the ack names the product and
+order read from the **verified receipt**, never from the phone's request body.
+
+### C-AK-7 — Proven by mutation, not assumed (5/5 caught)
+
+```bash
+cd <engine> && git checkout origin/claude/s5-entitlement-ack-emitter
+# M1' absent order_id becomes an empty string
+sed -i 's/order_id = orderId }/order_id = orderId ?? "" }/' src/Sync/SyncPayloads.cs
+dotnet build tests/SyncHarness/SyncHarness.csproj -c Release >/dev/null \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep -c FAIL
+git checkout -- src/Sync/
+# M2 field order swapped
+sed -i 's/new { product_id = productId, acknowledged_at = acknowledgedAt, order_id = orderId }/new { acknowledged_at = acknowledgedAt, product_id = productId, order_id = orderId }/' src/Sync/SyncPayloads.cs
+dotnet build tests/SyncHarness/SyncHarness.csproj -c Release >/dev/null \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep -c FAIL
+git checkout -- src/Sync/
+# M5 the ack drops the receipt's order id
+sed -i 's/PublishEntitlementAckAsync(verdict.ProductId!, verdict.OrderId, ct)/PublishEntitlementAckAsync(verdict.ProductId!, null, ct)/' src/Sync/InboundDispatcher.cs
+dotnet build tests/SyncHarness/SyncHarness.csproj -c Release >/dev/null \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep -c FAIL
+git checkout -- src/Sync/
+```
+
+*Expected:* **3**, **4**, **1** failures respectively. Two further mutations (dispatcher never
+publishes → **2** failures; ack also published on a rejected receipt → **1**) require editing the
+dispatch arm by hand rather than by `sed`.
+
+**Revert only `src/`, and commit the harness first.** Reverting `tests/SyncHarness/` with
+uncommitted work in it deletes the assertions being measured, and the tell is a mutation reporting
+the *pre-change* total (`142`) rather than a lower one — that is a missing test file, not a weak
+mutation. This happened in-session; see LOG.md AK-7.
+
+### C-AK-8 — No vector byte moved, and no vector was added
+
+```bash
+cd <engine> && git diff --name-only origin/claude/s5-engine-wire-parser..origin/claude/s5-entitlement-ack-emitter -- docs/sync-vectors/ | wc -l
+node docs/sync-vectors/generate.mjs --check
+```
+
+*Expected:* **0**, and `OK: 29 vector files match the generator.` The android repo's vendored copies
+are pinned at `679a317` and are untouched by construction — **no cross-repo drift event**.
+
+### C-AK-9 — The offline sum measured on Linux is 408; 217 is carried, not measured
+
+```bash
+cd <engine> && for h in Slice ResearcherHarness HookHarness StoreParityHarness \
+  GatewayGateHarness DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  dotnet run --project tests/$h/$h.csproj -c Release --no-build | tail -1
+done
+dotnet run --project tests/EngineHarness/EngineHarness.csproj -c Release --no-build | tail -3
+```
+
+*Expected:* 28, 57, 16, 28, 36, 35, 45, 6, **157** → **408**. `EngineHarness` **throws**:
+`System.InvalidOperationException: Refusing full-data deletion for a volume root` at
+`src/Engine/FullDataDeletion.cs:81` — correct behaviour, since a Windows install path resolves to
+`/` on Linux. Its **217 is carried from the CI-settled 610 pin, not measured this session**.
+408 + 217 = **625**.
+
+### C-AK-10 — The pin and every count-reporting doc moved together
+
+```bash
+cd <engine> && grep -rn "625\|SyncHarness | 157" README.md src/Engine/README.md \
+  docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md scripts/Verify-Alpha.ps1
+grep -rn "610\|SyncHarness | 142" README.md src/Engine/README.md \
+  docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md scripts/Verify-Alpha.ps1 \
+  | grep -v "10.0.26100" | grep -v "^scripts/Verify-Alpha.ps1:1[5-6][0-9]:#"
+```
+
+*Expected:* the first finds `$ExpectedOfflineTotal = 625`, both table rows in all three tables, the
+Audit-Handoff line, and each `Assert-Contains` literal. The second finds **only** the historical
+narrative comment above the pin, which deliberately keeps `598 -> 610` and `610` as the record of
+how the number got here. This is CLAUDE.md's drift trap: doc content and verifier expectation are
+one unit that changes together.
+
+### C-AK-11 — §10.2 now names which implementation asserts, and which does not
+
+```bash
+cd <engine>  && sed -n '/#### 10.2/,/#### 10.3/p' docs/Sync-Protocol.md
+cd <android> && sed -n '1,30p' core/src/test/kotlin/app/careerseeker/core/EntitlementAckTest.kt
+```
+
+*Expected:* §10.2 states the engine asserts against the vector files byte-for-byte and that the
+**phone does not read them** — `EntitlementAckTest` transcribes the two bodies verbatim because the
+android repo vendors `docs/sync-vectors/` at a pin predating the ack vectors, which the Kotlin file
+says itself. **These vectors are therefore evidence about ONE implementation**, and §10's
+cross-implementation property does not yet hold for this kind. → **PQ-A2-5**.
+
+### C-AK-12 — The seam has no production caller: the path is closed in the library, not the engine
+
+```bash
+cd <engine> && grep -rn "IEntitlementAckPublisher" src/ | grep -v "^src/Sync/"
+grep -rn "PublishEntitlementAckAsync" src/ | grep -v "^src/Sync/"
+```
+
+*Expected:* **both print nothing.** A dispatcher constructed without the seam applies the
+entitlement and emits nothing, exactly as before — there is an assertion pinning that inert
+behaviour. Host wiring needs the pairing vault and device session (same host work S2/S4 await;
+B-2 still gates the vault end). **Unblocked, merely unwritten** — do not file it as a blocker.
+
+### C-AK-13 — No E2E claim is made anywhere
+
+```bash
+cd <engine> && git log origin/claude/s5-engine-wire-parser..origin/claude/s5-entitlement-ack-emitter -p \
+  -- src/ tests/ | grep -iE "relay\.careerseeker|https://|health"
+```
+
+*Expected:* **nothing**. No relay was contacted in this session, not even `GET /v1/health`; no phone
+exists; `PublishEntitlementAckAsync` has never sent a byte to a real receiver.
+
+### C-AK-14 — What did NOT run, and what remains the gate
+
+```bash
+cd <android> && ./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug --rerun-tasks
+cd <engine>  && pwsh -File scripts/Verify-Alpha.ps1
+```
+
+*Expected:* **both fail to start here.** The first needs the Android SDK (B-7/B-4). The second needs
+PowerShell, absent and **not in the Ubuntu archive** — so `Verify-Alpha.ps1` was not run and could
+not even be parse-checked. `:core:test` was not run and did not need to be: nothing in `:core`
+changed. **CI on `windows-latest` is the gate for the 625 pin**, exactly as it was for 610. Citing
+this section as "the engine gate passed" is the precise failure these records exist to prevent.

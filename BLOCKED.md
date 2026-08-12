@@ -1198,3 +1198,61 @@ calling either a blocker would send the next session hunting a phantom:
 
 Both are recorded in `docs/protocol-questions.md` with the commands that reproduce them
 (**C-WP-11**).
+
+---
+
+## No new blocker arose 2026-08-12 (S5 entitlement_ack emitter, twenty-third cloud iteration)
+
+Recorded as an entry because its absence is otherwise indistinguishable from an omission, and
+because this iteration produced **three** things that look like blockers and are not.
+
+**The slice completed end to end on this machine.** `SyncPayloads.EntitlementAck`, the
+`SyncPublisher` method and the `InboundDispatcher` seam were written, built (0 warnings / 0 errors),
+and asserted: SyncHarness 142 → **157, 0 failed**, with **5/5 mutations caught** and
+`generate.mjs --check` green at 29 files. Nothing was attempted and abandoned. Draft PR **#38**.
+
+**Not a blocker (1): S5's remaining host wiring.** `IEntitlementAckPublisher` has no production
+caller — `grep -rn IEntitlementAckPublisher src/` outside `src/Sync/` prints nothing — so the
+purchase path is closed **in the library, not in the running engine**. That wiring needs the pairing
+vault and device session, which is the *same host work S2 and S4 already await*, and B-2 (`/pair`
+page) gates the vault end. It is **unblocked and merely unwritten**. Filing it here would send the
+next session hunting for a phantom, which is what this file exists to prevent.
+
+**Not a blocker (2): PQ-A2-5.** The ack vectors are read by the engine and only *transcribed* by the
+phone, because the android repo vendors `docs/sync-vectors/` at pin `679a317` and the ack vectors
+postdate it. Closing it is a re-vendor plus a test rewrite — both cheap, neither doable without
+`:core:test` (B-7, already recorded). It is a **conformance gap with a name**, in
+`docs/protocol-questions.md` as PQ-A2-5, not an obstacle.
+
+**Not a blocker (3): the prompt's stated S5 slice.** For the **sixth consecutive run** the iteration
+prompt described S5 work that was already done (this time: amend §4.3.3, add the ack vectors, add
+`invalid-unknown-field`, close PQ-A2-1/-2/-3 — all landed in PRs #32 and #37) and instructed that
+the C# applier "must not be written because you cannot compile it". Both premises were stale and the
+records said so **before** anything was touched. A stale prompt is not an obstacle; it is the reason
+RULE ONE is a fetch and the reason the ladder is derived rather than trusted.
+
+### B-6 status 2026-08-12 (twenty-third iteration) — still RESOLVED, and re-proved from scratch
+
+The .NET route was re-tested on a **fresh sandbox** rather than assumed from the last run's note:
+`which dotnet` → nothing (as always), `apt-cache policy dotnet-sdk-8.0` → candidate in
+`noble-updates/main`, one `apt-get install` → SDK **8.0.129**, whole solution builds. The standing
+lesson holds: when a blocker's reason is "tool X is absent", the re-test is `apt-cache policy <pkg>`,
+not `which <tool>`.
+
+### B-7 status 2026-08-12 (twenty-third iteration) — unchanged, and it bounded nothing this time
+
+No Android SDK, so the android gate did not run — but **nothing in `:core` or `:app` changed this
+iteration**, so `:core:test` was not needed and no claim here rests on it. The one android-side
+statement made (that `EntitlementAckTest` transcribes rather than reads the vectors) is derived from
+**reading** the file's own KDoc, and is labelled as such in C-AK-11 and PQ-A2-5.
+
+### The PowerShell limit is unchanged, and it is the gate for 625
+
+`scripts/Verify-Alpha.ps1` **did not run** — no PowerShell in this sandbox and none in the Ubuntu
+archive, so it could not even be parse-checked. The offline pin moved 610 → **625** on a measured
+Linux sum of **408** plus `EngineHarness`'s **217 carried from the CI-settled 610 pin, not measured
+here** (it throws on Linux: `Refusing full-data deletion for a volume root`,
+`src/Engine/FullDataDeletion.cs:81`, which is correct). **CI on `windows-latest` is the gate**, as it
+was for 610. If a full local gate measures a different `EngineHarness`, the 625 pin is wrong and the
+fix is the standing one: re-run, write the measured number, sweep every count-reporting doc in the
+same commit.
