@@ -4267,16 +4267,27 @@ grep -rl "EnvelopeReceiver" core/src/test/ | sort
 ```bash
 cd <android>
 node -e '
-const fs=require("fs");const d="docs/sync-vectors/v1";
+const fs=require("fs");const d="core/src/test/resources/sync-vectors/v1";
+let n=0;
 for (const f of fs.readdirSync(d).filter(f=>f.endsWith(".json"))) {
   const v=JSON.parse(fs.readFileSync(`${d}/${f}`));
-  if (v.type==="envelope" && v.valid==="false") console.log(f, v.expect_error);
-}'
+  if (v.type==="envelope" && v.valid===false) { console.log(f.padEnd(34), "->", v.expect_error); n++; }
+}
+console.log("invalid envelope vectors:", n);'
 ```
 
-*Expected:* every invalid envelope vector carries **exactly one** `expect_error`, because each
-breaks exactly one rule. A receiver applying its checks in any order classifies all of them
-identically — which C-ER-4's M1–M3 then demonstrates by measurement.
+**Two things in that command were wrong in this entry's first draft and are corrected here, because
+an audit command that does not reproduce its own stated output is a bug in this document.** The
+vendored vectors live at **`core/src/test/resources/sync-vectors/v1`**, not `docs/sync-vectors/v1`
+(that is the *generator's* path, in the other repo); and `valid` is a **JSON boolean**, so
+`v.valid === "false"` matches nothing and the loop printed an empty list that could be misread as
+"no invalid vectors exist".
+
+*Expected:* **13** invalid envelope vectors, each with **exactly one** `expect_error` —
+`decrypt_failed` ×3, `bad_signature` ×4, `unknown_kind` ×2, and one each of `too_large`,
+`replay_rejected`, `key_unknown`, `version_unsupported`. **One rule broken per vector is the whole
+point:** a receiver applying its checks in any order classifies all 13 identically, which is why the
+suite pins classification and cannot pin order. C-ER-4's M1–M3 then demonstrate that by measurement.
 
 ### C-ER-4 — Six mutations, six caught, and three are invisible to the pre-existing suite
 
@@ -4325,13 +4336,28 @@ git checkout -- core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt
 *And the reason it did not fail before the fix*, which is the part worth understanding:
 
 ```bash
-node -e 'const s=JSON.stringify({note:"\"kind\":\"snapshot\"",kind:"heartbeat"});
-console.log(s); console.log("scanner finds:", s.indexOf("\"kind\""));'
+node -e '
+const s=JSON.stringify({note:"\"kind\":\"snapshot\"",kind:"heartbeat"});
+const hit=s.indexOf("\"kind\"");
+console.log("wire text :", s);
+console.log("scanner hit at", hit, "->", s.slice(hit, hit+20));
+console.log("is that the REAL key (not the decoy)?", hit === s.lastIndexOf("\"kind\""));'
 ```
 
-*Expected:* the escaped `\"kind\"` inside the string value is **not** a match for `"kind"` — the
-scanner skips it and finds the real field, so that body passes under the naive scanner and proves
-nothing. The nested-object body is the one that works, and it is why three bodies ship.
+*Expected:*
+
+```
+wire text : {"note":"\"kind\":\"snapshot\"","kind":"heartbeat"}
+scanner hit at 32 -> "kind":"heartbeat"}
+is that the REAL key (not the decoy)? true
+```
+
+**The last line is the one that carries the claim, and the first draft of this entry printed only
+the index — a bare `32` that a reader cannot evaluate without counting characters by hand.** The
+escaped `\"kind\"` inside the string value is **not** a match for `"kind"`, so the scanner walks
+past the decoy and lands on the real field. That body therefore passes under the naive scanner and
+proves nothing. The **nested-object** body is the one that works, which is why three bodies ship and
+why the ineffective one ships first with a comment.
 
 ### C-ER-6 — The docstring's "structural decode" is one step in prose, two in code — and it costs no divergence
 

@@ -5210,3 +5210,30 @@ upload keystore was neither read nor referenced. **No secrets read, written or p
 Terra's state was read at iteration start **and again before writing this**: still **R6(b) BLOCKED**
 on draft PR #26, heartbeat unchanged at **2026-08-07T21:18**, **claims no files** — no collision, and
 this iteration claims no main-repo file at all.
+
+### ER-9 Two of my own audit commands did not reproduce their stated output
+
+Added after the fact, because the check that catches this is the one worth keeping. Every command in
+C-ER was run **as written** before the branch was called done. Two failed, and both were in
+`AUDIT-REQUEST.md` rather than in the code:
+
+1. **C-ER-3 pointed at the wrong path and tested the wrong type.** It read
+   `docs/sync-vectors/v1` — that is the **generator's** path, in the *other* repo. The android
+   repo's vendored copy is `core/src/test/resources/sync-vectors/v1`, so the command died
+   `ENOENT`. Worse, its predicate was `v.valid === "false"`, and `valid` is a **JSON boolean**: had
+   the path been right, the loop would have printed **an empty list**, which reads exactly like
+   "there are no invalid vectors" — a silent wrong answer rather than a loud one. Corrected, it
+   prints **13** invalid envelope vectors, one `expect_error` each, which is the claim.
+
+2. **C-ER-5 printed a number nobody can evaluate.** `console.log("scanner finds:", s.indexOf(…))`
+   emitted a bare `32`. The claim is *"the scanner skips the escaped decoy and lands on the real
+   field"* — and `32` demonstrates that only to a reader willing to count characters. Corrected to
+   print the matched slice and the boolean `hit === s.lastIndexOf(…)`, so the output states the
+   claim instead of encoding it.
+
+**Neither defect touched the tests**, which is the point worth drawing out: the suite was green and
+the mutations were caught with both of these sitting broken in the document beside them. **A claim
+and the command that re-checks it can drift independently**, and only running the command finds it.
+The seventeenth iteration caught the same shape (a `sed` that matched three sites, not one); that
+this recurs suggests it should be a standing step rather than a habit — **run every command you just
+wrote, from the path you told the reader to stand in.**
