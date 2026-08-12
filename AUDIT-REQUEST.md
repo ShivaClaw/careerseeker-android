@@ -4215,3 +4215,185 @@ diff under `core/`, `app/`, `gradle/` or either build script; and the android di
 **Not run and not runnable here:** `Verify-Alpha.ps1` (no .NET — `which dotnet` prints nothing) and
 the android gate's other three tasks, `checkCoreIsAndroidFree`, `:app:assembleDebug`,
 `:app:lintDebug` (all need the Android SDK). CI is the gate for those.
+
+---
+
+## C-ER — The receive state machine's check order (nineteenth cloud iteration, 2026-08-11)
+
+Every claim in `LOG.md` §ER, with the command that re-checks it. **All of these run in a Linux
+sandbox with no Android SDK**, which is the point of the lane; the three gate tasks they do *not*
+cover are named in C-ER-8.
+
+**Prerequisite for every command below** (the JDK is not egress-blocked, but it is not preinstalled):
+
+```bash
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+```
+
+The `update` is not optional — `install` alone 404s against a stale index.
+
+### C-ER-1 — The suite exists, runs, and is 216/0 across 15 classes
+
+```bash
+cd <android> && git checkout claude/android-a0-probe
+scripts/core-probe.sh --rerun
+```
+
+*Expected:* `BUILD SUCCESSFUL`, then
+`core-probe: 216 tests, 0 failed, 0 skipped, across 15 classes`, exit 0.
+
+**The baseline this is a delta from was re-measured in the same session, not quoted from the
+eighteenth iteration's record:** `git stash`-ing the new file (or running the same command at
+`a7528c1`) gives `190 tests, 0 failed, 0 skipped, across 14 classes`. **190 → 216 is 26 tests in
+one new class**, and nothing else moved.
+
+### C-ER-2 — `EnvelopeReceiver` had no dedicated test file before this commit
+
+```bash
+cd <android>
+git show a7528c1 --stat | grep -c EnvelopeReceiverTest        # 0
+git ls-tree --name-only a7528c1 core/src/test/kotlin/app/careerseeker/core/ | grep EnvelopeReceiver
+```
+
+*Expected:* `0`, and the second command prints **nothing**. The class was reachable only through
+`ProtocolVectorsTest`, `SyncPumpTest`, `EntitlementVectorsTest` and `OutboundEnvelopesTest`:
+
+```bash
+grep -rl "EnvelopeReceiver" core/src/test/ | sort
+```
+
+### C-ER-3 — The vector suite cannot pin the order, and this is structural rather than an oversight
+
+```bash
+cd <android>
+node -e '
+const fs=require("fs");const d="docs/sync-vectors/v1";
+for (const f of fs.readdirSync(d).filter(f=>f.endsWith(".json"))) {
+  const v=JSON.parse(fs.readFileSync(`${d}/${f}`));
+  if (v.type==="envelope" && v.valid==="false") console.log(f, v.expect_error);
+}'
+```
+
+*Expected:* every invalid envelope vector carries **exactly one** `expect_error`, because each
+breaks exactly one rule. A receiver applying its checks in any order classifies all of them
+identically — which C-ER-4's M1–M3 then demonstrates by measurement.
+
+### C-ER-4 — Six mutations, six caught, and three are invisible to the pre-existing suite
+
+**This is the claim to re-run first if you only run one.** For each mutation: apply it, run the
+probe, revert. The script used is reproduced in `LOG.md` §ER-3's table; the essential shape is
+
+```bash
+cd <android>
+SRC=core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt
+# M1: move the replay check above the signature-placement check in receive()
+$EDITOR $SRC
+git diff --numstat -- $SRC          # 1 1
+scripts/core-probe.sh 2>&1 | grep -E "FAILED|^core-probe:"
+git checkout -- $SRC                # ALWAYS, including on failure
+```
+
+*Expected, per mutation:*
+
+| # | mutation | numstat | failing tests |
+| --- | --- | --- | --- |
+| M1 | replay above signature placement | `1 1` | `signature placement is checked before replay` |
+| M2 | size below signature placement | `1 1` | `size is checked before signature placement` |
+| M3 | `key_id` below the structural decode | `1 1` | `key_id is checked before the structural decode`, `key_id is checked before size` |
+| M4 | `seq.accept` above the decrypt | `1 1` | `no rejection advances the sequence tracker…`, `ProtocolVectorsTest > the receiver classifies…` |
+| M5 | `kindOf` as a substring scan | `11 5` | `untrusted body text cannot choose the route`, `a non-string kind is unknown_kind…` |
+| M6 | version check deleted | `0 1` | `version is checked before key_id`, `the strict parse runs ahead…`, `no rejection advances…`, `ProtocolVectorsTest > …` |
+
+Each exits **1**. **For M1, M2 and M3 the only failures are in `EnvelopeReceiverTest`** — that is
+the measurement behind "the pre-existing 190 tests do not notice a pure reordering". To check that
+half directly, stash the new file and re-run any of M1–M3: the suite returns **190/0 green on a
+receiver whose checks are in the wrong order**.
+
+**Verify the tree is clean afterwards:** `git diff --stat -- core/src/main/` → **empty**.
+
+### C-ER-5 — The first draft of the untrusted-text test did not discriminate, and the shipped one does
+
+```bash
+cd <android>
+# apply M5 (kindOf by substring scan), then:
+scripts/core-probe.sh 2>&1 | grep "untrusted body text"
+git checkout -- core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt
+```
+
+*Expected:* `untrusted body text cannot choose the route() FAILED`.
+
+*And the reason it did not fail before the fix*, which is the part worth understanding:
+
+```bash
+node -e 'const s=JSON.stringify({note:"\"kind\":\"snapshot\"",kind:"heartbeat"});
+console.log(s); console.log("scanner finds:", s.indexOf("\"kind\""));'
+```
+
+*Expected:* the escaped `\"kind\"` inside the string value is **not** a match for `"kind"` — the
+scanner skips it and finds the real field, so that body passes under the naive scanner and proves
+nothing. The nested-object body is the one that works, and it is why three bodies ship.
+
+### C-ER-6 — The docstring's "structural decode" is one step in prose, two in code — and it costs no divergence
+
+```bash
+cd <android>
+sed -n '26,35p;70,76p' core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt
+
+cd <main-repo>
+sed -n '16,25p;50,62p' src/Sync/EnvelopeReceiver.cs
+grep -rn "keyForDir\|KeyFor(string" --include=*.cs src/ tests/ | grep -v "^src/Sync/EnvelopeReceiver.cs"
+grep -rn "new InboundDispatcher" --include=*.cs src/
+```
+
+*Expected:* the two docstrings are **identical prose**; the Kotlin's `Direction.fromWire` sits at
+step 6, after size and signature placement; the C# **never parses `dir`** and passes the raw string
+to `HighestAccepted`, `keyForDir` and the AAD. Every `keyForDir` that exists is **total** (a
+`dir == "e2p" ? … : …` or a `_ =>` constant — none can throw on an unknown `dir`), and the last
+command prints **nothing**: `InboundDispatcher` has no production construction, only the seam
+comment at `src/Engine/Program.cs:247`.
+
+**So both sides answer `decrypt_failed` for an unrecognised `dir`, by different routes.** The prose
+is what is imprecise. **Deliberately unchanged** — see §ER-5; the shared docstring should be
+corrected in a change that can gate both repos.
+
+### C-ER-7 — PQ-ER-1's two halves, both pinned by executed tests
+
+```bash
+cd <android>
+scripts/core-probe.sh 2>&1 | grep "strict parse runs ahead"
+sed -n '/the strict parse runs ahead of the version check/,/^    }/p' \
+  core/src/test/kotlin/app/careerseeker/core/EnvelopeReceiverTest.kt
+```
+
+*Expected:* `PASSED`, and the body shows both halves — a `v=2` envelope **with** an unknown
+top-level field answers `decrypt_failed`, and the **same envelope without it** answers
+`version_unsupported`. That pair is the whole of PQ-ER-1: the rejection is correct either way, only
+the code the sender learns differs. **Diagnosability, not safety** — see
+`docs/protocol-questions.md`.
+
+### C-ER-8 — What did NOT run, stated so no reader promotes this to a gate result
+
+```bash
+cd <android>
+which dotnet                                  # nothing
+./gradlew --no-daemon checkCoreIsAndroidFree  # fails: AGP resolves from google() (B-7)
+cd <main-repo> && git status --porcelain      # empty
+```
+
+*Expected:* no .NET, so **`scripts\Verify-Alpha.ps1` did not run and cannot**; the root Gradle
+script still fails here, so **`checkCoreIsAndroidFree`, `:app:assembleDebug` and `:app:lintDebug`
+did not run** — three of the android gate's four tasks. **`scripts/core-probe.sh` runs exactly one
+of them.** Citing this iteration as "the android gate passed" is the failure these records exist to
+prevent. **CI is still the gate**, and the main-repo tree is untouched.
+
+Also verify the blast radius directly:
+
+```bash
+cd <android>
+git diff --name-only a7528c1..HEAD
+git diff --stat a7528c1..HEAD -- core/src/main/ app/ gradle/ .github/ scripts/
+```
+
+*Expected:* the first lists `core/src/test/.../EnvelopeReceiverTest.kt` plus `LOG.md`, `STATE.md`,
+`AUDIT-REQUEST.md`, `BLOCKED.md`, `docs/protocol-questions.md` — **and nothing else**. The second is
+**empty**: no production Kotlin, no `:app`, no build script, no CI workflow, no script changed.

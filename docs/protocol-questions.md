@@ -1149,3 +1149,55 @@ covers the resumed-publisher case at `tests/SyncHarness/Program.cs:419-425`, wit
 the drift trap in `CLAUDE.md`. That is a local session's slice.
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-S6C-3** and **C-S6C-4**.
+
+---
+
+## PQ-ER-1 — The strict parse runs ahead of the version check, so a v2 dialect reads as malformed
+
+**Opened 2026-08-11 (receive-order tests, nineteenth cloud iteration).** **Severity: diagnosability,
+not safety.** Stated first because a question filed as though it were a defect is its own kind of
+drift, and this one is small.
+
+**Behaviour, executed rather than read** (`:core:test` via `scripts/core-probe.sh`, test
+`the strict parse runs ahead of the version check, so a v2 dialect reads as malformed`):
+
+| envelope | answer |
+| --- | --- |
+| `v=2`, plus an unknown top-level field | **`decrypt_failed`** |
+| `v=2`, no unknown field | `version_unsupported` |
+
+`EnvelopeReceiver.receiveWire` calls `EnvelopeJson.parse` before the state machine sees anything,
+and §3's unknown-top-level-field rule is the parser's first check. So a **v2 sender that both bumps
+`v` and adds a field** — the ordinary shape of a protocol upgrade — is told its envelope is
+malformed, and cannot learn that the version is the problem.
+
+**The rejection itself is correct in both rows, and that is why this is not a defect.** §3 requires
+unknown fields to be rejected rather than ignored, and `EnvelopeJson`'s docstring gives the reason
+the parse comes first: *if the sender is speaking a dialect this receiver does not know, nothing
+else it says should be interpreted.* That argument is sound. The cost is only that the **error code
+is less informative than it could be**, and it lands on exactly the upgrade path §3's rule exists to
+protect.
+
+**Why nothing was changed.** Reordering — version before the unknown-field check — means reading `v`
+out of a document this receiver has already decided it does not understand, which is the reasoning
+`EnvelopeJson` rejects. Adding a distinct `version_unsupported` pre-check is a **normative change to
+§3's parse order**, it would need the same edit in the C# engine to avoid drift, and **neither gate
+is runnable from a cloud sandbox** (no .NET; three of the android gate's four tasks need the SDK).
+A phone that reports differently from the engine here is the field bug the mission's
+engine-compatible interpretation rule names.
+
+**Also worth knowing before anyone acts on this:** the engine's inbound path **cannot reach this
+question today**. `src/Sync` has no inbound wire-JSON parser at all — that is **B-6**, the same gap
+that blocks PQ-A2-3's `invalid-unknown-field` vector. So there is currently **no C# counterpart to
+`receiveWire`** to keep in step, and whoever closes B-6 should decide this at the same time rather
+than building the parser and then reordering it.
+
+**Smallest resolution — a decision, then one edit per implementation, on a machine with both gates:**
+does a v2 sender need to distinguish "your version is unsupported" from "your envelope is
+malformed"? If yes, both receivers check `v` before the unknown-field rule and §3 says so. If no,
+this entry closes as **working as intended** and the test that pins it stays as documentation of a
+deliberate choice.
+
+**Not filed in `BLOCKED.md`:** nothing is blocked.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-ER-7**.

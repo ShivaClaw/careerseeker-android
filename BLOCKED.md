@@ -932,3 +932,41 @@ was ever red, and the branch tip is green with `:core` at 54 s (baseline 50 s) a
 at 108 s (baseline 93 s). **Transient runner infrastructure, self-resolved.** It is **not** a
 blocker and was never one; leaving it phrased as an open anomaly would send the next session hunting
 a fault that is not there.
+
+---
+
+## No new blocker arose 2026-08-11 (receive-order tests, nineteenth cloud iteration)
+
+**Recorded because the absence is the point**, and because this iteration was handed a task that a
+blocker already covers.
+
+**B-6 was re-read, not assumed, and it is unchanged.** The iteration prompt assigned PQ-A2-3's
+`invalid-unknown-field` vector as part of an S5 slice. B-6 exists precisely to stop that: `src/Sync`
+still has no inbound wire-JSON parser, so the engine would **accept** an envelope carrying an
+unknown top-level field, and a vector asserting rejection would turn the offline gate red on
+`windows-latest` for whoever pushes next while proving nothing. **Parser first (C#), vector second.**
+No cloud session has .NET. **This is the second consecutive prompt to describe S5 as not-started and
+not-blocked; both halves are wrong** — see `LOG.md` §ER-0 and the seventeenth iteration's entry.
+
+**B-7 unchanged, and its corrected scope held up under the first real use.** The eighteenth
+iteration narrowed B-7 to "`:app` and three of the gate's four tasks", against seven iterations that
+had read it as "no Kotlin runs here". This iteration **wrote and executed new Kotlin** in `:core` —
+26 tests, plus six mutate-and-revert cycles of a production file — and needed nothing from
+`dl.google.com`. The narrowed scope is now exercised rather than merely measured. **What remains
+blocked is exactly what B-7 says:** `:app` entirely, `checkCoreIsAndroidFree`,
+`:app:assembleDebug`, `:app:lintDebug`. CI is still the gate for those.
+
+**B-4, B-5, B-8 untouched** — nothing this iteration did bears on the emulator lane, Room under
+Robolectric, or the persisted p2e counter.
+
+**One thing that could have become a blocker and did not.** ER-5 found the receiver's shared
+docstring describing "structural decode" as one step where the Kotlin splits it across steps 3 and
+6. That was chased to a conclusion rather than filed: both implementations still answer
+`decrypt_failed` for an unrecognised `dir`, by different routes, and every engine `keyForDir` is
+total so none can throw. **No divergence, so no blocker** — the prose is imprecise and the
+correction belongs in a change that can gate both repos. Filing it as a blocker would have sent the
+next session hunting a fault that is not there.
+
+**One open question was opened, deliberately not as a blocker:** **PQ-ER-1** (a v2 dialect reads as
+`decrypt_failed` rather than `version_unsupported`). Nothing is blocked; it is a decision that has
+not been made, and it is diagnosability rather than safety.

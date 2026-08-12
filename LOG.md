@@ -5000,3 +5000,213 @@ no cert-store, MSIX or keystore action — the upload keystore was neither read 
 Terra's state was read at iteration start: still **R6(b) BLOCKED** on draft PR #26, heartbeat
 unchanged at **2026-08-07T21:18**, **claims no files** — no collision, and this iteration claims no
 main-repo file at all.
+
+---
+
+## §ER — The receive state machine's check order, tested for the first time (nineteenth cloud iteration, 2026-08-11)
+
+Linux sandbox, cloud iteration, **nineteenth** run. **`:core` Kotlin written and executed here** —
+the second iteration to do so, and the first to add code rather than a probe.
+
+### ER-0 Why this slice, and a correction to the iteration prompt
+
+The prompt assigned **S5**, on the stated basis that S5 is "**NOT STARTED** and genuinely **NOT
+blocked**". **Both halves are wrong, and the seventeenth iteration already recorded that they are**
+— this is the second consecutive prompt to carry the error, so it is restated here rather than in
+passing:
+
+- `origin/claude/s5-entitlement-ack-spec` has carried **four commits since 2026-08-09** as draft
+  **PR #32**. §4.3.3's `entitlement_ack` body, both shared vectors, and **PQ-A6-1 / PQ-A2-1 /
+  PQ-A2-2** are closed. Verified after the mandatory fetch, not inherited:
+  `git log --oneline origin/claude/s5-entitlement-ack-spec -4` → `9c05ef7`, `a564c0c`, `22b028e`,
+  `8575539`, all above `origin/main` at `00b3705`.
+- The one remaining piece the prompt names — **PQ-A2-3's `invalid-unknown-field` vector** — is
+  **blocked by B-6**, and the blocker exists precisely to stop a session doing what the prompt
+  asks. `src/Sync` has no inbound wire-JSON parser, so the engine would *accept* the envelope and
+  the vector would turn the offline gate red on `windows-latest` for whoever pushes next, while
+  proving nothing. **Parser first (C#), vector second.** No cloud session has .NET.
+
+So this iteration took the prompt's own escape clause and picked the topmost rung actually
+verifiable here. **The reason that is now a different question than it was two runs ago** is the
+eighteenth iteration's finding: `:core` is pure-Kotlin/JVM and its suite **runs in this sandbox**
+via `scripts/core-probe.sh`. That iteration closed by naming the honest next question —
+
+> *"the honest next question for a cloud iteration is no longer 'which spec paragraph can I verify'
+> but 'which `:core` behaviour is unwritten or untested'."*
+
+This entry answers it with the first candidate found, and **writes Kotlin instead of prose for the
+first time in nine iterations.**
+
+### ER-1 The gap: an order called normative, tested by nothing
+
+`EnvelopeReceiver`'s own docstring — carried **verbatim** in both implementations
+(`core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt:26-35` and the engine's
+`src/Sync/EnvelopeReceiver.cs:16-25`) — says:
+
+> *"The check ORDER is part of the protocol, not an implementation detail: rejecting for the wrong
+> reason usually means a check fired earlier than intended and the real one is untested."*
+
+**`EnvelopeReceiver` had no dedicated test file.** It was exercised incidentally by
+`ProtocolVectorsTest`, `SyncPumpTest`, `EntitlementVectorsTest` and `OutboundEnvelopesTest`.
+
+**And the incidental coverage cannot reach the order, structurally.** `ProtocolVectorsTest` feeds
+every shared envelope vector through the receiver and asserts each one's error code — but **every
+vector violates exactly one rule**. A receiver that ran its checks in a completely different order
+would classify all of them identically and pass. That is not a criticism of the vectors; a vector
+file pins *the wire*, and order is not on the wire. It does mean the claim was load-bearing and
+unpinned.
+
+### ER-2 The construction: two violations per envelope
+
+The only construction that can tell orders apart is **one envelope breaking two rules at once**,
+asserting the earlier check answers. `core/src/test/kotlin/app/careerseeker/core/EnvelopeReceiverTest.kt`,
+**26 tests**, walks the documented chain adjacency by adjacency:
+
+| envelope violates | must answer | pins |
+| --- | --- | --- |
+| `v=2` **and** a revoked `key_id` | `version_unsupported` | version → key_id |
+| revoked `key_id` **and** an unparseable nonce | `key_unknown` | key_id → structural |
+| revoked `key_id` **and** a 1 MiB+1 ciphertext | `key_unknown` | key_id → size |
+| unparseable nonce **and** oversized ciphertext | `decrypt_failed` | structural → size |
+| oversized ciphertext **and** a sig on an `e2p` envelope | `too_large` | size → sig placement |
+| sig on `e2p` **and** a replayed seq | `bad_signature` | sig placement → replay |
+| replayed seq **and** an undecryptable ciphertext | `replay_rejected` | replay → decrypt |
+| wrong sealing key **and** a body whose kind is unknown | `decrypt_failed` | decrypt → kind |
+| reserved L2 kind **and** an unparseable sig on `p2e` | `unknown_kind` | kind → signature |
+
+Plus the invariants the order exists to protect: **no rejection advances the sequence cursor**,
+asserted **once per error code** rather than in aggregate — an aggregate assertion passes while one
+code leaks — and gaps are legitimate, the two directions keep independent counters, a rejected
+envelope never hands back a plaintext, and `receiveWire`'s strict parse runs ahead of the machine.
+
+**Measured, `scripts/core-probe.sh --rerun`:**
+
+```
+core-probe: 216 tests, 0 failed, 0 skipped, across 15 classes
+```
+
+**190 → 216, 14 → 15 classes.** Baseline re-measured this session before the change (190/0/14), so
+the delta is this file and nothing else.
+
+### ER-3 Proven live, because a suite that has never failed is not evidence
+
+**No production code changed**, so every one of the 26 assertions is a **pin by construction**. The
+seventeenth iteration's rule applies: check each against a deliberately broken receiver. Six
+mutations of `EnvelopeReceiver.kt`, each reverted immediately (`git checkout --` in a trap, so the
+tree is restored even on failure):
+
+| # | mutation | numstat | caught by |
+| --- | --- | --- | --- |
+| M1 | replay moved ahead of signature placement | `1 1` | `signature placement is checked before replay` |
+| M2 | size moved after signature placement | `1 1` | `size is checked before signature placement` |
+| M3 | `key_id` moved after the structural decode | `1 1` | `key_id is checked before …` **×2** |
+| M4 | sequence committed before the checks | `1 1` | `no rejection advances the sequence tracker`; **`ProtocolVectorsTest`** |
+| M5 | `kindOf` reverted to a substring scan | `11 5` | `untrusted body text …`; `a non-string kind …` |
+| M6 | version check deleted | `0 1` | `version is checked before key_id`; +2; **`ProtocolVectorsTest`** |
+
+**Six of six caught, and the build exits 1 on each.**
+
+**The load-bearing row is M1–M3.** Those three are *pure reorderings* — no check removed, no
+classification of a single-fault envelope changed — and **the pre-existing 190 tests did not notice
+any of them.** Only M4 and M6, which delete or move a check's effect, reach `ProtocolVectorsTest`.
+That is the gap in ER-1, measured rather than argued.
+
+### ER-4 A finding from auditing my own draft, which is the habit these records keep rewarding
+
+The first version of `untrusted body text cannot choose the route` **did not discriminate**, and
+M5 is what exposed it: the mutation was caught by the *non-string kind* test, not by the test
+written for exactly that attack.
+
+The reason is worth the paragraph. §8.6's concern is that the decrypted body carries untrusted job
+and recruiter text, so `kindOf` parses JSON rather than scanning for the first `"kind"` substring.
+My draft modelled the attack as a **quoted `"kind":"snapshot"` inside a string value** — but JSON
+escapes an inner quote as `\"`, so in the raw wire text the scanner's `indexOf("\"kind\"")` never
+matches it. **The attack fails against the naive scanner on its own, and a test built on it proves
+nothing.**
+
+What actually defeats a scanner is a **nested object** — `{"meta":{"kind":"snapshot"},"kind":"heartbeat"}`
+— whose `"kind"` is unescaped, well-formed, and earlier in the byte stream than the real one. Added
+that case and an array-of-objects variant, re-ran M5: the test now **fails** against the substring
+scanner as intended. All three bodies ship, ordered with the ineffective one first and a comment
+saying why it is ineffective, so the next reader does not re-derive this.
+
+### ER-5 The docstring's "structural decode" is one step in prose and two in code — corrected nowhere, recorded here
+
+Reading the code against its own stated order surfaced a mismatch. The docstring says *structural
+decode* happens at step 3, before size and signature placement. In the Kotlin, the **`dir` decode is
+also a structural decode** and sits at **step 6** (`EnvelopeReceiver.kt:75`), after both.
+
+**This is a documentation imprecision, not a behavioural defect, and the check was made rather than
+assumed.** The engine twin **never parses `dir` at all** — it threads the raw string through
+`HighestAccepted`, `keyForDir` and the AAD (`src/Sync/EnvelopeReceiver.cs:54-62`). So for an
+envelope with an unrecognised `dir`:
+
+- **Phone:** `Direction.fromWire` returns null → `decrypt_failed`, before any crypto.
+- **Engine:** proceeds, the bogus `dir` reaches the AAD, the GCM tag fails → `decrypt_failed`.
+
+**Same classification, different path.** And no engine caller can throw on the way: every
+`keyForDir` lambda that exists today is total (`tests/SyncHarness/Program.cs:194`,
+`tests/SyncLiveSmoke/Program.cs:126,146`, `tests/EngineHarness/Program.cs:2280`), and
+`InboundDispatcher` has **no production construction at all** — `src/Engine/Program.cs:247` is a
+comment describing the seam B-2 is about. **No divergence, and deliberately no code change**: the
+Kotlin's placement is what keeps it agreeing with an engine that does not parse `dir`, so
+"correcting" it to match the prose would be the phone being *more correct than the engine*, which
+the mission's interpretation rule names as a field bug. **The prose is what is imprecise.** Left for
+a session that can gate both repos, since the docstring is shared and a one-word edit to it belongs
+in the same change as the C# one.
+
+### ER-6 One observation opened as a question, and it is diagnosability rather than safety
+
+`receiveWire` applies §3's strict parse **before** the version check. So a v2 sender that both bumps
+`v` **and** adds a top-level field is told **`decrypt_failed`**, never `version_unsupported`, and
+cannot learn the version is the problem. Both halves are pinned by
+`the strict parse runs ahead of the version check…`, which also shows the same envelope **without**
+the extra field is correctly told `version_unsupported`.
+
+`EnvelopeJson`'s docstring argues for this order — *if the sender speaks a dialect this receiver
+does not know, nothing else it says should be interpreted* — and that argument is sound. The cost is
+that it lands on **exactly the upgrade path** §3's rule exists to protect. **Behaviour unchanged**;
+recorded as **PQ-ER-1** with its severity stated plainly, because a question filed as though it were
+a defect is its own kind of drift.
+
+### ER-7 Ladder effect, stated narrowly
+
+**No rung moved, and none was attempted.** S5 is **PARTIAL** exactly as the seventeenth iteration
+left it — spec and vectors done in PR #32, the phone applier done, the **C# applier unwritten** (not
+blocked, merely impossible here), **PQ-A2-3 still blocked by B-6**. S2's B-2 is still the missing
+`/pair` page. S3/S4/S6 are unchanged.
+
+**What this iteration did was make an existing claim checkable**, in the module the eighteenth
+iteration proved reachable. The receiver is the piece both `SyncPump` and the vector suite sit on
+top of, so the order it applies is load-bearing for S4's transport loop and S6's send path alike —
+but **none of that is a rung advancing**, and calling it one would be the failure this file exists
+to prevent.
+
+### ER-8 What was NOT touched
+
+**Android repo:** one file added, `core/src/test/kotlin/app/careerseeker/core/EnvelopeReceiverTest.kt`,
+plus these records. **No production Kotlin changed** — `EnvelopeReceiver.kt` was mutated six times
+and restored six times, and `git diff --stat` against `core/src/main/` is **empty**. No `:app` file,
+no Gradle script, no `gradle/libs.versions.toml`, no CI workflow, no `scripts/` change. **No
+vendored vector byte** — the pin stays `679a317`.
+
+**Main repo (`careerseeker`): nothing but the coordination bus.** No `docs/Sync-Protocol.md`, no
+`relay/` file, **no vector, no `generate.mjs` run that wrote anything**, no `.cs`, no harness, no
+`Verify-Alpha.ps1`, no `$ExpectedOfflineTotal`. The C# files named in ER-5 were **read only**. Draft
+PRs #32–#36 were not touched: not merged, retargeted, rebased or force-pushed.
+
+**Neither gate ran in full and neither could.** `Verify-Alpha.ps1` needs .NET (none here). The
+android gate needs the Android SDK for **three of its four tasks**; the fourth, `:core:test`, ran via
+`scripts/core-probe.sh`. **That is one task, not a gate result**, and `checkCoreIsAndroidFree`,
+`:app:assembleDebug` and `:app:lintDebug` did not run — CI remains the gate for those.
+
+**No merge in either repo**, no force-push, no history rewrite, no branch deleted. **No deploy** of
+any kind (Cloudflare, Workers, relay, site, Pages) and **no `wrangler` invocation`**. **The
+production relay was contacted zero times, not even `GET /v1/health`.** Network egress was the
+Gradle distribution, Maven Central, the Ubuntu archive and the GitHub API. No Google, Play, OAuth or
+Console action; no accounts, no purchases; no Gmail; no cert-store, MSIX or keystore action — the
+upload keystore was neither read nor referenced. **No secrets read, written or printed.**
+
+Terra's state was read at iteration start **and again before writing this**: still **R6(b) BLOCKED**
+on draft PR #26, heartbeat unchanged at **2026-08-07T21:18**, **claims no files** — no collision, and
+this iteration claims no main-repo file at all.
