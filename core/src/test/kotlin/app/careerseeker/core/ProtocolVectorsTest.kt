@@ -13,6 +13,7 @@ import kotlinx.serialization.json.long
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -162,26 +163,27 @@ class ProtocolVectorsTest {
         val valid = envelopeVectors().filter { it["valid"]!!.jsonPrimitive.content == "true" }
             .sortedBy { it["envelope_json"]!!.jsonObject["seq"]!!.jsonPrimitive.long }
         for (v in valid) {
-            val result = receiver.receive(received(v["envelope_json"]!!.jsonObject), ::keyFor)
-            assertTrue(result.accepted, "receiver should accept ${v.str("name")} (got ${result.error})")
+            val error = receiveFromWire(receiver, v["envelope_json"]!!.jsonObject)
+            assertNull(error, "receiver should accept ${v.str("name")} (got $error)")
         }
 
         for (v in envelopeVectors().filter { it["valid"]!!.jsonPrimitive.content == "false" }) {
             val name = v.str("name")
             val expected = v.str("expect_error")
-            val result = if (v["envelope_json"] == null || v["envelope_json"] is kotlinx.serialization.json.JsonNull) {
-                // invalid-oversized ships a synth length rather than a literal megabyte.
+            val error = if (v["envelope_json"] == null || v["envelope_json"] is kotlinx.serialization.json.JsonNull) {
+                // invalid-oversized ships a synth length rather than a literal megabyte. It has
+                // no wire form to parse, so it is handed to the receiver already structured.
                 val synth = v["synth_ciphertext_len"]!!.jsonPrimitive.int
                 receiver.receive(
                     ReceivedEnvelope(1, idx.str("pairing_id"), "e2p", 999L, "2026-06-11T14:02:11Z",
                         idx.str("active_key_id"), Base64Url.encode(ByteArray(Protocol.NONCE_BYTES)),
                         Base64Url.encode(ByteArray(synth)), null),
                     ::keyFor,
-                )
+                ).error
             } else {
-                receiver.receive(received(v["envelope_json"]!!.jsonObject), ::keyFor)
+                receiveFromWire(receiver, v["envelope_json"]!!.jsonObject)
             }
-            assertEquals(expected, result.error?.wire, "$name should reject as $expected")
+            assertEquals(expected, error?.wire, "$name should reject as $expected")
         }
 
         // The rejections above must not have advanced the sequence tracker.
@@ -202,12 +204,23 @@ class ProtocolVectorsTest {
         assertTrue(PayloadKind.RESERVED_FOR_L2.contains("kill"))
     }
 
-    private fun received(env: JsonObject) = ReceivedEnvelope(
-        env["v"]!!.jsonPrimitive.int, env.str("pairing"), env.str("dir"),
-        env["seq"]!!.jsonPrimitive.long, env.str("ts"), env.str("key_id"),
-        env.str("nonce"), env.str("ciphertext"),
-        env["sig"]?.let { if (it is kotlinx.serialization.json.JsonNull) null else it.jsonPrimitive.content },
-    )
+    /**
+     * Delivers a vector the way the relay does: as **wire text**, through [EnvelopeJson].
+     *
+     * This used to build [ReceivedEnvelope] field by field, reading the nine keys §3 defines
+     * and ignoring anything else. That is precisely the permissive parser §3's closing rule
+     * forbids ("Other unknown top-level fields MUST be rejected, not ignored"), so the one
+     * suite that exists to prove the two implementations agree was structurally unable to
+     * fail on the rule — `invalid-unknown-field` was ACCEPTED here while the engine rejected
+     * it. `EnvelopeJson` had enforced the rule since it was written; nothing routed the
+     * vectors through it. Re-serialising `envelope_json` keeps the unknown field, so the
+     * parser sees what a receiver on the network would see.
+     */
+    private fun receiveFromWire(receiver: EnvelopeReceiver, env: JsonObject): ErrorCode? {
+        val parsed = EnvelopeJson.parse(env.toString())
+        val envelope = parsed.envelope ?: return parsed.error
+        return receiver.receive(envelope, ::keyFor).error
+    }
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 }
