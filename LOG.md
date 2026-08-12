@@ -5237,3 +5237,21 @@ and the command that re-checks it can drift independently**, and only running th
 The seventeenth iteration caught the same shape (a `sed` that matched three sites, not one); that
 this recurs suggests it should be a standing step rather than a habit — **run every command you just
 wrote, from the path you told the reader to stand in.**
+
+### ER-10 CI reported green on the final head, and it is the gate for the three tasks this sandbox cannot run
+
+Checked rather than predicted, and **after** the last push rather than assumed from an earlier one:
+run [31553243004](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31553243004)
+(run #97, event `push`), **`head_sha` `a58f7d5` read from the run's own field** and equal to the
+branch tip, `status: completed`, `conclusion: success`, 01:19:53 → 01:28:26 UTC.
+
+**This is the part that matters for every claim above.** The workflow is a single job on
+`ubuntu-latest` with the real SDK and JDK 17, so green covers `checkCoreIsAndroidFree`, the
+vendored-vector drift check against `679a317`, `:core:test`, `:app:test`, `:app:assembleDebug` and
+`:app:lintDebug` — **the three gate tasks `scripts/core-probe.sh` structurally cannot run**, plus
+the only check that this change compiles under the real toolchain rather than the probe's
+substituted one.
+
+**It corroborates green, not the count.** CI prints no totals and I did not count the log's per-case
+`PASSED` lines, so **216** remains the probe's number, corroborated by CI as *green* and not as a
+figure. That distinction is the one C-S6S-12 established and it still holds.
