@@ -1,10 +1,31 @@
 # Shared sync-protocol test vectors, vendored from the public main repo.
 #
 # Source: ShivaClaw/careerseeker  docs/sync-vectors/v1/
-# Pinned commit: 679a3175590dcd021b21c85af9daf12114e131fd
+# Pinned commit: 7328a0bc043335491cd96a67d634e8eea2a13af9
 # Generator:     docs/sync-vectors/generate.mjs (Node, deterministic)
 #
 # These are consumed unmodified by ProtocolVectorsTest. They must stay byte-identical to
 # the main repo -- that identity is what makes cross-repo protocol drift a CI failure
 # rather than a field bug. CI re-fetches this commit's vectors and diffs (see ci.yml).
 # To update: bump the pin, re-vendor, and expect the C# SyncHarness to move in lockstep.
+#
+# ---------------------------------------------------------------------------------------
+# 2026-08-12: pin moved 679a317 -> 7328a0b, and the new pin is NOT on main. Read this.
+#
+# 7328a0b sits on the unmerged draft stack (PR #38 -> #37 -> #32). It was chosen over the
+# branch tip deliberately: it is the last commit that touches docs/sync-vectors/, so later
+# work on that branch cannot move the pin's content, and the SHA stays fetchable for CI's
+# per-file `?ref=` lookup regardless of where the branch head goes next.
+#
+# The pin was already off-main before this change -- 679a317 is not an ancestor of main
+# either -- so this is the same posture, not a new one. What makes it safe to rely on is
+# not the branch: it is that `node docs/sync-vectors/generate.mjs --check` reports
+# "OK: 29 vector files match the generator" at this commit, so the content is anchored to a
+# deterministic generator rather than to a mutable ref. The 26 files that were already
+# vendored are byte-identical across 679a317, origin/main, and 7328a0b -- verified by
+# `diff -r`, not assumed -- so this re-vendor ADDED three files and changed no existing
+# vector byte.
+#
+# ACTION WHEN PR #38's STACK MERGES: re-pin to the merge commit on main and re-run the
+# diff. Nothing breaks if this is forgotten -- CI still verifies against 7328a0b -- but the
+# lock stops describing where the vectors actually live.
