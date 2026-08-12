@@ -1201,3 +1201,84 @@ deliberate choice.
 **Not filed in `BLOCKED.md`:** nothing is blocked.
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-ER-7**.
+
+---
+
+## PQ-B64-1 — Non-canonical base64url trailing bits are accepted, and whether .NET agrees is unmeasured
+
+**Opened 2026-08-12 (crypto-primitive tests, twentieth cloud iteration).** **Severity:
+conformance/interoperability, not safety on today's code paths.** Stated first, because this one
+reads worse than it is and the narrow version is the true one.
+
+**Behaviour, executed rather than read** (`:core:test` via `scripts/core-probe.sh`, tests
+`non-canonical trailing bits are ACCEPTED` and
+`spare bits and therefore spellings are decided by length mod three`):
+
+`Base64Url.decodeOrNull` delegates to `java.util.Base64.getUrlDecoder()`, which **ignores the unused
+low bits of the final character** rather than requiring them to be zero. So several distinct strings
+decode to identical bytes:
+
+| input | decodes to |
+| --- | --- |
+| `QQ` | `0x41` |
+| `QR`, `QV`, `QZ` | `0x41` — same byte, three other spellings |
+
+**How many alternate spellings exist is decided by the field's length mod 3**, measured against the
+JDK directly:
+
+| field | bytes | `len % 3` | spare bits | spellings |
+| --- | --- | --- | --- | --- |
+| `nonce` | 12 | 0 | 0 | **1 — cannot be re-spelled** |
+| key / `secret` | 32 | 2 | 2 | 4 |
+| `engine_pub` (uncompressed P-256) | 65 | 2 | 2 | 4 |
+| `sig` (raw P-256) | 64 | 1 | 4 | 16 |
+
+**This is materially narrower than "base64url fields are malleable", which is what the first draft
+of the test file assumed.** It tried to build a second spelling of a 12-byte nonce; there is none,
+and the draft's own guard assertion is what caught it.
+
+**Why it is not a defect today, each half checked rather than argued:**
+
+- **Not a replay bypass.** `seq` is inside the AAD (`Protocol.kt:143`) and the receiver's replay
+  check is on `seq`, so a re-spelled copy is refused as a duplicate like any byte-wise one.
+- **Not a signature bypass.** `signatureInput` binds the `nonce` **string** — which is immune, per
+  the table — and the ciphertext by the **hash of its decoded bytes** (`PairingDerivation.kt:62-65`).
+  A re-spelled ciphertext therefore signs *identically* and opens identically.
+- **Both encoders only ever emit canonical output.** Nothing in either implementation produces an
+  alternate spelling; reaching this needs a hostile or buggy third writer on the wire.
+
+**The one consequence that survives, stated because it is a real constraint on future code:** an
+envelope's **wire form is not uniquely determined**. Two distinct byte strings can be the same
+envelope. So an envelope must never be de-duplicated, cached, or authenticated by hashing its wire
+bytes — that would see two envelopes where the protocol sees one. Nothing does this today.
+
+**What is genuinely open, and what cannot be settled from a cloud sandbox.** If .NET's decoder
+**refuses** non-canonical trailing bits where the JDK's accepts them, the engine and the phone
+disagree about whether a given envelope is *well-formed*: one opens it, the other answers
+`decrypt_failed`. That is a conformance divergence in `docs/Sync-Protocol.md` §3's terms, and **no
+vector covers it** — the generator emits canonical output, so no existing vector can express the
+question. This iteration had no .NET and did **not** measure the engine side.
+
+**Why nothing was changed.** Tightening the Kotlin to require canonical trailing bits would make the
+phone stricter than an engine whose behaviour is unmeasured — the "more correct than the engine"
+field bug the mission's engine-compatible interpretation rule names. The direction of the divergence
+has to be measured before either side moves.
+
+**Smallest resolution — one command on a machine with .NET, then a decision:**
+
+```csharp
+// Does the engine's decoder accept a non-canonical final character?
+// "QQ" and "QR" both carry the single byte 0x41 under a permissive decoder.
+Console.WriteLine(Convert.ToHexString(Base64Url.DecodeFromChars("QQ")));
+Console.WriteLine(Convert.ToHexString(Base64Url.DecodeFromChars("QR"))); // throws, or 41?
+```
+
+If .NET **throws**, the two implementations already disagree and §3 must say which is normative —
+almost certainly "reject", with the Kotlin tightened and an `invalid-noncanonical-b64u` vector added
+alongside PQ-A2-3's (**both blocked by B-6** for the same reason: the engine has no inbound wire-JSON
+parser to feed a vector through). If .NET **accepts**, the two agree, §3 records the permissive
+reading as deliberate, and this closes as working as intended with the tests above as documentation.
+
+**Not filed in `BLOCKED.md`:** nothing is blocked. The vector half would be, and it is already B-6's.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-CR-5**, **C-CR-6**.

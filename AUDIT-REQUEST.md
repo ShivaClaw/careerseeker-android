@@ -4423,3 +4423,194 @@ git diff --stat a7528c1..HEAD -- core/src/main/ app/ gradle/ .github/ scripts/
 *Expected:* the first lists `core/src/test/.../EnvelopeReceiverTest.kt` plus `LOG.md`, `STATE.md`,
 `AUDIT-REQUEST.md`, `BLOCKED.md`, `docs/protocol-questions.md` — **and nothing else**. The second is
 **empty**: no production Kotlin, no `:app`, no build script, no CI workflow, no script changed.
+
+---
+
+## C-CR — `:core`'s two crypto primitives, tested as subjects (twentieth cloud iteration, 2026-08-12)
+
+Base commit for every command below: **`0182d89`** (branch tip before this slice).
+
+### C-CR-1 — The suite moved 216 → 244, and the 216 is re-measurable
+
+```bash
+cd <android>
+scripts/core-probe.sh --rerun 2>&1 | tail -1
+git stash list >/dev/null; git show 0182d89 --stat | head -3
+```
+
+*Expected:* `core-probe: 244 tests, 0 failed, 0 skipped, across 17 classes`. The prior figure is
+recoverable exactly — remove the two new files and re-run:
+
+```bash
+mkdir -p /tmp/hold && mv core/src/test/kotlin/app/careerseeker/core/crypto/*.kt /tmp/hold/
+scripts/core-probe.sh --rerun 2>&1 | tail -1
+mv /tmp/hold/*.kt core/src/test/kotlin/app/careerseeker/core/crypto/
+```
+
+*Expected:* `core-probe: 216 tests, 0 failed, 0 skipped, across 15 classes` — matching STATE.md's
+nineteenth-run figure, so the delta is exactly **+28** (13 `HkdfTest` + 15 `Base64UrlTest`).
+
+**This is one of the android gate's four tasks, not a gate result.** See C-CR-8.
+
+### C-CR-2 — Before this change, no test named `Hkdf`
+
+```bash
+cd <android>
+git grep -l "Hkdf" 0182d89 -- core/src/test | wc -l
+git grep -l "Hkdf" HEAD   -- core/src/test
+```
+
+*Expected:* **`0`**, then `core/src/test/kotlin/app/careerseeker/core/crypto/HkdfTest.kt`. The
+primitive was exercised indirectly through `PairingDerivation` and the pairing vectors; it was the
+subject of nothing.
+
+### C-CR-3 — Production never leaves HKDF's first block
+
+```bash
+cd <android>
+grep -rn "Hkdf\.deriveKey" core/src/main app/src/main
+```
+
+*Expected:* **five** lines, all in `PairingDerivation.kt` — lines 31, 39, 40, 41 and 49, and no hit
+under `app/src/main` at all. Line 31 passes the literal length `4`; the other four pass
+`Protocol.KEY_BYTES` (on line 49 the argument is on a following line, as a named `length =`).
+
+Grep for the bare word `deriveKey` instead and the count is **six**: the sixth is the declaration in
+`Hkdf.kt` itself, not a call site. The qualified pattern above is the one that answers the claim.
+And: 
+
+```bash
+grep -n "KEY_BYTES" core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+```
+
+*Expected:* `const val KEY_BYTES = 32`. HKDF-SHA256's block is 32, so **every production call
+completes in one iteration of `expand`'s loop**: `counter` is never anything but 1 and `mac.update(t)`
+never sees a non-empty `t`. That is the gap the RFC cases close, and C-CR-7 measures that the prior
+suite could not detect a break in it.
+
+### C-CR-4 — The RFC 5869 expectations were recomputed, not transcribed
+
+```bash
+node -e '
+const c=require("node:crypto"), h=b=>Buffer.from(b).toString("hex");
+console.log("A.1", h(c.hkdfSync("sha256",Buffer.alloc(22,0x0b),
+  Buffer.from("000102030405060708090a0b0c","hex"),
+  Buffer.from("f0f1f2f3f4f5f6f7f8f9","hex"),42)));
+console.log("A.3", h(c.hkdfSync("sha256",Buffer.alloc(22,0x0b),
+  Buffer.alloc(0),Buffer.alloc(0),42)));'
+```
+
+*Expected:* `A.1 3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865`
+and `A.3 8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8` —
+byte-identical to the strings asserted in `HkdfTest.kt`, produced by an implementation that is not
+this program's. (A.2 is omitted here only for line length; it is in the test file.)
+
+**Also the limit of the empty-salt assertion**, measured rather than assumed:
+
+```bash
+node -e '
+const c=require("node:crypto"), h=b=>Buffer.from(b).toString("hex");
+for (const n of [0,1,32,64,65]) console.log(String(n).padStart(2),
+  h(c.hkdfSync("sha256",Buffer.alloc(22,0x0b),Buffer.alloc(n),Buffer.alloc(0),42)).slice(0,32));'
+```
+
+*Expected:* lengths **0, 1, 32 and 64 all print the same prefix**; 65 differs. HMAC zero-pads any
+key shorter than its 64-byte block, so `empty salt equals thirty-two zero bytes` pins RFC 5869 §2.2's
+*contract* and cannot pin the constant `32`. Stated in the test's own docstring.
+
+### C-CR-5 — Non-canonical trailing bits are accepted (PQ-B64-1's core measurement)
+
+```bash
+cd <android>
+scripts/core-probe.sh 2>&1 | grep -E "non-canonical trailing bits|spare bits and therefore"
+```
+
+*Expected:* both `PASSED`. The behaviour is the JDK's, and is reproducible without this repo:
+
+```bash
+cat > /tmp/B.java <<'JAVA'
+import java.util.Base64;
+public class B { public static void main(String[] a){
+  for (String s : new String[]{"QQ","QR","QV","QZ"})
+    System.out.println(s+" -> "+Base64.getUrlDecoder().decode(s)[0]);
+}}
+JAVA
+java /tmp/B.java
+```
+
+*Expected:* all four print `65` (`0x41`) — four spellings, one byte. This is why PQ-B64-1 exists.
+
+### C-CR-6 — Spellings are decided by length mod 3, and the nonce has exactly one
+
+```bash
+cd <android>
+scripts/core-probe.sh 2>&1 | grep "the nonce cannot be re-spelled"
+sed -n '/fun `spare bits and therefore spellings are decided by length mod three`/,/^    }/p' \
+  core/src/test/kotlin/app/careerseeker/core/crypto/Base64UrlTest.kt
+```
+
+*Expected:* `PASSED`, and the body asserts **1** spelling at 12 and 48 bytes, **4** at 32 and 65,
+**16** at 64. The 12-byte `nonce` is therefore immune, which is what makes `signatureInput`'s binding
+of the nonce *string* unambiguous. **The first draft of this file assumed the opposite** and its own
+guard assertion caught it — see LOG §CR-4.
+
+### C-CR-7 — The mutation battery, including the two mutations nothing can catch
+
+Each row: apply, run, revert. `git checkout --` restores the source between rows.
+
+```bash
+cd <android>
+H=core/src/main/kotlin/app/careerseeker/core/crypto/Hkdf.kt
+B=core/src/main/kotlin/app/careerseeker/core/crypto/Base64Url.kt
+
+# M1 -- the headline. Break multi-block chaining, WITHOUT the new tests present.
+sed -i 's/^            counter++$/            \/\/ MUTANT/' $H
+mkdir -p /tmp/hold && mv core/src/test/kotlin/app/careerseeker/core/crypto/*.kt /tmp/hold/
+scripts/core-probe.sh --rerun 2>&1 | tail -1        # -> 216 tests, 0 failed   <== BLIND
+mv /tmp/hold/*.kt core/src/test/kotlin/app/careerseeker/core/crypto/
+scripts/core-probe.sh --rerun 2>&1 | tail -3        # -> 3 failed, all HkdfTest
+git checkout -- $H
+```
+
+*Expected, and this is the measurement the HKDF file exists to make:* with `counter++` deleted the
+**pre-existing 216 tests pass** — the shared pairing vectors included — and the three RFC cases fail.
+
+| mutation | caught by |
+| --- | --- |
+| **M1** `counter++` removed | RFC A.1, A.2, A.3 — **and by nothing in the prior 216** |
+| **M2** `mac.update(t)` removed (chaining) | RFC A.1, A.2, A.3 |
+| **M4** length lower bound `1` → `0` | `length below one is refused` |
+| **M5** length upper bound `255` → `256` blocks | `length above 255 blocks is refused` |
+| **M6** `s.contains('=')` dropped | `padded input is refused` |
+| **M8** `isNullOrEmpty` → `== null` | `null and empty decode to null`, `the empty array does not round trip` |
+| **M3** empty-salt `ByteArray(HASH_LEN)` → `ByteArray(1)` | ***nothing — and nothing can*** |
+| **M7** `s.contains('+') \|\| s.contains('/')` → `false` | ***nothing — and nothing can*** |
+
+**M3 and M7 are semantically equivalent mutations, not test gaps**, and both were checked rather
+than excused. M3: HMAC zero-pads short keys, so every all-zero salt ≤ 64 bytes is the same key
+(C-CR-4's second command). M7: `+` and `/` are outside the URL alphabet, so the JDK decoder throws
+and the `catch` returns null anyway — the explicit guard is defence in depth, and only its `=` half
+does work the decoder does not already do (M6 proves that half is load-bearing).
+
+Note the structural tests do **not** catch M1 or M2: `output at length N is a prefix of N plus one`
+and `maximum length is 255 blocks` both survive, because a stuck counter still chains and still
+produces distinct blocks. **Only the published vectors catch it** — which is the argument for RFC
+cases over self-consistency properties, made by measurement rather than by preference.
+
+### C-CR-8 — What did NOT run, and the blast radius
+
+```bash
+cd <android>
+git diff --name-only 0182d89..HEAD
+git diff --stat  0182d89..HEAD -- core/src/main/ app/ gradle/ .github/ scripts/
+```
+
+*Expected:* the first lists the two new test files plus `LOG.md`, `STATE.md`, `AUDIT-REQUEST.md`,
+`docs/protocol-questions.md` — **and nothing else**. The second is **empty**: no production Kotlin,
+no `:app`, no build script, no CI workflow, no `scripts/` change, and **no vendored vector byte**
+(the pin stays `679a317`).
+
+**Neither gate ran and neither could.** `Verify-Alpha.ps1` needs .NET; there is none here. The
+android gate needs the Android SDK for **three of its four tasks** — `checkCoreIsAndroidFree`,
+`:app:assembleDebug`, `:app:lintDebug` — which **did not run**. The fourth, `:core:test`, ran via
+`scripts/core-probe.sh`. **CI remains the gate**; see the CI row in `STATE.md` for this branch tip.

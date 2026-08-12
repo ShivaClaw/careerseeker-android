@@ -5255,3 +5255,166 @@ substituted one.
 **It corroborates green, not the count.** CI prints no totals and I did not count the log's per-case
 `PASSED` lines, so **216** remains the probe's number, corroborated by CI as *green* and not as a
 figure. That distinction is the one C-S6S-12 established and it still holds.
+
+---
+
+## CR — `:core`'s two crypto primitives had no tests of their own (2026-08-12, twentieth cloud iteration)
+
+**Rung: none moved, and none was attempted.** This is the second consecutive iteration to answer the
+standing question the eighteenth run replaced "which spec paragraph can I verify?" with — *which
+`:core` behaviour is unwritten, untested, or asserted only by reading?* — and the answer this time
+was the bottom of the stack.
+
+**A correction to the iteration prompt, for the third consecutive run**, made after the mandatory
+fetch and recorded because the recurrence is now the finding. The prompt again described **S5** as
+"NOT STARTED and genuinely NOT blocked" and named it the strongest candidate, listing four
+sub-tasks. Three have been done since 2026-08-09 on `origin/claude/s5-entitlement-ack-spec`
+(draft **PR #32**, four commits, §4.3.3 plus both `entitlement_ack` vectors, closing PQ-A6-1,
+PQ-A2-1 and PQ-A2-2); the fourth, PQ-A2-3's `invalid-unknown-field` vector, is **blocked by B-6**,
+whose entry exists precisely to stop a session adding it. The seventeenth and nineteenth runs each
+recorded this. **The tree outranks the prompt, including on what is already done** — and the
+prompt's own escape clause is what this iteration took.
+
+### CR-1 The gap, measured rather than guessed
+
+`core/src/main/.../crypto/` holds three files. `core/src/test/.../crypto/` **did not exist**.
+
+```
+git grep -l "Hkdf" 0182d89 -- core/src/test   ->   0 files
+```
+
+`Base64Url` was better off only in appearance: **seven** test files call it, none asserts anything
+about it. `SyncCrypto` is genuinely exercised by six. So the gap was two primitives — the ones every
+key and every wire field passes through — and `Hkdf` was named by nothing at all. Re-verify: C-CR-2.
+
+### CR-2 Why "named by no test" understated it
+
+`Hkdf` is not unexercised: `PairingDerivation` calls it five times and the shared pairing vectors
+prove those outputs byte-for-byte against the engine. The real gap is narrower and worse:
+
+**Every production call asks for 4 or 32 bytes, and HKDF-SHA256's block is 32.** So `expand`'s
+`while (pos < length)` loop had only ever run **once**, `counter` had never been anything but **1**,
+and `mac.update(t)` had never been fed a non-empty `t`. The chaining that makes HKDF an extendable
+KDF — the part that is easy to get wrong and impossible to notice — was unreached by the product
+**and** by the suite. Re-verify: C-CR-3.
+
+### CR-3 RFC 5869 rather than more generated vectors, and the reason is not style
+
+The pairing vectors come from `docs/sync-vectors/generate.mjs`. They prove **Node ≡ Kotlin ≡ .NET**
+at the lengths the product happens to use. They cannot prove any of the three is *RFC-correct*, and
+they cannot reach a second block at all. Appendix A's SHA-256 cases are published, independent of
+this program, and **A.1 (L=42) needs two blocks, A.2 (L=82) needs three**.
+
+The expected values were **recomputed with `node:crypto` before being written down** rather than
+transcribed from the RFC — the seventeenth run's lesson that a transcribed measurement is not a
+measurement. Re-verify: C-CR-4.
+
+### CR-4 The Base64Url finding, and the draft of it that was wrong
+
+The docstring makes a protocol claim — refusing alternate spellings is what lets the vectors "pin
+one encoding" so Kotlin and C# cannot "disagree about what an envelope even says". Measured, two of
+three spelling axes are closed (padding, standard alphabet). The third is open: the JDK's URL
+decoder **ignores the final character's unused bits**, so `QQ`, `QR`, `QV` and `QZ` all decode to
+`0x41`.
+
+**The first draft of the test asserted this against the nonce, and was wrong.** It tried to build a
+second spelling of a 12-byte nonce; there is none. Spare bits exist only when the byte length is
+**not a multiple of 3** — the nonce (12) has exactly **one** spelling, a 32-byte key has 4, a
+64-byte signature has 16. **The draft's own guard assertion (`test built no second spelling`) is
+what caught it**, on the first run, before anything was recorded. That is the whole argument for
+writing a guard into a test whose construction you believe.
+
+What survives is narrower and true: a re-spelled **ciphertext** both opens and signs identically,
+because `signatureInput` binds the nonce *string* (immune) and the ciphertext by the **hash of its
+decoded bytes**. Not a replay bypass — `seq` is in the AAD. The one live constraint: **an envelope's
+wire form is not unique**, so it must never be de-duplicated or authenticated by hashing its wire
+bytes. Nothing does. Opened as **PQ-B64-1** for the half that cannot be settled here — whether .NET's
+decoder agrees, which decides a §3 conformance question and which no vector can express.
+Re-verify: C-CR-5, C-CR-6.
+
+### CR-5 The mutation battery, and the two mutations that cannot be caught
+
+Eight mutations, each applied, run and reverted; `git diff --stat -- core/src/main/` is **empty**
+afterwards. The headline is M1 — delete `counter++`, so every block after the first is wrong:
+
+| | result |
+| --- | --- |
+| M1 with the two new files **removed** | **216 tests, 0 failed** — the prior suite is **blind** |
+| M1 with them **present** | **3 failed**, all `HkdfTest`, all three RFC cases |
+
+M2 (chaining removed) behaves identically. M4/M5 (bounds) and M6/M8 (base64) are each caught by
+their named test.
+
+**Two mutations were caught by nothing, and both are semantically equivalent changes rather than
+test gaps** — checked, not excused. **M3**: replacing the empty-salt substitution `ByteArray(32)`
+with `ByteArray(1)` changes no behaviour, because HMAC zero-pads any key shorter than its 64-byte
+block; verified against `node:crypto`, where salts of 0, 1, 32 and 64 zero bytes all agree and 65
+diverges. **M7**: deleting the `'+'`/`'/'` guard changes nothing a test can see, because those
+characters are outside the URL alphabet and the JDK decoder throws anyway — so only the `'='` half
+of that guard is load-bearing, which M6 proves. Both are now stated in the tests' own docstrings, so
+neither reads as stronger than it is.
+
+**A result worth keeping that runs against my own instinct:** the two *structural* tests I wrote —
+`output at length N is a prefix of N plus one` and `maximum length is 255 blocks` — **do not catch
+M1 or M2**. A stuck counter still chains and still produces distinct blocks. Only the published
+vectors catch it. The argument for RFC cases over self-consistency properties is therefore a
+measurement here, not a preference. Re-verify: C-CR-7.
+
+### CR-6 One of my own audit commands did not reproduce its stated output
+
+The nineteenth run found two and proposed making the re-run a standing step rather than a habit.
+Done as a standing step this time, and it caught one: **C-CR-3 claimed "five call sites" while its
+command printed six.** The sixth is `Hkdf.kt`'s own `fun deriveKey` declaration. Corrected to the
+qualified pattern `Hkdf\.deriveKey`, which returns exactly five, with the six-line result explained
+in place rather than overwritten. Small, and the same shape as the seventeenth run's `sed` and the
+nineteenth's `C-ER-3`: **a claim and the command that re-checks it drift independently, and only
+running the command finds it.**
+
+### CR-7 Ladder effect, stated narrowly
+
+**No rung moved.** S5 is **PARTIAL** exactly as the seventeenth and nineteenth runs left it — spec
+and vectors in PR #32, phone applier done, **C# applier unwritten** (not blocked, merely impossible
+here), **PQ-A2-3 still blocked by B-6**. S2's B-2 is still the missing desktop `/pair` page. S3, S4,
+S6, S7, S8 are unchanged. `:core` suite **216 → 244** across **15 → 17** classes.
+
+What this iteration did is make two previously-unasserted claims checkable, at the bottom of the
+dependency stack: every envelope key comes out of `Hkdf`, and every wire field goes through
+`Base64Url`. **That is not a rung advancing, and calling it one would be the failure this file
+exists to prevent.**
+
+### CR-8 What was NOT touched
+
+**Android repo:** two files added, `core/src/test/.../crypto/HkdfTest.kt` and
+`core/src/test/.../crypto/Base64UrlTest.kt`, plus these records and `docs/protocol-questions.md`.
+**No production Kotlin changed** — `Hkdf.kt` and `Base64Url.kt` were mutated eight times and
+restored eight times, and `git diff --stat 0182d89..HEAD -- core/src/main/` is **empty**. No `:app`
+file, no Gradle script, no `gradle/libs.versions.toml`, no CI workflow, no `scripts/` change. **No
+vendored vector byte** — the pin stays `679a317`.
+
+**Main repo (`careerseeker`): nothing but the coordination bus.** No `docs/Sync-Protocol.md`, no
+`relay/` file, no vector, no `generate.mjs` run that wrote anything, no `.cs`, no harness, no
+`Verify-Alpha.ps1`, no `$ExpectedOfflineTotal`. Draft PRs #32–#36 were not touched: not merged,
+retargeted, rebased or force-pushed. **The offline pin stays 598 and could not have moved** — this
+iteration wrote no main-repo file other than the bus.
+
+**One machine change, logged as the mission requires:** `apt-get install openjdk-17-jdk-headless`.
+`:core` pins `jvmToolchain(17)`, the sandbox shipped only JDK 21, and `api.foojay.io` is denied by
+the same egress policy as `dl.google.com` (B-7), so Gradle cannot auto-provision. `core-probe.sh`'s
+header already prescribed this exact command.
+
+**Neither gate ran and neither could.** `Verify-Alpha.ps1` needs .NET (none here). The android gate
+needs the Android SDK for **three of its four tasks** — `checkCoreIsAndroidFree`,
+`:app:assembleDebug`, `:app:lintDebug` — none of which ran. The fourth, `:core:test`, ran via
+`scripts/core-probe.sh`: **244 tests, 0 failed, 0 skipped, across 17 classes.** **That is one task,
+not a gate result**, and CI remains the gate for the rest.
+
+**No merge in either repo**, no force-push, no history rewrite, no branch deleted. **No deploy** of
+any kind (Cloudflare, Workers, relay, site, Pages) and **no `wrangler` invocation**. **The production
+relay was contacted zero times, not even `GET /v1/health`.** Network egress was the Gradle
+distribution, Maven Central, the Ubuntu archive and the GitHub API. No Google, Play, OAuth or Console
+action; no accounts, no purchases; no Gmail; no cert-store, MSIX or keystore action — the upload
+keystore was neither read nor referenced. **No secrets read, written or printed.**
+
+Terra's state was read at iteration start: still **R6(b) BLOCKED** on draft PR #26, heartbeat
+unchanged at **2026-08-07T21:18**, **claims no files** — no collision, and this iteration claims no
+main-repo file at all.
