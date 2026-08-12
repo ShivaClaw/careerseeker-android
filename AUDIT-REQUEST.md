@@ -5112,3 +5112,24 @@ denied); the second needs PowerShell, which is absent and **not in the Ubuntu ar
 even be parse-checked. `:core:test` was **not** run this iteration either, and did not need to be:
 nothing in `:core` changed. **CI on `windows-latest` is the gate for the 610 pin and for every
 claim in this section that depends on it.**
+
+### C-WP-13 — CI ran the gate and confirmed the pin (added after the entry above was written)
+
+```bash
+gh run view 31600630766 --repo ShivaClaw/careerseeker
+gh run view 31600630766 --repo ShivaClaw/careerseeker --log \
+  | grep -E "invalid-unknown-field|Offline total|142 passed"
+```
+
+*Expected:* both jobs **success**, and the log contains
+`PASS  invalid-unknown-field -> decrypt_failed`, `=== 142 passed, 0 failed ===` and
+**`=== Offline total: 610 passed, 0 failed ===`**.
+
+This is the evidence **C-WP-10 could not produce in-session**. `Verify-Alpha.ps1` throws on a pin
+mismatch, so a green run *is* the pin check — which also settles `EngineHarness = 217`
+(610 − the 393 measured locally), the one number quoted rather than measured. The relay job's
+*"Assert sync vectors match their generator"* step passing is the independent confirmation of
+**C-WP-6**.
+
+**This does not retire C-WP-12.** `Verify-Alpha.ps1` still cannot run in a cloud sandbox; the gate
+ran on `windows-latest`, as it always must.

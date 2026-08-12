@@ -5901,3 +5901,37 @@ three SDK-dependent tasks are still blocked, and `:core:test` was not exercised 
 full C# solution build and nine of ten offline harnesses. **CI is still the gate**, and citing this
 entry as "the engine gate passed" would be the exact failure these records exist to prevent.
 Re-verify: **C-WP-1…12**.
+
+### WP-9 (added same day) — CI ran the gate I could not, and it is GREEN
+
+Recorded because the rest of this entry was written **before** the gate could answer, and leaving
+it at "unverified" would now understate the evidence.
+
+Run **`31600630766`** on draft PR **#37**, both jobs **success**:
+
+| job | result |
+| --- | --- |
+| **Build and offline harnesses** (`windows-latest`, runs `./scripts/Verify-Alpha.ps1`) | **success** |
+| **Blind relay (Worker)** — includes *"Assert sync vectors match their generator"* | **success** |
+
+From the job log, verbatim:
+
+```
+  PASS  invalid-unknown-field -> decrypt_failed
+=== 142 passed, 0 failed ===                        (SyncHarness)
+=== Offline total: 610 passed, 0 failed ===
+CareerSeeker alpha verification complete.
+```
+
+**Three claims move from corroborated to confirmed.** (1) The **610 pin is right** — the verifier's
+own drift check (`throw` on mismatch) passed, so the measured sum equals the pinned value. (2)
+**`EngineHarness` really is 217**: I measured 393 across nine harnesses and quoted 217 from a
+comment; 610 − 393 = 217 is now measured on Windows, so the one number I could not check was
+correct. (3) **The drift sweep is complete** — every `Assert-Contains` literal I edited matched its
+doc, which is what the string check in this session could only suggest.
+
+**What this does NOT change.** `Verify-Alpha.ps1` still **did not run in this session** — every
+"did not run" statement above stands as written about the sandbox, and the standing limit is
+unchanged for the next cloud iteration. What changed is that the gate has now spoken, and it agreed.
+**The PR remains a DRAFT and was not merged**: the merge policy requires a *local* full gate, which
+is a different condition from CI being green, and it is still out of reach here.
