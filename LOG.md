@@ -5418,3 +5418,72 @@ keystore was neither read nor referenced. **No secrets read, written or printed.
 Terra's state was read at iteration start: still **R6(b) BLOCKED** on draft PR #26, heartbeat
 unchanged at **2026-08-07T21:18**, **claims no files** — no collision, and this iteration claims no
 main-repo file at all.
+
+### CR-9 CI reported, and the first attempt was red — on a commit that changed no code
+
+Checked rather than predicted, and the result needed a second measurement before it meant anything.
+
+Run [31566551075](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31566551075) on
+**`head_sha` `d8ae5da`**, read from the run's own field and equal to the branch tip:
+
+| attempt | conclusion | ended |
+| --- | --- | --- |
+| **1** | **`failure`** | 05:31:54 UTC |
+| **2** (re-run, **identical commit, no push between**) | **`success`** | 05:42:06 UTC |
+
+Attempt 1's only failure:
+
+```
+ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab FAILED
+    java.lang.AssertionError at ScreensFromFixtureTest.kt:69
+35 tests completed, 1 failed, 3 skipped
+```
+
+**That test is in `:app`, and this iteration touched no `:app` file.**
+`git diff --stat 0182d89..HEAD -- app/ core/src/main/` is **empty** — the branch added two `:core`
+*test* files and Markdown. `:core` test sources are not on `:app`'s compile or runtime classpath, so
+there is no mechanism by which this change could reach a Compose UI test. The parent commit
+`0182d89` had passed the same job 4 hours earlier (run `31553856359`).
+
+**Attempt 2 is the controlled experiment that settles it:** same tree, same SHA, no intervening
+push, opposite outcome. **The test is nondeterministic.** Attempt 2 went green on all thirteen
+steps, including the three the probe structurally cannot run — *Assert :core has no Android
+dependency*, *Assemble debug APK*, *Lint* — plus the vendored-vector drift check against `679a317`
+and *Assert no analytics or tracking SDKs ship*.
+
+**The diagnosis is narrow and is a reading, not a run** (no Android SDK here — B-7). Line 69 is the
+**first** assertion, immediately after `setContent` and **before any tab is clicked**:
+
+```kotlin
+compose.setContent { DashboardApp(db) }
+val label = "Demo data — not a live engine"
+
+compose.onNodeWithText(label).assertIsDisplayed()   // <- line 69
+```
+
+So the failure is **initial composition not having settled**, not the navigation loop the test was
+written to walk. The same job log carries the matching deprecation warning against
+`createComposeRule`: *"The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher…
+Tests relying on immediate execution may require explicit synchronization."* That is exactly this
+shape of failure, and the test relies on immediate execution.
+
+### CR-10 Why a flaky test in this program is worth more than a shrug
+
+**CI is the gate.** Nine iterations of records — including every claim in this entry — end with
+"the probe runs one of the gate's four tasks; CI is the gate for the rest." A gate that fails
+~1 run in N on a timing race weakens every one of those sentences, and it fails in the most
+expensive way: **a future session sees red on a commit that is fine, and either misattributes it to
+its own slice or spends its iteration on a phantom.** The eighteenth iteration lost most of a run to
+an inherited belief; this is the same cost with a different cause.
+
+**Not fixed here, and the reason is B-7 rather than judgement.** The repair is in `:app` — either
+`compose.waitForIdle()`/`waitUntil` before the first assertion, or migrating to the v2
+`createComposeRule` the warning names. Neither can be compiled, run or gated in this sandbox, and
+shipping an `:app` edit whose only verification is CI-roulette is precisely what these records
+exist to prevent. **Recorded in `BLOCKED.md` as a standing gate hazard with the smallest human
+unblock**, not as a blocker on this slice — nothing here was blocked.
+
+**Also recorded because it will mislead someone otherwise:** run **#99** (`49bbe25`, the code head)
+shows `cancelled`. It was superseded by the records-only push that produced `d8ae5da`; it did not
+fail. Since `d8ae5da` differs from `49bbe25` only in `BLOCKED.md`, **attempt 2's green covers this
+slice's code in full.**

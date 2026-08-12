@@ -1008,3 +1008,51 @@ fault nobody has established exists.
 mutations (M3, M7) were caught by no test. **Neither is a coverage gap** — both are semantically
 equivalent changes, checked rather than assumed (HMAC zero-pads short keys; `+` and `/` are already
 outside the JDK's URL alphabet). Recording them as gaps would have put a phantom in these records.
+
+---
+
+## Standing gate hazard (new 2026-08-12, twentieth iteration) — `ScreensFromFixtureTest` is flaky, and CI is the gate
+
+**Not a blocker on any slice.** Nothing was obstructed. Filed because it will cost a future session
+an iteration if it is not written down.
+
+**Symptom.** `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab` fails intermittently in
+CI with `java.lang.AssertionError at ScreensFromFixtureTest.kt:69`. Measured on run
+[31566551075](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31566551075):
+**attempt 1 `failure`, attempt 2 `success`, identical `head_sha` `d8ae5da`, no push between them.**
+The parent commit passed the same job hours earlier.
+
+**Why it matters more here than in an ordinary repo.** Every record in this program ends with
+"the probe runs one of the gate's four tasks; **CI is the gate** for the rest". A gate that goes red
+on a good commit means a session either misattributes the red to its own slice or burns its
+iteration chasing a phantom — and the records are explicit that calling something BLOCKED when
+nothing blocks it is the failure mode to avoid.
+
+**Attempts.** One re-run, which passed. **Bounded there deliberately** rather than re-running until
+a pattern emerged: repeated re-runs would measure a frequency I cannot act on, and `:app` cannot be
+built here at all.
+
+**Diagnosis — a reading, not a reproduction (B-7: no Android SDK in a cloud sandbox).** Line 69 is
+the **first** assertion, immediately after `compose.setContent { DashboardApp(db) }` and **before
+any tab click**, so this is initial composition not having settled rather than the navigation loop
+the test exists to walk. The same job log warns that `createComposeRule` is deprecated in favour of
+`androidx.compose.ui.test.junit4.v2.createComposeRule`, whose note reads: *"The v2 APIs use
+StandardTestDispatcher instead of UnconfinedTestDispatcher… Tests relying on immediate execution may
+require explicit synchronization."* This test relies on immediate execution.
+
+**Smallest human unblock — one of two, on a machine with the Android SDK:**
+
+1. Insert `compose.waitForIdle()` (or `compose.waitUntil { … }` on the banner node) between
+   `setContent` and the first assertion at line 69. Smallest possible change; leaves the deprecated
+   rule in place.
+2. Migrate the rule to `androidx.compose.ui.test.junit4.v2.createComposeRule`, which the warning
+   names and which changes the dispatcher to `StandardTestDispatcher`. Larger, and it may require
+   the same explicit synchronization anyway — **the warning says so**, so (1) is likely needed
+   regardless and is the better first move.
+
+Verify with `./gradlew --no-daemon :app:testDebugUnitTest --rerun-tasks` repeated several times, and
+by re-reading this entry's attempt-1/attempt-2 evidence before declaring it fixed.
+
+**Deliberately not attempted here.** The repair is an `:app` edit, `:app` cannot be compiled, run or
+gated in this sandbox, and shipping an `:app` change whose only verification is another CI roll is
+exactly what these records exist to prevent.

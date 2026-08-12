@@ -4614,3 +4614,57 @@ no `:app`, no build script, no CI workflow, no `scripts/` change, and **no vendo
 android gate needs the Android SDK for **three of its four tasks** — `checkCoreIsAndroidFree`,
 `:app:assembleDebug`, `:app:lintDebug` — which **did not run**. The fourth, `:core:test`, ran via
 `scripts/core-probe.sh`. **CI remains the gate**; see the CI row in `STATE.md` for this branch tip.
+
+### C-CR-9 — CI's two attempts on one commit, and the flake they establish
+
+```bash
+# Both attempts of the same run, on the same head. No push happened between them.
+# (any GitHub API client; the run is public to the repo's collaborators)
+#   GET /repos/ShivaClaw/careerseeker-android/actions/runs/31566551075/attempts/1
+#   GET /repos/ShivaClaw/careerseeker-android/actions/runs/31566551075/attempts/2
+```
+
+*Expected:* both report `head_sha` `d8ae5da8b33bf6f23008753186ad1beccd97f3a7`; attempt **1** is
+`conclusion: failure`, attempt **2** is `conclusion: success`. Attempt 1's job log contains
+`ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab FAILED` and
+`35 tests completed, 1 failed, 3 skipped`; attempt 2 has all thirteen steps `success`.
+
+**Same tree, opposite outcomes, nothing pushed in between — that pair is the whole claim.**
+
+And the blast-radius check that rules this slice out as the cause:
+
+```bash
+cd <android>
+git diff --stat 0182d89..HEAD -- app/ core/src/main/
+```
+
+*Expected:* **empty**. No `:app` file and no production Kotlin changed, and `:core` *test* sources
+are not on `:app`'s classpath — so no mechanism connects this branch to a Compose UI test. The
+parent `0182d89` passed the same job at run `31553856359`.
+
+**Note `49bbe25` (run #99) shows `cancelled`, not failed** — superseded by the records-only push
+that produced `d8ae5da`. The two commits differ only in `BLOCKED.md`, so attempt 2's green covers
+this slice's code in full.
+
+### C-CR-10 — The flake's location, which is a reading rather than a run
+
+```bash
+cd <android>
+sed -n '66,72p' app/src/test/kotlin/app/careerseeker/dashboard/ui/ScreensFromFixtureTest.kt
+```
+
+*Expected:* line **69** is `compose.onNodeWithText(label).assertIsDisplayed()` — the **first**
+assertion, immediately after `setContent` and **before any `performClick`**. So the failure is
+initial composition not having settled, **not** the tab-navigation loop the test walks.
+
+Corroborating, from attempt 1's own log:
+
+```bash
+# grep the job log for the deprecation warning carried in the same run
+#   'fun createComposeRule(...)' is deprecated. Use androidx.compose.ui.test.junit4.v2.createComposeRule
+#   ... "Tests relying on immediate execution may require explicit synchronization."
+```
+
+*Expected:* present. **`:app` cannot be built or run in a cloud sandbox (B-7)**, so this diagnosis
+is explicitly a reading of the failing line plus the run's own warning — **not** a reproduction. The
+repair is named in `BLOCKED.md`; it was deliberately not attempted here.
