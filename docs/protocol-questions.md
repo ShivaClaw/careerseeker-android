@@ -1282,3 +1282,132 @@ reading as deliberate, and this closes as working as intended with the tests abo
 **Not filed in `BLOCKED.md`:** nothing is blocked. The vector half would be, and it is already B-6's.
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-CR-5**, **C-CR-6**.
+
+---
+
+## PQ-AAD-1 — The AAD is not an injective encoding of the header, in two independent ways
+
+**Raised:** 2026-08-12, twenty-first cloud iteration, while writing `SyncCryptoTest`.
+**Severity:** latent. Neither half is reachable from a conforming sender today, and the tests
+that pin them say so at their own sites. Filed because the AAD's *whole job* is to bind the
+header, and both halves rest on validation that `EnvelopeJson` does not perform.
+
+**Where.** `EnvelopeHeader.aad()` (`core/…/Protocol.kt:143-144`) builds
+
+```
+v=$v|pairing=$pairing|dir=${dir.wire}|seq=$seq|ts=$ts|key_id=$keyId
+```
+
+and `SyncCrypto.gcm()` (`core/…/crypto/SyncCrypto.kt:53`) feeds it to GCM as
+`aad.toByteArray(Charsets.US_ASCII)`. The engine builds the same string in `src/Sync/`
+(ShivaClaw/careerseeker); its charset is **unmeasured** — no .NET in a cloud sandbox.
+
+`EnvelopeJson.parse` regex-checks `pairing` and type-checks `v`/`seq`/`dir`, but takes **`ts`
+and `key_id` as arbitrary JSON strings with no charset or content check at all**
+(`EnvelopeJson.kt:55-56`). They are also the last two fields of the AAD, and adjacent.
+
+**Half 1 — `US_ASCII` is lossy, so the AAD does not bind non-ASCII content.** Java's encoder
+replaces every unmappable character with `?` (0x3F). Measured: `é`, `è`, `Ж` and `😀` all
+become the *single* byte 0x3F, so they collide with each other and with a literal `?` (a
+surrogate pair collapses to one byte, not two). An envelope sealed under `ts=…Zé` opens under
+`ts=…Zè`, `ts=…Z😀` and `ts=…Z?`. §5.4's signature input is encoded the same way, so command
+signatures inherit it.
+
+**Half 2 — the `|`/`=` framing is ambiguous, with no non-ASCII needed.** Content can move
+across the `|key_id=` boundary without changing a byte:
+
+```
+ts = "T"           key_id = "K|key_id=Z"   ->  …|ts=T|key_id=K|key_id=Z
+ts = "T|key_id=K"  key_id = "Z"            ->  …|ts=T|key_id=K|key_id=Z
+```
+
+Two distinct header tuples, one AAD, and each opens the other's envelope.
+
+**Why neither is a live bypass, checked rather than waved through.** A header rewrite only
+survives authentication if the *original* bytes and the rewritten bytes agree after encoding.
+Conforming senders emit RFC 3339 timestamps and generated key ids — pure ASCII, no delimiters
+— so every mutation of a real envelope changes a byte and fails the tag. The collision classes
+are reachable only if the genuine sender put a non-ASCII character or a `|`/`=` into `ts` or
+`key_id` to begin with, which neither implementation does. Half 2 is self-limiting a second
+way: `key_id` selects the decryption key *before* the AAD is built, so a rewritten form must
+still name a key the receiver holds.
+
+**What is genuinely open, and it is the cross-implementation half.** If `src/Sync/` builds its
+AAD with **UTF-8** rather than ASCII, the two sides agree on every all-ASCII header and
+disagree on every other one — each computing different AAD bytes for the same envelope and
+each answering `decrypt_failed` on the other's traffic. Identical in shape to **PQ-B64-1**.
+
+**No vector can express this, and the vector set shows why it was missed.** 26 vendored
+vectors, 23 with an `aad` field, and **zero** carry a non-ASCII byte in the AAD. The one
+vector that does carry non-ASCII — `heartbeat-unicode.json`, whose note says it "catches
+implementations that treat UTF-8 as Latin-1 or mangle surrogate pairs" — puts it in the
+**plaintext**, and its AAD is plain ASCII. The suite deliberately tests the body's charset and
+has never tested the header's.
+
+**Why nothing was changed.** Tightening the Kotlin — validating `ts`/`key_id`, or switching to
+UTF-8 — would make the phone stricter than an engine whose behaviour is unmeasured, the
+"more correct than the engine" field bug the mission's interpretation rule names. Either fix
+must be symmetric and land with the spec.
+
+**Smallest resolution — read one line of C# on a machine with .NET, then decide:**
+
+```
+grep -rn "ASCII\|UTF8\|GetBytes" src/Sync/EnvelopeReceiver.cs src/Sync/SyncPublisher.cs
+```
+
+If the engine uses UTF-8 and the phone ASCII, that is a live conformance divergence and §3
+must name one normative. If both use ASCII they agree today, and the remaining work is §3
+constraining `ts` and `key_id` to a delimiter-free ASCII subset, so the AAD is injective by
+construction rather than by the accident of what senders happen to emit.
+
+**Not filed in `BLOCKED.md`:** nothing is blocked. The measurement is one grep.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-SC-2**, **C-SC-5**, **C-SC-6**.
+
+---
+
+## PQ-SC-1 — `:core`'s crypto is tested only on `SunEC`, and three of its defences are unobservable there
+
+**Raised:** 2026-08-12, twenty-first cloud iteration, out of `SyncCryptoTest`'s mutation run
+rather than out of its plan.
+**Severity:** a bound on the evidence, not a defect. Nothing is known to be wrong.
+
+**The measurement.** Eight mutations were applied to `SyncCrypto.kt` and reverted. Four were
+caught. **M6** survived because it is semantically redundant (the explicit 64-byte gate
+duplicates an `IndexOutOfBoundsException` the `try` already converts to `false`) — not a gap.
+The other three survived for one shared reason:
+
+| Mutation | What it deletes | Why no test on this JVM can see it |
+| --- | --- | --- |
+| **M2** | the `0x00` positive pad in `toDerInteger` | `SunEC` **accepts** an unpadded negative DER INTEGER (while rejecting the non-minimal encoding M1 produces) |
+| **M7** | `leftPad` on the ECDH secret | `SunEC`'s `generateSecret()` returns a **fixed-width 32-byte** array even when the X coordinate's top byte is zero, so the pad never fires |
+| **M8** | the `catch` in `verifySignature`, rethrowing instead | `SunEC`'s `KeyFactory.generatePublic` returns normally for an off-curve point **and** for coordinates above the field prime; invalidity surfaces as `verify() == false`, never as an exception |
+
+**The gap.** `:core` is a pure-JVM module, so `:core:test` runs on the JDK's `SunEC` — here,
+and on `windows-latest` in CI. The phone runs on Android, where the provider is **Conscrypt**.
+These three lines are precisely the ones that matter when a provider behaves differently from
+`SunEC`, and they are the three no JVM test can exercise. `:core:test` green is therefore not
+evidence about the codec's behaviour on a device, and this is the first record to say so.
+
+**Why this is not alarmism.** All three are *defensive*: the pad and left-pad make the encoding
+conform to DER/§5.2 regardless of provider, and the catch converts provider exceptions into the
+`false` that §7.2 expects. They are insurance against a stricter provider, and the fact that
+they cannot be observed on `SunEC` is the reason they should stay rather than a reason to
+delete them as dead code. **The risk is deleting them, not keeping them** — and this entry
+exists so that a future session running a coverage tool does not read them as unreachable.
+
+**Where it would bite, worst case.** If Conscrypt returned the BigInteger-minimal ECDH secret,
+`leftPad` is the only thing stopping a 31-byte IKM reaching HKDF — a *different* IKM, so the
+two ends would derive different directional keys for roughly **1 pairing in 256**: far too
+rare to find by hand, far too common never to happen in the field.
+
+**Smallest resolution — needs a device or emulator, which B-4/B-7 put out of reach here:**
+run the three assertions as an instrumented (`androidTest`) case on a real Android runtime and
+compare against the JVM results recorded above. That is the only way to learn whether
+Conscrypt agrees, and it is the same lane the emulator work already needs.
+
+**Not filed in `BLOCKED.md`:** nothing this iteration attempted was obstructed, and no rung
+depends on the answer. Filing it as a blocker would send the next session hunting a fault
+nobody has established exists.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-SC-7**, **C-SC-8**.
