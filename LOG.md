@@ -7446,3 +7446,16 @@ printed or referenced.** `Documents\CareerSeeker` and Terra's worktrees were nev
 `apt-get update && apt-get install -y dotnet-sdk-8.0` — note the `update`, without which the archive
 serves a 404 on the SDK package (measured again this run: the first install attempt failed exactly
 that way).
+
+**Addendum — the android CI on this records-only push, and why its red was not a break.** Run
+[31745067571](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31745067571) on
+`ffd7970` failed **attempt 1** at step 9, `Unit tests (:app, Robolectric)`, with the signature
+already recorded in `BLOCKED.md`: `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab`,
+`AssertionError at ScreensFromFixtureTest.kt:69`, `35 tests completed, 1 failed, 3 skipped`. Steps
+10–13 were **skipped, not passed**. **Attempt 2 on the identical tree passed all thirteen steps**
+(21:32:15 → 21:39:51), including the step that had failed — so the flake is **proven flaky, not
+assumed to be**. `git diff --stat c9842c1..ffd7970 -- app/ core/` is **empty**: this push changed
+three Markdown files and no source, so it could not have caused the failure. The vendored-vector
+step passed in real CI, independently confirming the `7328a0b` pin held and **no vector byte moved
+this iteration**. Re-running failed jobs is the remedy the twenty-fourth run recorded for this exact
+signature; it is neither a merge nor a deploy, and no embargo covers it.
