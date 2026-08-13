@@ -1346,3 +1346,36 @@ because it was blocked.
 session — `which pwsh` is empty and `apt-cache policy powershell` offers no candidate, so the
 `apt-get` route that closed B-6 does not repeat here. **CI on `windows-latest` remains the gate for
 the offline pin (now 641).**
+
+---
+
+### B-2 status 2026-08-13 — the `/pair` page exists; the phone-facing half does not
+
+The page landed: draft PR [careerseeker#42](https://github.com/ShivaClaw/careerseeker/pull/42),
+`GET /pair` plus begin/complete/unpair controls, gated exactly like every other mutating control
+(Host/Origin shape + control token). `Program.cs` holds the `PairingManager` across the two requests,
+bootstraps the relay channel, takes the completion and writes `SyncPairing` to the vault — so the
+vault the publisher has needed since PR #31 now has a way to be filled from the product rather than
+from a harness. Full local gate green, **609 passed, 0 failed** (EngineHarness 217 → 228).
+
+**One of the eleven new assertions found a real defect on its first run.** The confirmation code was
+rendered only on the pre-completion screen, so after pairing the human had nothing to compare against
+the phone — the entire MITM check, absent, while every other assertion passed and the flow worked.
+That is the failure mode worth remembering from this rung: state that exists in the model and is
+never rendered.
+
+**Still open, and now precisely two things:**
+
+1. **QR rendering is not implemented**, and the page says so in those words; the payload shown is the
+   QR contents verbatim. No encoder was added because none can be *verified* here — no scanner, no
+   emulator (**B-4**) — and a QR that cannot be proven to scan is the unverifiable artifact this
+   repo's rules forbid. Either a verified encoder, or a manual-entry path on the phone (S3), closes it.
+2. **The host half has no test.** The eleven assertions drive the dashboard with a *stub* seam; the
+   real `BeginAsync`/`CompleteAsync` — relay bootstrap, `TakeCompletionAsync`, vault write — are
+   exercised by nothing. The local-relay rig from S2's earlier slice (miniflare on `127.0.0.1:8787`)
+   is the honest way to close this, and it does not need B-4.
+
+**Smallest unblock for (2):** point a `dashboard` run at the local relay
+(`--relay http://127.0.0.1:8787 --sync-vault <temp>`), drive begin → simulated phone completion →
+complete with the same `src/Sync` primitives `SyncLiveSmoke` already uses, and assert the vault was
+written. That is a bounded piece of work on a machine that can run .NET.
