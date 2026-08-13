@@ -1406,3 +1406,36 @@ cites a §6.4 that is not on its branch, because PR #33 and PR #39 are **sibling
 *ordering* constraint — the two land together — not an obstruction: both branches are pushed, both
 PRs are open, and nothing about it needs a human to unblock. Calling it BLOCKED would send the next
 session hunting for a phantom, which is the failure these records exist to prevent.
+
+---
+
+## Blocker status 2026-08-13 (RelayClient pull result, twenty-seventh cloud iteration)
+
+**No new blocker, and nothing was blocked this iteration.** The slice was chosen precisely because it
+is verifiable here: C# compiles and runs in this sandbox (B-6's closure), the harness is offline, and
+a stub `HttpMessageHandler` needs no relay, no SDK and no device.
+
+- **B-7** (cloud egress / Android SDK) — **untouched and unchanged**, and it did not obstruct this
+  slice because nothing in `core/` or `app/` moved. The android gate was **not run** and correctly so;
+  `scripts/core-probe.sh` would have proven only that an untouched module still passes.
+- **PowerShell is still absent** and this is *not* filed as a blocker, deliberately: it is a standing
+  environmental limit recorded in every entry that reports a pin, not an obstruction awaiting a human.
+  Re-measured this run — `which pwsh` empty, `apt-cache policy powershell` returns nothing, so **the
+  `apt` trick that closed B-6 does not repeat.** CI on `windows-latest` runs `Verify-Alpha.ps1` and is
+  the gate.
+- **B-9** (Play licence key) — unchanged, and it is why the engine's inbound composition, including
+  the new host-side logging added this run, is **compile-checked and never executed**.
+- **B-1, B-2, B-4, B-5, B-8** — untouched by this slice, all unchanged. B-2 is worth one line: this
+  hardens S2's *transport* for the fourth-plus time while the `/pair` page — the whole of what B-2 is
+  actually about — **still has not moved**. That pattern is now long enough to be worth naming here
+  as well as in `STATE.md`.
+
+**Two things that are NOT blockers and must not be filed as ones.**
+
+1. **The rebase pin conflict.** `origin/main` is `aac05f3` at pin **611**; this stack reads **662** on
+   an older base. That is a *merge-ordering* consequence with a standing resolution already written
+   (whoever lands first wins; the other re-runs the verifier and writes the measured number). Nothing
+   needs a human to unblock it — it needs a machine that can run `Verify-Alpha.ps1`.
+2. **`Misconfigured`/`Unauthorised` having no behavioural consumer.** The host logs each once and
+   returns `null`. That is a *deliberately deferred* design step recorded in the LOG and in PR #45's
+   self-audit, not an obstruction: nothing prevents the next session from acting on them.

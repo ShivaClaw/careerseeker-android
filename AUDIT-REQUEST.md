@@ -6013,3 +6013,197 @@ answered, and by a machine rather than by me.
 policy requires a full *local* gate (`Verify-Alpha.ps1 -IncludePublish -IncludePackage`), a different
 condition that remains out of reach here; the android repo is **never-self-merge** regardless. Every
 PR in both stacks stays a **DRAFT**, and #33 and #39 still have to land together (C-CUR-10).
+
+---
+
+## C-RPR — RelayClient.PullAsync's failure channel, and PQ-S2-4's engine half (2026-08-13, twenty-seventh cloud iteration)
+
+Every command below is run from a clone of `ShivaClaw/careerseeker` at
+`claude/s2-relay-pull-result` (**draft PR #45**, stacked on #39 → #38 → #37 → #32), unless it names
+this repo. `.NET` is not preinstalled in a fresh cloud sandbox; `apt-get update -qq && apt-get install
+-y dotnet-sdk-8.0` is the one machine change, as the twenty-second run established.
+
+### C-RPR-1 — the defect: three throwing calls and no failure channel
+
+```bash
+git show claude/s5-inbound-pump:src/Sync/RelayClient.cs | sed -n '62,75p'
+git show claude/s5-inbound-pump:src/Engine/Program.cs  | sed -n '370,387p'
+```
+
+*Expected:* the **pre-change** `PullAsync` returning a bare
+`Task<(IReadOnlyList<JsonElement> Envelopes, long Latest)>` and calling **`EnsureSuccessStatusCode`**,
+**`GetProperty`** (twice) and **`GetInt64`** — three throwing calls, no failure channel in the
+signature. The second command shows the host's containment: a single `catch` naming **five** exception
+types, whose own comment reads *"Containment, not a fix."*
+
+### C-RPR-2 — RelayClient had no offline coverage of any kind
+
+```bash
+git grep -l RelayClient claude/s5-inbound-pump -- tests/
+```
+
+*Expected:* **exactly one path** — `tests/SyncLiveSmoke/Program.cs`. That project needs a live or
+local relay and is excluded from the hermetic offline suite (`grep -n SyncLiveSmoke
+scripts/Verify-Alpha.ps1` shows it gated behind `-IncludeLive`), so before this change the engine's
+relay client was **never executed by the offline gate**. This is the measurement behind the LOG's
+claim that the partiality survived four iterations that cited it.
+
+### C-RPR-3 — the four cases, and that they are derived from the relay rather than invented
+
+```bash
+sed -n '/^public abstract record RelayPullResult/,/^}/p' src/Sync/RelayClient.cs
+sed -n '40,70p' relay/src/index.ts
+```
+
+*Expected:* a hierarchy closed by a **private constructor** to `Ok`, `Unauthorised`, `Misconfigured`
+and `Unavailable`. The relay source is what licenses that split: `index.ts:55` answers **404
+`pairing_unknown`** for a pairing id that fails the shape check, `index.ts:61` answers **401
+`unauthorized`** when the bearer is absent or malformed *before* dispatch, and `index.ts:66` answers
+**404 `not_found`** for an unknown route.
+
+### C-RPR-4 — PQ-S2-4's engine half: the asymmetry that forbids copying the phone's mapping
+
+```bash
+# engine: no pairing-id guard at construction, though the check exists in the same assembly
+sed -n '/public sealed class RelayClient/,/^{/p' src/Sync/RelayClient.cs
+grep -n "IsValidPairingId" src/Sync/EnvelopeJson.cs
+# phone: the guard the engine lacks
+grep -n "isValidPairingId" ../careerseeker-android/core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+```
+
+*Expected:* the engine's `RelayClient` primary constructor takes `string pairing` and **validates
+nothing**, while `EnvelopeJson.cs:51` defines `IsValidPairingId` in the same assembly; the phone's
+client carries `require(isValidPairingId(pairing))` in its `init`. **So the relay's shape-check 404 is
+reachable for the engine and unreachable for the phone**, which is why 404 maps to `Misconfigured`
+here and must not be mapped to the phone's terminal `PairingUnknown`. The guard is **deliberately not
+added** — a throwing change to a startup-path constructor belongs to a slice that can run the full
+local gate.
+
+### C-RPR-5 — build and harness, measured
+
+```bash
+dotnet build CareerSeeker.sln -c Release 2>&1 | tail -4
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 | tail -2
+```
+
+*Expected:* **0 Warning(s), 0 Error(s)**, and **`=== 194 passed, 0 failed ===`**. The baseline
+**173** was re-measured this session on `claude/s5-inbound-pump` before any edit rather than quoted
+from the previous record; `git stash`-ing this branch's `tests/SyncHarness/Program.cs` reproduces it.
+
+### C-RPR-6 — the new section, and that it drives the real client over a fake socket only
+
+```bash
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 \
+  | sed -n '/relay pull result/,$p' | head -25
+sed -n '/sealed class StubTransport/,/^}/p' tests/SyncHarness/Program.cs
+```
+
+*Expected:* **21 `PASS` lines** under `[ relay pull result ]`, and a `StubTransport : HttpMessageHandler`
+that answers whatever the test hands it — including by throwing. The class under test is the shipping
+`SeekerSvc.Sync.RelayClient`; only the socket is stubbed.
+
+### C-RPR-7 — proven by mutation: seven applied, seven caught
+
+Apply each edit to `src/Sync/RelayClient.cs`, rebuild `tests/SyncHarness`, run it, then revert.
+
+*Expected:*
+
+| | mutation | result |
+| --- | --- | --- |
+| M1 | `case NotFound:` returns `Unauthorised()` | **193 passed, 1 failed** — `404 is Misconfigured, NOT Unauthorised and NOT Unavailable` |
+| M2 | drop `.Clone()` from the envelope projection | **ESCAPED** — `System.ObjectDisposedException`, no summary line, exit 134 |
+| M3 | delete the `when (ct.IsCancellationRequested)` catch | **193 passed, 1 failed** — `caller cancellation propagates rather than becoming a result` |
+| M4 | accept `latest` via `(long)GetDouble()` without the integer check | **191 passed, 3 failed** |
+| M5 | missing `envelopes` returns `Ok(empty, 0)` | **192 passed, 2 failed** |
+| M6 | delete the `root.ValueKind != JsonValueKind.Object` guard | **ESCAPED** — `System.InvalidOperationException`, no summary line, exit 134 |
+| M7 | remove `case HttpStatusCode.Forbidden:` | **193 passed, 1 failed** — `403 is Unauthorised too` |
+
+**M2 and M6 do not produce a FAIL line**, and that is the point rather than a gap in the report: they
+take the harness down with an **unhandled exception escaping through `PullAsync`'s own contract**,
+which is the exact failure mode this change removes. Verify the tree is restored afterwards:
+`git diff --stat -- src/Sync/RelayClient.cs` must match the committed diff and nothing else.
+
+### C-RPR-8 — the pin sweep is complete, and no literal was left behind
+
+```bash
+grep -n "ExpectedOfflineTotal = " scripts/Verify-Alpha.ps1
+grep -rn "641\|SyncHarness | 173" scripts/Verify-Alpha.ps1 README.md src/Engine/README.md \
+  docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md | grep -v ":[0-9]*:#"
+```
+
+*Expected:* **`$ExpectedOfflineTotal = 662`**, and the second command prints **nothing** — no live
+`641` and no `SyncHarness | 173` literal anywhere in the swept set. Six `Assert-Contains` literals
+moved (three `| SyncHarness | 173 |` → `194`, three `| **Total** | **641** |` → `662`) plus the
+pinned-verifier phrase, together with the four docs those literals target.
+
+**The `| grep -v ":[0-9]*:#"` is load-bearing and this entry shipped without it at first.** Run
+without the filter, the command returns **one** line — `scripts/Verify-Alpha.ps1:185`, reading
+*"…which is why there are sixteen assertions rather than fifteen. 641."* That is the **previous**
+pin's derivation comment, which correctly ends at the total it derived; the comment block is a
+running history of how each bump was reached, so a past total appearing in it is right and must not
+be "corrected". The claim worth auditing is that **no live assertion** still says 641, and the filter
+is what makes the command test that claim rather than a stronger and false one. Caught by the
+standing re-run step before commit — the **fourth** recurrence of an audit command whose stated
+output did not reproduce.
+
+### C-RPR-9 — 662 is corroborated, not measured; and exactly which part is carried
+
+```bash
+for h in Slice ResearcherHarness HookHarness StoreParityHarness GatewayGateHarness \
+         DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  dotnet run --project tests/$h/$h.csproj -c Release --no-build 2>&1 | grep -oE "=== [0-9]+ passed"
+done
+dotnet run --project tests/EngineHarness/EngineHarness.csproj -c Release --no-build 2>&1 | tail -3
+which pwsh; apt-cache policy powershell
+```
+
+*Expected:* **28, 57, 16, 28, 36, 35, 45, 6, 194 — summing to 445.** `EngineHarness` **aborts** with
+`System.InvalidOperationException: Refusing full-data deletion for a volume root` at
+`FullDataDeletion.ResolveAllowedWorkspace` — the guard **correctly** refusing a Windows install path
+that resolves to `/` on Linux — so its **217 is carried from the CI-settled 641, not re-measured**.
+445 + 217 = **662**. The last two commands print **nothing**: there is no PowerShell binary and **no
+installation candidate**, so **`scripts/Verify-Alpha.ps1` did not run and could not**. The `apt` trick
+that closed B-6 does **not** repeat. **CI on `windows-latest` is the gate.**
+
+### C-RPR-10 — no vector byte moved, so no cross-repo drift event
+
+```bash
+node docs/sync-vectors/generate.mjs --check
+git diff --name-only origin/claude/s5-inbound-pump..HEAD -- docs/sync-vectors/ | wc -l
+```
+
+*Expected:* **`OK: 29 vector files match the generator`** and **`0`**. The android repo's vendored
+pin **`7328a0b`** is therefore intact and this iteration is **not** a drift event. (Note the count is
+**29**, not 28: `invalid-unknown-field` arrives with PR #37, which *is* an ancestor of this branch —
+unlike the twenty-sixth run's #33, where it was not.)
+
+### C-RPR-11 — the rebase hazard, which is a live pin conflict rather than a note
+
+```bash
+git fetch origin main
+git show origin/main:scripts/Verify-Alpha.ps1 | grep -n "ExpectedOfflineTotal = "
+git log --oneline -1 origin/main
+```
+
+*Expected:* `origin/main` is **`aac05f3`** (Terra's R7 track landed) and its pin reads **611**, while
+this stack reads **662** on an older base. **These are not comparable and 662 must not be carried
+across a rebase blindly** — the standing resolution is that whoever lands first wins and the other
+re-runs the verifier and writes the **measured** number, sweeping every count-reporting doc in the
+same commit. Recorded on PR #45 and on `autonomy/claude-state`.
+
+### C-RPR-12 — what did NOT run, and therefore what is unverified
+
+```bash
+head -20 ../careerseeker-android/scripts/core-probe.sh
+git diff --name-only origin/claude/s5-inbound-pump..HEAD
+```
+
+*Expected:* the probe's header stating it runs **one** of the android gate's four tasks — and it was
+**not run at all** this iteration, correctly, because the second command shows **no `core/` or `app/`
+file changed** (nine files, all in the engine repo). `checkCoreIsAndroidFree`, `:app:assembleDebug`
+and `:app:lintDebug` need the Android SDK (**B-7**); `Verify-Alpha.ps1` needs PowerShell (C-RPR-9).
+**Nothing was executed against a relay, an engine or a phone** — no network call was made at all, not
+even `GET /v1/health`. The engine's inbound composition remains **compile-checked and never
+executed** (`BuildSyncBridge` returns `null` without a pairing; the vault is DPAPI/Windows; B-9 keeps
+inbound OFF), so **the new `Console.WriteLine` lines and the once-only reporting flag have never
+run.**

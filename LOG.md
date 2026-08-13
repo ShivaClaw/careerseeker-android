@@ -6726,3 +6726,198 @@ certificate-store action; no emulator, no `sdkmanager`, no keystore use. No secr
 or referenced other than by the name of an environment variable that does not exist on this machine.
 `Documents\CareerSeeker` and Terra's worktrees were never touched, and `autonomy/codex-state` was
 read and not written.
+
+---
+
+## RPR — the client that had no way to say "the relay refused" (2026-08-13, twenty-seventh cloud iteration)
+
+**Rung-slice: S2's transport half, engine side.** `STATE.md`'s ordered next intent, items **1 and 2**,
+taken together because they are the same file and the same signature change. Engine repo only, new
+branch `claude/s2-relay-pull-result`, **draft PR #45**, stacked on **#39 → #38 → #37 → #32**. Three
+commits. **No android source changed this run** — this entry is a record, not a code change here.
+
+### RPR-0 — the iteration prompt was stale for the NINTH consecutive run
+
+The prompt assigned the S5 spec slice again: amend §4.3 for `entitlement_ack`, add the vector via
+`generate.mjs`, close PQ-A2-1/-2/-3, and it pinned the vendored vectors at **`679a317`**. All of that
+landed between the twenty-first and twenty-fifth runs. **Verified again after the mandatory fetch,
+before anything was written**, rather than carried from the last record: `git log --oneline
+origin/main..origin/claude/s5-inbound-pump` shows `8575539` ("define the entitlement_ack body"),
+`22b028e` ("pin section 4.3.3 with two entitlement_ack vectors"), `9c05ef7`/`a564c0c` (§3.1's
+ciphertext cap), and **`7328a0b`** ("add the invalid-unknown-field vector, closing PQ-A2-3 and B-6").
+The vector pin moved to **`7328a0b`** three runs ago. **Ninth identical correction.** `STATE.md`'s
+ordered next intent is what routed this run, for the second run running — **the records are the
+routing infrastructure now; the prompt is not.**
+
+### RPR-1 — the defect: a method with no way to report failure
+
+`RelayClient.PullAsync` called **`EnsureSuccessStatusCode`, `GetProperty` and `GetInt64`** — three
+throwing calls — and returned a bare `(IReadOnlyList<JsonElement>, long)` tuple. There was **no
+failure channel in the signature at all**, so every relay answer that was not a well-formed 200 left
+the method as an exception. PR #39 contained that in the host by catching **five exception types by
+name** (`HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException or
+InvalidOperationException`) and its own comment called it *"Containment, not a fix"*. It is: a sixth
+escaping type takes the engine's tick down with it, and `InboundPump`'s constructor doc says in as
+many words that *"a transport failure must arrive as data, never as an exception, or one bad response
+takes the whole drain down with it."*
+
+### RPR-2 — why it survived four iterations that cited it: nothing offline could fail
+
+`grep -rl RelayClient tests/` returned **exactly one file** — `tests/SyncLiveSmoke/Program.cs`, which
+needs a live or local relay and is **deliberately excluded from the hermetic offline suite**. So the
+engine's relay client had **no offline coverage of any kind**, and its failure behaviour had never
+been executed by the gate. That is the same shape as the twenty-fifth run's finding (every inbound
+seam shipped, individually correct, zero production callers) one layer over: **the piece was named in
+four records and tested by none of them.**
+
+### RPR-3 — the fix, and the four cases derived rather than assumed
+
+`PullAsync` now returns **`RelayPullResult`**, a hierarchy closed by a private constructor to four
+cases, read off `relay/src/index.ts:40-70` and `relay/src/channel.ts` and separated by what a caller
+should *do*: **`Ok`** (200 with a §2.2 page), **`Unauthorised`** (401/403), **`Misconfigured`** (404),
+**`Unavailable`** (transport, timeout, 5xx, or a 200 that is not a pull page). The three throwing
+calls are **checks now rather than catches**.
+
+**Caller cancellation is the one exception still propagated**, and the distinction is load-bearing:
+`HttpClient` raises `TaskCanceledException` for *its own timeout* and for *the caller's token*, and
+the old adapter caught both. A timeout is a relay condition; a cancellation is the caller's decision,
+and laundering it into "the relay did not answer" is how a requested shutdown becomes a loop that
+will not stop. The two are separated by `ct.IsCancellationRequested`, because nothing else separates
+them.
+
+### RPR-4 — PQ-S2-4's engine half, answered rather than copied across
+
+The phone maps any 404 → `PairingUnknown` → the **terminal** `SendHalt.PAIRING_GONE`. **That mapping
+cannot be lifted onto the engine**, and the reason is a real asymmetry:
+
+- A **purged pairing answers 401** on every route (measured under miniflare in the seventeenth run,
+  pinned in §2.3), so "pairing gone" and "wrong bearer" are deliberately indistinguishable — both are
+  `Unauthorised`, and the relay refuses to say which.
+- The relay's **404** on this route means the pairing id failed the shape check
+  (`relay/src/index.ts:55`) or the route is absent (`index.ts:66`).
+- **The phone refuses a malformed pairing id at construction** (`require(isValidPairingId(pairing))`);
+  **this client does not**, though the check exists in the same assembly as
+  `EnvelopeJson.IsValidPairingId:51`.
+
+So the shape-check 404 is **reachable for the engine and unreachable for the phone** — hence
+`Misconfigured`, a configuration fault, not a purge. **Deliberately not "fixed" by adding the
+constructor guard**: that is a throwing change to a type built on the engine's startup path, and it
+belongs to a slice that can run the full local gate. The asymmetry is recorded on the class so the
+next reader does not read it as an oversight.
+
+### RPR-5 — measured, and proven by mutation
+
+Every number below was produced by a command run in this session:
+
+- `dotnet build CareerSeeker.sln -c Release` → **0 Warning(s), 0 Error(s)**
+- `SyncHarness` **173 → 194 passed, 0 failed** (21 new assertions; 173 re-measured as the baseline
+  this session, not quoted)
+- `node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the generator`**
+
+The new assertions drive the **real shipping client** over a stub `HttpMessageHandler`, so only the
+socket is fake. **Seven mutations applied and reverted, seven caught**, tree byte-identical
+afterwards (`diff` against the pre-mutation copy → identical):
+
+| | mutation | result |
+| --- | --- | --- |
+| M1 | fold 404 into `Unauthorised` | 193/1 — the PQ-S2-4 distinction |
+| M2 | drop the `.Clone()` | **ESCAPED** — `ObjectDisposedException` |
+| M3 | drop the cancellation filter | 193/1 |
+| M4 | accept a non-integer `latest` | 191/3 |
+| M5 | missing `envelopes` as an empty page | 192/2 |
+| M6 | drop the root-is-an-object guard | **ESCAPED** — `InvalidOperationException` |
+| M7 | map 403 to `Unavailable` | 193/1 |
+
+**M2 and M6 are the load-bearing row and neither produced a FAIL line.** They took the harness down
+with an **unhandled exception escaping through `PullAsync`'s own contract** — which is precisely the
+failure mode this change exists to remove, reproduced on demand. M6 is the argument that the
+root-object guard is not defensive clutter: without it a 200 whose body is `[]` throws straight out,
+the twenty-second run's `parsePullPage` shape again.
+
+**One free sharpening, in the live smoke:** its unpair assertion caught `HttpRequestException` — which
+a DNS failure raises too, so **a relay that had merely gone away would have passed that line**. It
+now asserts `afterUnpair is RelayPullResult.Unauthorised`, which is the condition PQ-S2-4 measured.
+
+### RPR-6 — the pin, and exactly what 662 is worth
+
+Swept as one unit per the `CLAUDE.md` drift trap: **`$ExpectedOfflineTotal` 641 → 662**, the three
+`| SyncHarness | 173 |` and three `| **Total** | **641** |` `Assert-Contains` literals, the
+pinned-verifier phrase, and the four docs those literals target. Re-grepped afterwards: **no live
+`641` or `SyncHarness | 173` literal anywhere in the swept set** — the one remaining `641` is inside
+`Verify-Alpha.ps1`'s comment block at line 185, where it is the **previous** pin's derivation and is
+correct history rather than a missed literal (see C-RPR-8, whose first draft claimed the grep printed
+nothing and did not reproduce).
+
+**662 is CORROBORATED, NOT MEASURED END-TO-END.** `scripts/Verify-Alpha.ps1` **did not run and could
+not** — `which pwsh` is empty and `apt-cache policy powershell` returns nothing, so there is no
+PowerShell here and none in the Ubuntu archive; **the `apt` trick that closed B-6 does not repeat.**
+What *was* measured is the **Linux sum, 445**, by running the nine harnesses that complete on Linux
+one at a time (Slice 28, ResearcherHarness 57, HookHarness 16, StoreParityHarness 28,
+GatewayGateHarness 36, DispatcherNoSendHarness 35, LifecycleHarness 45, RendererHarness 6, SyncHarness
+194). **`EngineHarness` cannot complete here** — it aborts at
+`FullDataDeletion.ResolveAllowedWorkspace` with *"Refusing full-data deletion for a volume root"*,
+which is the guard **correctly** refusing a Windows install path that resolves to `/` — so its **217
+is carried from the CI-settled 641, not re-measured**. 445 + 217 = **662**. **CI on `windows-latest`
+is the gate.**
+
+### RPR-7 — the limits, stated because they are the whole of what is unverified
+
+**The android gate did NOT run and could not.** `scripts/core-probe.sh` runs **one** of its four
+tasks; `checkCoreIsAndroidFree`, `:app:assembleDebug` and `:app:lintDebug` need the Android SDK
+(B-7). It was not run at all this iteration, because **nothing in `core/` or `app/` changed** —
+running it would have proven only that an untouched module still passes.
+
+**The engine's inbound composition is still compile-checked and never executed**, exactly as the
+twenty-fifth run recorded: `BuildSyncBridge` returns `null` without a pairing, the vault is
+DPAPI/Windows, and B-9 (no Play licence key) keeps inbound OFF. **The new `Console.WriteLine` lines
+and the once-only reporting flag have therefore never run.**
+
+**The stub transport is not a relay.** These assertions pin what the client does *with* an answer;
+they say nothing about which answers the relay actually produces. Only `SyncLiveSmoke` can close that
+and it **did not run** — no live or local relay was contacted.
+
+**`Misconfigured` and `Unauthorised` are reachable but barely consumed.** The host logs each once and
+returns `null`; no behaviour changes on them. That is one step from the dead-code criticism PQ-S2-4
+levels at the phone's `PAIRING_GONE`, and the defence — **these are reachable, that one is not** — is
+stated here so an auditor can attack it rather than having to reconstruct it.
+
+**`latest` is checked to be an integer and is not range-checked** against §3.2's 2^53−1 cap. A
+hostile relay can still return an absurd-but-integral `latest`, and the pump bounds cursor advance by
+it. Out of scope for this slice; **named as the next thing to test rather than left silent.**
+
+### RPR-8 — the drift traps, both checked rather than assumed
+
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the generator`**, and
+`git diff --name-only -- docs/sync-vectors/` prints **0**. **No vector byte moved**, so the android
+repo's **`7328a0b`** vendored pin is intact and **no cross-repo drift event occurred**.
+
+The doc/verifier trap **was** engaged this time — 21 assertions were added — and was swept in the same
+change (RPR-6). **`origin/main` has moved to `aac05f3`** (Terra's R7 landed) and its pin reads
+**611** against this stack's **662** on an older base. **These are not comparable, and 662 must not be
+carried across a rebase blindly** — recorded on PR #45 and on the coordination bus.
+
+### RPR-9 — one of my own measurements was wrong and the script caught it
+
+The first mutation run reported **all seven mutations as "DID NOT COMPILE"**, which would have been a
+finding about the tests being unreachable. It was **my detector**, not the mutations: it tested
+`'error' in build_output.lower()`, and `dotnet`'s own success banner prints **`0 Error(s)`**, so every
+build "failed". Fixed to test for `Build succeeded` and re-run; seven of seven then caught. **Recorded
+because the false result was the *flattering* one to skip past** — it would have been easy to write
+"the mutations do not compile, so the tests are pinned by construction" and move on.
+
+### Prohibition — what this iteration did not touch
+
+**No android source changed** — not `core/`, not `app/`, not a screen, not the Room replica, not the
+migration tests; this repo received records only. In the engine repo, **no `relay/` source, no
+`docs/sync-vectors/` byte, no `generate.mjs`, no `docs/Sync-Protocol.md`** — the normative document is
+untouched, and the C# and Kotlin appliers were not written. `src/Engine/Host.cs` untouched. No merge
+in either repo, no force-push, no history rewrite, no branch deleted; draft PRs **#26 and #32–#39** in
+the engine repo and **#1–#5** here were left exactly as found — not merged, retargeted or rebased. No
+deploy of any kind (Cloudflare, Workers, relay, site, Pages), and **the production relay was not
+contacted at all, not even `GET /v1/health`** — **not one byte was sent to a relay, an engine or a
+phone this run.** No Play, Google or OAuth console; no accounts, no purchases, no Play Billing code;
+no Gmail, no email; no MSIX or certificate-store action; no emulator, no `sdkmanager`, no keystore
+use. No secret was read, printed or referenced other than by the name of an environment variable that
+does not exist on this machine. `Documents\CareerSeeker` and Terra's worktrees were never touched, and
+`autonomy/codex-state` was **read and not written**. One machine change, logged:
+`apt-get install dotnet-sdk-8.0` from the Ubuntu archive, as the twenty-second run established.
