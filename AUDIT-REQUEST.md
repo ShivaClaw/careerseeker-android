@@ -5974,3 +5974,42 @@ binary and no installation candidate. `checkCoreIsAndroidFree`, `:app:assembleDe
 `:app:lintDebug` need the Android SDK (**B-7**) and **did not run**; `Verify-Alpha.ps1` **did not run
 and could not**. **CI is the gate.** Nothing was executed against a relay, an engine or a phone: the
 pump's *rules* are tested, the composition is not.
+
+### C-CUR-14 — CI ran both repos' gates on these exact heads (added after §C-CUR was written)
+
+```bash
+gh api repos/ShivaClaw/careerseeker/actions/runs/31669070172/jobs \
+  --jq '.jobs[] | "\(.name): \(.conclusion)"'
+gh api repos/ShivaClaw/careerseeker-android/actions/runs/31669725746/jobs \
+  --jq '.jobs[] | .steps[] | "\(.number) \(.name): \(.conclusion)"'
+```
+
+*Expected (engine, head `3a8dfdd`):* two jobs, **both `success`** — `Blind relay (Worker)` and
+`Build and offline harnesses`, 05:04:35 → 05:06:50 UTC. The `windows-latest` job's step 6, **`Run
+offline alpha verification`**, *is* `Verify-Alpha.ps1` — the script that **throws on a pin
+mismatch** — and it is `success`. So **`$ExpectedOfflineTotal = 598` is CI-confirmed rather than
+merely asserted**, on the one platform this sandbox cannot reach, and C-CUR-12's claim is now
+measured on a second machine. The relay job's step 10, `Assert sync vectors match their generator`,
+is also `success` — zero vector drift, independently confirmed.
+
+*Expected (android, head `d3dcce7`):* **all thirteen steps `success`, first attempt**, 05:15:45 →
+05:22:53 UTC (**7 m 08 s** against a ~7 m 51 s baseline). Read one by one, the four that matter here
+are the four **`scripts/core-probe.sh` structurally cannot run**:
+
+- `Assert :core has no Android dependency` ✓
+- `Assert vendored sync vectors match the pinned main-repo commit` ✓ — **the `7328a0b` pin holds**,
+  independently confirming this iteration moved no vector byte
+- `Assemble debug APK` ✓ and `Lint` ✓
+
+`Unit tests (:core)` ✓ (05:18:02 → 05:18:51) is the **276 measured on the real JDK 17 + SDK
+toolchain**, not only on the reduced probe. `Unit tests (:app, Robolectric)` ✓ — **the standing
+`ScreensFromFixtureTest` flake did not fire**, and this slice touched no `:app` file anyway.
+
+**So the android gate passed, and this is the first claim in this section entitled to say so.**
+Everything above it says `core-probe.sh` ran one of four tasks; this row is where the other three are
+answered, and by a machine rather than by me.
+
+**What this does and does not license.** CI green is **not** the merge condition. The main-repo merge
+policy requires a full *local* gate (`Verify-Alpha.ps1 -IncludePublish -IncludePackage`), a different
+condition that remains out of reach here; the android repo is **never-self-merge** regardless. Every
+PR in both stacks stays a **DRAFT**, and #33 and #39 still have to land together (C-CUR-10).
