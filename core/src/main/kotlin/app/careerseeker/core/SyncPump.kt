@@ -151,13 +151,22 @@ fun interface ReplicaPositionSource {
  * splices the envelope back verbatim; the rule is what keeps that a property of this deployment
  * rather than an assumption baked into the phone.
  *
- * An element that fails the §3 parse has no authenticated `seq` at all, and that is the case §6.4
- * governs: the claimed number MAY move the cursor, but never past the page's own `latest`. Letting
- * it move the cursor freely is history truncation performed without decrypting anything — one
- * unparseable element claiming `seq: 1000000` skips every envelope below it, permanently, because
- * the cursor never moves backwards. Refusing to move at all is the opposite failure and §6.2
- * forbids it by name. The asymmetry is what decides it: a stall is recoverable and visible, a
- * truncation is silent and is not.
+ * **Parsing is not authenticating**, and that is where the line falls (§6.4, amended 2026-08-13 —
+ * PQ-CUR-1). A `seq` is recovered from the sealed bytes only once the AEAD tag verifies over the
+ * AAD that carries it, so the cursor advances *without a bound* only for an envelope the receiver
+ * **accepted**. Everything else — an element that fails the §3 parse, and an element that parses
+ * cleanly and is then refused for any reason, the tag included — carries a `seq` that is a claim,
+ * and §6.4 lets that claim move the cursor only as far as the page's own `latest`.
+ *
+ * The two failures are one case here on purpose. An envelope can pass the §3 parse completely and
+ * still be bytes the relay invented: well-formed JSON, the right fields, a valid pairing id, a
+ * 12-byte nonce, a base64url ciphertext, and nothing at all vouching for its `seq`. This class
+ * originally advanced the moment the parse succeeded, which handed that element the unbounded path
+ * — history truncation performed without decrypting anything, since one such element claiming
+ * `seq: 1000000` skips every envelope below it, permanently, because the cursor never moves
+ * backwards. Refusing to move at all is the opposite failure and §6.2 forbids it by name. The
+ * asymmetry is what decides it: a stall is recoverable and visible, a truncation is silent and is
+ * not.
  *
  * ## What this class deliberately does not do
  *
@@ -236,40 +245,55 @@ class SyncPump(
             val parsed = EnvelopeJson.parse(envelope.wire)
             val header = parsed.envelope
 
-            // Advance first. A rejected or unapplied envelope must not be re-fetched next cycle —
-            // see rule 1 on the class. The relay already handed it over; asking again produces the
-            // same bytes and, after the receiver's window has seen them, a replay rejection.
-            //
             // Rule 4, and it is the reason the parse is hoisted: the seq that drives the cursor is
             // the one inside the envelope, which the AEAD tag authenticates through the AAD — not
             // the one the relay put in the page. The relay is blind but it is not trusted (§2),
             // and a claimed seq of 999999 on an envelope carrying 5 would otherwise skip the
             // stream past everything the phone had not read.
             //
-            // An envelope that does not parse has no authenticated seq, so the only number
-            // available is the one it claims. §6.4 says it MAY be used and MUST be bounded by the
-            // page's own `latest`. Bounded, not refused: refusing stalls the direction forever on
-            // one corrupt byte, which §6.2 forbids. Bounded, not free: free is history truncation
-            // achieved without decrypting anything, and the two failure modes are not symmetric —
-            // a stall keeps `latest` above the cursor and resumes the moment a readable page
-            // arrives, while truncation is silent, permanent, and looks like a healthy sync.
+            // PARSING IS NOT AUTHENTICATING (§6.4, amended 2026-08-13 / PQ-CUR-1). A seq is
+            // "recovered from the sealed bytes" only once the AEAD tag verifies over the AAD that
+            // carries it. So the cursor advances WITHOUT A BOUND only for an envelope the receiver
+            // ACCEPTED, and every other element — one that fails the §3 parse, and one that parses
+            // and is then refused for any reason, the tag included — advances it only as far as the
+            // page's own `latest`. This block used to advance before the receive call, using
+            // `header.seq` unbounded the moment the parse succeeded: a well-formed envelope that no
+            // key opens could be minted by the relay and walked the cursor anywhere it liked.
+            //
+            // Bounded, not refused: refusing stalls the direction forever on one corrupt byte,
+            // which §6.2 forbids. Bounded, not free: free is history truncation achieved without
+            // decrypting anything, and the two failure modes are not symmetric — a stall keeps
+            // `latest` above the cursor and resumes the moment a readable page arrives, while
+            // truncation is silent, permanent, and looks like a healthy sync.
             //
             // `latest` is the bound because it costs the relay nothing it did not already have:
             // it is the same number that decides `moreAvailable` below. Against an honest relay
             // this is a no-op — its `latest` covers every row it serves.
-            val seq = header?.seq ?: minOf(envelope.seq, page.latest)
-            if (seq > cursorValue) cursorValue = seq
-
+            //
+            // Every path still advances, which is rule 1: a rejected or unapplied envelope must not
+            // be re-fetched next cycle. The relay already handed it over; asking again produces the
+            // same bytes and, after the receiver's window has seen them, a replay rejection.
             if (header == null) {
+                // No authenticated seq exists and no parsed header either, so the only number
+                // available is the element's claimed top-level one.
+                advanceBounded(envelope.seq, page.latest)
                 rejections += parsed.error ?: ErrorCode.DECRYPT_FAILED
                 continue
             }
 
             val received = receiver.receive(header, keyForDir)
             if (!received.accepted) {
+                // It parsed, so a header seq exists — but the receiver refused it, so the tag never
+                // verified over that seq (or never ran at all). Same rule as an unparseable element.
+                advanceBounded(header.seq, page.latest)
                 rejections += received.error ?: ErrorCode.DECRYPT_FAILED
                 continue
             }
+
+            // Accepted: the tag verified over the AAD, and the AAD carries this seq. It is a fact
+            // now, and it is the one number here that may move the cursor without a bound.
+            val seq = header.seq
+            if (seq > cursorValue) cursorValue = seq
 
             // Read per envelope, before applying. Rule 2.
             val before = position.current()
@@ -309,6 +333,22 @@ class SyncPump(
     }
 
     // ---------------------------------------------------------------- internals
+
+    /**
+     * Advance the cursor to [claimed], but never past [latest] and never backwards (§6.4).
+     *
+     * The single place the unauthenticated path is allowed to move the cursor. Both callers reach
+     * it for the same reason — no AEAD tag has verified over the number they hold — and they are
+     * deliberately not distinguished here: §6.4's rule is about *whether the seq is authenticated*,
+     * not about which check refused the element, and giving a parse failure and a tag failure two
+     * different bounds is exactly the gap PQ-CUR-1 was filed against.
+     *
+     * The engine's twin is `InboundPump.AdvanceBounded` (careerseeker `src/Sync/InboundPump.cs`).
+     */
+    private fun advanceBounded(claimed: Long, latest: Long) {
+        val bounded = minOf(claimed, latest)
+        if (bounded > cursorValue) cursorValue = bounded
+    }
 
     private suspend fun seed(): ReplicaPosition {
         val current = position.current()

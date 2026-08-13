@@ -587,6 +587,124 @@ class SyncPumpTest {
         assertEquals(7L, sinceOf(relay.pullUrls[1]))
     }
 
+    /**
+     * PQ-CUR-1, and it is the case §6.4's first draft did not reach.
+     *
+     * The element below is the `truncator` from the two tests above with **one field removed** —
+     * the `"surprise":"v2"` that made it fail the §3 parse. Everything else is byte-identical. So
+     * it parses completely: well-formed JSON, exactly the nine known fields, a valid pairing id, a
+     * typed `seq`, a 12-byte nonce, a base64url ciphertext. And it is still bytes the relay
+     * invented — nothing opens them, because no key ever sealed them.
+     *
+     * **Parsing is not authenticating.** A `seq` becomes a fact only when the AEAD tag verifies
+     * over the AAD that carries it, and this one never does. Before PQ-CUR-1 the pump advanced the
+     * moment the parse succeeded, so removing that single field moved the element from the bounded
+     * path to the **unbounded** one and its claimed `seq: 1000000` walked the cursor past every
+     * envelope below it, permanently. The bound is the same one the unparseable element gets,
+     * because the question §6.4 asks is whether the seq is authenticated — not which check refused
+     * the element.
+     */
+    @Test
+    fun `a parseable envelope whose tag fails cannot move the cursor past latest either`() = runTest {
+        val forged =
+            """{"v":1,"pairing":"$pairing","dir":"e2p","seq":1000000,"ts":"2026-08-10T09:00:00Z",""" +
+                """"key_id":"$keyId","nonce":"AAAAAAAAAAAAAAAA","ciphertext":"AAAA"}"""
+        val relay = FakeRelay(listOf(page(forged, latest = 10), page(latest = 10)))
+        val replica = FakeReplica(warm(1)) { _, _ -> ApplyDisposition.APPLIED }
+        val pump = pumpOver(relay, replica)
+
+        val report = pump.pump()
+        assertEquals(listOf(ErrorCode.DECRYPT_FAILED), report.rejections)
+        assertEquals(0, replica.applied.size, "nothing opened, so nothing reached the replica")
+        assertEquals(10L, report.cursor, "the header seq parsed, but no tag ever vouched for it")
+
+        // The ceiling is the `since` the next pull actually sends — the cursor, not just the report.
+        pump.pump()
+        assertEquals(10L, sinceOf(relay.pullUrls[1]))
+    }
+
+    /**
+     * The same bound, reached through a different refusal, because §6.4 is written against *every*
+     * element the receiver did not accept rather than against one named check.
+     *
+     * This envelope is genuinely sealed and its tag would verify — it is refused earlier, at §5's
+     * revocation check, for a `key_id` this receiver does not consider active. So the tag never
+     * runs at all, which is the same standing as a tag that ran and failed: no authenticated seq.
+     * The existing `advances past an envelope the receiver rejected outright` test cannot see this,
+     * because its envelope's seq equals the page's `latest` and the two paths agree there.
+     */
+    @Test
+    fun `a rejected envelope is bounded whichever check refused it`() = runTest {
+        val relay = FakeRelay(
+            listOf(page(e2p(1000000, "snapshot", withKeyId = "k-retired"), latest = 10), page(latest = 10)),
+        )
+        val replica = FakeReplica(warm(1)) { _, _ -> ApplyDisposition.APPLIED }
+        val pump = pumpOver(relay, replica)
+
+        val report = pump.pump()
+        assertEquals(listOf(ErrorCode.KEY_UNKNOWN), report.rejections)
+        assertEquals(10L, report.cursor, "refused before the tag ran; the seq is still only a claim")
+
+        pump.pump()
+        assertEquals(10L, sinceOf(relay.pullUrls[1]))
+    }
+
+    /**
+     * The bound must not become a stall (§6.2). After the forged element is skipped, envelopes the
+     * engine issues *later* — below the number the forgery claimed — still arrive and still apply.
+     */
+    @Test
+    fun `after a bounded tag failure the stream still delivers envelopes issued later`() = runTest {
+        val forged =
+            """{"v":1,"pairing":"$pairing","dir":"e2p","seq":1000000,"ts":"2026-08-10T09:00:00Z",""" +
+                """"key_id":"$keyId","nonce":"AAAAAAAAAAAAAAAA","ciphertext":"AAAA"}"""
+        val relay = FakeRelay(
+            listOf(
+                page(forged, latest = 10),
+                page(e2p(11, "snapshot"), latest = 11),
+            ),
+        )
+        val replica = FakeReplica(cold()) { _, _ -> ApplyDisposition.APPLIED_SNAPSHOT }
+        val pump = pumpOver(relay, replica)
+
+        pump.pump()
+        val second = pump.pump()
+
+        assertEquals(listOf(11L), replica.applied.map { it.first }, "seq 11 is below the claimed 1000000")
+        assertEquals(11L, second.cursor)
+    }
+
+    /**
+     * §6.4's **first** bullet — "the cursor MUST NOT move backwards" — which until now was a
+     * normative MUST that no test on this side asserted.
+     *
+     * Found by mutation, not by reading: deleting the `bounded > cursorValue` guard in
+     * `advanceBounded` left all 275 other tests green. The bound makes the gap reachable rather
+     * than theoretical, because `minOf(claimed, latest)` takes the relay's `latest` whenever it is
+     * the smaller number — so a page that understates `latest` would *drag the cursor down* and
+     * re-request envelopes the receiver has already accepted. Its in-process replay window then
+     * refuses them, which is the pull-the-same-page-forever loop rule 1 exists to prevent.
+     *
+     * The engine's twin assertion is `the cursor never moves backwards (seeded at 20, page claims
+     * 2)` in `SyncHarness`; this is the phone's, in the same shape.
+     */
+    @Test
+    fun `a page that understates latest cannot drag the cursor backwards`() = runTest {
+        val forged =
+            """{"v":1,"pairing":"$pairing","dir":"e2p","seq":1000000,"ts":"2026-08-10T09:00:00Z",""" +
+                """"key_id":"$keyId","nonce":"AAAAAAAAAAAAAAAA","ciphertext":"AAAA"}"""
+        val relay = FakeRelay(listOf(page(forged, latest = 2), page(latest = 2)))
+        val replica = FakeReplica(warm(20)) { _, _ -> ApplyDisposition.APPLIED }
+        val pump = pumpOver(relay, replica)
+
+        val report = pump.pump()
+        assertEquals(listOf(ErrorCode.DECRYPT_FAILED), report.rejections)
+        assertEquals(20L, report.cursor, "min(1000000, 2) is 2, but 2 is behind the cursor")
+
+        pump.pump()
+        assertEquals(20L, sinceOf(relay.pullUrls[1]), "the next pull must not re-ask for 3..20")
+    }
+
     // ---------------------------------------------------------------- failure mapping
 
     @Test
