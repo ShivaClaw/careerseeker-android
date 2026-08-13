@@ -6207,3 +6207,26 @@ even `GET /v1/health`. The engine's inbound composition remains **compile-checke
 executed** (`BuildSyncBridge` returns `null` without a pairing; the vault is DPAPI/Windows; B-9 keeps
 inbound OFF), so **the new `Console.WriteLine` lines and the once-only reporting flag have never
 run.**
+
+### C-RPR-13 — CI ran `Verify-Alpha.ps1` on this exact head and the 662 pin held (added after §C-RPR was written)
+
+```bash
+gh api repos/ShivaClaw/careerseeker/actions/runs/31685499397/jobs \
+  --jq '.jobs[] | "\(.name): \(.conclusion)"'
+gh api repos/ShivaClaw/careerseeker/actions/jobs/94400476634/logs | grep -E "Offline total|=== 194"
+```
+
+*Expected (head `ddd4a9a`, draft PR #45):* two jobs, **both `success`** — `Blind relay (Worker)`
+(09:12:05 → 09:12:30 UTC) and `Build and offline harnesses` (09:12:06 → 09:13:43 UTC). The second
+command prints **`=== 194 passed, 0 failed ===`** and **`=== Offline total: 662 passed, 0 failed ===`**.
+
+**This is the row that upgrades C-RPR-9.** That entry says 662 is *corroborated, not measured*,
+because `Verify-Alpha.ps1` cannot run in this sandbox. It ran here, on `windows-latest`, and **it
+throws on a pin mismatch** — so **662 is confirmed**, and `EngineHarness` = 662 − 445 = **217** is
+re-confirmed as the carried number rather than an assumption. The twenty-one new assertions pass on
+**Windows** as well as on the Linux run measured in C-RPR-5; the log lists them by name.
+
+**What it does not license:** CI green is **not** the merge condition. The main-repo merge policy
+requires a full *local* gate (`-IncludePublish -IncludePackage`), which remains out of reach here, and
+the android repo is **never-self-merge**. **#45 stays a DRAFT** and inherits #39's ordering
+constraint.
