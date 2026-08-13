@@ -1290,3 +1290,59 @@ and the question itself is **unblocked and merely undone** — it was left becau
 stay *true* until this android PR merges, and writing them early would put a claim in the engine
 repo whose truth depends on an unmerged PR in another repo. Filing that under BLOCKED would send the
 next session hunting a phantom, which is the failure this file exists to prevent.
+
+---
+
+## B-9 — The engine's inbound path cannot run: no Play licence key exists yet
+
+**New 2026-08-13 (twenty-fifth cloud iteration), found by building the thing it blocks.**
+
+**Symptom.** `BuildInboundPump` (engine repo, `src/Engine/Program.cs`, draft PR #39) returns null and
+the engine prints *"Inbound is OFF: no Play licence key is configured, so a purchase cannot be
+verified."* `GoogleSignedPayloadVerifier` requires the Play Console **"License Key for This
+Application"** — an X.509 SPKI in standard base64 — and validates it eagerly at construction. There is
+no production source for it anywhere in `src/`: measured, the verifier is constructed only in tests,
+each with a locally generated key.
+
+**This is expected, not a surprise, and the spec says so.** `docs/Sync-Protocol.md` §4.3.2: *"the
+production licence key only exists once the Play app is created, and slots in then."* It is
+configuration, deliberately not a constant. So B-9 is a **configuration gap awaiting an account-day
+action**, not a defect — but it is recorded as a blocker because it is the one thing standing between
+"the engine has a receive path" (now true, PR #39) and "the engine receives" (still false).
+
+**Attempts.** None, and deliberately none. The two ways to proceed without the key were both refused
+rather than tried: a verifier that accepts, and a verifier that rejects while looking like a real
+signature check. Both are the hand-waving `CLAUDE.md` forbids by name on this repo's other
+verification path, and a fail-closed placeholder is still a placeholder that a later change deletes
+the guard from. Creating the Play app is embargoed (no Google/Play console), so there is no third
+option a cloud session may take.
+
+**What it blocks, precisely.** The `entitlement` inbound kind, and therefore the whole S5 purchase
+loop end-to-end. It does **not** block the pump, the cursor rules, the resumable replay mark, or the
+ack emitter — all of those are written and asserted (`AUDIT-REQUEST.md` C-IP-4…8). Collaterally it
+also switches off `outcome` and `pull_request`, because the drain is gated as one unit; that is
+acceptable only while neither has an engine implementation (S6 owns the outcome applier, S2/S4 the
+republisher), and **if either grows one, this gate becomes wrong and must be split**.
+
+**Smallest human unblock.** On account day, after the Play app exists: copy Play Console →
+Monetisation setup → *"Licensing"* → the base64 licence key, and set
+`CAREERSEEKER_PLAY_LICENSE_KEY` in `secrets/env.secrets` (or pass `--play-key`). Nothing else changes;
+the engine picks it up on the next start and prints the pairing line instead of the inbound-off line.
+A mistyped key fails **at startup** with a named error rather than silently at the first real
+purchase — that eagerness is deliberate.
+
+**Not blocked by this, and worth stating so nobody hunts for a phantom:** B-9 is not why S5's E2E is
+unproven. That is the ordinary state of an unmerged stack plus B-4 (no emulator) plus the absence of
+a `/pair` page (B-2). B-9 is narrower: it is the one input the engine half needs and cannot obtain.
+
+### No new *android* blocker arose 2026-08-13 (twenty-fifth cloud iteration)
+
+This iteration changed no android source, so B-4, B-5, B-7 and B-8 were neither exercised nor
+re-measured, and none of their statuses moved. **B-7 was re-confirmed only in the negative sense that
+matters here:** the android gate was not attempted because nothing in `app/` or `core/` changed, not
+because it was blocked.
+
+**One standing limit re-proved rather than carried:** `Verify-Alpha.ps1` still cannot run in a cloud
+session — `which pwsh` is empty and `apt-cache policy powershell` offers no candidate, so the
+`apt-get` route that closed B-6 does not repeat here. **CI on `windows-latest` remains the gate for
+the offline pin (now 641).**

@@ -6378,3 +6378,187 @@ plausible for far longer than the first run actually lived.
 
 **What this does not change.** `Verify-Alpha.ps1` still did not run — no PowerShell here — so no
 claim is made about the engine gate or the 625 pin. Every "did not run" statement in §VR-5 stands.
+
+---
+
+## IP — the engine could publish and could not receive (2026-08-13, twenty-fifth cloud iteration)
+
+**Rung:** S5, its stated remainder. **Branch:** `claude/s5-inbound-pump` in the **engine** repo, draft
+PR **#39**, stacked on #38 → #37 → #32. **Questions opened:** **PQ-CUR-1**. **Questions closed:** none.
+**Android source changed: none** — this entry, `AUDIT-REQUEST.md` §C-IP, `BLOCKED.md` §B-9 and
+`STATE.md` are the whole of this repo's diff.
+
+### IP-0 — the iteration prompt was stale for the seventh consecutive run, and this time differently
+
+Derived after the mandatory fetch, before anything was written. The prompt assigned the S5 **spec**
+slice — amend §4.3 for `entitlement_ack`, add the vector, close PQ-A2-1/-2/-3 — and stated S5 was
+"NOT STARTED". All of that landed between the twenty-second and twenty-fourth runs (PRs #32, #37,
+#38, and this repo's own #6). The prompt also pinned the vendored vectors at `679a317`; the
+twenty-fourth run moved them to **`7328a0b`** and recorded it.
+
+The difference from the previous six corrections is that the *records were right and complete* and
+the prompt still did not reflect them. `STATE.md`'s own standing rule — "a session handed S5 must
+verify PR #32's four commits and read B-6 before writing a line" — is what routed this run in about
+fifteen minutes. **The rule works; what does not work is expecting the prompt to stop being stale.**
+
+So this run took `STATE.md`'s ordered next-intent instead. Item 1 (the C# ack applier) was done by
+the twenty-third run. **Item 2 was still open, and measuring it turned it into something larger.**
+
+### IP-1 — the finding: every inbound seam had zero production callers
+
+`STATE.md` recorded S5's remainder as "host wiring", and B-2 as "engine ↔ local relay proven 30/30".
+Both true. What neither says is how much of the *receive* half had a caller. Measured (C-IP-1):
+
+```
+git grep -nE "RecordP2eSeq|EnvelopeJson\.|InboundDispatcher\(|PullAsync\(|IEntitlementAckPublisher|LastP2eSeq" 2bb61de -- src/
+  (minus each symbol's own declaring file)
+  -> src/Engine/Program.cs:246   // a pull loop (RelayClient.PullAsync("p2e", since) ...
+  -> src/Engine/Program.cs:247   // an InboundDispatcher(EnvelopeReceiver, EntitlementService ...
+```
+
+**Two lines, both comments.** The pull loop, the strict wire parser, the dispatcher, the ack
+publisher and the vault's `last_p2e_seq` — every one of them shipped, tested, and referenced by
+nothing outside its own file. `last_p2e_seq` had been persisted since PR #31 and read by no code that
+has ever run.
+
+So the engine could publish and could not receive, and the purchase path terminated exactly where the
+twenty-third run said it did — except one seam further out than that entry could see. That run closed
+the gap between `EntitlementService` and the wire. This one is the gap between the wire and the
+engine. **The pattern is now three-for-three: every piece individually DONE and honestly recorded,
+with the hole sitting *between* the entries, in a producer or a caller nobody had claimed.**
+
+### IP-2 — parsing is not authenticating, and that is the whole of the cursor rule
+
+The pump had to decide which sequence number may move the transport cursor. §6.4 (PR #33) says: only
+one "recovered from the sealed bytes", except that an element failing the §3 parse MAY advance it by
+its claim, bounded by the page's `latest`.
+
+Writing it exposed that the carve-out is drawn in the wrong place. **A seq is recovered from the
+sealed bytes only when the AEAD tag verifies** — the seq lives in the AAD, and the tag is what turns
+it from a claim into a fact. An envelope can be perfectly well-formed §3 JSON — valid pairing id,
+dir, key_id, nonce, base64url ciphertext — and be bytes the relay invented. It parses. Its header seq
+is authenticated by nothing at all, and §6.4's carve-out, written for *parse* failures, does not
+cover it. Read literally, §6.4 then forbids advancing at all there — which is the permanent stall
+§6.2 forbids in as many words.
+
+`InboundPump` therefore advances freely **only for an envelope the receiver accepted**, and bounds
+every other advance — failed parse and failed tag alike — by the page's `latest`. Bounded rather than
+refused, bounded rather than free, for the asymmetry §6.4 already argues: a stall is recoverable and
+loud, truncation is silent, permanent, and presents as a healthy caught-up sync.
+
+**The spec hole is real and is not fixed here**, because §6.4 lives on PR #33 — a *sibling* of this
+stack, not an ancestor — so this branch's `docs/Sync-Protocol.md` has §6.1, §6.2, §6.3 and no §6.4 at
+all (C-IP-13). The code cites a section its own reader cannot find. Amending a section that is not in
+the tree would be worse than saying so. **PQ-CUR-1**, and the two PRs have to land together.
+
+### IP-3 — the same door is open on the phone, and this deliberately did not close it
+
+`core/.../SyncPump.kt:260` reads `val seq = header?.seq ?: minOf(envelope.seq, page.latest)`. The
+phone bounds the claimed seq **only when the parse fails**. An envelope that parses and then fails
+the tag moves the phone's cursor by its header seq, unbounded — the same truncation door, one field
+over (C-IP-14).
+
+The engine is now stricter than the phone on a shared rule. Stated precisely so nobody reads it as
+the mission's named field bug: **there is no interop risk**, because the transport cursor is local
+state that never appears on the wire, and a stricter receiver merely re-requests what a looser one
+would skip. It is unclosed work, it is in PQ-CUR-1, and it belongs in the change that amends §6.4 —
+not in a slice that cannot even see the section.
+
+### IP-4 — the second finding, which the wiring produced rather than the design
+
+An envelope **the engine itself sent** — `dir: e2p`, sealed under `k_e2p`, unsigned — is a well-formed
+envelope, and a relay may serve it back on the p2e page. Traced through the shipping receiver, every
+check passes: the sig-placement rule is satisfied *because* an e2p envelope carries no sig; the replay
+check consults the **e2p** counter, which the p2e resume never seeds; `keyForDir` hands over `k_e2p`,
+so the tag verifies. It is **accepted**. Its kind falls through to `Ignored`, which is why this looks
+harmless — and the damage lands off to the side: `onAccepted` writes an **e2p** seq into the persisted
+**p2e** replay mark. Push that mark past the phone's counter and every genuine phone envelope
+afterwards is refused as a replay. Silent, permanent, one-directional, and caused by handing the
+engine back its own traffic.
+
+The pump refuses any element whose header names a direction other than the one it pulled. Mutation M1
+measures the claim rather than arguing it (IP-6).
+
+### IP-5 — the persisted mark protects nothing unless the receiver is built from it
+
+`EnvelopeReceiver`'s `SequenceTracker` started empty on every process start and had no way to be told
+otherwise, so `last_p2e_seq` was a field the vault wrote and nothing consumed. This is not
+bookkeeping: **the relay chooses what a page contains**, so a restarted engine can simply be handed an
+entitlement it already applied, and an empty tracker accepts it.
+
+`SequenceTracker.Resume` + an `EnvelopeReceiver(resume:)` constructor parameter close it. Supplied at
+construction rather than through a setter, so trust state cannot move once the receiver is in use, and
+**Resume raises only** — a tracker that could be lowered is one whose replay rule can be switched off
+by whoever supplies the number. Both halves are asserted, and the first assertion pins the *failure*:
+an unseeded receiver accepts the already-applied envelope (C-IP-7).
+
+### IP-6 — proven live: seven mutations, and the seventh was not caught
+
+Applied and reverted against `src/Sync/`; the working tree is byte-identical after
+(`git diff --stat -- src/Sync/` empty).
+
+| | mutation | caught by |
+| --- | --- | --- |
+| M1 | drop the pump's direction guard | 2 assertions (the e2p-on-p2e pair) |
+| M2 | `AdvanceBounded` ignores the `latest` bound | 3 |
+| M3 | a receive rejection advances the cursor unbounded | 1 |
+| M4 | persist the mark from the parse-failure branch | **nothing** |
+| M5 | the receiver ignores the resume mark | 1 |
+| M6 | `Resume` may lower the mark | 1 |
+| M7 | the cursor may move backwards | 1 |
+
+**M4 is the entry that matters.** The assertion covering the parse-failure branch pinned the *cursor*
+and said nothing about the *mark*, so writing a claimed seq into the persisted replay mark — from the
+least authenticated branch on the page — passed unnoticed. That is a **test gap, not a semantically
+equivalent change**, and the twentieth run's rule says the two are not distinguishable without
+checking which. Checked: closed with a sixteenth assertion, and M4 re-run against it now fails
+(C-IP-8). Fifteen assertions were drafted; sixteen shipped, and the difference was found by mutation
+rather than by reading.
+
+### IP-7 — counts, and what did not run
+
+`dotnet build CareerSeeker.sln -c Release` → **0 warnings / 0 errors**, both at the base and after.
+`SyncHarness` **157 → 173, 0 failed**, both ends measured this session. Nine Linux-capable offline
+harnesses sum to **424**; offline pin **625 → 641**, swept in one commit with `Verify-Alpha.ps1`'s
+`$ExpectedOfflineTotal` and all four count-reporting docs. `generate.mjs --check` → `OK: 29 vector
+files match the generator`, and `git diff --name-only -- docs/sync-vectors/` prints **0** — **no
+vector byte moved, so the android repo's `7328a0b` pin is intact and no cross-repo drift event
+occurred.**
+
+**641 is corroborated, not measured end-to-end.** `EngineHarness` still cannot complete on Linux —
+its `FullDataDeletion` guard **correctly** refuses a volume root when a Windows install path resolves
+to `/` — so its **217** is carried from the CI-settled 625. 424 + 217 = 641.
+
+**`Verify-Alpha.ps1` did NOT run and could not**: no PowerShell here and none in the Ubuntu archive,
+so the trick that solved .NET does not repeat. **No claim is made about the engine gate.** CI on
+`windows-latest` is the gate for 641.
+
+**And the limit that this slice specifically must state: the host wiring is compile-checked and was
+never executed.** `BuildSyncBridge` returns null without a pairing, and the pairing vault is DPAPI —
+Windows only. The pump's *rules* are tested; the *composition* is not (C-IP-12). Nothing here is an
+end-to-end claim: no relay was contacted, no phone exists, and not one byte was sent or received.
+
+### IP-8 — one refusal worth recording as a decision
+
+Inbound is built only when a Play licence key is configured. Without it there is no honest inbound
+path — `entitlement` is the kind that matters and it cannot be verified — and the alternatives were a
+verifier that accepts, or one that rejects while looking like a real check. Both are the hand-waving
+`CLAUDE.md` forbids by name on this repo's other verification path, and a placeholder that fails
+closed today is still a placeholder somebody deletes the guard from later. **So the engine says
+plainly that it cannot receive, and why.** The cost is stated rather than hidden: `outcome` and
+`pull_request` need no key and are switched off with it, which is acceptable only because neither has
+an engine implementation yet. Recorded as **B-9**.
+
+### Prohibition — what this iteration did not touch
+
+**No android source file changed**: `app/` and `core/` are untouched, so `:core:test` had nothing to
+re-measure and was not run. No vector file was added, changed or regenerated — `docs/sync-vectors/`
+is byte-identical, and the `7328a0b` pin was not moved. No `relay/` source. No merge in either repo,
+no force-push, no history rewrite, no branch deleted; draft PRs #32–#38 and android #1–#6 were left
+exactly as found — not merged, retargeted or rebased. No deploy of any kind (Cloudflare, Workers,
+relay, site, Pages) and **the production relay was not contacted at all, not even `GET /v1/health`**.
+No Play, Google or OAuth console; no accounts, no purchases, no Play Billing code; no Gmail, no
+email; no MSIX or certificate-store action; no emulator, no `sdkmanager`, no keystore use. No secret
+was read, printed or referenced other than by the name of an environment variable that does not exist
+on this machine. `Documents\CareerSeeker` and Terra's `CareerSeeker-r6-sbom` worktree were never
+touched, and `autonomy/codex-state` was read and not written.

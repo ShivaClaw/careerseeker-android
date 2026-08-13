@@ -5523,3 +5523,238 @@ cd <engine> && git show origin/claude/s5-entitlement-ack-emitter:docs/Sync-Proto
 *Expected:* both still say the ack vectors are evidence about **one** implementation. That is
 **correct and deliberate** — it stays true until this android PR merges, and amending it early would
 make the engine repo assert something whose truth depends on an unmerged PR in another repo.
+
+---
+
+## C-IP — the engine had no receive path at all (twenty-fifth cloud iteration, 2026-08-13)
+
+Every claim in `LOG.md` §IP. `<engine>` is a `ShivaClaw/careerseeker` clone; `<android>` is this
+repo. Run `git fetch --all --prune` in both first. Everything below is engine-side: **this iteration
+changed no android source file**, only these records.
+
+Commits referenced, so the commands keep working as the branch grows: `2bb61de` the base
+(`origin/claude/s5-entitlement-ack-emitter`, PR #38) · `c7c79ce` the pump · `1b30643` the resumable
+replay mark · `e1fc72d` the host wiring · `7bd4812` the assertions · `ec7d0e5` the pin sweep.
+Branch `claude/s5-inbound-pump`, draft PR **#39**.
+
+Toolchain, needed by nearly every command below:
+
+```bash
+apt-get update -qq && apt-get install -y --no-install-recommends dotnet-sdk-8.0 && dotnet --version
+```
+
+*Expected:* `8.0.129` (`noble-updates/main`). Standing rule, re-proved: when a blocker's stated
+reason is "tool X is absent", the re-test is `apt-cache policy <pkg>`, not `which <tool>`.
+
+### C-IP-1 — The finding: every inbound seam had zero production callers
+
+```bash
+cd <engine> && git grep -n -E "RecordP2eSeq|EnvelopeJson\.|InboundDispatcher\(|PullAsync\(|IEntitlementAckPublisher|LastP2eSeq" 2bb61de -- src/ \
+  | grep -v "src/Sync/InboundDispatcher.cs\|src/Sync/EnvelopeJson.cs\|src/Sync/RelayClient.cs\|src/Engine/SyncPairingVault.cs"
+```
+
+*Expected:* **exactly two lines**, both in `src/Engine/Program.cs` (246 and 247), and both are
+**comments** describing what should be built. No inbound seam had a caller: not the pull loop, not
+the dispatcher, not the ack publisher, and not the vault's `last_p2e_seq`, which had been persisted
+since PR #31 and read by nothing. The engine could publish and could not receive.
+
+Same command against `HEAD` of `claude/s5-inbound-pump` returns real call sites in
+`src/Engine/Program.cs` (356–392), `src/Engine/SyncAckPublisher.cs` and `src/Sync/InboundPump.cs`.
+
+### C-IP-2 — Build baseline and after
+
+```bash
+cd <engine> && git checkout 2bb61de && dotnet build CareerSeeker.sln -c Release 2>&1 | tail -4
+cd <engine> && git checkout claude/s5-inbound-pump && dotnet build CareerSeeker.sln -c Release 2>&1 | tail -4
+```
+
+*Expected:* **0 Warning(s) / 0 Error(s)** both times. The whole C# solution builds in a Linux cloud
+sandbox.
+
+### C-IP-3 — SyncHarness 157 → 173
+
+```bash
+cd <engine> && git checkout 2bb61de && dotnet build CareerSeeker.sln -c Release >/dev/null && \
+  dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -1
+cd <engine> && git checkout claude/s5-inbound-pump && dotnet build CareerSeeker.sln -c Release >/dev/null && \
+  dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -1
+```
+
+*Expected:* `=== 157 passed, 0 failed ===` then `=== 173 passed, 0 failed ===`. Both ends measured
+in this session; neither number is carried.
+
+### C-IP-4 — The cursor rules, read as executed output
+
+```bash
+cd <engine> && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build \
+  | sed -n '/inbound pump/,/replay mark raises/p'
+```
+
+*Expected:* fourteen `PASS` lines under `[ inbound pump: the engine's p2e transport loop ]`,
+including by name:
+
+- `a crafted seq of 1,000,000 on an undecryptable envelope is capped at the page's latest`
+- `an accepted envelope's AUTHENTICATED seq moves the cursor past a lying latest`
+- `the cursor never moves backwards (seeded at 20, page claims 2)`
+- `an unauthenticated seq is never persisted as the replay mark`
+
+The pair is the point: the bound applies to unauthenticated advances and **only** to those. Bounding
+an accepted seq too would be the stall §6.2 forbids by name.
+
+### C-IP-5 — Parsing is not authenticating, and that is the whole rule
+
+```bash
+cd <engine> && sed -n '/A seq is recovered from the sealed bytes/,/every conforming page/p' src/Sync/InboundPump.cs
+```
+
+*Expected:* the doc paragraph stating that an envelope can be well-formed §3 JSON — valid pairing
+id, dir, key_id, nonce, base64url ciphertext — and still be bytes the relay invented; its header seq
+parses and is authenticated by nothing. The cursor therefore advances freely only for an envelope the
+receiver **accepted**; a failed §3 parse and a failed AEAD tag are treated identically, both bounded
+by the page's `latest`.
+
+### C-IP-6 — The engine's own traffic, served back at it
+
+```bash
+cd <engine> && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build \
+  | grep "e2p envelope replayed onto the p2e page\|cannot corrupt the p2e replay mark"
+```
+
+*Expected:* two `PASS` lines. The attack they pin, in full: an envelope the engine itself sent
+(`dir: e2p`, sealed under `k_e2p`, unsigned) is well-formed, and a relay may serve it back on the p2e
+page. Every downstream check passes — the sig-placement rule is satisfied because an e2p envelope
+carries no sig, the replay check consults the **e2p** counter which the resume never seeds, and
+`keyForDir` hands over `k_e2p`, so the tag verifies. It is **accepted**, its kind falls through to
+`Ignored`, and the damage lands to the side: `onAccepted` writes an **e2p** seq into the persisted
+**p2e** replay mark. Push that mark past the phone's counter and every genuine phone envelope
+afterwards is refused as a replay — silent, permanent, one-directional. M1 below measures it.
+
+### C-IP-7 — The persisted mark only protects anything if the receiver is built from it
+
+```bash
+cd <engine> && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build \
+  | grep "unseeded receiver ACCEPTS\|resumed from the persisted mark"
+```
+
+*Expected:* two `PASS` lines. The first asserts the **failure**: a receiver that starts empty accepts
+an already-applied envelope. That is not hypothetical — the relay chooses what a page contains, so a
+restarted engine can simply be handed the entitlement again. The second asserts the fix.
+
+### C-IP-8 — Proven by mutation, and one was NOT caught
+
+```bash
+cd <engine> && python3 - <<'PY'
+s=open('src/Sync/InboundPump.cs').read()
+old='                rejections.Add(parsed.Error ?? SyncError.DecryptFailed);'
+open('src/Sync/InboundPump.cs','w').write(s.replace(old,'                _onAccepted?.Invoke(ClaimedSeq(element));\n'+old))
+PY
+dotnet build tests/SyncHarness/SyncHarness.csproj -c Release >/dev/null && \
+  dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep "FAIL\|passed,"
+cd <engine> && git checkout -- src/Sync/InboundPump.cs
+```
+
+*Expected:* `FAIL  pump: an element failing the §3 parse persists no replay mark either` and
+`=== 172 passed, 1 failed ===`.
+
+Seven mutations were applied and reverted this session; the full list and their caught assertions are
+in `LOG.md` §IP-6. **M4 above survived the first pass.** The assertion covering the parse-failure
+branch pinned the cursor and said nothing about the mark, so writing a claimed seq into the persisted
+replay mark from the least-authenticated branch on the page was caught by nothing. That is a real gap
+in the new tests rather than a semantically equivalent change — checked, not excused — and it is why
+there are sixteen new assertions and not fifteen.
+
+### C-IP-9 — No vector byte moved
+
+```bash
+cd <engine> && node docs/sync-vectors/generate.mjs --check
+cd <engine> && git diff --name-only 2bb61de..claude/s5-inbound-pump -- docs/sync-vectors/ | wc -l
+```
+
+*Expected:* `OK: 29 vector files match the generator` and **0**. No vector was added or changed, so
+the android repo's `7328a0b` vendor pin is untouched and **no cross-repo drift event occurred**.
+
+### C-IP-10 — The pin moved 625 → 641, and the arithmetic is stated
+
+```bash
+cd <engine> && for h in Slice ResearcherHarness HookHarness StoreParityHarness GatewayGateHarness \
+  DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  dotnet run --project tests/$h/$h.csproj -c Release --no-build 2>&1 | grep -oE "=== [0-9]+ passed, [0-9]+ failed ==="; done
+cd <engine> && grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1
+cd <engine> && grep -rn "641" scripts/Verify-Alpha.ps1 docs/CareerSeeker-Project-Summary.md \
+  docs/External-Audit-Handoff.md README.md src/Engine/README.md
+```
+
+*Expected:* 28, 57, 16, 28, 36, 35, 45, 6, 173 — summing to **424**, all with 0 failed.
+`$ExpectedOfflineTotal = 641`, and 641 appears in all five count-reporting files, swept in the same
+commit (`ec7d0e5`) as the drift trap requires. **641 = 424 + 217.**
+
+### C-IP-11 — The 217 is carried, not measured, and here is why
+
+```bash
+cd <engine> && dotnet run --project tests/EngineHarness/EngineHarness.csproj -c Release --no-build 2>&1 | tail -4
+```
+
+*Expected:* `Unhandled exception. System.InvalidOperationException: Refusing full-data deletion for a
+volume root.` at `FullDataDeletion.ResolveAllowedWorkspace`. `EngineHarness` **cannot complete on
+Linux**, because a Windows install path resolves to `/` here and the guard **correctly** refuses it.
+Its **217** is quoted from the CI-settled 625 (610 + 15), not measured this session. So **641 is
+corroborated, not measured end-to-end**, and CI on `windows-latest` is the gate.
+
+### C-IP-12 — The host wiring is compile-checked and was never executed
+
+```bash
+cd <engine> && sed -n '/^InboundPump? BuildInboundPump/,/^}/p' src/Engine/Program.cs | head -30
+cd <engine> && grep -n "DrainInboundAsync" src/Engine/Host.cs src/Engine/EngineSyncBridge.cs
+```
+
+*Expected:* the composition exists and compiles. **It did not run anywhere in this session and could
+not**: `BuildSyncBridge` returns null without a pairing, and the pairing vault is DPAPI — Windows
+only. The pump's *rules* are tested (C-IP-4/6/7); the *composition* is not. Any record that blurs
+those two is wrong.
+
+### C-IP-13 — The code implements §6.4, which is not in the branch it is written on
+
+```bash
+cd <engine> && grep -n "^### 6\." docs/Sync-Protocol.md
+cd <engine> && git show origin/claude/s4-pull-request-semantics:docs/Sync-Protocol.md | grep -n "^### 6.4"
+```
+
+*Expected:* this branch's spec has **§6.1, §6.2, §6.3 and no §6.4**; §6.4 exists only on
+`claude/s4-pull-request-semantics` (PR #33), a **sibling** of this stack. So a reader of PR #39
+cannot find the section the code cites, and the two PRs must land together or the citation dangles.
+
+Worse, and this is the substantive half: §6.4's carve-out is written for "an element that **fails the
+§3 parse**" and says nothing about one that parses and then fails the tag. Read literally it forbids
+advancing at all in that case — which is the stall §6.2 forbids in as many words. **The spec has a
+hole**, PR #39 implements the sensible reading rather than the literal one, and the amendment belongs
+on #33. Filed as **PQ-CUR-1**.
+
+### C-IP-14 — The phone has the same hole and this did not close it
+
+```bash
+cd <android> && sed -n '255,262p' core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+```
+
+*Expected:* `val seq = header?.seq ?: minOf(envelope.seq, page.latest)` — the phone bounds the
+claimed seq only when the **parse** fails. An envelope that parses and then fails the tag moves the
+phone's cursor by its header seq, **unbounded**. Same truncation door, one field over.
+
+The engine is now stricter than the phone on a shared rule. There is **no interop risk** — the cursor
+is local transport state and never appears on the wire — so this is not the mission's "phone more
+correct than the engine" field bug in either direction. It is unclosed work, in **PQ-CUR-1**, and it
+is deliberately not this slice: closing it well means amending §6.4 first, on a branch this one does
+not contain.
+
+### C-IP-15 — What did NOT run, and what remains the gate
+
+```bash
+cd <engine> && which pwsh powershell; apt-cache policy powershell 2>/dev/null | head -3
+cd <android> && git diff --stat 2bb61de..HEAD -- app/ core/ 2>/dev/null | tail -1
+```
+
+*Expected:* no PowerShell binary and **no candidate in the Ubuntu archive** — the trick that solved
+.NET does not repeat, so **`scripts/Verify-Alpha.ps1` did not run and could not be parse-checked**.
+No claim is made about the engine gate this iteration. The android gate did not run either and did
+not need to: **no android source file changed**, so `:core:test` had nothing to re-measure. **CI is
+the gate in both repos**, and citing anything here as "the gate passed" is the precise failure these
+records exist to prevent.
