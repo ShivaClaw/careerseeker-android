@@ -6921,3 +6921,203 @@ use. No secret was read, printed or referenced other than by the name of an envi
 does not exist on this machine. `Documents\CareerSeeker` and Terra's worktrees were never touched, and
 `autonomy/codex-state` was **read and not written**. One machine change, logged:
 `apt-get install dotnet-sdk-8.0` from the Ubuntu archive, as the twenty-second run established.
+
+---
+
+## S2 — `latest` was type-checked and never range-checked (twenty-eighth cloud iteration, 2026-08-13)
+
+**Engine repo only**, branch `claude/s2-relay-pull-result`, draft PR **#45** (refreshed, not
+reopened), stacked on **#39** → #38 → #37 → #32. Three commits: `706f2df`, `5c8b063`, `818c5b3`.
+This repo received records plus two new protocol questions; **no android source changed.**
+
+### Milestone 0 — the fetch, and what routed this run
+
+`git fetch --all --prune` in both trees before anything was read. Both were on detached HEADs at
+start; `careerseeker` local `main` was **16 commits behind** `origin/main` and was reset to
+`aac05f3`. Nothing was branched or compared before the fetch.
+
+**The iteration prompt was stale for the TENTH consecutive run.** It assigned the S5 spec slice —
+§4.3 `entitlement_ack`, the `generate.mjs` vector, PQ-A2-1/-2/-3 — all of which landed in **#32/#37/
+#38/#39** and this repo's PR #6, and it pinned the vendored vectors at **`679a317`**, which moved to
+**`7328a0b`** four runs ago. Verified again after the fetch rather than carried from the records.
+**Third run running where `STATE.md`'s ordered next intent, not the prompt, routed the work**, and it
+named this slice as **item 1**. Terra's `autonomy/codex-state` read first, as required: heartbeat
+`2026-08-12T20:28:36`, **"COMPLETE… the ladder is exhausted"**, **files claimed: none** — no
+collision, and Terra's right-of-way was not contested.
+
+### Milestone 1 — the measurement that came before any code
+
+`RelayClient.PullAsync` validates `latest` with `TryGetInt64`, which fixes the **type** and the
+**width** and nothing else. Driven against the real shipping client over a stub transport:
+
+```
+latest = -1                    -> Ok, carried straight through
+latest = 0                     -> Ok
+latest = 9007199254740991      -> Ok    (2^53-1)
+latest = 9007199254740992      -> Ok    (one past it)
+latest = 9223372036854775807   -> Ok    (Int64.MaxValue)
+latest = 10000000000000000000  -> Unavailable
+latest = 1e300                 -> Unavailable
+```
+
+**The last two lines are the trap.** Two values *are* refused — by the width of `Int64`, not by any
+bound — so the field looked guarded. The unguarded bands were exactly `latest < 0` and
+`[2^53, Int64.MaxValue]`, and **no type check can see either**.
+
+`latest` is not an arbitrary `Int64`: it is `MAX(seq)` over the rows the relay holds
+(`relay/src/channel.ts:206`), and every one of those rows passed the relay's seq check, so it
+inherits `seq`'s domain from §3.2. `PullAsync` now refuses outside `[0, Protocol.MaxSeq]`.
+**Refuse, not clamp** — clamping accepts a page while silently disagreeing with it about the one
+number the caller bounds its cursor with, and the asymmetry decides it: refusing keeps the cursor
+still, reports `PullFailed` and retries, which is loud and recoverable. Re-verify: **C-LAT-1, C-LAT-2**.
+
+**Two citations flagged rather than glossed.** §3.2 lives on a **sibling** branch
+(`claude/s2-seq-bound`, draft PR #35 — `merge-base --is-ancestor` exits **1**; §3.2 count is **0** in
+this branch's spec and **1** in #35's), so `Protocol.MaxSeq` carries the same flagged-citation note
+`InboundPump` already carries for §6.4, and both resolve **on merge**, not before. #35 touches **no
+C# file**, so the constant cannot conflict with it. And **§3.2 never mentions `latest`** — it caps
+what a sender emits and what the relay rejects, while `latest` is the relay's *report* of that
+number, so the domain is inherited **by derivation, not by statement** → **PQ-LAT-1**. Re-verify:
+**C-LAT-3**.
+
+### Milestone 2 — the finding, which is worth more than the fix
+
+`InboundPump`'s docstring claimed the §6.4 bound *"denies a hostile relay a second, independent
+lever, because `latest` is already the number it must publish to say there is more."*
+
+**It does not, and this run measured it.** `latest` and the crafted element arrive in the **same
+response, from the same party**, and nothing authenticates either. The "independence" is an
+assumption about an honest relay, inside a rule written for a dishonest one:
+
+| page's `latest` | cursor after one unreadable element claiming `seq: 1000000` |
+| --- | --- |
+| `5` (honest) | **5** — bounded, as §6.4 intends |
+| `Protocol.MaxSeq` (inflated) | **1000000** — the bound is a no-op |
+
+So the history truncation §6.4 exists to prevent is reachable in full: inflate `latest`, serve one
+crafted element, and the cursor parks past every genuine envelope below it — and because the cursor
+never moves backwards, they are never requested again, presenting as a healthy caught-up sync.
+
+**The range check does NOT close this**, and the record must say so plainly: it lowers the ceiling
+from `2^63-1` to `2^53-1`, which is still astronomically past any real counter. Recorded as
+**PQ-LAT-2**; the docstring is **corrected in place** rather than quietly reworded, because a reader
+who believed the old paragraph would conclude the attack was closed. Two harness assertions **pin
+the weakness** — if a later slice closes it, **they should fail.** Re-verify: **C-LAT-5**.
+
+**A correction against my own draft, before it shipped.** PQ-LAT-2's first draft proposed
+`min(page.latest, cursor + elements_served)` as the obvious fix. **§6 refuses it in as many words:** a
+receiver MUST accept `seq > highest_accepted` *"including gaps — the relay's TTL purge creates
+legitimate gaps and a gap MUST NOT stall the stream"* (`docs/Sync-Protocol.md:568`). After a purge a
+page can legitimately serve one element at `seq: 500`, and that bound would refuse to reach it — the
+direction stalls forever on a retention event the protocol **requires** the relay to perform, which
+is §6.2's permanent stall reached by the exact route §6.4's own "bounded, not refused" reasoning
+rejected. **The obvious fix is wrong, and that it looks right is why this is a question and not a
+patch.** Re-verify: **C-LAT-6**.
+
+### Milestone 3 — proven live: seven mutations, seven caught
+
+`SyncHarness` **194 → 205, 0 failed**; `dotnet build CareerSeeker.sln -c Release` **0 warnings / 0
+errors**. Baseline **re-measured this session** (194), not quoted. Tree byte-identical after every
+mutation (`git status --porcelain` empty).
+
+| mutation | measured |
+| --- | --- |
+| M1 remove the range check | 201/4 |
+| M2 lower bound `0` → `1` | 203/2 — **one is a PRE-EXISTING assertion** (*an empty page is Ok, not a failure*) |
+| M3 upper bound `>` → `>=` | 204/1 — exactly the at-the-cap case |
+| M4 `MaxSeq` transcribed as `2^53` | 201/4, including both arithmetic pins |
+| M5 clamp instead of refuse | 201/4 — the same four as M1 |
+| M6 drop the lower bound alone | 204/1 |
+| M7 drop `Math.Min` in `AdvanceBounded` | 201/4, **three pre-existing** |
+
+**M2 and M7 are the row worth reading:** each takes down assertions written *before* this slice, so
+the new checks are anchored by tests that did not come with them. **M5 is the second finding of the
+milestone** — clamping fails the same four as deleting the check entirely, which is the measurement
+that clamping and refusing are not interchangeable, and it is why the commit argues the choice rather
+than asserting it. Two of the eleven assertions pin `Protocol.MaxSeq` **by arithmetic** — that it
+survives a `double` round trip and that the next integer up does not — rather than by re-typing the
+digits, because a transcribed constant drifts from the number it claims to be and this one is shared
+with a JavaScript relay that reaches it through a double. Re-verify: **C-LAT-7**.
+
+### Milestone 4 — the pin, swept as one unit
+
+`$ExpectedOfflineTotal` **662 → 673**, with six `Assert-Contains` literals and the four
+count-reporting docs (`README.md`, `src/Engine/README.md`,
+`docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`) moved in the same commit,
+per the drift trap.
+
+**673 is CORROBORATED, NOT MEASURED.** `Verify-Alpha.ps1` **did not run and could not** — `which
+pwsh` empty and `apt-cache policy powershell` returns nothing, re-checked this session, so the trick
+that solved .NET does not solve this. What was measured is the **Linux sum: 456**, harness by
+harness (28 + 57 + 16 + 28 + 36 + 35 + 45 + 6 + 205), up from **445** by exactly the eleven
+assertions added. `EngineHarness`'s **217 is carried, not measured**: it aborts at
+`FullDataDeletion.PlanWorkspace` (`src/Engine/FullDataDeletion.cs:29`), **correctly** refusing a
+volume root when a Windows install path resolves to `/`. 456 + 217 = **673**. **CI on
+`windows-latest` is the gate** — it runs the script that throws on a pin mismatch.
+
+**The rebase caveat is unchanged and still load-bearing:** `origin/main` is `aac05f3` and its pin
+reads **611**, while this stack reads **673** on its own older base. Not comparable; **673 must not
+be carried across a rebase blindly.** Re-verify: **C-LAT-4**.
+
+### Milestone 5 — two of my own audit commands did not reproduce
+
+Caught by the standing re-run step, before commit, and both would have shipped a false measurement:
+
+1. **C-LAT-1 did not compile.** Its first draft reverted `RelayClient.cs` **and** `Protocol.cs` to
+   demonstrate the failures; `Protocol.MaxSeq` has three call sites in `tests/SyncHarness/Program.cs`,
+   so removing the constant yields `error CS0117` and **no test result at all** — which would have
+   been written down as a measurement. Reverting `RelayClient.cs` alone gives the claimed split
+   exactly: **four FAIL, three PASS**.
+2. **C-LAT-7 used the wrong diff base.** It claimed "nine changed files" while diffing against
+   `origin/claude/s5-inbound-pump`, the **PR's** base, which returns **eleven** — the extra two
+   (`src/Engine/Program.cs`, `tests/SyncLiveSmoke/Program.cs`) belong to the twenty-seventh run.
+   **It would have credited this slice with two files it never touched.** Base corrected to
+   `ddd4a9a`.
+
+**Fifth recurrence of this shape across the series** (after CR-6, C-CR-3, C-SC-1/-3/-4 and C-RPR-8).
+The re-run step keeps catching it, which is the argument for keeping the step — but five recurrences
+say the drafting habit itself is the defect, not the individual commands.
+
+### What this slice deliberately did NOT do
+
+**No C# or Kotlin applier, no host wiring, no relay change.** The phone's `strictLong`
+(`RelayClient.kt:258`) still accepts the whole of `Int64` and was **left alone deliberately** — the
+engine is now stricter, which costs a conforming relay nothing and carries no interop risk since the
+cursor never appears on the wire, and changing the phone needs the android gate this sandbox cannot
+run. **`docs/Sync-Protocol.md` was not amended**: the §3.2 sentence PQ-LAT-1 asks for belongs on the
+branch that owns §3.2 (#35), and PQ-LAT-2's amendment binds both receivers and is Brandon's to
+direct. **`Protocol.MaxSeq` duplicates a constant #35 defines in TypeScript and nothing checks the
+two agree** — no shared vector can express a bound, so if they diverge both suites stay green. That
+is stated in PR #45's self-audit rather than fixed.
+
+### Ladder movement
+
+**S2 stays PARTIAL**, and the sentence the twenty-seventh run added applies again: **this is the
+fifth hardening of S2's transport half, and B-2 — the missing desktop `/pair` page, which is the
+whole of what B-2 is about — has still not moved.** A session picking S2 again should read that
+before picking it. **No new blocker**; nothing here was blocked. `AUDIT-REQUEST.md` gains
+**C-LAT-1…8**; `docs/protocol-questions.md` gains **PQ-LAT-1** and **PQ-LAT-2**.
+
+### Prohibition — what this iteration did not touch
+
+**No android source changed** — not `core/`, not `app/`, not a screen, not the Room replica, not the
+migration tests; this repo received records and two protocol questions only, so the **android gate
+did not run and correctly was not attempted** (`core-probe.sh` runs one of its four tasks and had
+nothing to run; `checkCoreIsAndroidFree`, `:app:assembleDebug` and `:app:lintDebug` need the SDK —
+**B-7**). In the engine repo: **no `relay/` source, no TypeScript, no `docs/sync-vectors/` byte
+(`--check` OK at 29, `git status --porcelain docs/sync-vectors/` empty — the `7328a0b` pin is intact
+and there was NO cross-repo drift event), no `generate.mjs`, no `docs/Sync-Protocol.md`, no
+`src/Engine/Host.cs`, no `docs/autonomy/*`.** No engine C# outside `RelayClient.cs`, `Protocol.cs`
+and `InboundPump.cs`'s docstring. No merge in either repo, no force-push, no history rewrite, no
+branch deleted; draft PRs **#26 and #32–#44** in the engine repo and **#1–#6** here were left exactly
+as found — not merged, retargeted or rebased. No deploy of any kind (Cloudflare, Workers, relay,
+site, Pages), and **the production relay was not contacted at all, not even `GET /v1/health`** —
+**not one byte was sent to a relay, an engine or a phone this run.** The engine's inbound composition
+remains **compile-checked and never executed**, and the range check has run **only against a stub
+`HttpMessageHandler`**. No Play, Google or OAuth console; no accounts, no purchases, no Play Billing
+code; no Gmail, no email; no MSIX or certificate-store action; no emulator, no `sdkmanager`, no
+keystore use. No secret was read, printed or referenced. `Documents\CareerSeeker` and Terra's
+worktrees were never touched, and `autonomy/codex-state` was **read and not written**. One machine
+change, logged: `apt-get update && apt-get install -y dotnet-sdk-8.0` from the Ubuntu archive — note
+the `update`, without which the archive serves a **404** on the SDK package, which the twenty-second
+run's recipe did not mention.

@@ -6230,3 +6230,168 @@ re-confirmed as the carried number rather than an assumption. The twenty-one new
 requires a full *local* gate (`-IncludePublish -IncludePackage`), which remains out of reach here, and
 the android repo is **never-self-merge**. **#45 stays a DRAFT** and inherits #39's ordering
 constraint.
+
+---
+
+## C-LAT — `latest` had a type check and never a range check (twenty-eighth iteration, 2026-08-13)
+
+Engine repo, branch `claude/s2-relay-pull-result`, draft PR **#45**, commits `706f2df`, `5c8b063`,
+`818c5b3`. Run everything below from a `careerseeker` checkout at `818c5b3` unless a command says
+otherwise. `dotnet-sdk-8.0` installs from the Ubuntu archive
+(`apt-get update && apt-get install -y dotnet-sdk-8.0`); `apt-cache policy dotnet-sdk-8.0` is the
+re-test, **not** `which dotnet` — see B-6's closure.
+
+### C-LAT-1 — the hole was exactly two bands, and a type check cannot see them
+
+The measurement that motivated the change, reproducible by reverting the check:
+
+```bash
+git show 706f2df -- src/Sync/RelayClient.cs | grep -A3 "outside the legal seq range"
+git checkout 706f2df~1 -- src/Sync/RelayClient.cs          # RelayClient.cs ONLY -- see the note
+dotnet build CareerSeeker.sln -c Release 2>&1 | grep "Error(s)"
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 \
+  | grep -E "latest (is negative|one past|at Int64|0 is Ok|above Int64|exactly at)|out-of-range latest"
+git checkout HEAD -- src/Sync/RelayClient.cs
+```
+
+**Revert `RelayClient.cs` and not `Protocol.cs`.** This entry's first draft reverted both and **did
+not compile** — `Protocol.MaxSeq` has three call sites in `tests/SyncHarness/Program.cs` (1020, 1070
+twice), so taking the constant away yields `error CS0117` and no test result at all, which would have
+been recorded as a measurement. Caught by the standing re-run step before commit; **second audit
+command this iteration to fail it** (the other is C-LAT-7's diff base), and the fifth recurrence of
+this shape across the series.
+
+*Expected:* with the check reverted, **four** of those lines read `FAIL` — *a 200 whose latest is
+negative*, *latest one past §3.2's cap*, *latest at Int64.MaxValue*, and *an out-of-range latest
+refuses the page even when the envelopes are fine* — while *latest exactly at §3.2's cap is still
+Ok*, *latest 0 is Ok* and *latest above Int64 is still Unavailable* keep passing. That split **is**
+the claim: the two values already refused (`1e19`, `1e300`) are refused by the **width of `Int64`**,
+not by any bound, which is why the gap looked closed. Restore with the final `git checkout`.
+
+### C-LAT-2 — the bound is `[0, 2^53-1]`, and the constant is checked by arithmetic not by transcription
+
+```bash
+grep -n "MaxSeq" src/Sync/Protocol.cs
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 \
+  | grep -E "seq cap"
+```
+
+*Expected:* `public const long MaxSeq = 9_007_199_254_740_991L;` with the docstring stating **§3.2
+lives on a sibling branch**, and two `PASS` lines — *the seq cap is 2^53-1, the largest integer a
+double represents exactly* and *the seq cap round-trips through a double unchanged, and the next
+integer up does not*. The second is the load-bearing one: it asserts the *property* that chose the
+number (all three implementations represent it exactly) rather than re-typing the digits, and the
+relay reaches the same value through an IEEE-754 double.
+
+### C-LAT-3 — §3.2 is on a SIBLING branch, so the citation is flagged and does not resolve yet
+
+```bash
+git merge-base --is-ancestor origin/claude/s2-seq-bound HEAD; echo "exit=$?"
+grep -c "^### 3.2" docs/Sync-Protocol.md
+git show origin/claude/s2-seq-bound:docs/Sync-Protocol.md | grep -c "^### 3.2"
+git diff --name-only $(git merge-base origin/claude/s2-seq-bound origin/main)..origin/claude/s2-seq-bound
+```
+
+*Expected:* **`exit=1`** (sibling, not ancestor); **`0`** occurrences of §3.2 in this branch's spec
+and **`1`** on #35's. This is the **same shape** as `InboundPump`'s §6.4 citation, which #39 flagged
+as "arriving with PR #33" — flagged rather than silent, and it resolves **on merge of both**, not
+before. The fourth command shows #35 touches **no C# file**, so `Protocol.MaxSeq` cannot conflict
+with it on merge.
+
+### C-LAT-4 — the sweep, and why 673 is corroborated rather than measured
+
+```bash
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1
+grep -rn "673\|SyncHarness | 205" scripts/Verify-Alpha.ps1 README.md src/Engine/README.md \
+  docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md
+for h in Slice ResearcherHarness HookHarness StoreParityHarness GatewayGateHarness \
+         DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  dotnet run --project tests/$h/$h.csproj -c Release --no-build 2>&1 | grep -oE "=== [0-9]+ passed"
+done
+dotnet run --project tests/EngineHarness/EngineHarness.csproj -c Release --no-build 2>&1 | tail -3
+which pwsh; apt-cache policy powershell
+```
+
+*Expected:* the pin reads **673**; the second command finds it in **six** `Assert-Contains` literals
+plus the four count-reporting docs. The nine harnesses sum to **456** (28+57+16+28+36+35+45+6+205),
+up from 445 by exactly the eleven assertions added. `EngineHarness` **aborts** at
+`FullDataDeletion.PlanWorkspace` (`src/Engine/FullDataDeletion.cs:29`) — correctly refusing a volume
+root when a Windows install path resolves to `/` — so its **217 is carried, not measured**.
+456 + 217 = **673**. The last line prints **nothing** for both: `Verify-Alpha.ps1` **did not run and
+could not**, so **673 is CORROBORATED, NOT MEASURED**, and CI on `windows-latest` is the gate. The
+rebase caveat is unchanged: `origin/main` is `aac05f3` with a pin of **611**, not comparable to 673
+on this stack's older base.
+
+### C-LAT-5 — the finding: §6.4's bound is supplied by the party it defends against
+
+```bash
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 \
+  | grep -E "honest latest bounds|inflated latest does NOT"
+git show 5c8b063 -- src/Sync/InboundPump.cs | grep -E "^\+.*(Corrected|Int64.MaxValue|supplied by the party)"
+```
+
+*Expected:* two `PASS` lines — *pump: an honest latest bounds an unauthenticated claim to the page's
+own high-water mark* and *pump: an inflated latest does NOT (open weakness, pinned — PQ-LAT-2)*. The
+identical element claiming `seq: 1000000` reaches cursor **5** under `latest: 5` and cursor
+**1000000** under `latest: Protocol.MaxSeq`.
+
+**These two assertions pin a WEAKNESS, not a fix, and that is the most attackable thing in the
+slice.** The second command shows the docstring correction: `InboundPump` previously claimed the
+bound *"denies a hostile relay a second, independent lever, because `latest` is already the number it
+must publish to say there is more"* — **false**, because `latest` and the crafted element arrive in
+the same response from the same party. The range check lowers the ceiling from `2^63-1` to `2^53-1`
+and **does not close this**. If a later slice closes it, **these two assertions SHOULD fail**.
+
+### C-LAT-6 — the obvious fix for PQ-LAT-2 is wrong, and §6 says so
+
+```bash
+sed -n '565,572p' docs/Sync-Protocol.md
+grep -n "TTL purge creates" ../careerseeker-android/docs/protocol-questions.md
+```
+
+*Expected:* §6 requires a receiver to accept `seq > highest_accepted` **"including gaps — the relay's
+TTL purge creates them"**. So `min(page.latest, cursor + elements_served)` — PQ-LAT-2's first draft,
+**corrected before it shipped** — would stall a direction forever after a retention event the
+protocol *requires* the relay to perform: after a purge a page can legitimately serve one element at
+`seq: 500`. That is §6.2's permanent stall reached by the route §6.4's own "bounded, not refused"
+reasoning rejected. The correction is recorded inside PQ-LAT-2 itself rather than silently dropped.
+
+### C-LAT-7 — seven mutations, seven caught, tree byte-identical after
+
+```bash
+git -C . status --porcelain
+git diff --stat ddd4a9a..HEAD
+```
+
+*Expected:* a **clean** tree (every mutation reverted) and **nine** changed files across the three
+commits. Note the base: `ddd4a9a` is the previous iteration's tip, **not** the PR's base
+`origin/claude/s5-inbound-pump` — diffing against the latter returns **eleven** files, because it
+also carries `src/Engine/Program.cs` and `tests/SyncLiveSmoke/Program.cs` from the twenty-seventh
+run. **This entry's first draft used the PR base and claimed nine**, which would have credited this
+slice with two files it never touched; caught by the standing re-run step before commit. The mutations and their measured results are in `LOG.md`'s C-LAT entry and in PR #45's
+follow-up comment; M2 and M7 are the row worth re-running, because each also takes down assertions
+that existed **before** this slice — M2 fails *an empty page is Ok, not a failure* and M7 fails three
+pre-existing pump assertions.
+
+### C-LAT-8 — what did NOT run, and therefore what is unverified
+
+```bash
+git diff --name-only ddd4a9a..HEAD
+head -20 ../careerseeker-android/scripts/core-probe.sh
+node docs/sync-vectors/generate.mjs --check
+git status --porcelain docs/sync-vectors/
+```
+
+*Expected:* **nine** files (see C-LAT-7 on the base), **all in the engine repo** — no `core/`, no
+`app/`, no `relay/`, no `docs/Sync-Protocol.md`, no `src/Engine/Host.cs`. So the **android gate did not run and correctly was not attempted**;
+`core-probe.sh` runs one of its four tasks and even that had nothing to run.
+`checkCoreIsAndroidFree`, `:app:assembleDebug` and `:app:lintDebug` need the Android SDK (**B-7**);
+`Verify-Alpha.ps1` needs PowerShell (C-LAT-4). The vector check prints **`OK: 29 vector files match
+the generator`** and the fourth command prints **nothing** — **zero vector bytes moved**, the android
+repo's `7328a0b` pin is intact, **no cross-repo drift event**.
+
+**Never executed:** the engine's inbound composition remains compile-checked only (`BuildSyncBridge`
+returns `null` without a pairing, the vault is DPAPI/Windows, B-9 keeps inbound OFF). **Not one byte
+was sent to a relay, an engine or a phone** — no network call of any kind was made this iteration,
+including `GET /v1/health`. The range check has been executed **only against a stub
+`HttpMessageHandler`**, never against a relay that produced one of these pages.

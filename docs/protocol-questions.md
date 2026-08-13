@@ -1654,3 +1654,109 @@ makes it reachable, because `minOf(claimed, latest)` takes the relay's `latest` 
 smaller. Closed with a fourth test; the mutation now fails exactly that test.
 
 **Re-verification:** `AUDIT-REQUEST.md` **C-CUR-1…13**.
+
+---
+
+## PQ-LAT-1 — §3.2 caps `seq`, and never says the cap reaches `latest`
+
+**Opened 2026-08-13** (twenty-eighth cloud iteration) while giving `RelayClient.PullAsync` a range
+check on `latest` (careerseeker draft PR #45). **Not a blocker.** The engine now enforces the cap on
+`latest`; this question asks the spec to *say* what the engine derived.
+
+**The rule as written.** §3.2 (careerseeker PR #35, `claude/s2-seq-bound`) caps `seq` at
+`2^53 - 1` and states three obligations:
+
+- a **sender** MUST NOT emit a larger value;
+- the **relay** MUST reject one with HTTP 400 `bad_request`;
+- a **receiver** SHOULD treat a larger value as a structural rejection (`decrypt_failed`, §3).
+
+All three are about the `seq` *inside an envelope*. §2.1 defines the pull page's `latest` as "a bare
+integer" and says nothing about its range.
+
+**Why that leaves a hole.** `latest` is not an independent number: it is `MAX(seq)` over the rows the
+relay holds for the direction (`relay/src/channel.ts:206`), and every one of those rows passed the
+relay's own seq check. So `latest` *does* inherit `seq`'s domain — but **by derivation, not by
+statement**, and the derivation runs through the relay's implementation rather than through the
+document. A receiver reading only §2.1 and §3.2 is entitled to accept any integer it can represent.
+
+**What both implementations did, measured.** Neither range-checked it. The engine's
+`TryGetInt64` and the phone's `strictLong` (`RelayClient.kt:258`, `toLongOrNull()`) fix the type and
+the width and nothing else, so both accepted the whole of `Int64`:
+
+```
+latest = -1                     -> Ok, carried through
+latest = 9007199254740992       -> Ok   (2^53, one past §3.2's cap)
+latest = 9223372036854775807    -> Ok   (Int64.MaxValue)
+latest = 10000000000000000000   -> refused (overflows Int64, not by any bound)
+```
+
+The last line is the trap: the two values that *are* refused are refused by the width of the integer
+type, which looks like a range check and is not one. The engine now refuses `latest < 0` and
+`latest > Protocol.MaxSeq`; **the phone still does not**, and is left alone deliberately — an engine
+stricter than the phone costs a conforming relay nothing, while changing the phone here would need
+the android gate this sandbox cannot run.
+
+**To close.** One sentence in §2.1 or §3.2: `latest` is a `seq` and carries `seq`'s range, `0`
+meaning the direction holds nothing. Then bound the phone's `strictLong` call site to match and add
+the case to `RelayClientTest`.
+
+**Re-verification:** `AUDIT-REQUEST.md` **C-LAT-1…4**.
+
+---
+
+## PQ-LAT-2 — §6.4's bound on an unauthenticated `seq` is supplied by the party it defends against
+
+**Opened 2026-08-13** (twenty-eighth cloud iteration), by measuring what the range check above does
+**not** fix. **Not a blocker, and it is the more serious of the two.** Recorded rather than fixed:
+the fix is a protocol change affecting both receivers.
+
+**The rule as written.** §6.4 says an element with no authenticated `seq` MAY advance the transport
+cursor by the number it *claims*, but MUST NOT advance past **the page's own `latest`**. Both
+implementations do exactly that, and `InboundPump`'s docstring argued the bound "denies a hostile
+relay a second, independent lever, because `latest` is already the number it must publish to say
+there is more".
+
+**That argument is wrong, and this iteration measured it wrong.** `latest` and the crafted element
+arrive in the **same response, from the same party**, and nothing authenticates either one. The
+"independence" is an assumption about an honest relay, inside a rule written for a dishonest one.
+Measured against the shipping `InboundPump`, one unreadable element claiming `seq: 1000000`:
+
+| page's `latest` | resulting cursor |
+| --- | --- |
+| `5` (honest) | **5** — bounded, as §6.4 intends |
+| `Int64.MaxValue` (inflated) | **1000000** — the bound is a no-op |
+
+So the history truncation §6.4 exists to prevent is reachable in full: inflate `latest`, serve one
+crafted element, and the cursor parks past every genuine envelope below it. Because the cursor never
+moves backwards, those envelopes are never requested again, and the direction presents as a healthy
+fully-caught-up sync.
+
+**What PR #45's range check does and does not do.** It lowers the reachable ceiling from `2^63 - 1`
+to `2^53 - 1`. That is a real narrowing against a garbage or rounded counter, and it is **not** a fix
+for this: `2^53 - 1` is still astronomically past any counter a real deployment reaches, so the
+attack survives the change unchanged. The two harness assertions that pin the table above are
+labelled as pinning an **open weakness** — if a later slice closes it, they SHOULD fail.
+
+**Why it was not fixed here.** Every in-band bound is relay-supplied, so closing it needs a bound
+that is not — and the obvious candidate does not survive one check.
+
+> **Corrected while drafting this entry, before it shipped.** The first draft proposed
+> `min(page.latest, cursor + elements_served)`, reasoning that a page cannot legitimately advance the
+> cursor past the number of elements it actually served. **§6 says otherwise in as many words:** a
+> receiver MUST accept `seq > highest_accepted` **"including gaps — the relay's TTL purge creates
+> them"** (`docs/Sync-Protocol.md:568`). After a purge a page can legitimately serve one element at
+> `seq: 500` with everything below it gone, and a cursor bounded to `cursor + 1` would refuse to
+> reach it — the direction stalls forever on a retention event that the protocol requires the relay
+> to perform. That is §6.2's permanent stall, arrived at by the same route §6.4's own "bounded, not
+> refused" reasoning rejected. So the element count is **not** a safe bound, and the fact that it
+> looks like one is why this needs a decision rather than a patch.
+
+What is left is a bound derived from something the relay does not choose — elapsed time, a
+receiver-side maximum advance per tick, or an accepted-envelope watermark — each of which trades a
+different property, and all of which are normative changes to §6.4 binding **both** receivers.
+Inventing one in a single engine PR is precisely the divergence this ledger exists to prevent.
+
+**To close.** Decide what bounds an unauthenticated advance when the relay supplies every in-band
+number, amend §6.4 on the branch that owns it, then move both pumps and both test suites together.
+
+**Re-verification:** `AUDIT-REQUEST.md` **C-LAT-5…6**.
