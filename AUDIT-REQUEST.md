@@ -5771,3 +5771,32 @@ No claim is made about the engine gate this iteration. The android gate did not 
 not need to: **no android source file changed**, so `:core:test` had nothing to re-measure. **CI is
 the gate in both repos**, and citing anything here as "the gate passed" is the precise failure these
 records exist to prevent.
+
+### C-IP-16 — CI ran the gate and confirmed the 641 pin (added after the section above was written)
+
+```bash
+gh api repos/ShivaClaw/careerseeker/actions/runs/31657307243 --jq '.head_sha,.status,.conclusion'
+gh api repos/ShivaClaw/careerseeker/actions/runs/31657307243/jobs --jq '.jobs[] | "\(.name): \(.conclusion)"'
+gh run view --repo ShivaClaw/careerseeker --job 94314498111 --log | grep "Offline total\|=== 173 passed"
+```
+
+*Expected:* head_sha **`ec7d0e5`** (equal to the branch tip), `completed`, **`success`**; both jobs
+success — *Build and offline harnesses* (`windows-latest`, job `94314498111`) and *Blind relay
+(Worker)* (`ubuntu-latest`, job `94314498169`); and from the log itself:
+
+```
+=== 173 passed, 0 failed ===
+=== Offline total: 641 passed, 0 failed ===
+CareerSeeker alpha verification complete.
+```
+
+So `Verify-Alpha.ps1` **ran in full and 641 is confirmed by measurement**, not by the "it throws on
+drift, so exit 0 implies it" argument. **`EngineHarness` = 217 is corroborated again** (641 − the 424
+measured on Linux), unchanged across the 610 and 625 settlements, which is what a carried number
+should do. The relay job's *Assert sync vectors match their generator* step also passed, independently
+confirming C-IP-9's zero-drift claim on a machine that is not this one.
+
+**What it does not prove.** No engine↔relay smoke ran, so **the host wiring is still unexecuted** —
+CI builds it and never constructs it, because there is no pairing vault on a runner (C-IP-12). And CI
+being green is **not** the merge condition: the policy needs a full *local* gate, so PR #39 stays a
+**DRAFT**.
