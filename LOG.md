@@ -7121,3 +7121,192 @@ worktrees were never touched, and `autonomy/codex-state` was **read and not writ
 change, logged: `apt-get update && apt-get install -y dotnet-sdk-8.0` from the Ubuntu archive — note
 the `update`, without which the archive serves a **404** on the SDK package, which the twenty-second
 run's recipe did not mention.
+
+---
+
+## PSH — the method that could not say "the relay refused" (twenty-ninth cloud iteration, 2026-08-13)
+
+**Rung:** S2 transport half, engine side. **Branch:** engine repo
+`claude/s2-relay-pull-result`, three commits (`e083f86`, `acf9ebe`, `62f1f8d`) onto `818c5b3`,
+draft PR **#45** refreshed (stacked #39 → #38 → #37 → #32). This repo: records only.
+**Questions opened:** **PQ-PSH-1**. **Questions closed:** the first bullet of **PQ-S6-3**.
+
+### Milestone 0 — the fetch, and what routed this run
+
+`git fetch --all --prune` in both trees before anything was read. Both were on detached HEADs;
+this repo's checkout was **143 commits behind** `origin/claude/android-a0-probe` and carried 10
+local-only commits — all of which are reachable from `origin/main` here (`git branch -r --contains
+ebfaf81` → `origin/main`), so nothing was lost by checking out the work branch. `careerseeker`'s
+`main` moved `00b3705..aac05f3` on the fetch. **Nothing was branched or compared before it.**
+
+**The iteration prompt was stale for the ELEVENTH consecutive run.** It assigned the S5 spec slice
+— §4.3 `entitlement_ack`, the `generate.mjs` vector, PQ-A2-1/-2/-3 — and stated S5 was "NOT
+STARTED". All of it landed in **#32/#37/#38/#39** and this repo's PR #6 between the twenty-first
+and twenty-fifth runs. It pinned the vendored vectors at **`679a317`**; they moved to **`7328a0b`**
+five runs ago. It also stated the C# applier could not be compiled here — **`dotnet-sdk-8.0`
+installs from the Ubuntu archive and nine of the ten offline harnesses run**, which is the lane
+this run worked in. Verified after the fetch rather than carried from the records.
+
+**Fourth run running where `STATE.md`'s ordered next intent, not the prompt, routed the work**, and
+it named this slice as **item 1**: *"`RelayClient.PushAsync` is the same defect one method over…
+now the largest offline-verifiable gap."* Terra's `autonomy/codex-state` read first, as required:
+heartbeat `2026-08-12T20:28:36`, **"COMPLETE… the ladder is exhausted"**, **files claimed: none** —
+no collision, right-of-way not contested.
+
+### Milestone 1 — the defect, and the number it threw away
+
+`PushAsync` returned `res.StatusCode is HttpStatusCode.Created` — a bare `bool`. So **a 409
+`replay_rejected`, a 400, a 413, a timeout and a DNS failure were the same value.** Three of those
+are permanent for the bytes in hand and two are worth retrying, and no caller could tell which it
+had.
+
+**The 409 is the load-bearing case, and this is the half that makes it more than a tidiness
+complaint.** §6.1 requires a sender to resume above `max(persisted_seq, relay_latest)`, and the
+relay puts `latest` in the very body that reports the counter is wrong — **discarded unread**. So
+the engine could neither reconcile up front nor recover from the refusal telling it to. PQ-S6-3
+recorded exactly this in two bullets; **the first is now closed.**
+
+The seven cases were derived from `relay/src/index.ts:40-70` and `relay/src/channel.ts:138-191`,
+not assumed: `Ok` / `Conflict(latest)` / `Unauthorised` / `Misconfigured` / `Rejected` / `TooLarge`
+/ `Unavailable`. Re-verify: **C-PSH-1**.
+
+### Milestone 2 — three decisions that are arguments, not preferences
+
+**1. A 409 with an unusable `latest` stays `Conflict(null)` and is NEVER downgraded to
+`Unavailable`.** The conflict is a fact independent of the number — the relay refused the seq, and
+that is true whether or not it explained itself. Reporting it as "the relay did not answer" tells
+the caller to retry the one thing that provably cannot work, which §2.2 forbids in as many words.
+**This is a deliberate asymmetry with `PullAsync`, which refuses the whole page on a bad `latest`:**
+there the number governs a cursor about to advance, here it is an optional aid to a decision
+already made. **M5 is the measurement behind it** — the plausible alternative fails ten assertions.
+
+**2. The 409's `latest` gets the same range check as a pull page's, and it matters more here.**
+`TryGetInt64` fixes the type and the width and nothing else. A sender resumes **above** this
+number, so it reaches the wire as the next envelope's `seq` — where the pull cursor's `latest`
+never does. An absurd-but-integral value burns the direction's whole domain.
+
+**3. 400 and 413 stay distinct**, because the remedies differ: a malformed envelope is a defect on
+this side to fix, an oversized one is a payload to split (§4.4).
+
+**And the 201 body is deliberately not parsed.** A relay that appended the envelope and answered
+with an unreadable body **has still appended it**; reporting that as a failure would make the
+sender retry bytes the relay already holds — which it then refuses with the 409 above, turning a
+cosmetic problem into a real one. Pinned by M9.
+
+### Milestone 3 — proven live: nine mutations, nine caught
+
+`SyncHarness` **205 → 236, 0 failed** — baseline **re-measured this session**, not quoted;
+`dotnet build CareerSeeker.sln -c Release` **0 warnings / 0 errors**.
+
+| mutation | measured |
+| --- | --- |
+| M1 409 falls through to `Unavailable` | **222 / 14** |
+| M2 drop the range check on `latest` | 233 / 3 |
+| M3 range check off-by-one (`>` → `>=`) | 235 / 1 |
+| M4 drop the lower bound alone | 235 / 1 |
+| M5 unusable `latest` downgrades to `Unavailable` | **226 / 10** |
+| M6 accept 200 as appended alongside 201 | 235 / 1 |
+| M7 collapse `Rejected` into `TooLarge` | 235 / 1 |
+| M8 swallow caller cancellation | 235 / 1 |
+| M9 parse the 201 body, fail if unreadable | 235 / 1 |
+
+**M1 and M5 failing different sets is the row worth reading:** it shows Conflict-the-case and
+Conflict's-number are independently pinned, rather than one assertion cluster answering to both.
+Three assertions also pin the **wire form**, which nothing offline had ever asserted — the bearer,
+the route, and that the body is the envelope byte for byte (a client that re-serialised it would
+change the bytes the AAD was computed over, and the receiver's tag check would notice far
+downstream). **The detector reads the harness result line, not a grep for `error`** — the
+twenty-seventh run's detector matched `dotnet`'s own `0 Error(s)` banner and called all seven
+mutations "DID NOT COMPILE". Re-verify: **C-PSH-2**.
+
+### Milestone 4 — the finding this produced on the OTHER side (PQ-PSH-1)
+
+Writing the engine's `Rejected` case is what exposed the phone's missing one. `RelayClient.kt` has
+**no `BadRequest` case** (`grep -c` → **0**), so a 400 falls to the `else` arm — **directly beneath
+a comment claiming "5xx and 429 are the only retryable answers"**. It is retried 4 times, becomes
+`Unavailable`, and `OutboundQueue.kt:245` maps that to `PushOutcome.Retry`, which keeps the bytes
+and re-sends indefinitely.
+
+**So a sender-side defect is presented to the user as an offline condition** — the one diagnosis
+that makes it invisible, showing "waiting for network" while the relay answers promptly and says
+exactly what is wrong. It needs no phone bug to reach: a relay that tightens its shape check 400s
+every push from an older phone, and version skew is precisely when that misdiagnosis is most
+expensive. **Not fixed here** — it needs the android gate (**B-7**) and its own derivation, since
+PQ-S2-4 already established the phone's status mapping is not the engine's to copy. Re-verify:
+**C-PSH-5**.
+
+### Milestone 5 — the pin, swept as one unit, and exactly what 704 is worth
+
+`$ExpectedOfflineTotal` **673 → 704**, with six `Assert-Contains` literals and the four
+count-reporting docs moved in the same commit, per the drift trap.
+
+**704 is CORROBORATED, NOT MEASURED.** `Verify-Alpha.ps1` did not run and could not — `which pwsh`
+empty and `apt-cache policy powershell` returns nothing, **both re-checked this session**. What was
+measured is the **Linux sum: 487**, harness by harness (28 + 57 + 16 + 28 + 36 + 35 + 45 + 6 +
+236), up from **445** by exactly the thirty-one assertions added. `EngineHarness`'s **217 is
+carried, not measured**: it aborts at `FullDataDeletion.PlanWorkspace`, **correctly** refusing a
+volume root when a Windows install path resolves to `/`. 487 + 217 = **704**. **CI on
+`windows-latest` is the gate** — it runs the script that throws on a pin mismatch. **The rebase
+caveat stands:** `origin/main` is `aac05f3` and its pin reads **611** against this stack's **704**
+on an older base; not comparable, and **704 must not be carried across a rebase blindly.**
+
+**0 vector bytes moved** — `--check` **OK at 29**, `git status --porcelain docs/sync-vectors/` empty.
+The `7328a0b` pin is intact and there was **no cross-repo drift event**. Re-verify: **C-PSH-3, C-PSH-4**.
+
+### Milestone 6 — one flagged citation, and one of my own audit commands rewritten
+
+**§2.2 is cited from a branch that does not contain it.** `RelayPushResult`'s comments cite §2.2
+for the 409's `latest`; §2.2 lives on **sibling** branch `claude/s2-transport-vocabulary`
+(`merge-base --is-ancestor` exits **1**; §2.2 count **0** here, **1** there). **Third citation of
+this shape**, after `InboundPump`'s §6.4 and `Protocol.MaxSeq`'s §3.2 — flagged in the commit and
+in the PR rather than quietly reworded, and it **resolves on merge of both PRs, not before**.
+
+**And C-PSH-8's first draft asserted nothing.** It ran `git diff --name-only … -- core/ app/` in the
+**engine** repo, where those paths do not exist — so it would have printed nothing and been recorded
+as proof that no android source changed, when it could not have printed anything either way. Caught
+by the standing re-run step and rewritten to run in the android repo. **Sixth recurrence of this
+shape** (after CR-6, C-CR-3, C-SC-1/-3/-4, C-RPR-8 and C-LAT-1/-7); as the twenty-eighth run said,
+the count now indicts the drafting habit rather than the individual commands — **every audit command
+must be executed where it will be read, not merely composed.**
+
+### Ladder movement
+
+**S2 stays PARTIAL**, and the sentence the last two runs added applies a third time: **this is the
+sixth hardening of S2's transport half, and B-2 — the missing desktop `/pair` page, which is the
+whole of what B-2 is about — has still not moved.** A session picking S2 again should read that
+first. **No new blocker**; nothing here was blocked. `AUDIT-REQUEST.md` gains **C-PSH-1…8**;
+`docs/protocol-questions.md` gains **PQ-PSH-1**.
+
+### What this slice deliberately did NOT do
+
+**No counter reconciliation.** PQ-S6-3's second bullet — construct the publisher with
+`max(vault.LastE2pSeq, relay latest e2p)` and act on `Conflict` — is **still open**. Acting on it
+needs a surface `SyncPublisher` does not have (its counter is private and assigned by
+`Interlocked.Increment`), and a constructor/startup-path change wants the full local gate. The host
+therefore **logs each case distinctly and changes no control flow**, and the code says so where a
+reader will find it rather than leaving the gap to be inferred. **No phone change** (PQ-PSH-1,
+B-7). **No `docs/Sync-Protocol.md` amendment** — §2.2 already says what this code needed, on the
+branch that owns it.
+
+### Prohibition — what this iteration did not touch
+
+**No android source changed** — not `core/`, not `app/`, not a screen, not the Room replica, not the
+migration tests; this repo received **records only** (`LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`,
+`docs/protocol-questions.md`), so the **android gate did not run and correctly was not attempted**
+(`checkCoreIsAndroidFree`, `:app:assembleDebug`, `:app:lintDebug` need the SDK — **B-7**). In the
+engine repo: **no `relay/` source, no TypeScript, no `docs/sync-vectors/` byte** (`--check` OK at
+29, `git status --porcelain` empty — the `7328a0b` pin is intact and there was **NO cross-repo
+drift event**), **no `generate.mjs`, no `docs/Sync-Protocol.md`, no `src/Engine/Host.cs`, no
+`docs/autonomy/*`.** No engine C# outside `RelayClient.cs` and `Program.cs`'s sink lambda. **No
+merge in either repo**, no force-push, no history rewrite, no branch deleted; draft PRs **#26 and
+#32–#45** in the engine repo and **#1–#6** here were left exactly as found — not merged, retargeted
+or rebased. No deploy of any kind (Cloudflare, Workers, relay, site, Pages), and **the production
+relay was not contacted at all, not even `GET /v1/health`** — **not one byte was sent to a relay, an
+engine or a phone this run.** `PushAsync` has been executed **only against a stub
+`HttpMessageHandler`**; the engine's inbound composition remains compile-checked and never
+constructed. No Play, Google or OAuth console; no accounts, no purchases, no Play Billing code; no
+Gmail, no email; no MSIX or certificate-store action; no emulator, no `sdkmanager`, no keystore use.
+**No secret was read, printed or referenced.** `Documents\CareerSeeker` and Terra's worktrees were
+never touched, and `autonomy/codex-state` was **read and not written**. One machine change, logged:
+`apt-get update && apt-get install -y dotnet-sdk-8.0` — note the `update`, without which the archive
+serves a 404 on the SDK package.

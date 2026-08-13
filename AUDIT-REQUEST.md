@@ -6427,3 +6427,160 @@ requires a full *local* gate (`-IncludePublish -IncludePackage`), which remains 
 and the android repo is **never-self-merge**. **#45 stays a DRAFT** and inherits #39's ordering
 constraint. CI also **cannot** touch the standing limit: it builds the engine's inbound composition
 and never constructs it, because a runner has no pairing vault.
+
+---
+
+## C-PSH — `RelayClient.PushAsync`'s failure channel (twenty-ninth cloud iteration, 2026-08-13)
+
+Engine repo, branch `claude/s2-relay-pull-result`, draft PR **#45**. Auditor setup:
+
+```bash
+cd careerseeker && git fetch --all --prune
+git checkout claude/s2-relay-pull-result     # tip 62f1f8d
+sudo apt-get update && sudo apt-get install -y dotnet-sdk-8.0   # the `update` is required
+dotnet build CareerSeeker.sln -c Release
+```
+
+### C-PSH-1 — the headline: 205 → 236, and the build stays clean
+
+```bash
+dotnet build CareerSeeker.sln -c Release 2>&1 | grep -E "Warning|Error"
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -2
+```
+
+*Expected:* **0 Warning(s) / 0 Error(s)** and **`=== 236 passed, 0 failed ===`**. The **205**
+baseline was re-measured in this session before any edit, not quoted from the previous record.
+
+### C-PSH-2 — nine mutations, nine caught (the assertions are load-bearing)
+
+Each edit is to `src/Sync/RelayClient.cs`; rebuild and re-run C-PSH-1 after each, then restore.
+
+| # | mutation | expected |
+| --- | --- | --- |
+| M1 | delete the `case HttpStatusCode.Conflict:` arm (409 falls to `default`) | **222 / 14** |
+| M2 | delete `if (latest < 0 \|\| latest > Protocol.MaxSeq) return null;` in `ConflictLatest` | **233 / 3** |
+| M3 | that line's `>` → `>=` | **235 / 1** |
+| M4 | drop its lower bound, keeping `if (latest > Protocol.MaxSeq)` | **235 / 1** |
+| M5 | return `Unavailable` when `ConflictLatest` yields null | **226 / 10** |
+| M6 | add `case HttpStatusCode.OK:` above `case HttpStatusCode.Created:` | **235 / 1** |
+| M7 | `case HttpStatusCode.BadRequest:` returns `TooLarge` | **235 / 1** |
+| M8 | delete the `when (ct.IsCancellationRequested) { throw; }` catch | **235 / 1** |
+| M9 | make the 201 arm parse its body and return `Unavailable` when unreadable | **235 / 1** |
+
+**M5 is the row to read first.** It is the plausible-looking alternative design — "an unusable
+`latest` means the answer was no good" — and it takes down **ten** assertions, which is the
+measurement behind the commit arguing that choice rather than asserting it. **M1 and M5 failing
+different sets** is what shows Conflict-the-case and Conflict's-number are independently pinned.
+
+**Detector warning, and it is not hypothetical.** Read the harness's own
+`=== N passed, M failed ===` line. Testing build output for the substring `error` matches `dotnet`'s
+`0 Error(s)` banner and reports every mutation as "DID NOT COMPILE" — that is what the twenty-seventh
+run's first pass did, and the false result was the flattering one.
+
+### C-PSH-3 — the pin 673 → 704 is arithmetic, and is NOT a Verify-Alpha measurement
+
+```bash
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1
+for h in Slice EngineHarness ResearcherHarness HookHarness StoreParityHarness \
+         GatewayGateHarness DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  echo -n "$h: "
+  dotnet run --project tests/$h/$h.csproj -c Release --no-build 2>&1 \
+    | grep -oE "=== [0-9]+ passed, [0-9]+ failed ===" | tail -1
+done
+which pwsh; apt-cache policy powershell
+```
+
+*Expected:* the pin reads **704**. The loop prints **28, 57, 16, 28, 36, 35, 45, 6, 236** and
+**EngineHarness prints nothing** — it aborts at `FullDataDeletion.PlanWorkspace`
+(`src/Engine/FullDataDeletion.cs:29`), **correctly** refusing a volume root when a Windows install
+path resolves to `/` on Linux. Linux sum **487** (was 445 — up by exactly the 31 assertions added).
+`EngineHarness` = **217**, *carried, not measured*; 487 + 217 = **704**. The last two commands print
+**nothing at all**: there is no PowerShell here and none in the Ubuntu archive, both **re-checked
+this session** rather than carried.
+
+**So 704 is CORROBORATED, NOT MEASURED.** `scripts/Verify-Alpha.ps1` did not run and could not.
+**CI on `windows-latest` is the gate** — it runs the script, which throws on a pin mismatch.
+**The rebase caveat stands:** `origin/main` is `aac05f3` and its pin reads **611**, while this stack
+reads **704** on its own older base. Not comparable; **704 must not be carried across a rebase
+blindly.**
+
+### C-PSH-4 — zero vector bytes moved, so no cross-repo drift event
+
+```bash
+node docs/sync-vectors/generate.mjs --check
+git status --porcelain docs/sync-vectors/
+```
+
+*Expected:* **`OK: 29 vector files match the generator.`** and the second command prints **nothing**.
+The android repo's vendored pin `7328a0b` is intact. **No vector file was added, edited or
+regenerated this iteration.**
+
+### C-PSH-5 — the phone finding (PQ-PSH-1): a 400 is retried, and the comment says it is not
+
+In the **android** repo, `claude/android-a0-probe`:
+
+```bash
+grep -c "BadRequest" core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+sed -n '287,292p' core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+grep -n "is RelayResult.Unavailable ->" core/src/main/kotlin/app/careerseeker/core/OutboundQueue.kt
+```
+
+*Expected:* the count is **0** — the phone has no 400 case, so a 400 falls to the `else` arm
+**directly beneath a comment claiming "5xx and 429 are the only retryable answers"**. It is then
+retried 4 times, becomes `Unavailable`, and line **245** maps that to `PushOutcome.Retry`, which
+keeps the bytes and re-sends indefinitely. **A sender-side defect presented as an offline
+condition.** Not fixed here: it needs the android gate (**B-7**) and its own derivation (PQ-S2-4
+already shows the phone's status mapping is not the engine's to copy).
+
+### C-PSH-6 — the §2.2 citation is FLAGGED, not glossed
+
+```bash
+git merge-base --is-ancestor origin/claude/s2-transport-vocabulary HEAD; echo "exit=$?"
+grep -c '^### 2.2' docs/Sync-Protocol.md
+git show origin/claude/s2-transport-vocabulary:docs/Sync-Protocol.md | grep -c '^### 2.2'
+```
+
+*Expected:* **exit 1** (a sibling branch, not an ancestor), then **0** here and **1** there. So
+`RelayPushResult`'s doc comments cite a section this branch does not contain — the **third** citation
+of this shape, after `InboundPump`'s §6.4 and `Protocol.MaxSeq`'s §3.2. It **resolves on merge of
+both PRs, not before**, and is recorded rather than quietly reworded.
+
+### C-PSH-7 — exactly which files moved, and which did not
+
+```bash
+git diff --name-only 818c5b3..HEAD
+```
+
+*Expected:* **nine** files — `src/Sync/RelayClient.cs`, `src/Engine/Program.cs`,
+`tests/SyncHarness/Program.cs`, `tests/SyncLiveSmoke/Program.cs`, `scripts/Verify-Alpha.ps1`,
+`README.md`, `src/Engine/README.md`, `docs/CareerSeeker-Project-Summary.md`,
+`docs/External-Audit-Handoff.md`. **All in the engine repo.** Note the base is **this slice's**
+parent `818c5b3`, not the PR's base — the twenty-eighth run's audit command used the PR base and
+would have credited the slice with two files it never touched.
+
+No `core/`, no `app/`, no `relay/`, no `docs/Sync-Protocol.md`, no `docs/sync-vectors/`, no
+`generate.mjs`, no `src/Engine/Host.cs`.
+
+### C-PSH-8 — what did NOT run, stated because it is the whole of what is unverified
+
+Run this one in the **android** repo — `core/` and `app/` do not exist in the engine repo, so
+asking there would pass trivially and prove nothing:
+
+```bash
+cd careerseeker-android && git diff --name-only cd58689..HEAD
+git diff --name-only cd58689..HEAD -- core/ app/     # the android gate's inputs
+```
+
+*Expected:* the first lists **records only** — `LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`,
+`docs/protocol-questions.md` — and the second prints **nothing**. No android source changed, so the
+android gate **did not run and correctly was not attempted** (`:app:assembleDebug`,
+`:app:lintDebug`, `checkCoreIsAndroidFree` need the SDK — **B-7**). `Verify-Alpha.ps1` needs
+PowerShell (C-PSH-3).
+
+**Never executed:** `PushAsync` has been driven **only against a stub `HttpMessageHandler`**, never
+against a relay that produced one of these statuses — the live proof is `SyncLiveSmoke`, which needs
+a relay and is excluded from the hermetic suite. Its sharpened replay assertion (`the 409 carries the
+relay's e2p high-water mark`) is therefore **written and unrun**. The engine's inbound composition
+remains compile-checked and never constructed (`BuildSyncBridge` returns `null` without a pairing;
+the vault is DPAPI/Windows). **Not one byte was sent to a relay, an engine or a phone this
+iteration — no network call of any kind, including `GET /v1/health`.**

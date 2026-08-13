@@ -1760,3 +1760,59 @@ Inventing one in a single engine PR is precisely the divergence this ledger exis
 number, amend §6.4 on the branch that owns it, then move both pumps and both test suites together.
 
 **Re-verification:** `AUDIT-REQUEST.md` **C-LAT-5…6**.
+
+---
+
+## PQ-PSH-1 — The phone retries a malformed envelope forever, and its own comment says it does not
+
+**Opened 2026-08-13 (S2 push result, twenty-ninth cloud iteration).** Found while giving the
+**engine's** `PushAsync` a failure channel — the engine half is fixed on `claude/s2-relay-pull-result`
+and this is the phone half, **deliberately not fixed here** because it needs the android gate
+(**B-7**), not because anything about it is unclear.
+
+**What the phone does.** `core/.../RelayClient.kt` maps relay statuses inside its retry loop:
+
+```kotlin
+HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden -> return RelayResult.Unauthorised
+HttpStatusCode.NotFound   -> return RelayResult.PairingUnknown
+HttpStatusCode.Conflict   -> return RelayResult.Conflict(conflictLatest(response.bodyAsText()))
+HttpStatusCode.PayloadTooLarge -> return RelayResult.TooLarge
+
+// 5xx and 429 are the only retryable answers: they say "not now", whereas
+// every 4xx above says "not ever", and retrying those just burns battery
+// and adds load to a relay that already told us the answer.
+else -> "relay answered ${response.status.value}"
+```
+
+**`HttpStatusCode.BadRequest` is not in that list** (`grep -c BadRequest` → **0**), so a 400 falls to
+`else`. The comment is describing an intent the code does not implement: the enumerated 4xx are
+terminal, but 400 — equally "not ever" — is treated as "not now".
+
+**What follows, in full.** A 400 is retried `retry.attempts` (**4**) times with backoff, then becomes
+`RelayResult.Unavailable`, and `OutboundQueue` maps that to `PushOutcome.Retry` — *"Keep the bytes.
+Offline is not a data-loss event"* (`OutboundQueue.kt:245`). So the envelope is kept and re-sent
+indefinitely. **A sender-side defect is therefore presented to the user as an offline condition**,
+which is the one diagnosis that makes it invisible: the phone shows "waiting for network" while the
+relay is answering promptly and telling it exactly what is wrong. 405 and 426 take the same path.
+
+**Reachable how.** The relay answers 400 when the body will not parse or the envelope fails its
+header-shape check (`relay/src/channel.ts:143-159`). Two live routes to it: a bug in the phone's
+own envelope composition, and — the one that needs no bug at all — **version skew**, where a relay
+that tightens its shape check 400s every push from an older phone. That is precisely when "the
+network is down" is the most expensive possible misdiagnosis.
+
+**What the engine now does, for contrast.** `RelayPushResult.Rejected` is its own case, separate from
+`TooLarge`, because the remedies differ: a malformed envelope is a defect to fix, an oversized one is
+a payload to split (§4.4). The engine's harness pins it (`400 is Rejected`), and the mutation that
+collapses the two fails that assertion.
+
+**Not fixed unilaterally**, per this ledger's standing rule and because the fix cannot be verified
+here: `:app:assembleDebug`/`:core:test` need the Android SDK (**B-7**). It is also **not** a mere
+transcription of the engine's mapping — the phone's `PairingUnknown`/`Misconfigured` split already
+differs for a measured reason (PQ-S2-4), so the phone's 400 case needs its own derivation.
+
+**To close.** Add a terminal case for 400 on the phone, decide whether `OutboundQueue` should drop or
+quarantine those bytes (dropping silently is its own data-loss question, which is why this is a
+question and not a patch), and run the full android gate.
+
+**Re-verification:** `AUDIT-REQUEST.md` **C-PSH-5**.
