@@ -6586,3 +6586,143 @@ email; no MSIX or certificate-store action; no emulator, no `sdkmanager`, no key
 was read, printed or referenced other than by the name of an environment variable that does not exist
 on this machine. `Documents\CareerSeeker` and Terra's `CareerSeeker-r6-sbom` worktree were never
 touched, and `autonomy/codex-state` was read and not written.
+
+## CUR — parsing is not authenticating, and §6.4 was drawn at the wrong word (2026-08-13, twenty-sixth cloud iteration)
+
+**Rung:** S4/S5 boundary — **PQ-CUR-1, closed on both sides.** **Branches:** engine repo
+`claude/s4-pull-request-semantics` (draft PR **#33**, commit `3a8dfdd`) and this repo
+`claude/android-a0-probe`. **Questions opened:** none. **Questions closed:** **PQ-CUR-1**.
+
+### CUR-0 — the iteration prompt was stale for the eighth consecutive run, and the records routed it
+
+Derived after the mandatory fetch, before anything was written. The prompt assigned the S5 **spec**
+slice — amend §4.3 for `entitlement_ack`, add its vector, close PQ-A2-1/-2/-3 — and stated S5 was
+"NOT STARTED". Every one of those landed between the twenty-second and twenty-fifth runs (engine PRs
+#32, #37, #38, #39; this repo's #6). The prompt also pinned the vendored vectors at `679a317`; the
+twenty-fourth run moved them to **`7328a0b`**.
+
+This is the eighth such correction and the second in a row where the records were *right and
+complete* and the prompt still did not reflect them. `STATE.md`'s **ordered next intent** — written
+by the twenty-fifth run, items 1 and 2 — is what routed this run, and it named exactly this slice:
+amend §6.4 first, then bound the phone, in that order and for a stated reason. **The records are
+now load-bearing infrastructure, and the prompt is not.**
+
+### CUR-1 — the defect, which is one word wide
+
+§6.4 (engine PR #33) governs the transport cursor. It said:
+
+- the cursor MUST NOT move backwards;
+- it MUST advance only to a `seq` **recovered from the sealed bytes**, except under the bound;
+- **when an element fails the §3 parse**, it MAY advance by the element's claimed top-level `seq`,
+  bounded by the page's `latest`.
+
+A `seq` is recovered from the sealed bytes **only when the AEAD tag verifies** — the seq lives in
+the AAD, and the tag is what turns a claim into a fact. So an element that parses cleanly and then
+fails the tag was covered by **neither** rule: no authenticated seq, so the MUST forbade advancing;
+not a parse failure, so the carve-out did not reach it. Read literally, §6.4 said the cursor may not
+move at all for a forged-but-well-formed element — **the permanent stall §6.2 forbids in as many
+words**, reachable by serving one crafted element.
+
+The boundary is **accepted vs. not accepted**, not *parsed vs. not parsed*.
+
+### CUR-2 — what each implementation actually did, measured
+
+| | on a parseable envelope whose tag fails |
+| --- | --- |
+| engine (`InboundPump`, PR #39) | advanced **bounded** by the page's `latest` |
+| phone (`SyncPump.kt:260`, before this change) | advanced by the header `seq`, **unbounded** |
+
+The phone's line was `val seq = header?.seq ?: minOf(envelope.seq, page.latest)` — the bound applied
+only on the `null` branch. The advance also happened **before** `receiver.receive` was called, so the
+cursor was committed on the strength of the parse alone.
+
+### CUR-3 — the fix, in the order PQ-CUR-1 prescribed
+
+**Spec first** (`3a8dfdd`, PR #33): the carve-out now reads "for **every other element** — one that
+fails the §3 parse, *and* one that parses and is then rejected for any reason, **the AEAD tag
+included**". A new paragraph, *Parsing is not authenticating*, states why the two failures are one
+case, and three later sentences that said "malformed element" were widened to "unauthenticated
+element" — the rule now covers well-formed elements that no key opens, and "malformed" understated
+it.
+
+**Phone second** (`SyncPump.kt`): the advance moved *below* the receive call and split three ways —
+unparseable → `advanceBounded(envelope.seq, page.latest)`; parsed-but-refused →
+`advanceBounded(header.seq, page.latest)`; **accepted → unbounded**, because the tag has now verified
+over the AAD carrying that seq. `advanceBounded` is one private helper, deliberately not
+distinguishing *which* check refused the element, mirroring the engine's `InboundPump.AdvanceBounded`.
+
+Doing the phone first would have written a rule into the phone that the normative document does not
+state — the thirteenth run's §2.1 defect in reverse.
+
+### CUR-4 — measured, and proven by mutation
+
+`:core:test` via `scripts/core-probe.sh`, **baseline re-measured this session** rather than quoted:
+**272 → 276 tests, 0 failed, 18 classes**.
+
+**M1 — revert the production file, keep the new tests.** The three PQ-CUR-1 tests **FAILED** and
+nothing else did. That is the finding in one measurement: **the 272 pre-existing tests could not see
+this bug**, and the three new ones are regression catchers rather than pins.
+
+**M2 — drop the `latest` bound** (`minOf(claimed, latest)` → `claimed`). **Five** failures: the three
+new tests *and* the two pre-existing parse-failure bound tests. That is the property worth having —
+after this change there is exactly **one** bounded path, shared, so removing it breaks both halves.
+
+**M3 — clamp the authenticated seq too** (`header.seq` → `minOf(header.seq, page.latest)`). **One**
+failure: the pre-existing `an authenticated seq above latest still moves the cursor`. Proof the
+change did not over-clamp — bounding an accepted seq would hand the relay the opposite lever, letting
+an understated `latest` hold a receiver below envelopes it has already read.
+
+**M4 — drop the never-backwards guard. It SURVIVED, at 275/0.** §6.4's *first* bullet is a MUST and
+**no test on this side asserted it**. A real test gap, not a semantically equivalent change — and the
+bound is what makes it reachable, because `minOf(claimed, latest)` takes the relay's `latest`
+whenever it is smaller, so a page understating `latest` would drag the cursor *down* and re-request
+envelopes already accepted, which the replay window then refuses: the pull-the-same-page-forever loop
+rule 1 exists to prevent. Closed with a fourth test, in the same shape as the engine's existing
+`the cursor never moves backwards (seeded at 20, page claims 2)`, and **M4 re-run against it fails
+exactly that one test** — so the guard is now pinned rather than incidentally true. **Four mutations,
+three caught on the first pass, four of four after the gap was closed.**
+
+### CUR-5 — the limit, stated because it is the whole of what is unverified
+
+**The dangling citation is NOT removed by this change.** `claude/s4-pull-request-semantics` and
+`claude/s5-inbound-pump` are **siblings**, not ancestor and descendant (`merge-base --is-ancestor`
+exits 1), so `InboundPump.cs` still cites a §6.4 its own branch does not contain. The two PRs must
+still land together. What this change fixes is the section's *content*; the citation resolves on
+merge, and not before. PR #39's comment says "arriving with PR #33" out loud, so it is a flagged
+citation rather than a silent one.
+
+**The android gate did NOT run and could not.** `scripts/core-probe.sh` runs **one** of its four
+tasks. `checkCoreIsAndroidFree`, `:app:assembleDebug` and `:app:lintDebug` need the Android SDK
+(B-7); `Verify-Alpha.ps1` needs PowerShell, which is not here and not in the Ubuntu archive. **CI is
+still the gate**, and citing this run as "the android gate passed" would be the exact failure these
+records exist to prevent. No `:app` file changed, so the standing `ScreensFromFixtureTest` flake is
+the only expected source of a red first attempt.
+
+**Nothing was executed against a relay, an engine, or a phone.** The pump's *rules* are tested; the
+composition is still the host wiring the twenty-fifth run recorded as compile-checked-never-executed.
+
+### CUR-6 — the drift traps, both checked rather than assumed
+
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 28 vector files match the generator`**, and
+`git diff --name-only docs/sync-vectors/` prints **0**. **No vector byte moved**, so the `7328a0b`
+vendored pin is intact and **no cross-repo drift event occurred**.
+
+`grep -c "Sync-Protocol" scripts/Verify-Alpha.ps1` → **0**. The verifier carries no assertion against
+the normative protocol document, so the doc/verifier drift trap is **not engaged** by the §6.4 edit
+and `$ExpectedOfflineTotal` (**598** on PR #33's branch) is untouched and could not have moved. No
+harness assertion was added or removed in the engine repo this run.
+
+### Prohibition — what this iteration did not touch
+
+**No engine C# changed** — the engine half of PQ-CUR-1 was already correct; this run edited exactly
+one Markdown file there. No `relay/` source, no `docs/sync-vectors/` byte, no `generate.mjs`. In this
+repo, **only `core/` moved** — `app/` is untouched, and so are every screen, the Room replica and the
+migration tests. No merge in either repo, no force-push, no history rewrite, no branch deleted; draft
+PRs #26 and #32–#39 in the engine repo and #1–#5 here were left exactly as found, not merged,
+retargeted or rebased. No deploy of any kind (Cloudflare, Workers, relay, site, Pages), and **the
+production relay was not contacted at all, not even `GET /v1/health`**. No Play, Google or OAuth
+console; no accounts, no purchases, no Play Billing code; no Gmail, no email; no MSIX or
+certificate-store action; no emulator, no `sdkmanager`, no keystore use. No secret was read, printed
+or referenced other than by the name of an environment variable that does not exist on this machine.
+`Documents\CareerSeeker` and Terra's worktrees were never touched, and `autonomy/codex-state` was
+read and not written.

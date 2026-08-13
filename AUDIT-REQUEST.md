@@ -5800,3 +5800,177 @@ confirming C-IP-9's zero-drift claim on a machine that is not this one.
 CI builds it and never constructs it, because there is no pairing vault on a runner (C-IP-12). And CI
 being green is **not** the merge condition: the policy needs a full *local* gate, so PR #39 stays a
 **DRAFT**.
+
+## §C-CUR — PQ-CUR-1, closed on both sides (2026-08-13, twenty-sixth cloud iteration)
+
+Engine-repo claims are against `claude/s4-pull-request-semantics` at `3a8dfdd` (draft PR #33);
+android claims against `claude/android-a0-probe`. `<engine>` is a clone of `ShivaClaw/careerseeker`,
+`<android>` a clone of this repo. Every command below was executed before being written down.
+
+### C-CUR-1 — The defect: §6.4's carve-out named the parse, not the tag
+
+```bash
+cd <engine> && git show b114d11:docs/Sync-Protocol.md | sed -n '/### 6.4 The transport cursor/,/^\*\*Why bounded/p' | grep -n "fails the §3 parse\|recovered from the sealed bytes"
+```
+
+*Expected:* on the **pre-change** commit, the MUST names "recovered from the sealed bytes" and the
+only carve-out is "When an element fails the §3 parse". An element that parses and then fails the
+AEAD tag matches neither clause: no authenticated seq, so the MUST forbids advancing; not a parse
+failure, so the carve-out does not reach it.
+
+### C-CUR-2 — The amendment, read as shipped text
+
+```bash
+cd <engine> && sed -n '/### 6.4 The transport cursor/,/^\*\*Why bounded/p' docs/Sync-Protocol.md
+```
+
+*Expected:* the `Amended 2026-08-13 (PQ-CUR-1)` note; a bullet reading "For **every other element** —
+one that fails the §3 parse, *and* one that parses and is then rejected for any reason, **the AEAD
+tag included**"; and the `Parsing is not authenticating, and that is where the line falls` paragraph
+stating the boundary is *accepted vs. not accepted*.
+
+### C-CUR-3 — Three sentences widened from "malformed" to "unauthenticated"
+
+```bash
+cd <engine> && grep -c "malformed element" docs/Sync-Protocol.md
+cd <engine> && grep -c "unauthenticated element" docs/Sync-Protocol.md
+```
+
+*Expected:* **0** and **3**. The rule now covers well-formed elements that no key opens, so
+"malformed" understated it; leaving those three sentences would have re-stated the original defect in
+prose one paragraph below its correction.
+
+### C-CUR-4 — The phone's hole, read off the pre-change line
+
+```bash
+cd <android> && git show 9d5f1fd:core/src/main/kotlin/app/careerseeker/core/SyncPump.kt | grep -n "header?.seq ?: minOf"
+```
+
+*Expected:* one hit, `val seq = header?.seq ?: minOf(envelope.seq, page.latest)`. The bound is on the
+`null` branch only, and the assignment sits **above** the `receiver.receive` call — so the cursor was
+committed on the strength of the parse alone.
+
+### C-CUR-5 — The phone's fix: three paths, one bounded helper
+
+```bash
+cd <android> && sed -n '/PARSING IS NOT AUTHENTICATING/,/if (seq > cursorValue) cursorValue = seq/p' core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+cd <android> && sed -n '/Advance the cursor to \[claimed\]/,/^    }/p' core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+```
+
+*Expected:* the unparseable branch calling `advanceBounded(envelope.seq, page.latest)`, the
+refused branch calling `advanceBounded(header.seq, page.latest)`, and the accepted path taking
+`header.seq` with **no bound**; then `advanceBounded`'s body, `minOf(claimed, latest)` guarded by
+`bounded > cursorValue`. The two callers are deliberately not distinguished — §6.4 asks whether the
+seq is authenticated, not which check refused the element.
+
+### C-CUR-6 — The suite, both ends measured this session
+
+```bash
+cd <android> && apt-get update -qq && apt-get install -y openjdk-17-jdk-headless
+cd <android> && git stash && JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 bash scripts/core-probe.sh | tail -1
+cd <android> && git stash pop && JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 bash scripts/core-probe.sh | tail -1
+```
+
+*Expected:* `core-probe: 272 tests, 0 failed, 0 skipped, across 18 classes` then
+`core-probe: 276 tests, 0 failed, 0 skipped, across 18 classes`. Neither number is carried; the
+baseline was re-measured in this session rather than quoted from the twenty-fourth run.
+
+### C-CUR-7 — M1: the new tests fail against the pre-change source, and nothing else does
+
+```bash
+cd <android> && git show 9d5f1fd:core/src/main/kotlin/app/careerseeker/core/SyncPump.kt \
+  > core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 bash scripts/core-probe.sh | grep -E "FAILED|core-probe:"
+cd <android> && git checkout -- core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+```
+
+*Expected:* exactly three `FAILED` lines — `a parseable envelope whose tag fails cannot move the
+cursor past latest either`, `a rejected envelope is bounded whichever check refused it`, `after a
+bounded tag failure the stream still delivers envelopes issued later` — and **no others**. That the
+other 272 stay green **is** the finding: the pre-existing suite could not see this bug.
+
+### C-CUR-8 — M2/M3: the bound applies to the unauthenticated path and only to it
+
+```bash
+cd <android> && F=core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+sed -i 's/val bounded = minOf(claimed, latest)/val bounded = claimed/' $F
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 bash scripts/core-probe.sh | grep -cE "FAILED"
+git checkout -- $F
+sed -i 's/val seq = header.seq/val seq = minOf(header.seq, page.latest)/' $F
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 bash scripts/core-probe.sh | grep -E "FAILED"
+git checkout -- $F
+```
+
+*Expected:* **M2** fails **five** tests (the three new ones *plus* the two pre-existing parse-failure
+bound tests) — after this change there is exactly one bounded path and it is shared. **M3** fails
+exactly one, `an authenticated seq above latest still moves the cursor`, which is the proof the
+change did not over-clamp: bounding an accepted seq would let an understated `latest` hold a receiver
+below envelopes it has already read.
+
+### C-CUR-9 — M4 SURVIVED, and that is the fourth test
+
+```bash
+cd <android> && F=core/src/main/kotlin/app/careerseeker/core/SyncPump.kt
+sed -i 's/if (bounded > cursorValue) cursorValue = bounded/cursorValue = bounded/' $F
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 bash scripts/core-probe.sh | grep -E "FAILED|core-probe:"
+git checkout -- $F
+```
+
+*Expected now:* one `FAILED` — `a page that understates latest cannot drag the cursor backwards`.
+*Expected before that test was written:* **no failures at all, `276 tests, 0 failed`** (measured at
+275 with three new tests). §6.4's **first** bullet is a MUST that nothing on this side asserted, and
+the bound is what makes it reachable: `minOf(claimed, latest)` takes the relay's `latest` whenever it
+is smaller, so a page understating `latest` drags the cursor down and re-requests envelopes already
+accepted — which the in-process replay window then refuses, the pull-the-same-page-forever loop rule
+1 exists to prevent. A real test gap, checked rather than excused.
+
+### C-CUR-10 — The dangling citation is NOT removed by this change
+
+```bash
+cd <engine> && git merge-base --is-ancestor origin/claude/s4-pull-request-semantics origin/claude/s5-inbound-pump; echo "exit=$?"
+cd <engine> && git show origin/claude/s5-inbound-pump:docs/Sync-Protocol.md | grep -c "^### 6.4"
+cd <engine> && git grep -n "§6.4" origin/claude/s5-inbound-pump -- 'src/**/*.cs'
+```
+
+*Expected:* `exit=1` (**siblings**, not ancestor/descendant), `0` §6.4 headings on PR #39's branch,
+and two citations in `src/Sync/InboundPump.cs`. So `InboundPump.cs` still cites a section its own
+branch does not contain; **this change fixes the section's content, not the citation**, and the two
+PRs must still land together. PR #39's comment reads "arriving with PR #33", so it is a flagged
+citation rather than a silent one.
+
+### C-CUR-11 — No vector byte moved, and the vendored pin is intact
+
+```bash
+cd <engine> && node docs/sync-vectors/generate.mjs --check
+cd <engine> && git diff --name-only b114d11..3a8dfdd -- docs/sync-vectors/ | wc -l
+```
+
+*Expected:* `OK: 28 vector files match the generator` and `0`. No vector was added, changed or
+regenerated, so the android repo's `7328a0b` vendored pin is untouched and **no cross-repo drift
+event occurred**. (28 here, not the 29 the twenty-fifth run reported — `invalid-unknown-field`
+arrives with PR #37, which is not an ancestor of PR #33.)
+
+### C-CUR-12 — The doc/verifier drift trap is not engaged
+
+```bash
+cd <engine> && grep -c "Sync-Protocol" scripts/Verify-Alpha.ps1
+cd <engine> && grep -n 'ExpectedOfflineTotal\s*=' scripts/Verify-Alpha.ps1
+```
+
+*Expected:* **0**, and `$ExpectedOfflineTotal = 598`. The verifier carries **no** assertion against
+the normative protocol document, so a §6.4 edit cannot drift it; and no harness assertion was added
+or removed this run, so 598 is untouched on that branch and could not have moved. Checked rather than
+assumed — this is the trap `CLAUDE.md` names first.
+
+### C-CUR-13 — What did NOT run, and what remains the gate
+
+```bash
+cd <android> && sed -n '/WHAT THIS IS NOT/,/Do not report a gate result/p' scripts/core-probe.sh
+cd <android> && which pwsh powershell; apt-cache policy powershell 2>/dev/null | head -3
+```
+
+*Expected:* the probe's own header saying it runs **one** of the gate's four tasks; and no PowerShell
+binary and no installation candidate. `checkCoreIsAndroidFree`, `:app:assembleDebug` and
+`:app:lintDebug` need the Android SDK (**B-7**) and **did not run**; `Verify-Alpha.ps1` **did not run
+and could not**. **CI is the gate.** Nothing was executed against a relay, an engine or a phone: the
+pump's *rules* are tested, the composition is not.

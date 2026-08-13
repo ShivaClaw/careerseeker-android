@@ -1379,3 +1379,30 @@ never rendered.
 (`--relay http://127.0.0.1:8787 --sync-vault <temp>`), drive begin → simulated phone completion →
 complete with the same `src/Sync` primitives `SyncLiveSmoke` already uses, and assert the vault was
 written. That is a bounded piece of work on a machine that can run .NET.
+
+## No new blocker arose 2026-08-13 (PQ-CUR-1, twenty-sixth cloud iteration)
+
+The slice was spec + `:core` Kotlin, both of which this sandbox can verify, and nothing in it was
+obstructed. Recorded explicitly because "no entry" and "not checked" look identical a week later.
+
+**Existing blockers, re-read rather than assumed:**
+
+- **B-7** (cloud egress) — unchanged and it bounded this slice exactly where the eighteenth run said
+  it would. `:core:test` ran here (**276/0 across 18 classes** via `scripts/core-probe.sh`);
+  `checkCoreIsAndroidFree`, `:app:assembleDebug` and `:app:lintDebug` did **not**. No `:app` file
+  moved this run, so the untested three cover nothing this change touched — but **CI is still the
+  gate** and this run is not a gate result.
+- **The PowerShell limit** — unchanged. `which pwsh powershell` is empty and `apt-cache policy
+  powershell` offers no candidate, so `Verify-Alpha.ps1` **did not run and could not**. It also had
+  nothing to say here: `grep -c "Sync-Protocol" scripts/Verify-Alpha.ps1` is **0** and no harness
+  assertion moved, so `$ExpectedOfflineTotal` (598 on PR #33's branch) is untouched.
+- **B-4** (emulator), **B-5** (Room/Robolectric), **B-8** (persisted p2e counter), **B-9** (Play
+  licence key) — all untouched by this slice and all unchanged. B-8 is worth one line of contact:
+  this change moves the *transport cursor*, which is in-memory state seeded from the persisted mark;
+  it does **not** create the persisted counter B-8 is about, and does not shrink B-8 at all.
+
+**One thing that is NOT a blocker and must not be filed as one.** PR #39's `InboundPump.cs` still
+cites a §6.4 that is not on its branch, because PR #33 and PR #39 are **siblings**. That is a merge
+*ordering* constraint — the two land together — not an obstruction: both branches are pushed, both
+PRs are open, and nothing about it needs a human to unblock. Calling it BLOCKED would send the next
+session hunting for a phantom, which is the failure these records exist to prevent.

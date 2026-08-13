@@ -1625,3 +1625,32 @@ the thirteenth run's §2.1 defect, in reverse.
 
 **Re-verification:** `AUDIT-REQUEST.md` C-IP-13 (the section is absent from the branch that cites it)
 and C-IP-14 (the phone's unbounded advance, read off the shipping line).
+
+**CLOSED 2026-08-13 (twenty-sixth cloud iteration), in the prescribed order and on both sides.**
+
+1. **§6.4 amended** — careerseeker `claude/s4-pull-request-semantics` commit `3a8dfdd` (draft PR #33).
+   The carve-out now covers "every other element — one that fails the §3 parse, *and* one that parses
+   and is then rejected for any reason, **the AEAD tag included**", with a *Parsing is not
+   authenticating* paragraph stating that the boundary is **accepted vs. not accepted**. Three later
+   sentences saying "malformed element" were widened to "unauthenticated element", since the rule now
+   covers well-formed elements that no key opens.
+2. **Phone bounded to match** — `SyncPump.kt`: the advance moved *below* `receiver.receive` and split
+   three ways, with one `advanceBounded` helper shared by both unauthenticated paths and the accepted
+   path left deliberately unbounded. `:core` **272 → 276, 0 failed**; **M1 proves the three new tests
+   fail against the pre-change source and the other 272 do not**, so the pre-existing suite could not
+   see this bug.
+
+**One claim in this question turned out to be wrong and is corrected here.** Step 1 above said the
+amendment "also removes a dangling citation from shipped code". **It does not.**
+`claude/s4-pull-request-semantics` and `claude/s5-inbound-pump` are **siblings**
+(`git merge-base --is-ancestor` exits 1), so `InboundPump.cs` still cites a §6.4 its own branch does
+not contain. What the amendment fixes is the section's *content*; the citation resolves **on merge of
+both PRs**, and not before. The two must still land together.
+
+**A gap the closure found, which the question did not predict.** Mutating away the
+`bounded > cursorValue` guard left the whole suite green at 275/0 — §6.4's **first** bullet ("MUST NOT
+move backwards") was a normative MUST that no test on this side asserted, and the new bound is what
+makes it reachable, because `minOf(claimed, latest)` takes the relay's `latest` whenever it is
+smaller. Closed with a fourth test; the mutation now fails exactly that test.
+
+**Re-verification:** `AUDIT-REQUEST.md` **C-CUR-1…13**.
