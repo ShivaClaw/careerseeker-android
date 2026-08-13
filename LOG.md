@@ -6549,6 +6549,30 @@ plainly that it cannot receive, and why.** The cost is stated rather than hidden
 `pull_request` need no key and are switched off with it, which is acceptable only because neither has
 an engine implementation yet. Recorded as **B-9**.
 
+### IP-9 — two of the previous run's audit commands did not reproduce, and both are fixed
+
+The standing re-run step caught **C-VR-11**, shipped by the twenty-fourth run, failing in both halves:
+
+- `cd <engine> && git show origin/claude/s5-entitlement-ack-emitter:docs/protocol-questions.md` →
+  `fatal: path 'docs/protocol-questions.md' does not exist`. **The file lives in the android repo**,
+  not the engine's. The command named the wrong repository.
+- `grep -n "one implementation"` on that branch's `docs/Sync-Protocol.md` → **nothing**. §10.2 is
+  headed *"asserted by the engine, transcribed by the phone"* and states the asymmetry in those
+  words; the literal being grepped for was never in the file.
+
+Both are corrected, and both corrections were run before being written down. **The claim itself was
+true the whole time** — §10.2 still says the ack vectors are evidence about one implementation — which
+is the hazard: an audit command returning nothing is indistinguishable from a claim that has gone
+false, so a broken command silently converts a true record into an unverifiable one.
+
+This is the **fourth recurrence** of the audit-command-does-not-reproduce shape (after CR-6, C-CR-3
+and C-SC-1/3/4) and the first where the mistake was the *repository* rather than the pattern. Every
+new command in §C-IP was executed before being written, including the two `sed` line-ranges, which is
+what the previous three recurrences taught.
+
+**PQ-CUR-1 is filed in `docs/protocol-questions.md` in this repo** — the same correction applied
+forward, since that is where protocol questions actually live.
+
 ### Prohibition — what this iteration did not touch
 
 **No android source file changed**: `app/` and `core/` are untouched, so `:core:test` had nothing to

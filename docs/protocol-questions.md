@@ -1562,3 +1562,66 @@ this is not a blocker.
 
 **Until it closes**, `docs/Sync-Protocol.md` §10.2 says in the document itself that these vectors are
 evidence about **one** implementation. Do not cite the ack vectors as cross-implementation evidence.
+
+---
+
+## PQ-CUR-1 — §6.4's carve-out is drawn for parse failures, and a failed AEAD tag falls through it
+
+**Opened 2026-08-13** (twenty-fifth cloud iteration) while writing the engine's inbound pump
+(`src/Sync/InboundPump.cs`, careerseeker draft PR #39). **Not a blocker**, and it is a spec defect
+first and an implementation gap second.
+
+**The rule as written.** §6.4 (careerseeker PR #33) says the transport cursor:
+
+- MUST NOT move backwards;
+- MUST advance only to a `seq` **recovered from the sealed bytes** (§4.1), except under the bound;
+- when an element **fails the §3 parse**, MAY advance by the element's claimed top-level `seq`, but
+  MUST NOT advance beyond the page's `latest`.
+
+**The case it does not cover.** A `seq` is recovered from the sealed bytes only when the **AEAD tag
+verifies** — the seq lives in the AAD, and the tag is what makes it a fact rather than a claim.
+**Parsing is not authenticating.** An envelope can pass the §3 parse completely — well-formed JSON,
+exactly the nine known fields, a valid `p_`-prefixed pairing id, a typed `seq`, a 12-byte base64url
+nonce, a base64url ciphertext — and still be bytes the relay invented. It parses. Its header `seq` is
+authenticated by nothing at all.
+
+That element did **not** fail the §3 parse, so §6.4's carve-out does not apply to it; and its seq was
+**not** recovered from the sealed bytes, so the MUST forbids advancing to it. Read literally, §6.4
+therefore says the cursor may not move at all for a parseable envelope whose tag fails — which is the
+permanent stall §6.2 forbids in as many words, reachable by serving one crafted element.
+
+**What the two implementations do today.**
+
+| | behaviour on a parseable envelope whose tag fails |
+| --- | --- |
+| engine (`InboundPump`, PR #39) | advances **bounded by the page's `latest`**, same as a parse failure |
+| phone (`SyncPump.kt:260`) | advances by the header `seq`, **unbounded** |
+
+The phone's line is `val seq = header?.seq ?: minOf(envelope.seq, page.latest)` — the bound is applied
+only on the `null` branch, i.e. only when the parse failed. So on the phone, one well-formed
+undecryptable element claiming `seq: 1000000` walks the cursor past every envelope below it, and since
+the cursor never moves backwards those envelopes are never requested again. **That is the history
+truncation §6.4 exists to prevent, performed without decrypting anything, through the door §6.4 did
+not think to close.**
+
+**Severity, stated precisely.** No interop risk: the transport cursor is local state and never appears
+on the wire, so an engine stricter than the phone merely re-requests what the phone would skip. This
+is **not** the mission's "a phone more correct than the engine is a field bug" case in either
+direction. The exposure is availability and silent data loss on the phone, against a relay willing to
+serve a page it made up — which §2 explicitly says to assume it may.
+
+**To close, in this order** (the order matters, and is why PR #39 did not just fix the Kotlin):
+
+1. **Amend §6.4 on careerseeker PR #33**, the branch that owns the section — generalise the carve-out
+   from "fails the §3 parse" to "has no authenticated `seq`, whether because the parse failed or
+   because the AEAD tag did not verify". PR #39 already implements this reading and **cites a section
+   its own branch does not contain** (§6.4 is on a sibling branch; PR #39's `Sync-Protocol.md` has
+   §6.1–§6.3 only), so the amendment also removes a dangling citation from shipped code.
+2. **Then** bound the phone's advance the same way and add the case to `SyncPumpTest`. Verifiable in a
+   cloud session: `:core` compiles and runs via `scripts/core-probe.sh` (B-7 never covered `:core`).
+
+Doing (2) before (1) would write a rule into the phone that the normative document does not state —
+the thirteenth run's §2.1 defect, in reverse.
+
+**Re-verification:** `AUDIT-REQUEST.md` C-IP-13 (the section is absent from the branch that cites it)
+and C-IP-14 (the phone's unbounded advance, read off the shipping line).

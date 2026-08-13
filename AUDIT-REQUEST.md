@@ -5513,12 +5513,25 @@ gate passed" is the precise failure these records exist to prevent.
 
 ### C-VR-11 — PQ-A2-5's main-repo half is still open
 
+**Corrected 2026-08-13 (twenty-fifth run): the first command named the wrong repo and could never
+have run.** `docs/protocol-questions.md` lives in **this** repo, not the engine's —
+`git show origin/claude/s5-entitlement-ack-emitter:docs/protocol-questions.md` answers
+`fatal: path 'docs/protocol-questions.md' does not exist`. Fourth recurrence of the
+audit-command-does-not-reproduce shape (after CR-6, C-CR-3 and C-SC-1/3/4), and the first where the
+error was the repository rather than the pattern.
+
 ```bash
-cd <engine> && git show origin/claude/s5-entitlement-ack-emitter:docs/protocol-questions.md \
-  | sed -n '/## PQ-A2-5/,/^## /p' | tail -6
+cd <android> && sed -n '/^## PQ-A2-5/,/^---$/p' docs/protocol-questions.md | tail -4
 cd <engine> && git show origin/claude/s5-entitlement-ack-emitter:docs/Sync-Protocol.md \
-  | grep -n "one implementation" | head
+  | grep -n "transcribed by the phone\|The phone does not yet read these files"
 ```
+
+**Both halves were wrong, and both are fixed above.** The first named the engine repo for a file that
+lives here. The second grepped for the literal `one implementation`, which appears **nowhere** in
+`docs/Sync-Protocol.md` on that branch — §10.2 is headed *"asserted by the engine, transcribed by the
+phone"* and states the asymmetry in those words instead. An audit command that returns nothing is
+indistinguishable from a claim that has become false, which is exactly the failure this file exists to
+prevent.
 
 *Expected:* both still say the ack vectors are evidence about **one** implementation. That is
 **correct and deliberate** — it stays true until this android PR merges, and amending it early would
