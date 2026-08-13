@@ -7310,3 +7310,139 @@ Gmail, no email; no MSIX or certificate-store action; no emulator, no `sdkmanage
 never touched, and `autonomy/codex-state` was **read and not written**. One machine change, logged:
 `apt-get update && apt-get install -y dotnet-sdk-8.0` — note the `update`, without which the archive
 serves a 404 on the SDK package.
+
+---
+
+## S6 — three slices built a vocabulary and nothing spoke it (thirtieth cloud iteration, 2026-08-13)
+
+**Rung-slice:** S2's transport half, engine side — `STATE.md`'s ordered next intent **item 1**,
+which named it "the largest remaining offline-verifiable gap" and "what turns three runs of typed
+results into behaviour". Engine repo only, new branch `claude/s6-counter-reconciliation`, three
+commits (`6c3f8bb`, `f4d56f6`, `834adcd`), **draft PR #46**, stacked on #45 → #39 → #38 → #37 → #32.
+
+**The prompt was stale for the TWELFTH consecutive run**, verified after the mandatory fetch rather
+than assumed. It assigned the S5 spec slice — §4.3's `entitlement_ack` body, the `entitlement-ack`
+vectors, PQ-A2-1/-2/-3 — all of which landed in #32/#37/#38/#39: `git show
+origin/claude/s2-relay-pull-result:docs/Sync-Protocol.md | grep -c entitlement_ack` returns **8**,
+and `entitlement-ack.json`, `entitlement-ack-no-order-id.json` and `invalid-unknown-field.json` are
+all present in `docs/sync-vectors/v1/`. It pinned the vendored vectors at `679a317`; the lock file
+reads **`7328a0bc043335491cd96a67d634e8eea2a13af9`**, moved six runs ago. And it stated the C#
+applier could not be compiled here — **`dotnet-sdk-8.0` installs and nine of the ten offline
+harnesses run**. **Fifth run running where the ordered intent, not the prompt, routed the work.**
+
+**The defect.** Three consecutive slices gave the engine's transport a vocabulary — `RelayPullResult`
+(#45's predecessor), then `RelayPushResult` carrying the 409's `latest`, then a range check on that
+number — and **nothing consumed any of it**. §6.1 says an engine resumes its e2p counter above
+`max(persisted_seq, relay_latest_e2p_seq)`. The first term was wired (`startSeq: paired.LastE2pSeq`).
+The second was read, range-checked, logged, and thrown away, under a comment that said so:
+*"Nothing below changes control flow yet"* (`Program.cs:290-292`, now replaced). **The fourth
+instance of this repo's recurring shape** — every piece individually correct and honestly recorded,
+the hole sitting *between* the entries.
+
+**Why the second term is not academic.** `RecordE2pSeq` runs **after** the relay's 201, so a crash
+between the relay accepting an envelope and the vault recording it leaves the store behind what the
+relay holds. A store-only resume then walks straight into a 409 **on the recovery snapshot** — the
+precise failure §6.1 is written to prevent, reached by an ordinary crash rather than an attack.
+
+**The fix, in two halves, and only one of them is executable here.**
+
+- **Startup.** `SyncPublisher.ResumeSeq(persisted, relayAnswer)` is §6.1's `max()` **as a pure
+  function**, and `BuildSyncBridge` supplies it from a real `PullAsync("e2p", since: 0)`. The rule
+  was **extracted rather than left inline in the host on purpose**: the composition around it needs
+  a DPAPI vault and a live relay and can only ever be compile-checked in this sandbox, so extracting
+  the rule is what makes §6.1 **testable at all** instead of merely written down. `BuildSyncBridge`
+  became `async` to do it.
+- **Running.** `SyncPublisher.ReconcileTo(seq)` raises the counter, and a 409's `latest` moves it
+  inside the push sink. The bytes in hand stay dead — the refusal is about the number they carry —
+  so the sink still returns `false`; what changes is that the **next** push resumes above the
+  relay's mark instead of walking up one at a time into the same 409 forever.
+
+**Three decisions argued rather than preferred.** (1) **`ReconcileTo` raises and NEVER lowers**, and
+that asymmetry is the whole invariant: a relay mark *below* this counter is not evidence the counter
+ran ahead, because the seqs in between may already sit in the phone's accepted history, which §6.2
+refuses on sight and permanently — rewinding onto them is the one-sided sync death §6.1 exists to
+prevent. (2) **A relay that did not answer falls back to the store and does not stop publishing** —
+§6.1 makes the store the value and the relay read "belt-and-suspenders should the store lag", so the
+relay term only ever *raises*; `Unauthorised` gets the same treatment rather than a special one,
+because if the token is really dead the next push says so with the same 401 **on the path that can
+act on it**, and blocking startup would be a second, weaker copy of a check that already exists.
+(3) **An out-of-range seq throws rather than clamping** — no shipped caller can reach it, since
+`RelayClient` range-checks both numbers first and an unusable one arrives as `null` and is never
+passed, so the guard is an assertion against a future caller that skips that step; clamping would
+write a number this side has already judged untrustworthy into the counter that goes on the wire.
+
+**Evidence, all run this session on Linux.** Build **0 warnings / 0 errors**. `SyncHarness`
+**236 → 256, 0 failed**, baseline re-measured this session before anything was written.
+`generate.mjs --check` **OK at 29**, `git status --porcelain docs/sync-vectors/` **empty** — **zero
+vector bytes moved, the `7328a0b` pin intact, NO cross-repo drift event.**
+
+**The mutation pass found two real gaps, and one of them was my own detector lying.** Nine applied,
+**seven caught first pass, nine after**. **M4 SURVIVED:** removing the floor on a corrupt (negative)
+persisted seq changed nothing observable, because *both* assertions that mentioned a negative store
+were rescued by the relay term, which is `>= 0` and beats any negative on its own — **the floor is
+only observable when the relay does NOT answer**, which is exactly when it matters, since an
+unfloored `-9` constructs the publisher at `startSeq: -9` and puts an illegal seq (§3.2) on the wire
+on the first push. A real test gap, closed with a seventh startup assertion. **M9 read as a survivor
+and was not one:** the boundary mutation (`>` → `>=`) makes the cap assertion **throw**, and an
+uncaught throw takes the harness down **without printing a FAIL line**, so a detector counting FAIL
+lines scores it survived — **the twenty-seventh run's false-negative shape, reached by a different
+route.** The assertion now catches and reports, so the failure is legible rather than merely fatal.
+Both re-run after the fix and each fails **exactly one** assertion.
+
+**A third self-correction, and it invalidated eight results before they were recorded.** The first
+mutation run reported M2–M9 as "DID NOT COMPILE". The script restored with `git checkout` while the
+work was **still uncommitted**, so every mutation after the first was applied to a file that no
+longer contained the code under test. **Eight meaningless results, every one of which would have
+been written down as a measurement.** The whole pass was re-run from a committed base. The rule it
+yields: **a mutation harness that restores with `git checkout` requires a committed baseline**, and
+the restore point must be verified before the first mutation, not after the last.
+
+**Offline pin 704 → 724**, swept as one unit with six `Assert-Contains` literals and the four
+count-reporting docs (`README.md`, `src/Engine/README.md`,
+`docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`).
+
+**724 is CORROBORATED, NOT MEASURED.** `Verify-Alpha.ps1` did not run and could not — `which pwsh`
+empty, `apt-cache policy powershell` nothing, re-checked this session. The **Linux sum is 507**,
+measured harness by harness; `EngineHarness`'s **217 is carried, not measured**, because it
+correctly refuses a volume root on Linux (`InvalidOperationException: Refusing full-data deletion
+for a volume root`). 507 + 217 = **724**, which independently agrees with 704 + 20.
+
+**One measurement was nearly reported from a stale cache.** The first per-harness sweep read
+`SyncHarness` at **255**, not 256, because `--no-build` ran against binaries left over from the M9
+mutation build. Rebuilt and re-measured. The mission's own rule — *"always `--rerun-tasks` when
+claiming, or you're reading a cache"* — is written for Gradle and applies verbatim to
+`dotnet --no-build`.
+
+**The standing limit, unmoved.** The **composition was never executed**: `SyncPairingVault` is
+DPAPI/Windows and there is no pairing here, so the startup path that calls `PullAsync` and
+`ResumeSeq` **has never run**, and neither has the sink's new `ReconcileTo` call. The *rules* are
+tested; the wiring that feeds them is compile-checked only. **Nothing tests that the sink calls
+`ReconcileTo` on a `Conflict`** — reverting that one call site would fail no test in this repo, and
+that is named as the sharpest gap in #46's own self-audit rather than left to be found.
+
+**No new blocker.** Re-verify: **C-S6-1…11**.
+
+### Prohibition — what this iteration did not touch
+
+**No android source changed** — not `core/`, not `app/`, not a screen, not the Room replica, not the
+migration tests; this repo received **records only** (`LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`), so
+the **android gate did not run and correctly was not attempted** (`checkCoreIsAndroidFree`,
+`:app:assembleDebug`, `:app:lintDebug` need the SDK — **B-7**). In the engine repo: **no `relay/`
+source, no TypeScript, no `docs/sync-vectors/` byte** (`--check` OK at 29, `git status --porcelain`
+on that path empty — the `7328a0b` pin is intact and there was **NO cross-repo drift event**), **no
+`generate.mjs`, no `docs/Sync-Protocol.md`** (§6.1 already said what this code needed), **no
+`src/Engine/Host.cs`, no `src/Sync/RelayClient.cs`, no `src/Sync/Protocol.cs`, no
+`src/Sync/InboundPump.cs`, no `docs/autonomy/*`.** No engine C# outside `SyncPublisher.cs` and
+`Program.cs`'s `BuildSyncBridge` seam. **No merge in either repo**, no force-push, no history
+rewrite, no branch deleted; draft PRs **#26 and #32–#45** in the engine repo and **#1–#6** here were
+left exactly as found — not merged, retargeted or rebased. No deploy of any kind (Cloudflare,
+Workers, relay, site, Pages), and **the production relay was not contacted at all, not even
+`GET /v1/health`** — **not one byte was sent to a relay, an engine or a phone this run.** Every
+`RelayClient` call in evidence ran against a stub `HttpMessageHandler`. No Play, Google or OAuth
+console; no accounts, no purchases, no Play Billing code; no Gmail, no email; no MSIX or
+certificate-store action; no emulator, no `sdkmanager`, no keystore use. **No secret was read,
+printed or referenced.** `Documents\CareerSeeker` and Terra's worktrees were never touched, and
+`autonomy/codex-state` was **read and not written**. One machine change, logged:
+`apt-get update && apt-get install -y dotnet-sdk-8.0` — note the `update`, without which the archive
+serves a 404 on the SDK package (measured again this run: the first install attempt failed exactly
+that way).

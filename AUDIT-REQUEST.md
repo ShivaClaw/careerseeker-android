@@ -6618,3 +6618,195 @@ android repo is **never-self-merge** regardless. **#45 stays a DRAFT** and inher
 constraint. CI also does not touch the standing limit: it **builds** the engine's inbound
 composition and never constructs it, because a runner has no pairing vault — and `PushAsync` still
 has been executed only against a stub `HttpMessageHandler`, never against a relay.
+
+---
+
+## C-S6 — counter reconciliation, §6.1's second term (thirtieth cloud iteration, 2026-08-13)
+
+All commands run from a clone of `ShivaClaw/careerseeker` at
+`claude/s6-counter-reconciliation` (draft PR **#46**, tip `834adcd`) unless stated. **Run them in
+the engine repo** — the paths below do not exist in the android tree, which is the mistake C-PSH-8
+made and the reason this header says so.
+
+The toolchain is not preinstalled and the first install **fails**:
+
+```bash
+apt-get install -y dotnet-sdk-8.0     # 404s on every package -- stale index
+apt-get update && apt-get install -y dotnet-sdk-8.0    # this is the one that works
+dotnet --version                                       # 8.0.129
+```
+
+### C-S6-1 — the prompt's assigned slice had already landed
+
+```bash
+git fetch --all --prune
+git show origin/claude/s2-relay-pull-result:docs/Sync-Protocol.md | grep -c entitlement_ack
+git ls-tree -r --name-only origin/claude/s2-relay-pull-result docs/sync-vectors/ \
+  | grep -E "entitlement-ack|invalid-unknown-field"
+```
+
+*Expected:* **8**, and three files — `entitlement-ack.json`, `entitlement-ack-no-order-id.json`,
+`invalid-unknown-field.json`. The prompt assigned all of this as new work for the **twelfth**
+consecutive run.
+
+### C-S6-2 — the vendored vector pin is not what the prompt says
+
+```bash
+grep "Pinned commit" core/src/test/resources/sync-vectors/VECTORS.lock   # ANDROID repo
+```
+
+*Expected:* `7328a0bc043335491cd96a67d634e8eea2a13af9`, not the prompt's `679a317`.
+
+### C-S6-3 — build and harness
+
+```bash
+dotnet build CareerSeeker.sln -c Release
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -1
+```
+
+*Expected:* **0 Warning(s), 0 Error(s)**; **`=== 256 passed, 0 failed ===`**. Baseline before this
+slice is **236** (`git stash` the three commits, or run the same command at
+`origin/claude/s2-relay-pull-result`).
+
+### C-S6-4 — the new assertions exist and are named
+
+```bash
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build \
+  | sed -n '/counter reconciliation/,$p'
+```
+
+*Expected:* a `[ counter reconciliation (§6.1) ]` block of **20** PASS lines, including
+`ReconcileTo REFUSES to lower the counter and says it did nothing`, `an unreachable relay falls back
+to the store rather than refusing to publish`, and `a corrupt store AND a silent relay still resume
+from 0, not from a negative`.
+
+### C-S6-5 — the invariant is load-bearing (M5)
+
+```bash
+git checkout -- src/Sync/SyncPublisher.cs   # ensure a clean, COMMITTED baseline first
+python3 - <<'EOF'
+p='src/Sync/SyncPublisher.cs'; s=open(p).read()
+s=s.replace("            if (seq <= current) return false;\n","")
+open(p,'w').write(s)
+EOF
+dotnet build CareerSeeker.sln -c Release >/dev/null && \
+  dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep -E "^  FAIL|^=== "
+git checkout -- src/Sync/SyncPublisher.cs
+```
+
+*Expected:* **`=== 253 passed, 3 failed ===`**, failing `ReconcileTo REFUSES to lower the counter…`,
+`the counter survived the attempt to lower it`, and `an equal mark is not a move either`.
+
+**Note the first line, and it is the point of this entry.** The mutation script's `git checkout`
+restores to **HEAD**, so running any of these against *uncommitted* work silently reverts the code
+under test and every subsequent mutation reports "DID NOT COMPILE". That happened this run and
+invalidated eight results before they were recorded.
+
+### C-S6-6 — the two gaps the pass found, and that they are now closed
+
+```bash
+# M4 -- the floor
+python3 -c "
+p='src/Sync/SyncPublisher.cs'; s=open(p).read()
+s=s.replace('var floor = persistedSeq > 0 ? persistedSeq : 0;','var floor = persistedSeq;')
+open(p,'w').write(s)"
+dotnet build CareerSeeker.sln -c Release >/dev/null && \
+  dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep -E "^  FAIL|^=== "
+git checkout -- src/Sync/SyncPublisher.cs
+# M9 -- the cap boundary
+python3 -c "
+p='src/Sync/SyncPublisher.cs'; s=open(p).read()
+s=s.replace('if (seq < 0 || seq > Protocol.MaxSeq)','if (seq < 0 || seq >= Protocol.MaxSeq)')
+open(p,'w').write(s)"
+dotnet build CareerSeeker.sln -c Release >/dev/null && \
+  dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep -E "^  FAIL|^=== "
+git checkout -- src/Sync/SyncPublisher.cs
+```
+
+*Expected:* each prints **`=== 255 passed, 1 failed ===`**, failing exactly `a corrupt store AND a
+silent relay still resume from 0, not from a negative` and `a seq exactly at §3.2's cap is still
+accepted` respectively. **Before the fix in `f4d56f6` both of these SURVIVED** — M4 because the
+relay term rescued every case that tested a negative store, M9 because the throw took the harness
+down **without printing a FAIL line**, which reads as a survivor to anything counting FAILs. To see
+the latter, re-run M9 at `6c3f8bb` and observe `Unhandled exception.
+System.ArgumentOutOfRangeException` with **no** `=== N passed ===` line at all.
+
+### C-S6-7 — zero vector bytes moved (no cross-repo drift event)
+
+```bash
+node docs/sync-vectors/generate.mjs --check
+git status --porcelain docs/sync-vectors/
+git diff --stat origin/claude/s2-relay-pull-result..HEAD -- docs/sync-vectors/
+```
+
+*Expected:* **`OK: 29 vector files match the generator.`**, and **both** of the last two print
+nothing. The android repo's `7328a0b` pin is therefore untouched.
+
+### C-S6-8 — the offline pin sweep is complete
+
+```bash
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1
+# stale ASSERTION literals only -- the quoted strings the verifier checks docs against
+grep -rn "'| SyncHarness | 236 |'\|'| \*\*Total\*\* | \*\*704\*\* |'\|704 passed" \
+  scripts/Verify-Alpha.ps1 README.md src/Engine/README.md \
+  docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md
+grep -rn "724\|SyncHarness | 256" scripts/Verify-Alpha.ps1 README.md src/Engine/README.md \
+  docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md | wc -l
+```
+
+*Expected:* **724**; the second command prints **nothing** (no stale assertion literal survives);
+the third prints **17** — seven verifier lines (the pin, its comment's closing `724.`, and five
+`Assert-Contains` literals) plus the four docs' ten entries.
+
+**Why the second command filters to quoted literals.** A bare `grep -rn 704` still matches
+`Verify-Alpha.ps1:232`, `# nine caught. 704.` — the **previous** slice's comment paragraph recording
+the pin *as of that slice*. That is correct history, not drift, and a sweep check that flags it
+would train the next reader to ignore it. The drift trap is about the strings the verifier
+**asserts**, which are the quoted ones.
+
+### C-S6-9 — 724 is CORROBORATED, not measured
+
+```bash
+which pwsh ; apt-cache policy powershell
+for h in Slice EngineHarness ResearcherHarness HookHarness StoreParityHarness \
+         GatewayGateHarness DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  echo -n "$h: "
+  dotnet run --project tests/$h/$h.csproj -c Release --no-build 2>&1 \
+    | grep -oE "=== [0-9]+ passed, [0-9]+ failed" | tail -1
+  echo
+done
+```
+
+*Expected:* both of the first two print **nothing** — `Verify-Alpha.ps1` **cannot run here and did
+not**. The sweep prints 28 / **(EngineHarness: no count)** / 57 / 16 / 28 / 36 / 35 / 45 / 6 / 256 =
+**Linux sum 507**. `EngineHarness` aborts with `InvalidOperationException: Refusing full-data
+deletion for a volume root` — correct behaviour on Linux — so its **217 is CARRIED, not measured**.
+507 + 217 = **724**, agreeing independently with 704 + 20.
+
+**Rebuild before running this.** The first sweep this session read `SyncHarness` at **255** because
+`--no-build` used binaries left from a mutation build. A stale cache is not a measurement.
+
+### C-S6-10 — the composition is compile-checked and was never executed
+
+```bash
+grep -n "ResumeSeq\|ReconcileTo" src/Engine/Program.cs src/Sync/SyncPublisher.cs
+grep -rn --include=*.cs "ReconcileTo" tests/
+```
+
+**`--include=*.cs` is not optional:** without it `grep -r` reports `binary file matches` for every
+built `.dll` under `tests/*/bin` and `obj`, which looks like six test projects reference the method
+when exactly one does.
+
+*Expected:* `Program.cs` calls both (startup and the sink's `Conflict` arm); `tests/` matches
+**`SyncHarness/Program.cs` only**. **Nothing tests that the SINK calls `ReconcileTo`** — reverting
+that one call site fails no test in this repo. This is the sharpest gap in the slice and #46's
+self-audit names it.
+
+### C-S6-11 — no android source changed
+
+```bash
+git -C <android-clone> diff --stat origin/claude/android-a0-probe..HEAD -- core/ app/
+```
+
+*Expected:* **empty**. This repo took records only, which is why the android gate did not run and
+was not attempted (**B-7**).
