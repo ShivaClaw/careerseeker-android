@@ -6395,3 +6395,35 @@ returns `null` without a pairing, the vault is DPAPI/Windows, B-9 keeps inbound 
 was sent to a relay, an engine or a phone** — no network call of any kind was made this iteration,
 including `GET /v1/health`. The range check has been executed **only against a stub
 `HttpMessageHandler`**, never against a relay that produced one of these pages.
+
+### C-LAT-9 — CI ran `Verify-Alpha.ps1` on this exact head and the 673 pin held (added after §C-LAT was written)
+
+```bash
+gh api repos/ShivaClaw/careerseeker/actions/runs/31704145293 \
+  --jq '{head_sha, run_attempt, conclusion}'
+gh api repos/ShivaClaw/careerseeker/actions/runs/31704145293/jobs \
+  --jq '.jobs[] | "\(.name): \(.conclusion)"'
+gh api repos/ShivaClaw/careerseeker/actions/jobs/94460325057/logs \
+  | grep -E "Offline total|=== 205|latest (one past|at Int64|exactly at)"
+```
+
+*Expected:* `head_sha` **`818c5b39…`** — this branch's tip, read from **the run's own field** rather
+than from the PR check-runs view, which follows the current head and lags a push (the twenty-fourth
+run's lesson) — `run_attempt` **1**, `conclusion` **`success`**. Two jobs, **both `success`**:
+`Blind relay (Worker)` 13:17:11 → 13:17:51 UTC and `Build and offline harnesses` 13:17:11 → 13:18:48
+UTC. The third command prints **`=== 205 passed, 0 failed ===`** and
+**`=== Offline total: 673 passed, 0 failed ===`**, followed by `CareerSeeker alpha verification
+complete.`, plus the new assertions **by name** (`latest one past §3.2's cap is Unavailable`,
+`latest at Int64.MaxValue is Unavailable`, `latest exactly at §3.2's cap is still Ok`).
+
+**This is the row that upgrades C-LAT-4.** That entry says 673 is *corroborated, not measured*,
+because `Verify-Alpha.ps1` cannot run in this sandbox. It ran here, on `windows-latest`, and **it
+throws on a pin mismatch** — so **673 is CONFIRMED**, and `EngineHarness` = 673 − 456 = **217** is
+re-confirmed as the carried number rather than an assumption. The eleven new assertions pass on
+**Windows** as well as on the Linux run measured in C-LAT-4.
+
+**What it does not license:** CI green is **not** the merge condition. The main-repo merge policy
+requires a full *local* gate (`-IncludePublish -IncludePackage`), which remains out of reach here,
+and the android repo is **never-self-merge**. **#45 stays a DRAFT** and inherits #39's ordering
+constraint. CI also **cannot** touch the standing limit: it builds the engine's inbound composition
+and never constructs it, because a runner has no pairing vault.
