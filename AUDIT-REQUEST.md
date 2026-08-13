@@ -6584,3 +6584,37 @@ relay's e2p high-water mark`) is therefore **written and unrun**. The engine's i
 remains compile-checked and never constructed (`BuildSyncBridge` returns `null` without a pairing;
 the vault is DPAPI/Windows). **Not one byte was sent to a relay, an engine or a phone this
 iteration — no network call of any kind, including `GET /v1/health`.**
+
+### C-PSH-9 — CI ran `Verify-Alpha.ps1` on this exact head and the 704 pin held (added after §C-PSH was written)
+
+```bash
+gh api repos/ShivaClaw/careerseeker/actions/runs/31726114575 \
+  --jq '{head_sha, run_attempt, conclusion}'
+gh api repos/ShivaClaw/careerseeker/actions/runs/31726114575/jobs \
+  --jq '.jobs[] | "\(.name): \(.conclusion)"'
+gh api repos/ShivaClaw/careerseeker/actions/jobs/94534783762/logs \
+  | grep -E "Offline total|=== 236|400 is Rejected|latest 0 survives"
+```
+
+*Expected:* `head_sha` **`62f1f8dd…`** — this slice's tip, read from **the run's own field** rather
+than from the PR check-runs view, which follows the current head and lags a push (the twenty-fourth
+run's lesson, re-applied here) — `run_attempt` **1**, `conclusion` **`success`**. Two jobs, **both
+`success`**: `Blind relay (Worker)` 17:31:19 → 17:31:48 and `Build and offline harnesses`
+17:31:20 → 17:33:14 UTC. The third command prints **`=== 236 passed, 0 failed ===`** and
+**`=== Offline total: 704 passed, 0 failed ===`**, followed by `CareerSeeker alpha verification
+complete.`, plus new assertions **by name** (`400 is Rejected -- this side composed something the
+relay would not shape-check`, `latest 0 survives as 0, not null`).
+
+**This is the row that upgrades C-PSH-3.** That entry says 704 is *corroborated, not measured*,
+because `Verify-Alpha.ps1` cannot run in this sandbox. **It ran here, on `windows-latest`, and it
+throws on a pin mismatch** — so **704 is CONFIRMED**, and `EngineHarness` = 704 − 487 = **217** is
+re-confirmed as the carried number rather than an assumption. The thirty-one new assertions pass on
+**Windows** as well as on the Linux run measured in C-PSH-3. Same arithmetic that settled 610, 625,
+641, 662 and 673.
+
+**What it does not license:** CI green is **not** the merge condition. The main-repo merge policy
+needs a full *local* gate (`-IncludePublish -IncludePackage`), still out of reach here, and the
+android repo is **never-self-merge** regardless. **#45 stays a DRAFT** and inherits #39's ordering
+constraint. CI also does not touch the standing limit: it **builds** the engine's inbound
+composition and never constructs it, because a runner has no pairing vault — and `PushAsync` still
+has been executed only against a stub `HttpMessageHandler`, never against a relay.
