@@ -7610,3 +7610,144 @@ git log --oneline origin/main -1                            # aac05f3 -- unmoved
 `SyncPublisher` are byte-identical to `bb2cc63`. **No backoff and no halt was implemented.** PR #47
 is a **DRAFT**; the android repo received Markdown only, so the android gate was correctly not
 attempted (**B-7**).
+
+---
+
+## C-RST — the engine stack's restack, costed (2026-08-14, thirty-sixth run)
+
+Every command below runs in the **engine** checkout (`ShivaClaw/careerseeker`), after
+`git fetch --all --prune`, and reproduces a claim in
+[`docs/Merge-Topology.md`](docs/Merge-Topology.md) §10. Refs as measured: `origin/main` = `aac05f3`,
+common fork = `00b3705`, stack tip #47 = `1951313`.
+
+```bash
+B="claude/s5-entitlement-ack-spec claude/s4-pull-request-semantics claude/s2-relay-retention \
+claude/s2-seq-bound claude/s2-transport-vocabulary claude/s5-engine-wire-parser \
+claude/s5-entitlement-ack-emitter claude/s5-inbound-pump claude/s2-relay-pull-result \
+claude/s6-counter-reconciliation claude/s2-push-disposition"
+```
+
+### C-RST-1 — eleven chained PRs, a tree of depth 7, not a chain of sixteen
+
+```bash
+for b in $B; do printf "%-34s ahead=%s\n" "$b" "$(git rev-list --count 00b3705..origin/$b)"; done
+for a in $B; do line=""; for c in $B; do [ "$a" = "$c" ] && continue
+  git merge-base --is-ancestor origin/$c origin/$a 2>/dev/null && line="$line $c"; done
+  echo "$a contains:$line"; done
+```
+
+Ahead counts 4/12/6/9/15/8/12/17/26/37/43. Containment yields exactly the §10.1 tree: #32 contains
+nothing; #33, #34, #36, #37 each contain only #32; #35 ⊃ {#32,#34}; #38 ⊃ {#32,#37}; and the deepest
+path is #32 ⊂ #37 ⊂ #38 ⊂ #39 ⊂ #45 ⊂ #46 ⊂ #47 — **7 PRs, not 16**.
+
+### C-RST-2 — all eleven fork from one commit; main is 16 ahead of it
+
+```bash
+for b in $B; do git merge-base origin/$b origin/main; done | sort -u   # ONE line: 00b3705f89…
+git rev-list --count 00b3705..origin/main                              # 16
+```
+
+### C-RST-3 — the merge probe: five branches clean, six conflict on the same five files
+
+```bash
+for b in $B; do out=$(git merge-tree --write-tree --name-only origin/main origin/$b)
+  printf "%-34s conflicting-files=%s\n" "$b" "$(echo "$out" | sed -n '2,$p' | grep -c '^CONFLICT')"; done
+git merge-tree --write-tree --name-only origin/main origin/claude/s2-push-disposition \
+  | sed -n '2,$p' | grep '^CONFLICT'
+```
+
+0/0/0/0/0 then 5/5/5/5/5/5. The five are always `README.md`,
+`docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`,
+`scripts/Verify-Alpha.ps1`, `src/Engine/README.md`.
+
+### C-RST-4 — conflicts appear exactly where a pin sweep does
+
+```bash
+for b in $B; do printf "%-34s pin-sweeps=%s\n" "$b" \
+  "$(git log --oneline 00b3705..origin/$b -- scripts/Verify-Alpha.ps1 | wc -l)"; done
+```
+
+0/0/0/0/0/1/2/3/6/9/11 — **the same partition as C-RST-3**, clean exactly where the count is 0.
+
+### C-RST-5 — the conflict is additive; 806 is derived, not measured
+
+```bash
+for r in 00b3705 origin/main origin/claude/s2-push-disposition; do
+  git show $r:scripts/Verify-Alpha.ps1 | grep -m1 'ExpectedOfflineTotal = '
+  git show $r:README.md | grep -E "^\| (EngineHarness|SyncHarness|\*\*Total\*\*)"; done
+```
+
+598 (E 217 / S 130) → main **611** (E **230** / S 130, +13) and stack **793** (E 217 / S **325**,
++195). **Disjoint harnesses**, so the restacked value is `598 + 13 + 195` = **806** (E 230 / S 325).
+
+**806 WAS NOT MEASURED.** `Verify-Alpha.ps1` needs Windows PowerShell (`which pwsh` empty here) and
+**did not run**. It throws on a pin mismatch, so CI on `windows-latest` is what settles it —
+see C-RST-11. Treat 806 as an arithmetic prediction, not evidence.
+
+### C-RST-6 — the code half of the restack is free
+
+```bash
+git merge-tree --write-tree --name-only origin/main origin/claude/s2-push-disposition \
+  | grep -E "Host\.cs|Program\.cs|src/Sync|relay/"
+```
+
+Prints exactly two lines, both `Auto-merging` (`src/Engine/Host.cs`, `src/Engine/Program.cs`) and
+neither a `CONFLICT` — despite main rewriting them by +134 and +95. **No `src/Sync/` or `relay/`
+line appears at all**: main never touched those paths, so they do not even enter the merge.
+
+### C-RST-7 — the restack cannot cause a cross-repo drift event
+
+```bash
+git diff --name-status 00b3705 origin/main -- docs/sync-vectors/        # EMPTY: main touched no vector
+git diff --name-status 679a317 origin/claude/s2-push-disposition -- docs/sync-vectors/v1/ \
+  | grep "^M" | grep -v index.json                                      # EMPTY: no existing payload modified
+ls docs/sync-vectors/v1/*.json | wc -l                                  # 29
+node docs/sync-vectors/generate.mjs --check                             # OK: 29 vector files match the generator
+```
+
+The stack's whole effect on vectors is **three added payloads** (`entitlement-ack`,
+`entitlement-ack-no-order-id`, `invalid-unknown-field`) plus the `index.json` manifest. Existing
+payloads are byte-identical to the android vendored pin `679a317`. **Adding is permitted; nothing
+was modified.**
+
+### C-RST-8 — #36's declared base is not its actual base
+
+```bash
+git merge-base --is-ancestor origin/claude/s4-pull-request-semantics \
+  origin/claude/s2-transport-vocabulary && echo CONTAINS || echo "DOES NOT CONTAIN"
+git log --oneline b114d11..origin/claude/s4-pull-request-semantics
+```
+
+Prints `DOES NOT CONTAIN`, then the one commit #36 lacks: `3a8dfdd` (PQ-CUR-1). GitHub shows #36's
+base as #33 regardless. Restacking #36 onto its *actual* fork point silently drops `3a8dfdd`.
+
+### C-RST-9 — #48 is independent and free
+
+```bash
+git rev-list --left-right --count origin/claude/s8-harness-linux-reach...origin/main   # 1  0
+git merge-tree --write-tree --name-only origin/main origin/claude/s8-harness-linux-reach \
+  | sed -n '2,$p' | grep -c CONFLICT                                                   # 0
+```
+
+One commit, **zero behind** fresh main, **zero conflicts**. Nothing in §10 affects it.
+
+### C-RST-10 — §8's vector count was one stale, and is corrected
+
+```bash
+ls docs/sync-vectors/v1/*.json | wc -l                       # 29, not the 28 §8 recorded
+git log --oneline --diff-filter=A -1 -- docs/sync-vectors/v1/invalid-unknown-field.json
+#   7328a0b S5: add the invalid-unknown-field vector, closing PQ-A2-3 and B-6
+```
+
+### C-RST-11 — NOT RUN HERE: the command that settles 806
+
+**This is the one claim in §10 with no executed evidence, and it is labelled so on purpose.** On a
+Windows machine, after the restack:
+
+```powershell
+scripts\Verify-Alpha.ps1        # must print: === Offline total: 806 passed, 0 failed ===
+```
+
+If it prints anything else, §10.3's arithmetic is wrong and the doc/verifier sweep must take the
+**measured** number, per `CLAUDE.md`'s rule. **No cloud session can run this**; no cloud session
+should claim it.
