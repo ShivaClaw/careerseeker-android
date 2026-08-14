@@ -6969,3 +6969,170 @@ git -C <android-clone> diff --stat origin/claude/android-a0-probe..HEAD -- core/
 
 *Expected:* **empty** — run this in the **android** clone, where `core/` and `app/` exist. This repo
 took records only, which is why the android gate did not run and was not attempted (**B-7**).
+
+## Thirty-second run — the push path's wiring (draft PR #46, `0d369eb`, `783a6e1`, `8560796`, `3e7e728`, `9394ca1`)
+
+**Every command below runs in the ENGINE clone** (`ShivaClaw/careerseeker`, branch
+`claude/s6-counter-reconciliation`) unless it says otherwise — an audit command must be executed
+where it will be read. Prerequisite for all of them:
+`apt-get update && apt-get install -y dotnet-sdk-8.0` — **note the `update`**, without which the
+archive serves a **404** on the SDK package. Verify the toolchain actually landed
+(`which dotnet && dotnet --version` → `/usr/bin/dotnet`, `8.0.129`) before trusting anything below:
+the install's exit code has previously been a trailing `tail`'s, not the install's.
+
+### C-WIR-1 — the defect was LIVE at the parent commit, not merely asserted to have been
+
+```bash
+git switch --detach 63ec8a5
+sed -i 's|persistSeq: seq => vault.RecordE2pSeq(seq),|persistSeq: _ => { },|' src/Engine/Program.cs
+dotnet build CareerSeeker.sln -c Release 2>&1 | grep -E "^\s+[0-9]+ (Warning|Error)"
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 | tail -2
+git checkout -- src/Engine/Program.cs && git switch -
+```
+
+*Expected:* **0 Warning(s) / 0 Error(s)** and **`=== 277 passed, 0 failed ===`**. An engine that had
+silently stopped persisting its e2p high-water mark failed no test in this repo. Run in this session
+before any code was written, and re-run afterwards to confirm the command itself reproduces.
+
+### C-WIR-2 — and it is dead at HEAD: the same mutation at its new home now fails
+
+```bash
+git diff --quiet || echo "ABORT: commit first"
+sed -i 's|persistSeq: seqStore.RecordE2pSeq,|persistSeq: _ => { },|' src/Sync/SyncPushPath.cs
+dotnet build CareerSeeker.sln -c Release 2>&1 | grep -E "^\s+[0-9]+ (Warning|Error)"
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 \
+  | grep -E "^  FAIL|=== "
+git checkout -- src/Sync/SyncPushPath.cs
+```
+
+*Expected:* **5 failing**, `PUSH PATH PERSISTS THE MARK -- the wiring, not just the sink's rule`
+among them, and the run **reaches its summary line** rather than dying. **A committed baseline is
+mandatory** — the script restores with `git checkout`, so running it against uncommitted work
+reverts the code under test and reports meaningless results as measurements.
+
+### C-WIR-3 — eight mutations, eight caught, and the eighth does not compile
+
+```bash
+git diff --quiet || echo "ABORT: commit first"
+# M2: untie the mutual reference
+sed -i 's|^        publisherRef = publisher;|        // publisherRef = publisher;|' src/Sync/SyncPushPath.cs
+dotnet build CareerSeeker.sln -c Release >/dev/null 2>&1
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 | tail -1
+git checkout -- src/Sync/SyncPushPath.cs
+# M8: the vault stops implementing the interface
+sed -i 's|public sealed class SyncPairingVault : IE2pSeqStore|public sealed class SyncPairingVault|' src/Engine/SyncPairingVault.cs
+dotnet build CareerSeeker.sln -c Release 2>&1 | grep -cE 'error CS[0-9]+'
+git checkout -- src/Engine/SyncPairingVault.cs
+```
+
+*Expected:* M2 → **9 failing**; M8 → a **non-zero** count of `error CS…` lines, i.e. **it does not
+compile**. M8 is the one that converts "the host passes the right store" from a convention into a
+build error, which is why the PR claims **three** remaining argument identities and not four.
+Full pass measured this run: M1 5, M2 9, M3 4, M4 5, M5 5, M6 1, M7 6, M8 does-not-compile.
+
+### C-WIR-4 — the correction: a guard assertion that killed the run
+
+```bash
+git show 8560796 -- tests/SyncHarness/Program.cs | grep -E "^\+.*(catch \(Exception|did not throw|detail)"
+```
+
+*Expected:* the three-outcome `Throws<T>`. `Throws<T>`'s first version let a wrong exception type
+propagate by design; the null-store mutation (M6) then raised a `NullReferenceException` that took
+the harness down **after zero FAIL lines**, so every assertion below it silently never ran. Only a
+detector that checks for the **missing summary line before counting FAILs** notices — which is the
+thirty-first run's correction, and it is what caught this. After the fix M6 reports **CAUGHT (1
+failing)**. **Fourth appearance of this family, by a fourth route.**
+
+### C-WIR-5 — the harness moved 277 → 294, and the build is clean
+
+```bash
+dotnet build CareerSeeker.sln -c Release 2>&1 | grep -E "^\s+[0-9]+ (Warning|Error)"
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 | tail -1
+```
+
+*Expected:* **0 Warning(s) / 0 Error(s)** and **`=== 294 passed, 0 failed ===`**. Baseline
+re-measured this session on fresh binaries after a clean rebuild — `--no-build` against binaries
+left by a mutation build has previously reported a stale count as a measurement.
+
+### C-WIR-6 — 762 is CORROBORATED, NOT MEASURED, and here is the arithmetic
+
+```bash
+which pwsh || echo "no pwsh"; apt-cache policy powershell 2>&1 | head -3
+for p in Slice EngineHarness ResearcherHarness HookHarness StoreParityHarness \
+         GatewayGateHarness DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  printf '%-26s' "$p"
+  dotnet run --project tests/$p/$p.csproj -c Release --no-build 2>&1 \
+    | grep -oE '=== [0-9]+ passed, [0-9]+ failed ===' | tail -1 || echo "NO SUMMARY LINE"
+done
+```
+
+*Expected:* **no pwsh, and none in the Ubuntu archive** — so `scripts/Verify-Alpha.ps1` **did not run
+and cannot run here**. Nine harnesses report; the Linux sum is
+**28+57+16+28+36+35+45+6+294 = 545**. `EngineHarness` prints **NO SUMMARY LINE** and its **217 is
+carried** (see C-WIR-7). **545 + 217 = 762**, agreeing independently with 745 + 17.
+
+### C-WIR-7 — why EngineHarness carries, and what that COSTS this slice
+
+```bash
+dotnet run --project tests/EngineHarness/EngineHarness.csproj -c Release --no-build 2>&1 | tail -6
+grep -n "SyncPairingVault" tests/EngineHarness/Program.cs | head -2
+```
+
+*Expected:* an `InvalidOperationException: Refusing full-data deletion for a volume root` from
+`FullDataDeletion.cs:81`, thrown at `tests/EngineHarness/Program.cs:221`. The guard is **correct** —
+on Linux the packaged workspace root resolves to a volume root — so the 217 is carried, not guessed.
+
+**The cost, recorded rather than glossed:** the seven sync-pairing-vault assertions live at
+`Program.cs:2462`, **past** that line, so they **did not execute in this session**.
+`SyncPairingVault : IE2pSeqStore` is therefore **compile-verified here and assertion-verified only on
+Windows**. C-WIR-3's M8 shows the implementation is load-bearing, and implicitly implementing an
+interface with a pre-existing public method of the same signature changes no dispatch for existing
+callers — but that is an argument, not a run, and CI on `windows-latest` is what discharges it.
+
+### C-WIR-8 — zero vector bytes moved, so there was NO cross-repo drift event
+
+```bash
+node docs/sync-vectors/generate.mjs --check
+git diff --stat 63ec8a5..HEAD -- docs/sync-vectors/
+```
+
+*Expected:* **`OK: 29 vector files match the generator`** and an **empty** diff. The android repo's
+vendored pin (`7328a0b`) is untouched; this slice added no vector and changed none.
+
+### C-WIR-9 — the pin moved as ONE unit with every doc that reports it
+
+```bash
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1
+grep -rn '| SyncHarness | 294 |\|\*\*762\*\*\|762 passed, 0 failed' \
+  scripts/Verify-Alpha.ps1 README.md src/Engine/README.md \
+  docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md | wc -l
+grep -rn '| SyncHarness | 277 |\|\*\*745\*\*' README.md src/Engine/README.md \
+  docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md
+```
+
+*Expected:* **762**; a **non-zero** count across the verifier and the four count-reporting docs; and
+the last grep **empty** — no doc still reports the stale pair. The `294` inside the Alpha ZIP's
+SHA-256 at `Verify-Alpha.ps1:486,509` is **deliberately not swept**: it is a hash, not a count, the
+same trap as the `724` sitting inside a commit SHA in `docs/Codex-Resume-Handoff.md:80`.
+
+### C-WIR-10 — no android source changed
+
+```bash
+git -C <android-clone> diff --stat origin/claude/android-a0-probe..HEAD -- core/ app/
+```
+
+*Expected:* **empty**. This repo took records only, which is why the android gate did not run and
+was not attempted (**B-7**). Note the path: this command asserts nothing if run in the engine clone,
+where `core/` and `app/` do not exist.
+
+### C-WIR-11 — nothing was merged, rewritten, or deployed
+
+```bash
+git -C <engine-clone> log --oneline origin/main -1
+git -C <engine-clone> merge-base --is-ancestor HEAD origin/main && echo "MERGED" || echo "NOT MERGED"
+git -C <engine-clone> reflog --date=iso | grep -iE 'push --force|rebase' | head
+```
+
+*Expected:* `origin/main` still at **`aac05f3`** (Terra's R7 merge, unmoved this run); **NOT
+MERGED**; and no force-push or rebase in the reflog. #46 remains a **DRAFT**, and draft PRs #26 and
+#32–#45 were left exactly as found.
