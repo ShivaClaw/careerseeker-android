@@ -1530,3 +1530,47 @@ deletion-safety code, correct on its shipping platform, and a sandbox that canno
 **Smallest human unblock: none needed.** CI on `windows-latest` executes all 230 on every push, and
 the 611 reconciliation proves the two skips are the *entire* difference. This entry exists so nobody
 later reads "217 on Linux" as the whole harness — **it is 217 of 230, and the missing 13 are named.**
+
+---
+
+## Standing gate hazard #2 (new 2026-08-14, thirty-fourth run) — a Maven **403**, and it is NOT the `ScreensFromFixtureTest` flake
+
+**Filed specifically so the next session does not misread this as the standing flake.** The two look
+alike from the run list — android CI red on attempt 1 of a records-only push — and they are nothing
+alike underneath. **Checking the signature before claiming the flake is the whole discipline here**,
+and this run is the case that proves the discipline earns its keep: the reflex answer would have been
+wrong.
+
+| | Standing flake (5 prior instances) | **This** |
+| --- | --- | --- |
+| Failing step | **9**, `Unit tests (:app, Robolectric)` | **5**, `Set up Gradle` / dependency resolution |
+| Duration | ~93 s into the job | **`BUILD FAILED in 48s`** |
+| Signature | `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab FAILED`, `AssertionError at ScreensFromFixtureTest.kt:69` | `Received status code 403 from server: Forbidden` from `repo.maven.apache.org` **and** `plugins.gradle.org` |
+| Nature | a real intermittent test | **infrastructure — nothing was even compiled** |
+
+**Symptom.** Run [31806621771](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31806621771),
+`head_sha` `370ecfe`, attempt 1 `failure`. Gradle could not resolve the **AGP 9.3.0 buildscript
+itself** — `com.android.tools.build:gradle:9.3.0` and its transitive deps
+(`bundletool`, `jetifier-processor`, `kotlin-gradle-plugin-api:2.2.10`, `jsr305`, `dagger`, `jose4j`,
+`slf4j-api`, …) each **403 Forbidden** from both Maven Central and the Gradle plugin portal, with
+`There are 27 more failures with identical causes.` **No project code was compiled and no test ran**,
+so no step past dependency resolution has a result at all.
+
+**This push could not have caused it.** `git diff --stat 7009bfe..370ecfe` is **four Markdown files,
+377 insertions**; scoped to `app/ core/ gradle/ build.gradle.kts settings.gradle.kts gradle.properties
+.github/` the diff is **empty**. A records-only commit cannot make Maven Central return 403.
+
+**Attempts.** Re-ran the failed job (attempt 2) — the recorded remedy, and neither a merge nor a
+deploy. **Attempt 2 then sat in `Set up Android SDK` for well over eight minutes**, far longer than
+its usual few seconds, which points the same way: **runner-side network trouble reaching Google/Maven
+CDNs**, not a repo defect.
+
+**Smallest human unblock: none, and probably nothing to fix.** A 403 from Maven Central to a GitHub
+runner is transient infrastructure (rate-limiting or a CDN edge), and it clears on its own. **The
+action is to re-run, then read the signature.** If it persists across several hours and multiple
+re-runs, it becomes a real blocker and the mitigation is a dependency cache or a mirror — but do not
+build that on one bad afternoon.
+
+**What this does NOT license.** It does not make "CI was red, probably infrastructure" an acceptable
+reading of any future red. **This entry exists because the signature was checked and found to differ
+from the recorded one** — that check is the point, not the conclusion.
