@@ -7461,3 +7461,152 @@ git log --oneline origin/main -1                                            # st
 
 No android source changed this run (`git diff --stat origin/claude/android-a0-probe~1..HEAD` in the
 android repo shows Markdown only), so the android gate was correctly not attempted (**B-7**).
+
+---
+
+## Thirty-fifth run — the halt policy's FOR argument, measured (engine repo, `claude/s2-push-disposition`)
+
+All commands below run from a clone of `ShivaClaw/careerseeker` at
+`claude/s2-push-disposition` (`1951313`), on Linux, after
+`apt-get update && apt-get install -y dotnet-sdk-8.0`.
+
+### C-HALT-0 — the assigned slice was already landed, so it was declined rather than redone
+
+```bash
+git fetch --all --prune
+git log --oneline origin/main..origin/claude/s5-entitlement-ack-spec
+#   9c05ef7 / a564c0c / 22b028e "pin section 4.3.3 with two entitlement_ack vectors"
+#           / 8575539 "define the entitlement_ack body, and say what the size cap actually measures"
+git log --oneline origin/main..origin/claude/s5-engine-wire-parser | grep 7328a0b
+#   7328a0b S5: add the invalid-unknown-field vector, closing PQ-A2-3 and B-6
+```
+
+PQ-A6-1, PQ-A2-1, PQ-A2-2 and PQ-A2-3 are all closed on the open draft stack (#32, #37). **Nothing
+was re-derived, re-specified or duplicated.**
+
+### C-HALT-1 — the per-cycle cost of never halting is ten attempts and ten burnt seqs in ten cycles
+
+```bash
+dotnet build CareerSeeker.sln -c Release                                   # 0 Warning(s) / 0 Error(s)
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep "halt:"
+#   PASS  halt: a permanently dead pairing costs ONE push attempt per cycle, indefinitely
+#   PASS  halt: ...and burns one seq per cycle -- the counter advanced by exactly the cycle count
+#   PASS  halt: ...delivering nothing and persisting nothing
+#   PASS  halt: ...while the operator sees ONE line, not ten -- that clause is ALREADY answered
+```
+
+Driven through the **real `SyncPushPath` composition**, not through a copy of the sink.
+
+### C-HALT-2 — seq exhaustion is not the harm, and the claim is an assertion so it can rot loudly
+
+```bash
+grep -n "MaxSeq = " src/Sync/Protocol.cs        # 9_007_199_254_740_991 (2^53-1)
+python3 -c "print(9007199254740991 // 31557600)"   # 285420920  -> years at one seq per SECOND
+```
+
+Re-verified by mutation, not by arithmetic alone — see **M5** below.
+
+### C-HALT-3 — THE FINDING: a `PayloadDead` backoff would suppress the entitlement ack
+
+```bash
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep "halt:"
+#   PASS  halt: an oversized snapshot is refused by §3.1's cap, measured on the CIPHERTEXT (PQ-A2-1)
+#   PASS  halt: ...and that refusal classifies PayloadDead, which is what a backoff would key on
+#   PASS  halt: THE ACK STILL REACHES THE RELAY on the very next push -- what a PayloadDead backoff would suppress
+#   PASS  halt: ...and the bytes that got through ARE the entitlement_ack, decrypted from the wire
+#   PASS  halt: ...and its mark was persisted, so the delivery is a real one and not a reported one
+#   PASS  halt: under PairingDead the ack fails ANYWAY -- a backoff there withholds nothing that would have succeeded
+#   PASS  halt: ...so PairingDead and PayloadDead do NOT take the same policy, though they share a permanence
+```
+
+The ack is proven by **decrypting the envelope the transport received** (`EnvelopeCodec.Open`
+against the header's own AAD), not by the success flag of the call that produced it.
+
+### C-HALT-4 — nine mutations, nine caught, and the ninth is the remedy itself
+
+```bash
+sha256sum src/Sync/RelaySink.cs src/Sync/SyncPublisher.cs src/Sync/Protocol.cs \
+          src/Sync/SyncPayloads.cs tests/SyncHarness/Program.cs > /tmp/halt.sha
+```
+
+Apply each, rebuild `tests/SyncHarness`, run, and **check for the `=== N passed, M failed ===`
+summary line BEFORE counting FAILs** — a mutation that kills the run is not a catch:
+
+**M1** `src/Sync/RelaySink.cs`: `TooLarge => PushDisposition.PayloadDead` → `PairingDead`.
+**M2** `src/Sync/SyncPublisher.cs`: `Interlocked.Increment(ref _seq)` → `Interlocked.Read(ref _seq)`.
+**M3** `src/Sync/RelaySink.cs`: delete the `persistSeq(accepted)` call.
+**M4** `src/Sync/SyncPayloads.cs`: `Encode("entitlement_ack"` → `Encode("entitlement_acknowledgement"`.
+**M5** `src/Sync/Protocol.cs`: `MaxSeq = 9_007_199_254_740_991L` → `1_000_000L`.
+**M6** `src/Sync/RelaySink.cs`: `return disposition == PushDisposition.Delivered;` →
+`return disposition != PushDisposition.RetryLater;`.
+**M8** `src/Sync/RelaySink.cs`: `if (line == lastLine) suppressed++;` →
+`if (line == lastLine) { log(line); suppressed++; }`.
+**M9** `src/Sync/Protocol.cs`: `MaxEnvelopeBytes = 1024 * 1024` → `64 * 1024 * 1024`.
+**M7 — the naive backoff, the one that matters.** In `RelaySink.Create`'s returned lambda, before
+the `push` call, insert:
+
+```csharp
+bool skip;
+lock (gate) skip = lastDisposition is PushDisposition.PayloadDead or PushDisposition.PairingDead;
+if (skip) return false;
+```
+
+Expect **four** `FAIL  halt:` lines, led by
+`halt: THE ACK STILL REACHES THE RELAY on the very next push`. After each mutation:
+`git checkout <file> && sha256sum -c /tmp/halt.sha` must print `OK` for all five.
+
+### C-HALT-5 — the assertion was rewritten to survive its own target mutation
+
+```bash
+git show e071b98 -- tests/SyncHarness/Program.cs | grep -n "capPushed.Count == 2"
+```
+
+Before the rewrite, M7 raised `System.ArgumentOutOfRangeException` at `Program.cs:1992` and killed
+the harness **after one FAIL line**. The guarded form reports the failure and lets every assertion
+below it run. Re-verifiable by reverting the guard to a bare `capPushed[1]` and re-applying M7:
+expect no summary line.
+
+### C-HALT-6 — the pin sweep is counts only, and 793 is corroborated, not measured
+
+```bash
+git diff bb2cc63..1951313 -- README.md src/Engine/README.md docs/ scripts/Verify-Alpha.ps1 \
+  | grep -E "^[-+]" | grep -vE "^[-+][-+]|^\+#"        # only 313->325 and 781->793; no hash, no version string
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1                     # 793
+for h in Slice ResearcherHarness HookHarness StoreParityHarness GatewayGateHarness \
+         DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  dotnet run --project tests/$h/$h.csproj -c Release | tail -1; done
+#   28 / 57 / 16 / 28 / 36 / 35 / 45 / 6 / 325  = 576;  576 + EngineHarness's Windows 217 = 793
+```
+
+**`Verify-Alpha.ps1` did not run and cannot here** (`which pwsh` is empty). CI is what settles
+it, and **it did**: run `31822961113` on `head_sha` `1951313`, job `94840334927`
+(`windows-latest`), step 6, printed `=== 325 passed, 0 failed ===` then
+`=== Offline total: 793 passed, 0 failed ===`. The pin is therefore **measured on Windows**, not
+merely corroborated on Linux. Re-read it with:
+
+```bash
+gh run view 31822961113 --repo ShivaClaw/careerseeker --log --job 94840334927 | grep "Offline total"
+```
+
+### C-HALT-7 — zero vector bytes moved
+
+```bash
+node docs/sync-vectors/generate.mjs --check     # OK: 29 vector files match the generator
+git status --porcelain                          # empty
+```
+
+**No cross-repo drift event.** No vector was added, removed or edited this run, so the android repo's
+vendored pin is untouched.
+
+### C-HALT-8 — no behaviour changed, and nothing was merged, rewritten, deployed or contacted
+
+```bash
+git diff bb2cc63..1951313 --stat -- src/Sync/               # src/Sync/RelaySink.cs | 34 ++++ (1 file, +34/-0)
+git diff bb2cc63..1951313 -- src/Sync/ | grep -E "^\+" | grep -v "^+++" | grep -vcE "^\+///"   # 0 non-comment additions
+git log --oneline origin/main -1                            # aac05f3 -- unmoved by this run
+```
+
+`Classify`'s mapping, the sink's effects, its bool, `Report`, `SyncPushPath.Create` and
+`SyncPublisher` are byte-identical to `bb2cc63`. **No backoff and no halt was implemented.** PR #47
+is a **DRAFT**; the android repo received Markdown only, so the android gate was correctly not
+attempted (**B-7**).

@@ -8093,3 +8093,209 @@ merge condition** — merging in `careerseeker` needs a full *local* gate
 (`-IncludePublish -IncludePackage`) that cannot run here, so **nothing was merged**. `origin/main` is
 still `aac05f3`, unmoved by this run. The 13 Windows-only assertions are still Windows-only; **B-10
 is a named limit, not a solved problem.**
+
+---
+
+## Thirty-fifth run (2026-08-14, cloud iteration, Linux sandbox) — the option recorded as free was the one that would have suppressed the Pro unlock
+
+**Assigned slice:** S5's spec half — amend §4.3 for `entitlement_ack`, add the vector, close
+PQ-A2-1/-2/-3. **Declined, because it is landed.** Verified before anything else was decided:
+`git log origin/main..origin/claude/s5-entitlement-ack-spec` shows `8575539` ("define the
+entitlement_ack body, and say what the size cap actually measures"), `22b028e` ("pin section 4.3.3
+with two entitlement_ack vectors, generated not hand-written"), `a564c0c`, `9c05ef7` — draft PR #32,
+open since 2026-08-09. PQ-A2-3's `invalid-unknown-field` vector landed at `7328a0b` (PR #37) and
+**B-6 has been CLOSED in this book since the twenty-second run.** The stored prompt's ladder summary
+is eleven runs stale, and it says so itself: *"verify it; do not trust this summary."* This is the
+**second consecutive run** to find its assigned slice already done.
+
+**Slice actually taken:** `STATE.md`'s ordered next intent **item 1** — *"decide the halt policy, or
+write down that it stays open, but do not leave it implicit"* — the topmost surviving item, and the
+oldest by two runs now that item 3 was taken as PR #48. **Ninth consecutive run routed by this list
+rather than by the prompt.**
+
+### Milestone 1 — the argument FOR halting, which was recorded nowhere
+
+`RelaySink.Classify` names `PairingDead` and `PayloadDead` and nothing consumes either for anything
+but words. Both arguments *against* halting sit in `RelaySink`'s remarks
+([src/Sync/RelaySink.cs:92-104](https://github.com/ShivaClaw/careerseeker/blob/claude/s2-push-disposition/src/Sync/RelaySink.cs));
+the argument *for* was written down in no file, which made a taken decision read as a one-sided one.
+It runs: *on a pairing that can never accept, the engine burns one seq per cycle forever, and the
+operator's only signal is a single line that scrolls away.*
+
+Measured clause by clause through the **real `SyncPushPath` composition**, its three parts turn out
+not to be equally true:
+
+| Clause | Verdict | Measured |
+| --- | --- | --- |
+| per-cycle cost | **real** | 10 cycles on a dead pairing → **10 push attempts, 10 burnt seqs, 0 delivered, 0 persisted** |
+| "forever" | **NOT a resource risk** | `Protocol.MaxSeq` outlasts a burn of one seq **per second** by **>100 million years** |
+| operator signal | **already answered** | those same 10 cycles produce **ONE** operator line, not ten |
+
+The middle row is pinned as an **assertion**, not a sentence, so that lowering `MaxSeq` re-opens the
+question rather than silently invalidating the paragraph that answered it. Mutation **M5** (`MaxSeq`
+→ `1_000_000`) fails it.
+
+### Milestone 2 — the finding: the cheapest remedy was mis-specified
+
+The ordered intent named three options and labelled one of them free: *"a bounded backoff (which
+needs no product decision)"*. **It needs one, for half its domain**, and the reason is visible from
+`PushDisposition`'s own definition rather than from anything new.
+
+A backoff keys on the disposition. `PayloadDead` is a fact about **the bytes just pushed**, not about
+the pairing — while **one sink is shared by every payload a publisher sends**. So: an oversized
+snapshot is refused by §3.1's cap (measured on the **ciphertext**, per PQ-A2-1), which puts the sink
+in `PayloadDead`; `EngineSyncBridge`'s ratified snapshot retry re-sends that same snapshot every
+cycle, so it **stays** there. The next payload need not be another snapshot. It can be the
+`entitlement_ack` — small, and the only thing §4.3.3 lets unlock Pro.
+
+**Measured: today that ack gets through.** Proven by **decrypting the envelope the transport actually
+received** (`EnvelopeCodec.Open` against the header's own AAD) rather than by trusting the success
+flag of the call that produced it — `kind == "entitlement_ack"`, `body.product_id == "pro_unlock"`,
+and its mark persisted at seq 2. A backoff keyed on "permanent" as one bucket would suppress exactly
+that, trading a traffic defect for a paid-feature one.
+
+Under `PairingDead` the ack **fails anyway** (asserted), so a bounded, self-clearing backoff *there*
+withholds nothing that would have succeeded. **The two dispositions do not take the same policy.**
+
+### Milestone 3 — nine mutations, and the ninth is the remedy itself
+
+`SyncHarness` **313 → 325**, 0 failed, run here. Every one of the twelve new assertions was shown to
+fail under at least one mutation; **nine applied, nine caught**, tree restored byte-identical after
+each (`git status --porcelain` empty).
+
+| # | Mutation | Caught by |
+| --- | --- | --- |
+| M1 | `Classify`: 413 → `PairingDead` | classifies-PayloadDead; do-NOT-take-the-same-policy |
+| M2 | publisher: `Interlocked.Increment` → `Read` | burns-one-seq-per-cycle; mark-persisted |
+| M3 | sink: stop persisting on 201 | (pre-existing assertions) |
+| M4 | rename the `entitlement_ack` payload kind | bytes-ARE-the-entitlement_ack |
+| M5 | `Protocol.MaxSeq` → `1_000_000` | seq-exhaustion-is-NOT-the-harm |
+| M6 | sink reports success on a permanent failure | delivering-nothing; oversized-refused; ack-fails-anyway |
+| M8 | dedupe: log every repeat | operator-sees-ONE-line |
+| M9 | `MaxEnvelopeBytes` → 64 MiB | oversized-snapshot-refused-by-§3.1 |
+| **M7** | **the naive backoff itself** — 8 lines skipping the push while the last disposition was permanent | **costs-one-attempt-per-cycle; ACK-STILL-REACHES-THE-RELAY; bytes-ARE-the-ack; mark-persisted** |
+
+**M7 is the point of the slice.** The remedy under consideration is now caught *by name* by the
+harness, so the next session cannot ship it without being told what it breaks.
+
+### Milestone 4 — a correction to this slice's own first draft, and it is the fifth of its family
+
+**M7 did not fail cleanly on the first attempt — it CRASHED the harness.** The run printed
+`FAIL  halt: THE ACK STILL REACHES THE RELAY…` and then died on an unguarded `capPushed[1]`:
+`System.ArgumentOutOfRangeException` at `Program.cs:1992`, **after one FAIL line**, so every assertion
+below it silently never ran. Under the very mutation the assertion exists to catch, `capPushed` has
+**one** element.
+
+This is the **fifth** time this repo has met that false-negative family by a fifth route — and the
+first time the defect was in an assertion written *in the same session* to catch a mutation
+*designed in the same session*. The mutation detector caught it only because it **checks for the
+summary line before counting FAILs**, which is the previous run's lesson doing its job. The assertion
+was rewritten to survive its own target mutation; M7 then reported four clean failures.
+
+### Milestone 5 — the decision, written down rather than left implicit
+
+`RelaySink`'s remarks now carry the FOR argument with its three measured answers, the `PayloadDead`
+finding, and the conclusion: **a backoff on `PairingDead` alone is the shape that needs no product
+decision; the same backoff on `PayloadDead` needs one, because it delays the Pro unlock.** Doc
+comment only — **no behaviour changed, no signature changed.** The sink still does not halt and still
+does not back off, and this is still the layer that will not take that decision.
+
+**What is still not decidable in this repo is named too, and it is not the policy's shape — it is the
+WINDOW.** That is a function of the engine's cycle cadence, which lives in `EngineSyncBridge` and
+which no harness here can observe. Naming it is the difference between an open decision and a vague
+one.
+
+### Milestone 6 — evidence, and the pin
+
+```
+$ dotnet build CareerSeeker.sln -c Release      → 0 Warning(s) / 0 Error(s)
+$ dotnet run --project tests/SyncHarness/…      → === 325 passed, 0 failed ===
+$ node docs/sync-vectors/generate.mjs --check   → OK: 29 vector files match the generator.
+```
+
+Nine of the ten offline harnesses run on Linux and were all run this session:
+`Slice 28 · ResearcherHarness 57 · HookHarness 16 · StoreParityHarness 28 · GatewayGateHarness 36 ·
+DispatcherNoSendHarness 35 · LifecycleHarness 45 · RendererHarness 6 · SyncHarness 325` = **576**.
+`EngineHarness` still aborts here (**B-10**, whose fix sits on unmerged PR #48 and was deliberately
+**not** pulled into this branch); its Windows count of **217** is carried, and **576 + 217 = 793**.
+
+**Pin swept 781 → 793** as one unit with every doc that reports it: `README.md`,
+`src/Engine/README.md`, `docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`, and
+the four assertion blocks inside `Verify-Alpha.ps1` that pin those tables. **793 is CORROBORATED, NOT
+MEASURED** — `Verify-Alpha.ps1` did not run and cannot here (`which pwsh` empty, re-checked). CI on
+`windows-latest` is what settles it, as it settled 762 and 781. The sweep diff contains **no hash and
+no version string** — checked after the sweep, the trap the previous two runs each named.
+
+### Ladder movement
+
+**S2 stays PARTIAL**, and deliberately: this slice closed the *record* half of ordered-intent item 1
+and left the behaviour unchanged. Nothing moved to DONE. The claim is narrow — the halt question is
+no longer open in the shape it was recorded in, and the remedy that was recorded as free is now
+caught by name.
+
+### Prohibition — what this iteration did not touch
+
+**No behaviour changed in the engine.** The only edit under `src/Sync/` is a **doc comment** on
+`RelaySink` (+34/−0 of XML remarks, 0 non-comment additions); the only other `src/` file touched is
+`src/Engine/README.md`, and only for the pin sweep's two count lines. `Classify`'s mapping, the
+sink's effects, its bool, the dedupe, `Report`, `SyncPushPath.Create` and `SyncPublisher` are
+**byte-identical to `bb2cc63`**. **No backoff and no
+halt was implemented** — that is the whole point of the entry, and shipping the version that was on
+record would have suppressed the `entitlement_ack`. All nine mutations were **reverted**; the tree is
+clean.
+
+**`docs/Sync-Protocol.md`, `generate.mjs` and every byte of `docs/sync-vectors/` are unchanged** —
+`--check` **OK at 29**, no vector added, removed or edited: **NO cross-repo drift event**, and the
+android repo's vendored pin is intact. No `relay/`, no TypeScript, no `src/Engine/Host.cs`, no
+`src/Engine/Program.cs`, no `src/Engine/SyncPairingVault.cs`, no `src/Verifier/`, no `src/Gateway/`,
+no `src/Dispatcher/`, no `docs/autonomy/*` beyond the coordination bus.
+
+**No android source changed** — not `core/`, not `app/`, not a screen, not the Room replica; this
+repo received **records only**, so **the android gate did not run and was correctly not attempted**
+(**B-7**). **`Verify-Alpha.ps1` did not run and cannot.** **No merge in either repo** — #47 is a
+**DRAFT**, CI green is not the merge condition (that needs a full *local* gate out of reach here),
+and the android repo is **never-self-merge** regardless. No force-push, no history rewrite, no branch
+deleted; draft PRs **#26 and #32–#48** in the engine repo and **#1–#6** here were left exactly as
+found — not merged, retargeted or rebased. **PR #48 was read and NOT merged into this branch**: it is
+a separate slice off fresh `origin/main`, and pulling it here to make `EngineHarness` reach would
+have entangled two independent draft PRs.
+
+No deploy of any kind (Cloudflare, Workers, relay, site, Pages), and **the production relay was not
+contacted at all, not even `GET /v1/health`** — not one byte was sent to a relay, an engine or a
+phone. No Play, Google or OAuth console; no accounts, no purchases, no Play Billing code; no Gmail,
+no email; no MSIX or certificate-store action; no emulator, no `sdkmanager`, no keystore use. **No
+secret was read, printed or referenced.** `Documents\CareerSeeker` and Terra's worktrees were never
+touched, and `autonomy/codex-state` was **read and not written** — Terra reports **COMPLETE with no
+files claimed**, so there was no collision and no rebase was owed.
+
+**One machine change:** `apt-get update && apt-get install -y dotnet-sdk-8.0` → **8.0.129** (the
+container starts without it; the `update` is required or a bare install 404s).
+
+### Addendum — Windows CI settled the pin, and it did not have to be inferred
+
+Written after the entry above, whose stated exposure was that **793 was corroborated, not measured**.
+**It checked out, and the number was read from the job log rather than from the run's colour.**
+
+Run [31822961113](https://github.com/ShivaClaw/careerseeker/actions/runs/31822961113) on draft PR
+**#47**, **`head_sha` `1951313` read from the run's own field**, `run_attempt` **1**: **both jobs
+`success`** — *Blind relay (Worker)* (`ubuntu-latest`) 17:13:06 → 17:13:33, all ten steps including
+*Assert sync vectors match their generator*; *Build and offline harnesses* (`windows-latest`,
+job `94840334927`) 17:13:09 → 17:15:10, all steps green. Step 6 runs `Verify-Alpha.ps1`, **which
+throws on a pin mismatch**, and it printed:
+
+```
+=== 325 passed, 0 failed ===              <- SyncHarness
+=== Offline total: 793 passed, 0 failed ===
+CareerSeeker alpha verification complete.
+```
+
+**All twelve `halt:` assertions are in that Windows log, PASS**, including
+`halt: THE ACK STILL REACHES THE RELAY on the very next push` and
+`halt: seq exhaustion is NOT the harm`. So the finding is not a Linux artefact: **the sandbox
+measured it and the platform the engine ships to confirmed it.**
+
+**What this addendum does NOT change.** PR **#47** is still a **DRAFT** and **CI green is not the
+merge condition** — merging in `careerseeker` needs a full *local* gate
+(`-IncludePublish -IncludePackage`) that cannot run here, so **nothing was merged**. `origin/main` is
+still `aac05f3`, unmoved by this run. The halt policy is still **not implemented**, deliberately, and
+the window it would need is still a local-session question.

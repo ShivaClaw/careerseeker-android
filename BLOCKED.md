@@ -1671,3 +1671,40 @@ skill this program needs; but **B-11 was never warranted and is not filed.**
 **The lesson, stated once and plainly, because it cost most of an iteration:** *I generated the
 symptoms I then investigated.* Batch records into one commit, push once, and read `conclusion` — never
 a step's start time against a wall clock.
+
+---
+
+## B-12 — the halt policy's WINDOW, not its shape: a decision this environment cannot source
+
+**Milestone:** S2 (ordered next intent, item 1). **Filed 2026-08-14, thirty-fifth run.**
+**A LIMIT, not a blocker** — nothing is stuck, and the rung moved. B-11 was deliberately never
+filed (see the entry above); this one is filed because a later session *will* reach for the missing
+number and should not have to re-derive why it is missing.
+
+**Symptom.** `RelaySink` now records the halt policy's *shape*, measured rather than argued: a
+bounded, self-clearing backoff on `PushDisposition.PairingDead` **alone** needs no product decision,
+while the same backoff on `PayloadDead` needs one, because it would suppress the `entitlement_ack`
+(**C-HALT-3**). What is still unsourced is the **window** — how many cycles, growing how, capped
+where.
+
+**Attempts.** Two, both in this session, both dead ends *by construction* rather than by failure:
+
+1. **Derive it from the harness.** `SyncHarness` drives the real `SyncPushPath` composition and can
+   count pushes per cycle, but a "cycle" there is a loop iteration in a test. It carries no wall-clock
+   period, so a backoff of "skip 8 cycles" is unitless here and could mean eight seconds or eight
+   hours.
+2. **Read it off the engine.** The period lives in `EngineSyncBridge`, on the host side of the seam —
+   the same side as `BuildSyncBridge`, which **has never executed in any harness or on any CI runner**
+   (the standing item 2). Nothing in this sandbox can observe it, and inferring it from source would
+   be a guess dressed as a measurement.
+
+**Why it was not guessed anyway.** A backoff window that is too long converts a transient 401 — a
+relay deploy blip — into a sync outage, which is precisely argument two *against* halting in
+`RelaySink`'s own remarks. Picking that number blind from a cloud session would re-introduce the risk
+the whole decision exists to avoid.
+
+**Smallest human unblock.** One number, from a machine that runs the engine: the wall-clock period of
+`EngineSyncBridge`'s publish cycle. With it, the backoff is a small, testable change on
+`PairingDead` only. **Without it, do not implement the backoff** — the naive version is now caught by
+name by `SyncHarness` (mutation **M7**, four `FAIL halt:` lines), which is the guard this run left
+behind rather than a suggestion.
