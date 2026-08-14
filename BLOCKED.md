@@ -1462,3 +1462,71 @@ a stub `HttpMessageHandler` needs no relay, no SDK and no device.
 2. **`Misconfigured`/`Unauthorised` having no behavioural consumer.** The host logs each once and
    returns `null`. That is a *deliberately deferred* design step recorded in the LOG and in PR #45's
    self-audit, not an obstruction: nothing prevents the next session from acting on them.
+
+---
+
+## B-2 status 2026-08-14 (thirty-fourth run) — **THE "ONE REMAINING THING" HAS BEEN DONE FOR TWO DAYS**
+
+**Read this before picking S2 again.** Every B-2 entry above this line, including the ones that say
+so in bold, is **stale**: *"Still open, and it is exactly one thing: the desktop `/pair` page."*
+
+**The `/pair` page merged into `main` on 2026-08-12 19:57:26 −0600.** PR **#42** from
+`claude/s2-pair-page`, merge `d1bc698`, carrying `5a97b0f` — a `GET /pair` route plus three POST
+controls in `Host.cs`, the host half (PairingManager, relay channel, DPAPI vault write) in
+`Program.cs`, and eleven `EngineHarness` assertions. Verified this run by three independent means,
+not by reading the commit message: `git merge-base --is-ancestor d1bc698 origin/main` returns true;
+`git show origin/main:src/Engine/Host.cs | grep -c 'path == "/pair"'` returns 1; and **the eleven
+`/pair` assertions executed on Linux this session, 11/11 PASS** (they became reachable as a
+side-effect of B-10's fix).
+
+**Why five sessions kept reporting it open, and it was NOT a skipped fetch.** The thirty-third run
+fetched correctly. But it worked on `claude/s2-push-disposition` — **40 ahead of `main`, 16 behind
+it** — and derived its blocker list **from its own stack**.
+`git merge-base --is-ancestor d1bc698 origin/claude/s2-push-disposition` is **false**: the merge is
+not in the stack. **Rule one says fetch. The rule this adds: re-derive against `main`, because a
+long-lived stack is a stale ref that fetches perfectly cleanly.** The repeated "five hardenings, zero
+`/pair` progress" note was true when written and became false without anyone noticing.
+
+**What is actually left of B-2.** Not a screen. B-2 asks for "pair phone/emulator ↔ engine through
+the relay"; the engine half is **done and merged**, and what remains is **the phone and the device**
+— which is **B-4**, already tracked separately. **B-2 is therefore not CLOSED, but it is no longer
+blocked on anything of its own**, and the next session must not go looking for a `/pair` page to
+build. **Smallest unblock: B-4's** (one Android Studio SDK Tools checkbox), plus the live-relay
+re-run already queued for return day.
+
+---
+
+## B-10 — thirteen `EngineHarness` assertions are Windows-only, and until this run they cost 220 more
+
+**New 2026-08-14 (thirty-fourth run). A LIMIT, not a blocker — nothing is stuck, and CI covers it.**
+Filed because the code comments in `tests/EngineHarness/Program.cs` reference it by name, and a
+reference with no entry is the same bug as a claim with no command.
+
+**Symptom (measured, not assumed).** `EngineHarness` aborted on Linux with an **unhandled**
+`InvalidOperationException` at `tests/EngineHarness/Program.cs:221`, process exit **134**. A cloud
+session reached **17 of the file's 237 assertion sites**; **220 never ran.**
+
+**Diagnosis.** `FullDataDeletion.ResolveAllowedWorkspace` derives the volume root with
+`Path.GetPathRoot` and trims the trailing separator (`FullDataDeletion.cs:79-81`). On Windows `C:\`
+trims to `C:`; on Linux `/` trims to `""`, so the `IsNullOrWhiteSpace` arm refuses **every**
+workspace as a volume root. **This is not a defect** — it fails closed, which is right for a
+deletion guard, and the product is Windows-only.
+
+**Attempts.** (1) Editing `src/Engine/FullDataDeletion.cs` — **considered and refused**: production
+deletion-safety code, correct on its shipping platform, and a sandbox that cannot run
+`Verify-Alpha.ps1` is not where you loosen a delete-everything guard. (2) Harness-side skip —
+**taken** (PR #48): both platform-bound sections announce a skip instead of throwing. Result
+**17 → 217 passed, 0 failed**, and the whole offline ladder now runs here at **598**, with
+**598 + 13 = 611 = `$ExpectedOfflineTotal`** — confirmed against Windows CI, which measured
+**EngineHarness 230** and **`Offline total: 611 passed, 0 failed`** on the same commit.
+
+**What remains genuinely unrunnable off Windows, and why that is honest rather than a gap:**
+
+| Section | Assertions | Reason |
+| --- | --- | --- |
+| `[ confirmed full-data deletion ]` | 6 | POSIX path root resolves to `""` (above) |
+| `[ sync pairing vault ]` | 7 | `SyncPairingVault` is DPAPI-backed; `crypt32` has no POSIX equivalent |
+
+**Smallest human unblock: none needed.** CI on `windows-latest` executes all 230 on every push, and
+the 611 reconciliation proves the two skips are the *entire* difference. This entry exists so nobody
+later reads "217 on Linux" as the whole harness — **it is 217 of 230, and the missing 13 are named.**

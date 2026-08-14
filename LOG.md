@@ -7916,3 +7916,180 @@ about the engine slice moves: PR **#47** is still a **DRAFT**, the offline pin i
 ordered intent. The android gate still cannot be run from this sandbox (**B-7**) — CI ran it, I did
 not, and that distinction is the reason this paragraph exists rather than a claim that "the gate
 passed".
+
+---
+
+## Thirty-fourth run (2026-08-14, cloud iteration, Linux sandbox) — the assigned slice was already landed, the closed blocker was still open in the records, and the smallest recorded limit turned out to be the largest
+
+**This run did not do what it was told to do, and that was the point.** The stored prompt assigned
+the S5 spec slice: amend `docs/Sync-Protocol.md` §4.3 with the `entitlement_ack` body, add the
+vector via `generate.mjs`, close PQ-A2-1/-2/-3. **All of it was already landed**, and the previous
+run's own log had said so ("a fourth restatement of a spec already landed"). Restating it a fifth
+time would have burned an iteration and produced nothing. The prompt also said the vendored vector
+pin is `679a317`; **it is `7328a0b`**, and has been for twelve runs. The lesson the thirty-third run
+wrote down — *the environment section of a stored prompt ages exactly like a doc count* — held again,
+and this run extends it: **so does the task section.** A stored prompt is a hypothesis about the
+world, checked with `git`, not believed.
+
+### Milestone 1 — the assigned slice was verified as already done before it was declined
+
+Not inferred from the log; measured. `origin/claude/s5-entitlement-ack-spec` is **4 commits ahead of
+main with 28 vector files** (main has 26), and commit **`7328a0b`** is literally titled *"S5: add the
+invalid-unknown-field vector, closing PQ-A2-3 and B-6"*. The three PQ-A2 items and PQ-A6-1's §4.3
+body are on that branch and its descendants. Re-verify: **C-EHR-1**.
+
+### Milestone 2 — B-2's remaining gap closed two days ago, and the records still call it open
+
+**This is the finding worth reading twice.** `BLOCKED.md` B-2 says, in bold: *"Still open, and it is
+exactly one thing: the desktop `/pair` page."* `STATE.md`'s S2 row says the same, and adds that the
+rung *"has now been worked three times without moving that."*
+
+**The `/pair` page has been on `main` since 2026-08-12 19:57:26 −0600.** PR **#42** from
+`claude/s2-pair-page` merged as **`d1bc698`**, carrying **`5a97b0f`** — *"S2: the /pair page — the
+vault finally has a way to be filled"*: a `GET /pair` route and three POST controls in `Host.cs`, the
+host half in `Program.cs`, and **eleven `EngineHarness` assertions**. `git merge-base --is-ancestor`
+confirms it is an ancestor of `origin/main`.
+
+**Why the records missed it, and it is not that anyone skipped the fetch.** The thirty-third run *did*
+fetch — its log proves it read `autonomy/codex-state` twice. But it worked on `claude/s2-push-disposition`,
+which is **40 ahead of main and 16 behind it**, and it derived its blocker list from **its own stack
+rather than from `main`**. `git merge-base --is-ancestor d1bc698 origin/claude/s2-push-disposition`
+returns false: **the merge is not in the stack**. Rule one says fetch; the sharper rule this run adds
+is **re-derive against `main`, because a long-lived stack is a stale ref that fetches cleanly.**
+
+**What is honestly left of B-2.** Not "one screen." The engine half is **done** — and this run did not
+take that on trust either: the eleven `/pair` assertions **executed here, 11/11 PASS**, as a
+side-effect of Milestone 4. What remains of "pair phone ↔ engine through the relay" is **the phone
+and the device**, which is **B-4**, already tracked. B-2 is not closed; it is **no longer blocked on
+anything of its own**. Re-verify: **C-EHR-2**.
+
+### Milestone 3 — the harness reached 17 of 237 assertions here, where the record said seven were missing
+
+The standing record (ordered intent item 3, and B-2's neighbours) says: *"`EngineHarness`'s seven
+vault assertions do not run on Linux."* The seven are real and correctly diagnosed. **The scale was
+wrong by a factor of 31.**
+
+Measured, not assumed: `EngineHarness` **aborted with an unhandled exception** at
+`tests/EngineHarness/Program.cs:221` — process exit **134** — on the first line of the
+`[ confirmed full-data deletion ]` section. That is **2,280 lines before the vault**. Counted:
+**17 `PASS` lines against 237 `Check(` sites.** **220 assertions never ran**, including the eleven
+`/pair` assertions from Milestone 2, i.e. **the newest code in the file was the least covered.**
+Re-verify: **C-EHR-3**.
+
+### Milestone 4 — the fix is in the harness, because the thing it trips over is not a defect
+
+`FullDataDeletion.ResolveAllowedWorkspace` derives the volume root with `Path.GetPathRoot` and trims
+the trailing separator (`FullDataDeletion.cs:79-81`). On Windows `C:\` trims to `C:` and the guard
+compares two real paths. On Linux the root is `/`, which trims to `""`, so the `IsNullOrWhiteSpace`
+arm fires and **every** workspace is refused as a volume root.
+
+**That refusal fails closed, which is the right direction for a deletion guard, and the product is
+Windows-only, so the guard is correct where it ships.** Editing `src/Engine/FullDataDeletion.cs` was
+**considered and refused**: it is production deletion-safety code whose correct behaviour I could only
+observe on the one platform where it is wrong, and "make the delete-everything guard more permissive"
+is not a change to land from a sandbox that cannot run the local gate. **`src/` was not touched.**
+
+Both platform-bound sections now **announce a skip instead of throwing** — 6 for the path-root reason
+above, 7 for the vault, which is DPAPI-backed (`SyncPairingVault.cs:78` → `WindowsDpapi.Protect`) and
+**genuinely unrunnable here**; that skip is honest, not a gap to engineer away. The `[ pair page ]`
+section was **never platform-bound at all** — its host half lives in `Program.cs` precisely so the
+dashboard half stays harness-testable — and was being lost to the vault's exception rather than to any
+limit of its own.
+
+### Milestone 5 — evidence, and the number that makes it more than a bigger count
+
+`EngineHarness` **17 → 217 passed, 0 failed**. All ten offline harnesses run here now: Slice 28 ·
+EngineHarness 217 · ResearcherHarness 57 · HookHarness 16 · StoreParityHarness 28 · GatewayGateHarness
+36 · DispatcherNoSendHarness 35 · LifecycleHarness 45 · RendererHarness 6 · SyncHarness 130 —
+**`=== LINUX OFFLINE TOTAL: 598 ===`**.
+
+**The load-bearing check is not 217; it is 598 + 13 = 611 = `$ExpectedOfflineTotal`.** A bigger number
+would only prove more code ran. The exact reconciliation with the pinned Windows total proves the
+guards skip **precisely** the platform-bound assertions **and nothing else** — a guard that swallowed
+one assertion too many would land at 610 and a wrong `IsWindows()` predicate at 604. Re-verify:
+**C-EHR-4**.
+
+**Three mutations, three caught**, tree byte-identical after (`sha256sum -c`, verified rather than
+assumed): **M1** inverting the deletion guard restores the abort at `Program.cs:239`; **M2** inverting
+the vault guard gives `DllNotFoundException: crypt32.dll` at `SyncPairingVault.cs:78`; **M3**
+falsifying a newly-reached `/pair` assertion gives `FAIL … 216 passed, 1 failed`, which is the one that
+matters — **the 200 recovered assertions are live, not vacuous.** Build **0 warnings / 0 errors**.
+Re-verify: **C-EHR-5**.
+
+**`$ExpectedOfflineTotal` was deliberately NOT swept** — no assertion was added or removed and the
+Windows path is untouched, so the drift trap does not apply. **This is the run's biggest exposure and
+it is stated as such**: the claim "Windows is unchanged" rests on the diff being purely additive with
+the original code as the `else`-branch verbatim, and **CI on `windows-latest` is the only real check.**
+Re-verify: **C-EHR-6**.
+
+**One machine change, logged:** `apt-get update && apt-get install -y dotnet-sdk-8.0` → **8.0.129**.
+The first attempt **failed** (404s on a stale apt index) and needed the `update` first — worth
+recording, because the previous run's one-line install recipe does not work in a fresh container.
+
+### Ladder movement
+
+**S8 advanced.** Nothing moved to DONE. **B-2 was re-derived and its text corrected** (Milestone 2);
+**B-10 is new** and is a *limit*, not a blocker. **S5 was declined as already landed**, which is the
+first time this program has spent an iteration proving a rung did **not** need work.
+
+### Prohibition — what this iteration did not touch
+
+**One product file was NOT touched and that is the centre of this entry: `src/Engine/FullDataDeletion.cs`
+was read, quoted and deliberately left alone** — it is deletion-safety code, correct on the platform it
+ships to, and a sandbox that cannot run `Verify-Alpha.ps1` is not where you loosen a
+delete-everything guard. **No `src/` file changed at all**; the engine diff is **one test file**,
+`tests/EngineHarness/Program.cs`, **purely additive (+33, −0)**. **`$ExpectedOfflineTotal` was NOT
+swept** and `scripts/Verify-Alpha.ps1` was **not edited** — no assertion was added or removed, so the
+pinch point stayed untouched and Terra keeps it. **`docs/Sync-Protocol.md`, `generate.mjs` and every
+byte of `docs/sync-vectors/` are unchanged** — `--check` **OK at 26**, `git status --porcelain` empty:
+**NO cross-repo drift event**, and the android repo's `7328a0b` pin is intact. No `relay/`, no
+TypeScript, no `src/Sync/*`, no `src/Engine/Host.cs`, no `src/Engine/Program.cs`, no
+`src/Engine/SyncPairingVault.cs`, no `docs/autonomy/*`.
+
+**No android source changed** — not `core/`, not `app/`, not a screen, not the Room replica; this repo
+received **records only**, so **the android gate did not run and was correctly not attempted**
+(`ANDROID_HOME` empty, no `/usr/lib/android-sdk` — **B-7**, re-confirmed). **`Verify-Alpha.ps1` did not
+run and cannot** (`which pwsh` empty); **the Windows count of 230 is the verifier's pin, not a
+measurement from this session**, and 230 − 6 − 7 = 217 is arithmetic against that pin, not a Windows
+run. **No merge in either repo** — #48 is a **DRAFT**, and CI green is not the merge condition, which
+needs a full *local* gate out of reach here; the android repo is **never-self-merge** regardless. No
+force-push, no history rewrite, no branch deleted; draft PRs **#26 and #32–#47** in the engine repo and
+**#1–#6** here were left exactly as found — not merged, retargeted or rebased. **The `claude/s2-*`
+stack was read and NOT rebased**: a 40-commit restack is its own slice, and this run branched from
+fresh `origin/main` instead precisely so it would not collide with it. No deploy of any kind
+(Cloudflare, Workers, relay, site, Pages), and **the production relay was not contacted at all, not
+even `GET /v1/health`** — not one byte was sent to a relay, an engine or a phone. No Play, Google or
+OAuth console; no accounts, no purchases, no Play Billing code; no Gmail, no email; no MSIX or
+certificate-store action; no emulator, no `sdkmanager`, no keystore use. **No secret was read, printed
+or referenced.** `Documents\CareerSeeker` and Terra's worktrees were never touched, and
+`autonomy/codex-state` was **read and not written** — Terra reports **COMPLETE with no files claimed**,
+so there was no collision and no rebase was owed.
+
+### Addendum — Windows CI settled the one claim this sandbox could not
+
+Written after the entry above, because the run's stated biggest exposure was *"the claim 'Windows is
+unchanged' rests on the diff being purely additive… and CI on `windows-latest` is the only real
+check."* **It checked out.**
+
+Run [31806284566](https://github.com/ShivaClaw/careerseeker/actions/runs/31806284566) on
+`claude/s8-harness-linux-reach`, **all four checks `success`** on `run_attempt` 1. The
+*Build and offline harnesses* job is `windows-latest` (`C:\Program Files\Git`, `D:\a\careerseeker`)
+and it runs `Verify-Alpha.ps1`, **which throws on a pin mismatch**. It printed:
+
+```
+=== 230 passed, 0 failed ===          <- EngineHarness, UNCHANGED from the pin
+Offline total: 611 passed, 0 failed
+CareerSeeker alpha verification complete.
+```
+
+**Both halves of the arithmetic are now measured rather than one measured and one assumed:**
+Windows **230**, Linux **217**, difference **13**, and the two skip lines name exactly 6 + 7. The
+earlier entry's `230 − 6 − 7 = 217` was arithmetic against a pin; it is now arithmetic against two
+observations on two platforms. **`$ExpectedOfflineTotal` did not throw, which is the direct evidence
+that declining to sweep it was correct** — a swept pin would have failed this job.
+
+**What this addendum does NOT change.** PR **#48** is still a **DRAFT** and **CI green is not the
+merge condition** — merging in `careerseeker` needs a full *local* gate
+(`-IncludePublish -IncludePackage`) that cannot run here, so **nothing was merged**. `origin/main` is
+still `aac05f3`, unmoved by this run. The 13 Windows-only assertions are still Windows-only; **B-10
+is a named limit, not a solved problem.**

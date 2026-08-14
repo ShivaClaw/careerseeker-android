@@ -7333,3 +7333,131 @@ FAILED`, `java.lang.AssertionError at ScreensFromFixtureTest.kt:69`, `35 tests c
 rather than an assumed one; the signature is the one already recorded under **Standing gate hazard**
 in `BLOCKED.md`, and this is its **fifth** instance. Attempt 2's *Assert vendored sync vectors match
 the pinned main-repo commit* step also passed, confirming the `7328a0b` pin on a **third** machine.
+
+---
+
+## Thirty-fourth run — EngineHarness's reach off Windows, and two stale records
+
+Run from a Linux checkout of `ShivaClaw/careerseeker` at `claude/s8-harness-linux-reach`
+(branched from `origin/main` = `aac05f3`). Requires `dotnet-sdk-8.0` and `node`; **install dotnet
+with `sudo apt-get update && sudo apt-get install -y dotnet-sdk-8.0` — the `update` is required, a
+bare `install` 404s on a stale index in a fresh container.**
+
+### C-EHR-1 — the prompt's assigned S5 slice was already landed, and the pin in the prompt is stale
+
+```bash
+git fetch --all --prune
+git log --oneline -1 7328a0b                    # "S5: add the invalid-unknown-field vector, closing PQ-A2-3 and B-6"
+git ls-tree --name-only origin/claude/s5-entitlement-ack-spec docs/sync-vectors/v1/ | wc -l   # 28
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l                             # 26
+```
+
+The vendored pin is **`7328a0b`**, not the `679a317` the stored prompt names. Expect the S5 spec
+branch ahead of main with the extra vectors already present.
+
+### C-EHR-2 — B-2's "one remaining thing" has been on main since 2026-08-12
+
+```bash
+git log -1 --format='%ci %s' d1bc698            # 2026-08-12 19:57:26 -0600  Merge pull request #42 ... claude/s2-pair-page
+git merge-base --is-ancestor d1bc698 origin/main && echo "ON MAIN"
+git merge-base --is-ancestor d1bc698 origin/claude/s2-push-disposition || echo "NOT IN THE STACK"
+git show origin/main:src/Engine/Host.cs | grep -c 'path == "/pair"'    # 1
+```
+
+The last line is the point: the merge **is** on `main` and **is not** in the stack the thirty-third
+run derived its blocker list from. That is how a closed gap stayed open in the records.
+
+### C-EHR-3 — the baseline: 17 of 237 assertions, and an abort rather than a skip
+
+Against the **parent** commit, i.e. before this run's fix:
+
+```bash
+git checkout aac05f3
+dotnet build CareerSeeker.sln -c Release
+dotnet run --project tests/EngineHarness/EngineHarness.csproj -c Release --no-build; echo "EXIT=$?"
+```
+
+Expect `Unhandled exception. System.InvalidOperationException: Refusing full-data deletion for a
+volume root.` at `FullDataDeletion.cs:line 81`, from `Program.cs:line 221`, and **EXIT=134**. Count
+the two sides:
+
+```bash
+dotnet run --project tests/EngineHarness/EngineHarness.csproj -c Release --no-build 2>/dev/null | grep -c "^  PASS\|^  FAIL"   # 17
+grep -c "^\s*Check(" tests/EngineHarness/Program.cs                                                                            # 237
+```
+
+### C-EHR-4 — 17 → 217, and the reconciliation that makes it meaningful
+
+```bash
+git checkout claude/s8-harness-linux-reach
+dotnet build CareerSeeker.sln -c Release        # 0 Warning(s), 0 Error(s)
+dotnet run --project tests/EngineHarness/EngineHarness.csproj -c Release --no-build | tail -2
+```
+
+Expect `=== 217 passed, 0 failed ===`, plus two `SKIP` lines naming 6 and 7 assertions. Then the
+whole offline ladder:
+
+```bash
+for p in Slice EngineHarness ResearcherHarness HookHarness StoreParityHarness \
+         GatewayGateHarness DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  dotnet run --project tests/$p/$p.csproj -c Release --no-build 2>&1 \
+    | grep -oE "=== [0-9]+ passed, [0-9]+ failed ===" | tail -1 | sed "s/^/$p: /"
+done
+```
+
+Expect 28 · 217 · 57 · 16 · 28 · 36 · 35 · 45 · 6 · 130, **all `0 failed`**, summing to **598**.
+**The claim to check is the arithmetic, not the size:** `598 + 6 + 7 = 611`, and
+
+```bash
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1     # 611
+```
+
+If those disagree, the guards are skipping the wrong set and this run is wrong.
+
+### C-EHR-5 — three mutations, three caught, tree byte-identical after
+
+```bash
+sha256sum tests/EngineHarness/Program.cs > /tmp/eh.sha
+```
+
+**M1** — change the first `if (!OperatingSystem.IsWindows())` to `if (OperatingSystem.IsWindows())`,
+rebuild, run: expect the abort to return (`InvalidOperationException`, `Program.cs:line 239`).
+**M2** — same inversion on the `[ sync pairing vault ]` guard: expect
+`DllNotFoundException: Unable to load shared library 'crypt32.dll'` at `SyncPairingVault.cs:line 78`.
+**M3** — insert `false &&` into the `"the payload is HTML-escaped, not injected raw"` check: expect
+`FAIL` and `=== 216 passed, 1 failed ===`. **M3 is the one that matters** — it shows the recovered
+assertions are live rather than vacuous. After each: `git checkout tests/EngineHarness/Program.cs &&
+sha256sum -c /tmp/eh.sha` must print `OK`.
+
+### C-EHR-6 — Windows is unchanged, and this is the run's biggest exposure
+
+```bash
+git diff --stat aac05f3..claude/s8-harness-linux-reach     # 1 file changed, 33 insertions(+)
+git diff aac05f3..claude/s8-harness-linux-reach            # purely additive; original code is the else-branch verbatim
+sed -n '288,292p' scripts/Verify-Alpha.ps1                 # the four Assert-Contains literals, all still present in the file
+```
+
+**`$ExpectedOfflineTotal` was deliberately not swept.** The honest re-verification is not a command I
+can run: **CI on `windows-latest` runs `Verify-Alpha.ps1`, which throws on a pin mismatch.** If that
+job is green at 611, the claim holds; if it is red, this run was wrong and the pin needs the sweep I
+declined. Check it at
+`https://github.com/ShivaClaw/careerseeker/pull/48` → *Build and offline harnesses*.
+
+### C-EHR-7 — zero vector bytes moved
+
+```bash
+node docs/sync-vectors/generate.mjs --check     # OK: 26 vector files match the generator
+git status --porcelain                          # empty
+```
+
+**No cross-repo drift event**; the android repo's `7328a0b` pin is untouched.
+
+### C-EHR-8 — nothing was merged, rewritten, deployed, or contacted
+
+```bash
+gh pr view 48 --repo ShivaClaw/careerseeker --json isDraft,state,mergedAt   # isDraft true, OPEN, null
+git log --oneline origin/main -1                                            # still aac05f3 -- unmoved by this run
+```
+
+No android source changed this run (`git diff --stat origin/claude/android-a0-probe~1..HEAD` in the
+android repo shows Markdown only), so the android gate was correctly not attempted (**B-7**).
