@@ -1708,3 +1708,58 @@ the whole decision exists to avoid.
 `PairingDead` only. **Without it, do not implement the backoff** — the naive version is now caught by
 name by `SyncHarness` (mutation **M7**, four `FAIL halt:` lines), which is the guard this run left
 behind rather than a suggestion.
+
+---
+
+## B-13 — #36's declared base is not its actual base, and only a history-rewriting session can fix it
+
+**Found 2026-08-14 (thirty-sixth run)** while costing the restack (`docs/Merge-Topology.md` §10.5).
+Not a blocker on any rung — it is a **latent defect in the PR stack** that will silently lose a
+commit if the wrong session restacks it first.
+
+### Symptom
+
+GitHub declares [careerseeker#36](https://github.com/ShivaClaw/careerseeker/pull/36)
+(`claude/s2-transport-vocabulary`) as based on
+[#33](https://github.com/ShivaClaw/careerseeker/pull/33) (`claude/s4-pull-request-semantics`).
+**#36 does not contain #33's tip.** It forked at `b114d11`; #33 has since gained exactly one commit,
+`3a8dfdd` ("S4/S5: 6.4's carve-out was drawn at the parse, and a failed tag fell through it —
+PQ-CUR-1").
+
+```bash
+git merge-base --is-ancestor origin/claude/s4-pull-request-semantics \
+  origin/claude/s2-transport-vocabulary && echo CONTAINS || echo "DOES NOT CONTAIN"   # DOES NOT CONTAIN
+git log --oneline b114d11..origin/claude/s4-pull-request-semantics                    # 3a8dfdd
+```
+
+**The PR page shows no sign of this.** GitHub renders #36's diff from the merge-base, so the view is
+self-consistent and the missing commit is invisible in it. Re-verify: **C-RST-8**.
+
+### Why it matters
+
+Restacking #36 onto the **rebased #33** includes `3a8dfdd`. Restacking it onto its **actual fork
+point** drops `3a8dfdd` from #36's line. Both look correct locally and produce different trees, and
+`3a8dfdd` is a **parse carve-out fix** (PQ-CUR-1) — a silent revert of it would not be caught by
+#36's own tests, because #36 is about the transport vocabulary, not the parse.
+
+### Attempts
+
+**None, deliberately — this session is forbidden from the only fixes there are.** Correcting it means
+either retargeting the PR base or rebasing/force-pushing `claude/s2-transport-vocabulary`, and the
+standing rules for cloud sessions are **no force-push, no history rewrite, no retargeting, no merge**.
+Measuring it and writing it down is the whole of what this environment may do, so the two-attempt
+limit does not apply and no attempt was made.
+
+### Smallest human unblock
+
+One of, in a local session (either is ~1 minute):
+
+1. **Retarget** #36's base on GitHub to `claude/s5-entitlement-ack-spec` (#32), which **is** a true
+   ancestor of #36 — making the declared base match the actual one, and leaving `3a8dfdd` to arrive
+   with #33 on its own line; or
+2. **Rebase** `claude/s2-transport-vocabulary` onto the current tip of
+   `claude/s4-pull-request-semantics`, so the declared base becomes true by moving the branch.
+
+**(2) is the one that matches the record's intent** — #36 was written as a child of #33 — but it is a
+force-push, so it is a human's call and not a cloud session's. Either way, verify afterwards with
+**C-RST-8**: the check must flip to `CONTAINS`.
