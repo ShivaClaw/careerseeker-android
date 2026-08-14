@@ -8299,3 +8299,158 @@ merge condition** — merging in `careerseeker` needs a full *local* gate
 (`-IncludePublish -IncludePackage`) that cannot run here, so **nothing was merged**. `origin/main` is
 still `aac05f3`, unmoved by this run. The halt policy is still **not implemented**, deliberately, and
 the window it would need is still a local-session question.
+
+---
+
+## Thirty-sixth run — 2026-08-14 (Linux sandbox): the restack was costed, and it is one number
+
+**Third consecutive run to find its assigned slice already landed.** The stored prompt assigned S5's
+spec half — §4.3 `entitlement_ack`, PQ-A2-1/-2, and PQ-A2-3's vector. All of it is on the stack and
+was verified here rather than assumed: `docs/Sync-Protocol.md:307` carries §4.3.3 with the
+`{product_id, acknowledged_at, order_id?}` body, `:601` carries the `decrypt_failed` structural
+rule, `:111` measures the cap on the **ciphertext**, and `node docs/sync-vectors/generate.mjs
+--check` printed **`OK: 29 vector files match the generator`** with `invalid-unknown-field.json`
+present. The prompt's ladder summary is now **twelve runs stale**; B-2's `/pair` line in it is stale
+too, and this book already corrected that on the thirty-fourth run.
+
+Took `STATE.md`'s ordered next intent **item 3** instead — *the stack is sixteen PRs deep, the
+restack is real work that is growing, and no run has yet costed it* — **tenth consecutive run routed
+by that list rather than by the prompt.** It is the item that decays: every other item needs a gate
+or a machine this sandbox does not have, while costing a restack is pure `git` and is therefore
+exactly what a cloud session **can** settle.
+
+### Milestone 1 — the shape was wrong, and the wrong axis was being watched
+
+"Sixteen deep" is not what is there. Measured: **eleven** open chained PRs (#32–#39, #45–#47) plus
+**#48** standalone, forming a **tree of depth 7** — #32 ⊂ #37 ⊂ #38 ⊂ #39 ⊂ #45 ⊂ #46 ⊂ #47, with
+#33→#36 and #34→#35 hanging off #32 as siblings. All eleven fork from the **same** commit `00b3705`;
+`origin/main` is **16** ahead of it (**C-RST-1**, **C-RST-2**).
+
+### Milestone 2 — the entire cost is the pin, and the correlation is exact
+
+`git merge-tree` per branch against `origin/main`, beside each branch's count of pin-sweep commits:
+
+| PR | #32 | #33 | #34 | #35 | #36 | #37 | #38 | #39 | #45 | #46 | #47 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| conflicting files | 0 | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 5 | 5 | 5 |
+| pin sweeps | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 3 | 6 | 9 | 11 |
+
+**Conflicts appear exactly where a pin sweep does and nowhere else**, and the five files are always
+the drift trap's own family: `README.md`, `docs/CareerSeeker-Project-Summary.md`,
+`docs/External-Audit-Handoff.md`, `scripts/Verify-Alpha.ps1`, `src/Engine/README.md`. **Five of the
+eleven PRs have zero restack cost** (**C-RST-3**, **C-RST-4**).
+
+**The code half is free.** `src/Engine/Host.cs` (+134 on main) and `src/Engine/Program.cs` (+95)
+**auto-merge**; `src/Sync/` and `relay/` never enter the merge at all, because main did not touch
+them (**C-RST-6**). The thing everyone would have budgeted for is not the cost.
+
+### Milestone 3 — the finding: the conflict is additive, so both sides' numbers are wrong
+
+| | EngineHarness | SyncHarness | pin |
+| --- | --- | --- | --- |
+| fork `00b3705` | 217 | 130 | **598** |
+| `origin/main` | **230** | 130 | **611** (+13, the `/pair` page) |
+| tip #47 | 217 | **325** | **793** (+195) |
+| restacked | **230** | **325** | **806** |
+
+The two sides edited **different harnesses** from the **same** base, so the merge is not a choice
+between 611 and 793 — **it is `598 + 13 + 195`**. A resolver reaching for "take theirs" or "take
+mine" loses 195 or 13 assertions respectively, and the sweep's *prose* blocks must both be kept as
+well: each sweep's comment explains what it added, so this is not a pure number merge.
+
+**806 is DERIVED, NOT MEASURED**, and that is the one claim here with no executed evidence.
+`Verify-Alpha.ps1` needs Windows PowerShell (`which pwsh` empty, re-checked) and **did not run**. It
+**throws** on a pin mismatch, so here the drift trap is *protective*: a wrong prediction is a hard
+CI failure on `windows-latest`, not a silent drift. **C-RST-11** is written as NOT RUN HERE rather
+than quietly omitted.
+
+### Milestone 4 — merging costs 5; rebasing costs 55, for the identical tree
+
+The record never separated the two strategies, and they differ by **11×**:
+
+- **Merge into `main`**: the cumulative tree conflicts **once**, on **5** files.
+- **Rebase**: each of the **11** pin-sweep commits conflicts in turn, because every sweep states a
+  *from* value the previous resolution has just invalidated — **11 × 5 = 55** hunks.
+
+Proven, not argued: a trial rebase of #47 onto `origin/main` stopped at `78079c7` ("sweep the
+offline pin 598 → 610") with exactly those five files conflicted, and the hunk shows main's
+`$ExpectedOfflineTotal = 611` against the stack's `610`. **The rebase was aborted and no branch was
+modified.**
+
+The 11 intermediate values are **bookkeeping** — CI runs on PR heads, never on a stack's interior
+commits, so no intermediate pin was ever independently gated. A local session may therefore collapse
+the 11 sweeps into one at the tip and pay 5 instead of 55. **That rewrites draft history, which this
+session is forbidden to do and did not do.**
+
+**And the growth axis was wrong.** The stack gained **one conflict per assertion-adding run** — 11
+sweeps across 11 such runs. The cost grows in *runs*, not in *PRs*, so "before it is twenty deep"
+was watching the wrong number.
+
+### Milestone 5 — an anomaly nobody had looked for, and the drift risk that is not there
+
+**#36's declared base is not its actual base.** GitHub shows #36 based on #33, but #36 **does not
+contain** #33's tip: it forked at `b114d11`, and #33 has since gained `3a8dfdd` (PQ-CUR-1).
+Restacking #36 onto its actual fork point **silently drops** that commit from #36's line; the PR page
+shows nothing (**C-RST-8**).
+
+**The restack cannot cause a cross-repo drift event**, which is stronger than the "unchanged" §8 had
+been recording. `origin/main` has touched **no vector file at all** since the fork, and the stack's
+whole effect on `docs/sync-vectors/` is **three added payloads plus the `index.json` manifest** —
+**zero existing payloads modified**, byte-identical to the android vendored pin `679a317`
+(**C-RST-7**). §8's "28 files" was one stale and is corrected to **29** (**C-RST-10**).
+
+### Milestone 6 — evidence
+
+```
+$ node docs/sync-vectors/generate.mjs --check   → OK: 29 vector files match the generator.
+$ git rev-list --count 00b3705..origin/main     → 16
+$ git merge-tree … origin/main <each branch>    → 0,0,0,0,0,5,5,5,5,5,5 conflicting files
+$ git log … -- scripts/Verify-Alpha.ps1         → 0,0,0,0,0,1,2,3,6,9,11 pin sweeps
+$ git rebase origin/main   (on a throwaway ref) → stops at 78079c7, five files, then --abort
+```
+
+**All ten runnable `C-RST` commands were dry-run before being written down**, because this book has
+twice shipped an audit command that asserted nothing. `Verify-Alpha.ps1` and the android gate **did
+not run and cannot run here**.
+
+### Ladder movement
+
+**None, and deliberately.** No rung moved. This slice produced a **measurement and a
+recommendation**, and the recommendation is not a go-ahead: the merge condition remains a full local
+`Verify-Alpha.ps1 -IncludePublish -IncludePackage`, which is Brandon's gate and out of reach here.
+What changed is that the restack is no longer an unpriced fear — it is 5 resolutions, one derivable
+number, and five PRs that cost nothing.
+
+### Prohibition — what this iteration did not touch
+
+**Nothing was merged, in either repo**, and nothing was rebased, retargeted, force-pushed or
+deleted. The one `git rebase` was run on a **throwaway local ref** (`tmp/restack-47`), aborted at the
+first conflict, and **no branch — local or remote — was modified by it**; the trial left no commit
+and no push. Draft PRs **#26, #32–#39, #45–#48** in the engine repo and **#1–#6** here were **read
+and left exactly as found**. **The android repo is never-self-merge regardless**, and the engine
+repo's merge policy is conditional on a local gate this sandbox cannot run.
+
+**Not one byte of source changed in either repo.** No `src/`, no `core/`, no `app/`, no `relay/`, no
+`tests/`, no `scripts/`, no Kotlin, no C#, no TypeScript. The engine checkout was used **read-only**
+apart from the aborted trial rebase, and `git status --porcelain` there is clean. **This repo
+received Markdown only** — `docs/Merge-Topology.md`, `AUDIT-REQUEST.md`, `LOG.md`, `STATE.md` — so
+**the android gate did not run and was correctly not attempted** (**B-7**), and no compile-only or
+"should pass" claim appears above.
+
+**`docs/Sync-Protocol.md`, `generate.mjs` and every byte of `docs/sync-vectors/` are unchanged** —
+`--check` **OK at 29**, no vector added, removed or edited: **NO cross-repo drift event**, and the
+android repo's vendored pin `679a317` is intact. **`scripts/Verify-Alpha.ps1` was read and NOT
+edited**: the pin stands at **793** on the stack and **611** on main, and **806 was written down as a
+prediction, never swept into any file** — sweeping an unmeasured number into the trap's own files is
+exactly the failure this book exists to prevent.
+
+No deploy of any kind (Cloudflare, Workers, relay, site, Pages), and **the production relay was not
+contacted at all, not even `GET /v1/health`**. No Play, Google or OAuth console; no accounts, no
+purchases, no Play Billing code; no Gmail, no email; no MSIX or certificate-store action; no
+emulator, no `sdkmanager`, no keystore. **No secret was read, printed or referenced.**
+`Documents\CareerSeeker` and Terra's worktrees were never touched, and `autonomy/codex-state` was
+**read and not written** — Terra reports **COMPLETE with no files claimed**, so there was no
+collision and no rebase was owed.
+
+**No machine change this run** — `dotnet` was not needed and not installed, because nothing here
+compiled anything.
