@@ -7576,3 +7576,24 @@ certificate-store action; no emulator, no `sdkmanager`, no keystore use. **No se
 printed or referenced.** `Documents\CareerSeeker` and Terra's worktrees were never touched, and
 `autonomy/codex-state` was **read and not written** — Terra reports COMPLETE with **no files
 claimed**, so there was no collision and no rebase was owed.
+
+**Addendum — CI settles the 745 pin, same session.** Run
+[31759882956](https://github.com/ShivaClaw/careerseeker/actions/runs/31759882956) on
+**`head_sha` `63ec8a5`**, read from the run's own field rather than the PR check-runs view (which
+follows the current head and lags a push), `run_attempt` **1**: **both jobs `success`**. The
+`windows-latest` job runs `Verify-Alpha.ps1`, **which throws on a pin mismatch**, and its log prints
+**`=== 277 passed, 0 failed ===`** and **`=== Offline total: 745 passed, 0 failed ===`**, followed by
+`CareerSeeker alpha verification complete.` **So this run's "745 is CORROBORATED, NOT MEASURED"
+caveat is now discharged: 745 is CONFIRMED**, on the one platform this sandbox cannot reach, and
+`EngineHarness` = 745 − 528 = **217** is re-confirmed as carried rather than guessed. The log names
+the new assertions individually — `A 409 CALLS ReconcileTo -- the call site, not just the rule` and
+`composed: the relay's 409 moved the REAL publisher's counter` among them — so they pass **on
+Windows**, not only in the Linux measurement taken here. The relay job's *Assert sync vectors match
+their generator* passed too: **zero vector drift on a second machine**.
+
+**What CI does not change.** It is **not** the merge condition — the main-repo policy needs a full
+*local* gate (`-IncludePublish -IncludePackage`), out of reach here, and the android repo is
+never-self-merge regardless; **#46 stays a DRAFT**. And it does not touch the standing limit: the
+runner has no pairing vault either, so `BuildSyncBridge` is **built and never constructed** there
+too. **The composition is exactly as unexecuted in CI as it is in this sandbox** — which is the gap
+**C-SNK-8** measures and the next session's item 1.
