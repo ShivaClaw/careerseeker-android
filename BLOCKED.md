@@ -1587,3 +1587,52 @@ green, not red — **unfinished**. That distinction is the entire reason this pa
 re-run went green" would have been the flattering reading and it is not what happened. The push is
 records-only, so nothing about the engine work depends on it. **Next session: re-run and read the
 signature. If step 6 stalls again, that is the moment this stops being weather and becomes B-11.**
+
+### CORRECTION (same run, 30 minutes later) — **"attempt 2 hung for 21+ minutes" is FALSE, and I caused what I then reported as a symptom**
+
+The paragraph above is wrong on its central fact and is corrected here rather than edited away, because
+the mistake is instructive.
+
+**What actually happened.** Attempt 2 of run
+[31806621771](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31806621771) did not hang.
+It was **`cancelled` at 13:54:14, seventy-seven seconds after it started**; step 6 ran 13:53:30 →
+13:54:12, i.e. **42 seconds**, and steps 7–13 are `skipped`, not pending.
+
+**I cancelled it myself.** `.github/workflows/ci.yml:17-19` sets
+
+```yaml
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+so each push to this branch kills the previous run. I pushed `b2855cb` at 13:53:58 — **while attempt 2
+was live** — which cancelled it; `b2855cb`'s own run was then cancelled by `f28a276` at 13:54:39. Three
+runs, two of them killed by my own commits, in under a minute.
+
+**How I got it wrong, which is the part worth keeping.** I polled the job repeatedly and kept receiving
+a **stale `in_progress` snapshot** showing step 6 started at 13:53:30. I compared that start time to
+wall-clock, got "21+ minutes", and wrote *hung*. **The elapsed time was real; the `in_progress` was
+not.** The job had been finished for twenty minutes. **A timestamp inside a cached response is not a
+measurement of now** — and "still in progress" is exactly the kind of reading that looks like evidence
+while being an artifact of the transport. The rule this earns: **for a terminal state, read
+`conclusion`, never infer it from a start time and a clock.**
+
+**What still stands, unchanged.** Attempt 1's failure is solid and was read from the job log, not a
+snapshot: **403 Forbidden** from `repo.maven.apache.org` and `plugins.gradle.org`, AGP 9.3.0's
+buildscript unresolvable, `BUILD FAILED in 48s`. The comparison table above is still the right way to
+tell that apart from the `ScreensFromFixtureTest` flake. And **the gate still has NO result for this
+work** — that conclusion was right for the wrong reason.
+
+**Also still true, and now better evidenced:** the run for `f28a276` reached step 6 at 13:55:48 and was
+still there ~30 minutes later with its logs 404-ing (consistent with a genuinely running job, unlike
+the cached case above). So *something* is making dependency resolution crawl, which fits the same
+network trouble as the 403. **That observation now belongs to run
+[31806923786](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31806923786), not to the
+cancelled one.**
+
+**Note for the next session, learned the hard way: do not push three commits in ninety seconds to a
+branch with `cancel-in-progress: true` and then try to read CI.** Batch the records into one commit,
+push once, and let the run settle. **This correction is itself another push and will cancel the
+in-flight run** — so the run to read is the one for whatever commit is HEAD when you arrive, and the
+earlier cancellations are noise I created, not signal.
