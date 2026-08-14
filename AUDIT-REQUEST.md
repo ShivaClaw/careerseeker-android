@@ -7136,3 +7136,182 @@ git -C <engine-clone> reflog --date=iso | grep -iE 'push --force|rebase' | head
 *Expected:* `origin/main` still at **`aac05f3`** (Terra's R7 merge, unmoved this run); **NOT
 MERGED**; and no force-push or rebase in the reflog. #46 remains a **DRAFT**, and draft PRs #26 and
 #32–#45 were left exactly as found.
+
+## S2 — the push disposition (thirty-third run, 2026-08-14)
+
+Engine repo, draft PR **#47** on `claude/s2-push-disposition`, stacked on #46. Every command below
+runs in the **engine** clone unless it names another.
+
+### C-DSP-1 — the defect was LIVE, measured through the SHIPPING composition
+
+The reproduction is a throwaway console project outside the repo (it must not join the solution or
+it changes the pinned count). Recreate it verbatim: a project referencing `src/Sync`, and a `Main`
+that drives the real `SyncPushPath.Create` for five cycles per result, mimicking
+`EngineSyncBridge.PublishAsync`'s ratified snapshot retry (`ok` leaves the flag unset, so the next
+cycle re-sends):
+
+```csharp
+// for each of Rejected("x") / TooLarge() / Unauthorised() / Unavailable("dns"):
+var log = new List<string>(); var pushes = 0;
+var pub = SyncPushPath.Create(key, "p_probe0000000000000000000000", "k1",
+    push: (_, _) => { pushes++; return Task.FromResult(answer); },
+    seqStore: store, log: log.Add, startSeq: 0);
+for (var c = 0; c < 5; c++)
+    if (pub.PublishSnapshotAsync(counters, Array.Empty<AppSummary>(), Array.Empty<JobSummary>())
+        .GetAwaiter().GetResult()) break;
+// report pushes, pub.HighestSeq, log.Count, log.Distinct().Count()
+```
+
+*Expected at the parent commit `9394ca1`:* all four results identical — **pushes=5, highestSeq=5,
+delivered=0, logLines=5 (1 distinct)**. A 400 `bad_request` and a DNS failure are behaviourally
+indistinguishable. *Expected at HEAD:* pushes/seqs/delivered **unchanged** (the halt was deliberately
+not taken — see C-DSP-7) and **logLines=1** for every permanent case.
+
+### C-DSP-2 — the 413 line asserted something the shipping code contradicts
+
+```bash
+git show 9394ca1:src/Sync/RelaySink.cs | grep -n 'will not be retried'
+grep -n 'will not be retried' src/Sync/RelaySink.cs
+grep -n 'if (!SnapshotSent)' -A 4 src/Engine/EngineSyncBridge.cs
+```
+
+*Expected:* present at the parent, **absent at HEAD**, and the bridge visibly leaving its flag unset
+on failure — which is what makes the retry certain rather than possible. The probe measured **four
+retries in five cycles**.
+
+### C-DSP-3 — Classify is pure, total, and its mapping is pinned
+
+```bash
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build \
+  | grep -E 'CLASSIFY|PERMANENT FAILURE|share Pa|share the same|Classify refuses'
+```
+
+*Expected:* `PASS` on the full mapping, on **A PERMANENT FAILURE IS DISTINGUISHABLE FROM A TRANSIENT
+ONE**, on 413/400 sharing `PayloadDead`, on 401/404 sharing `PairingDead`, and on a null result being
+refused rather than classified.
+
+### C-DSP-4 — the bool is DERIVED, so it cannot drift from the disposition
+
+```bash
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build \
+  | grep "the sink's bool is exactly"
+```
+
+*Expected:* `PASS`. Asserting the mapping alone would leave the sink free to classify `PayloadDead`
+and still report success; mutation **M3** (misclassify `Ok`) fails **12** assertions, which is what
+shows the two are tied rather than merely consistent today.
+
+### C-DSP-5 — ten mutations, ten caught, tree byte-identical after
+
+Apply each to `src/Sync/RelaySink.cs`, rebuild, run `SyncHarness`, revert:
+
+| # | mutation | expected |
+| --- | --- | --- |
+| M1 | `Rejected => PushDisposition.RetryLater` (the original defect) | CAUGHT, 3 failed |
+| M2 | `Unauthorised => PayloadDead` | CAUGHT, 4 failed |
+| M3 | `Ok => RetryLater` | CAUGHT, 12 failed |
+| M4 | delete the dedupe (always log) | CAUGHT, 5 failed |
+| M5 | suppress silently (no recovery line) | CAUGHT, 4 failed |
+| M6 | dedupe by disposition, not by line | CAUGHT, 4 failed |
+| M7 | restore `"it will not be retried"` | CAUGHT, 2 failed |
+| M8 | `lastDisposition` starts at `PairingDead` (phantom recovery) | CAUGHT, 1 failed |
+| M9 | skip `Report` when the line repeats, so the EFFECTS are skipped too | CAUGHT, 1 failed |
+| M10 | recovery line drops the suppressed count | CAUGHT, 1 failed |
+
+*Expected:* **10/10 CAUGHT**, and `sha256sum -c` on `RelaySink.cs` **OK** afterwards. A mutation
+whose target text is not found must be reported **SKIPPED**, never CAUGHT, and a harness that
+**crashed** must be reported CRASH — checking for the missing summary line **before** counting FAILs
+is the correction runs 27/30/31/32 reached four times by four routes.
+
+### C-DSP-6 — suppression is words only; it never touches the effects
+
+```bash
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build \
+  | grep -E 'suppression is words only|persists the mark|announces nothing|no phantom|first push that succeeds'
+```
+
+*Expected:* `PASS` — an identical 409 reaches `ReconcileTo` **both** times, a 201 after a suppressed
+run still persists the mark, a steady healthy engine announces nothing, and a first successful push
+logs nothing at all. This is the assertion that stops a log fix becoming a protocol bug (M9).
+
+### C-DSP-7 — the halt was CONSIDERED and NOT TAKEN, and that is written down
+
+```bash
+grep -n 'deliberately does NOT do: halt' -A 18 src/Sync/RelaySink.cs
+grep -n 'does not authorise a halt' -A 6 src/Sync/RelaySink.cs
+```
+
+*Expected:* both present. The reasons are (a) the retry is **ratified above this layer** — the
+2026-07-24 snapshot finding, which exists to stop a fresh phone merging a delta into demo fixture
+rows — and (b) permanence is an **assumption about the relay's answer**, so an engine halting on a
+401 raised by a deploy blip converts a minute of relay trouble into an outage. **This is the item's
+open half, and it is open on purpose:** C-DSP-1's retry counts are unchanged at HEAD.
+
+### C-DSP-8 — the harness moved 294 → 313 and the build is clean
+
+```bash
+dotnet build CareerSeeker.sln -c Release | tail -4
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -2
+```
+
+*Expected:* **0 Warning(s) / 0 Error(s)** and **`=== 313 passed, 0 failed ===`**.
+
+### C-DSP-9 — 781 is CORROBORATED, NOT MEASURED, and here is the arithmetic
+
+```bash
+which pwsh; apt-cache policy powershell
+for h in Slice EngineHarness ResearcherHarness HookHarness StoreParityHarness \
+         GatewayGateHarness DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  echo -n "$h: "; dotnet run --project tests/$h/$h.csproj -c Release --no-build 2>&1 \
+    | grep -E 'passed, [0-9]+ failed' | tail -1
+done
+```
+
+*Expected:* `pwsh` **empty** and `apt-cache policy powershell` **nothing** — so `Verify-Alpha.ps1`
+did not run and cannot here. Nine harnesses report; they sum to **564**. `EngineHarness` prints **no
+summary**: it throws `Refusing full-data deletion for a volume root` at `FullDataDeletion.cs:81`,
+reached from `tests/EngineHarness/Program.cs:221` — a **correct** refusal on Linux and a pre-existing
+documented limit, not a new break. Its **217** is carried from Windows CI. **564 + 217 = 781**, and
+**762 + 19 = 781** independently. CI on `windows-latest` is what settles it.
+
+### C-DSP-10 — zero vector bytes moved, so there was NO cross-repo drift event
+
+```bash
+node docs/sync-vectors/generate.mjs --check
+git diff --stat HEAD~3..HEAD -- docs/sync-vectors/
+```
+
+*Expected:* **`OK: 29 vector files match the generator`** and an **empty** diff. The android repo's
+vendored pin (`7328a0b`) is untouched; this slice added no vector and changed none.
+
+### C-DSP-11 — the pin moved as ONE unit with every doc that reports it
+
+```bash
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1
+grep -rn '| SyncHarness | 313 |\|\*\*781\*\*\|781 passed, 0 failed' \
+  scripts/Verify-Alpha.ps1 README.md src/Engine/README.md \
+  docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md | wc -l
+grep -rn '| SyncHarness | 294 |\|\*\*762\*\*' README.md src/Engine/README.md \
+  docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md
+grep -c '3A4251F65AEF530BC5D73387422CD53556294970EC546C0112B6EF1BA4E900F2' scripts/Verify-Alpha.ps1
+```
+
+*Expected:* **781**; a **non-zero** count across the verifier and the four count-reporting docs; the
+third grep **empty**; and the hash count still **2**. The `294` inside the Alpha ZIP's SHA-256 at
+`Verify-Alpha.ps1:486,509` and the `762` inside the hash at `docs/Codex-Resume-Handoff.md:141` /
+`docs/BETA-AUDIT-REQUEST.md:48` are **deliberately not swept** — they are hashes, not counts, the
+same trap the previous run named. The two surviving prose mentions of `294`/`762` at
+`Verify-Alpha.ps1:269,290` are the narrative of the **previous** slice and are correct history.
+
+### C-DSP-12 — no android source changed, and nothing was merged, rewritten or deployed
+
+```bash
+git -C <android-clone> diff --stat origin/claude/android-a0-probe..HEAD -- core/ app/
+git -C <engine-clone> log --oneline origin/main -1
+git -C <engine-clone> merge-base --is-ancestor HEAD origin/main && echo MERGED || echo "NOT MERGED"
+git -C <engine-clone> reflog --date=iso | grep -iE 'push --force|rebase' | head
+```
+
+*Expected:* **empty** (this repo took records only, so the android gate did not run and was not
+attempted — **B-7**); `origin/main` still at **`aac05f3`**; **NOT MERGED**; and no force-push or
+rebase in the reflog. #47 is a **DRAFT**, and #26 and #32–#46 were left exactly as found.

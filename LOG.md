@@ -7757,3 +7757,131 @@ never-self-merge regardless; **#46 stays a DRAFT**. And it does not touch the st
 runner has no pairing vault either, so `BuildSyncBridge` is **built and never constructed** there too.
 **The composition is exactly as unexecuted in CI as it is in this sandbox** — which is the gap the
 next session's item 1 names.
+
+## Thirty-third run (2026-08-14, cloud iteration, Linux sandbox) — the type knew what was permanent, and the layer above it collapsed that back to `false`
+
+**A rung-slice moved: S2's transport half, engine side** — `STATE.md`'s ordered next intent **item 2**,
+*give `Misconfigured`/`Unauthorised`/`Rejected` a behavioural consumer*, the **oldest surviving item on
+that list by four runs**. Engine repo only, three commits onto the new branch
+`claude/s2-push-disposition` (`506c982`, `701a767`, `bb2cc63`), **draft PR #47 opened**, stacked on
+#46 → #45 → #39 → #38 → #37 → #32.
+
+**The prompt was stale for the FIFTEENTH consecutive run**, verified after the mandatory fetch rather
+than assumed. It assigned the S5 spec slice; that landed in #32/#37/#38/#39 and all three vectors it
+names are present in `docs/sync-vectors/v1/`. It pinned the vectors at `679a317`; the lock reads
+**`7328a0b`**, moved nine runs ago. It said the C# applier cannot be compiled here; **`dotnet-sdk-8.0`
+installs from the Ubuntu archive (`8.0.129`, `which dotnet` checked afterwards rather than a wrapper's
+exit code) and nine of the ten offline harnesses run.** And it summarised S5 as "NOT STARTED" when it
+is landed. **Eighth run running where the ordered intent, not the prompt, routed the work.**
+
+**The defect, reproduced before a line was written, and through the SHIPPING composition.**
+`RelayPushResult` exists because a bare `bool` could not tell a replay refusal from a DNS failure; its
+own summary names the three questions its cases answer — *retry these bytes, never retry these bytes,
+or fix the counter and send different bytes*. **That knowledge lived only in prose on the record
+types.** `RelaySink` named each case **for the operator** and then returned `false` for all of them, so
+**one layer above the fix the conflation was exactly as it had been.** Driven through the real
+`SyncPushPath.Create` for five engine cycles, mimicking `EngineSyncBridge.PublishAsync`'s ratified
+snapshot retry: a 400 `bad_request` and a DNS failure produce **the same push count (5), the same
+burnt seqs (5), the same delivered count (0)** (**C-DSP-1**). **The seventh instance of this repo's
+recurring shape** — every piece individually correct and honestly recorded, the hole sitting *between*
+the entries — and the third in a row the previous run's own self-audit had already named.
+
+**Two further defects the reproduction surfaced, neither of which the item predicted, and both about
+the record rather than the logic.** The 413 line asserted the envelope **"will not be retried"** —
+**false**: nothing in this repo prevents that retry and the ratified snapshot policy *guarantees* it,
+**four retries in five cycles, measured** (**C-DSP-2**). A comment in shipping code denying what the
+shipping code does is worse than no comment, because it is the thing an operator reads instead of the
+behaviour. And every failing cycle emitted a **byte-identical** line, so a permanent fault filled the
+log with one sentence and buried the two transitions that carry information (**C-DSP-4**).
+
+**The decision, argued rather than preferred — and it is a decision NOT to act.** `PairingDead` names
+a condition under which every subsequent push is guaranteed to fail, and halting there is the obvious
+move. **It was considered and refused, for two reasons.** First, **the retry is ratified above this
+layer**: `EngineSyncBridge.PublishAsync` leaves its snapshot flag unset on failure precisely so the
+next cycle re-sends the snapshot — the 2026-07-24 audit finding, whose purpose is to stop a fresh
+phone merging a delta into demo fixture rows. Suppressing that from inside the sink would **silently
+revert a decision taken above it**. Second, **permanence is an assumption about the relay's answer,
+not a fact about the world**: a 401 raised by a relay deploy blip is transient, and an engine halting
+on the first one converts a minute of relay trouble into an outage lasting until someone noticed.
+**So C-DSP-1's retry counts are UNCHANGED at HEAD, by design** — item 2 is advanced, not closed, and
+saying otherwise would be the flattering reading. **Item 1's warning was also taken as binding:** no
+new argument reaches the composition root, so `SyncPushPath.Create`'s four unexecuted argument
+identities stay **four**, not five.
+
+**What landed.** `RelaySink.Classify` is that permanence as a **pure, total, public** function
+(`Delivered`/`RetryLater`/`ResendAbove`/`PayloadDead`/`PairingDead`) — the same extraction pattern
+`SyncPublisher.ResumeSeq` used, and for the same reason: the composition around it cannot run here but
+the *rule* can. **The sink's `bool` is now DERIVED from it** rather than written per case, so a case
+that classified as `PayloadDead` while reporting success is no longer expressible — mutation **M3**
+fails **12** assertions, which is what shows the two are tied rather than merely consistent today. The
+413 line says what is true. A repeated line is **counted rather than repeated**, and the return to
+`Delivered` is announced **with that count**, so a suppressed run is never silently dropped. Measured
+post-change through the same probe: **5 operator lines → 1** for every permanent case.
+
+**`SyncHarness` 294 → 313, 0 failed**, build **0 warnings / 0 errors**. **Ten mutations, ten caught**,
+tree **byte-identical after** — verified with `sha256sum -c`, not assumed. The load-bearing assertion
+is not the count but **"suppression is words only"**: an identical 409 still reaches `ReconcileTo`
+**both** times and a 201 after a suppressed run still persists the mark (**M9**). A dedupe that skipped
+the effects because the words repeated would have traded a log defect for a protocol one — which is
+the specific way this slice could have gone wrong.
+
+**THE CORRECTION, and it is against the prompt's model of this machine rather than any code.** The
+prompt states flatly that the C# applier cannot be compiled here and that the slice must be spec-only.
+**That has been false for eleven runs.** Acting on it would have produced a fourth restatement of a
+spec already landed, while the measured defect stood. The standing lesson is now explicit: **the
+environment section of a stored prompt ages exactly like a doc count, and it is checked with `which`,
+not believed.**
+
+**Offline pin 762 → 781**, swept as one unit with the verifier's `Assert-Contains` literals and the
+four count-reporting docs. **781 was CORROBORATED and is now CONFIRMED, same session.** The Linux sum
+**564** was measured harness by harness and `EngineHarness`'s **217** is carried (it correctly refuses
+a volume root on Linux at `FullDataDeletion.cs:81`, stopping at `Program.cs:221` — a pre-existing
+documented limit, re-confirmed, not a new break); 564 + 217 = 781, agreeing independently with
+762 + 19. `Verify-Alpha.ps1` **did not run and cannot** (`which pwsh` empty, `apt-cache policy
+powershell` nothing, re-checked). **CI settled it:** run
+[31788164957](https://github.com/ShivaClaw/careerseeker/actions/runs/31788164957) on `head_sha`
+**`bb2cc63`**, `run_attempt` **1**, **both jobs `success`**; the `windows-latest` job — which runs
+`Verify-Alpha.ps1`, **which throws on a pin mismatch** — printed **`=== 313 passed, 0 failed ===`**
+and **`=== Offline total: 781 passed, 0 failed ===`**, followed by `CareerSeeker alpha verification
+complete.` All nineteen new assertions appear **by name** in that Windows log, so they pass on the one
+platform this sandbox cannot reach, and `EngineHarness`'s 217 is inside that total rather than
+inferred. **The `294` inside the Alpha ZIP's SHA-256 at `Verify-Alpha.ps1:486,509` and the `762`
+inside the hash at `Codex-Resume-Handoff.md:141` / `BETA-AUDIT-REQUEST.md:48` were deliberately NOT
+swept** — hashes, not counts, the same trap the previous run named; both verified intact afterwards.
+
+**0 vector bytes moved** (`generate.mjs --check` **OK at 29**; the `7328a0b` pin is intact, **no
+cross-repo drift event**), and CI's *Assert sync vectors match their generator* step confirmed it
+independently. **One machine change, logged:** `apt-get install -y dotnet-sdk-8.0` → **8.0.129**.
+
+**The standing limit, unmoved.** `BuildSyncBridge` **still has never executed anywhere**, and CI cannot
+execute it either. This slice did not touch that and did not pretend to. **No new blocker.**
+Re-verify: **C-DSP-1…12**.
+
+### Prohibition — what this iteration did not touch
+
+**No android source changed** — not `core/`, not `app/`, not a screen, not the Room replica, not the
+migration tests; this repo received **records only** (`LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`), so
+the **android gate did not run and correctly was not attempted** (`checkCoreIsAndroidFree`,
+`:app:assembleDebug`, `:app:lintDebug` need the SDK — **B-7**, re-confirmed: `ANDROID_HOME` empty and
+no `/usr/lib/android-sdk`). In the engine repo: **no `relay/` source, no TypeScript, no
+`docs/sync-vectors/` byte** (`--check` OK at 29 — **NO cross-repo drift event**), **no `generate.mjs`,
+no `docs/Sync-Protocol.md`** (§2.2/§6.1 already said what this code needed), **no
+`src/Sync/RelayClient.cs`, no `src/Sync/SyncPublisher.cs`, no `src/Sync/SyncPushPath.cs`, no
+`src/Sync/Protocol.cs`, no `src/Sync/InboundPump.cs`, no `src/Engine/EngineSyncBridge.cs`, no
+`src/Engine/Program.cs`, no `src/Engine/Host.cs`, no `docs/autonomy/*`.** **`EngineSyncBridge` was
+READ and quoted and deliberately NOT edited** — its retry is the ratified behaviour this slice
+declined to override. No engine C# outside `src/Sync/RelaySink.cs`; no test outside
+`tests/SyncHarness/Program.cs`; no doc outside the four that report the pin. The reproduction probe
+lives **outside the repo**, in the session scratchpad, precisely so it cannot join the solution and
+move the pinned count. **No merge in either repo** — #47 is a **DRAFT**, and CI green is not the merge
+condition, which needs a full *local* gate (`-IncludePublish -IncludePackage`) out of reach here; the
+android repo is **never-self-merge** regardless. No force-push, no history rewrite, no branch deleted;
+draft PRs **#26 and #32–#46** in the engine repo and **#1–#6** here were left exactly as found — not
+merged, retargeted or rebased. No deploy of any kind (Cloudflare, Workers, relay, site, Pages), and
+**the production relay was not contacted at all, not even `GET /v1/health`** — **not one byte was sent
+to a relay, an engine or a phone this run.** Every `RelayPushResult` in evidence came from a recording
+double, never from a network. No Play, Google or OAuth console; no accounts, no purchases, no Play
+Billing code; no Gmail, no email; no MSIX or certificate-store action; no emulator, no `sdkmanager`,
+no keystore use. **No secret was read, printed or referenced.** `Documents\CareerSeeker` and Terra's
+worktrees were never touched, and `autonomy/codex-state` was **read and not written** — Terra reports
+COMPLETE with **no files claimed**, so there was no collision and no rebase was owed.
