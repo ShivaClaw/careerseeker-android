@@ -7459,3 +7459,120 @@ three Markdown files and no source, so it could not have caused the failure. The
 step passed in real CI, independently confirming the `7328a0b` pin held and **no vector byte moved
 this iteration**. Re-running failed jobs is the remedy the twenty-fourth run recorded for this exact
 signature; it is neither a merge nor a deploy, and no embargo covers it.
+
+---
+
+## Thirty-first run (2026-08-14, cloud iteration, Linux sandbox) — the rule was pinned and its only caller was held in place by nothing
+
+**A rung-slice moved: S2's transport half, engine side** — `STATE.md`'s ordered next intent **item
+1**, which named it "the sharpest gap this slice leaves" and predicted, correctly, that it would
+need "a small extraction… the same move that made `ResumeSeq` testable". Engine repo only, three
+commits onto `claude/s6-counter-reconciliation` (`dee32f8`, `ca868e8`, `63ec8a5`), **draft PR #46
+refreshed** (stacked #45 → #39 → #38 → #37 → #32).
+
+**The prompt was stale for the THIRTEENTH consecutive run**, verified after the mandatory fetch
+rather than assumed. It assigned the S5 spec slice — landed in #32/#37/#38/#39: `grep -c
+entitlement_ack` on the stack's protocol doc returns **8**, and all three vectors named in the
+prompt (`entitlement-ack.json`, `entitlement-ack-no-order-id.json`, `invalid-unknown-field.json`)
+are present in `docs/sync-vectors/v1/`. It pinned the vectors at `679a317`; the lock file reads
+**`7328a0b`**, moved seven runs ago. And it stated the C# applier could not be compiled here —
+**`dotnet-sdk-8.0` installs from the Ubuntu archive and nine of the ten offline harnesses run.**
+**Sixth run running where the ordered intent, not the prompt, routed the work.**
+
+**The defect.** Three runs built a vocabulary and the last one finally consumed it — but only
+half-way. `SyncPublisher.ReconcileTo` was covered by eleven assertions; **the line that invokes it
+was covered by none.** The sink was a closure inside `BuildSyncBridge`, a host method that returns
+null without a DPAPI pairing vault, so **deleting `publisherRef.ReconcileTo(latest)` failed no test
+in this repo.** The rule was pinned and its only caller was held in place by nothing at all. **The
+fifth instance of this repo's recurring shape** — every piece individually correct and honestly
+recorded, the hole sitting *between* the entries — and the first one the previous run's own
+self-audit had already named, which is what let it be taken directly instead of re-derived.
+
+**The decision, argued rather than preferred.** `RelaySink.Create` takes its collaborators as
+**delegates** — `push`, `pushedSeq`, `persistSeq`, `reconcileTo`, `log` — rather than returning a
+decision record for a caller to interpret. A pure `Decide(result) -> what should happen` would be
+simpler to test and **would answer the wrong question**: "does the engine know what a 409 means" was
+never open, and was already settled by the assertions on `ReconcileTo` itself. The open question was
+whether the sink *calls* it, and **only an observable call site can answer that**. `Program.cs`
+keeps the composition — which relay, which vault, which publisher — which is the half a sandbox
+cannot execute anyway. A second decision, smaller: `pushedSeq` returns `long?` rather than `long`,
+because the publisher and its sink are mutually referential and laundering the "not yet attached"
+case into a `0` would persist a false high-water mark (**M6** is the measurement behind it).
+
+**`SyncHarness` 256 → 277, 0 failed**, baseline re-measured this session on fresh binaries after a
+clean rebuild; build **0 warnings / 0 errors**. **Ten mutations, ten caught**, tree byte-identical
+after. **M1 (delete the call site) fails 6** — including, composed against a *real* `SyncPublisher`,
+that the relay's 409 moves the actual counter and the next envelope resumes above the relay's mark.
+That composed pair is what shows the doubles were standing in for something that matches.
+
+**THE CORRECTION, and it is worth more than the fix.** My first mutation pass reported **M1 as a
+tidy "CAUGHT (1 failing)"**. It was not caught cleanly at all: deleting the call empties the
+recording list, and an **unguarded `reconciledTo[0]`** in the very next assertion threw — taking the
+harness down *after* one FAIL line. My detector checked the FAIL count **before** checking for the
+summary line, so a run that **died mid-suite** scored as a clean catch, and every assertion after it
+silently never ran. Two defects, one in the tests and one in the tooling: the assertion is now
+count-guarded (`ca868e8`), the detector checks for the crash first, and re-run from a committed base
+**M1 fails 6 and M10 fails 14** where the flawed script had shown 1 and 3. **An assertion that
+cannot survive its own target mutation is not an assertion.** This is the same false-negative family
+as the twenty-seventh run's (a detector matching `dotnet`'s own `0 Error(s)` banner) and the
+thirtieth's (a throw with **no** FAIL line) — reached a third time by a third route, and the
+flattering reading was again the one that required no further work.
+
+**A second correction, against a claim I had already published.** #46's refreshed self-audit first
+named *"swapping the `persistSeq` and `reconcileTo` arguments"* as the next attack. **Measured, that
+is wrong:** they are **named** arguments, and named arguments in C# are order-independent — swapping
+them compiles and changes nothing whatsoever. The real vector, measured instead of asserted, is a
+delegate wired to the wrong *body*: replacing `persistSeq: seq => vault.RecordE2pSeq(seq)` with
+`persistSeq: _ => { }` **builds clean and leaves `SyncHarness` at 277/0**, so an engine that had
+silently stopped persisting its high-water mark would fail no test here. The PR body was corrected
+rather than left standing (**C-SNK-8**).
+
+**Offline pin 724 → 745**, swept as one unit with the verifier's `Assert-Contains` literals and the
+four count-reporting docs. **745 is CORROBORATED, NOT MEASURED** — `Verify-Alpha.ps1` did not run
+and cannot (`which pwsh` empty, `apt-cache policy powershell` nothing, **re-checked this session**);
+the **Linux sum 528** was measured harness by harness, and `EngineHarness`'s **217 is carried**,
+since it correctly refuses a volume root on Linux (`FullDataDeletion.cs:81`). 528 + 217 = 745,
+agreeing independently with 724 + 21. **`docs/Codex-Resume-Handoff.md:80` was deliberately NOT
+swept** — its `724` sits inside a commit SHA.
+
+**0 vector bytes moved** (`generate.mjs --check` OK at **29**; the `7328a0b` pin is intact, **no
+cross-repo drift event**).
+
+**One machine change, logged, and its own trap re-measured:** `apt-get update && apt-get install -y
+dotnet-sdk-8.0`. The **first attempt failed** — a stale index serves a **404** on the SDK package —
+and it failed *quietly*, because the backgrounded command's reported "exit 0" was the trailing
+`tail`, not the install. Had that gone unchecked, every measurement below it would have been taken
+on a toolchain that was never there.
+
+**The standing limit, unmoved and now sharper.** The composition **was never executed**:
+`SyncPairingVault` is DPAPI/Windows, there is no pairing here, and CI has no pairing vault either —
+so `BuildSyncBridge` has never run anywhere. This slice moved the *decision* into reach and left the
+*wiring* exactly as unexecuted as it was; **C-SNK-8 measures precisely how much that still costs.**
+**The android gate did NOT run and correctly was not attempted** — no `core/` or `app/` file
+changed. **No new blocker.** Re-verify: **C-SNK-1…9**.
+
+### Prohibition — what this iteration did not touch
+
+**No android source changed** — not `core/`, not `app/`, not a screen, not the Room replica, not the
+migration tests; this repo received **records only** (`LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`), so
+the **android gate did not run and correctly was not attempted** (`checkCoreIsAndroidFree`,
+`:app:assembleDebug`, `:app:lintDebug` need the SDK — **B-7**, re-confirmed: `ANDROID_HOME` is empty
+and `/usr/lib/android-sdk` does not exist). In the engine repo: **no `relay/` source, no TypeScript,
+no `docs/sync-vectors/` byte** (`--check` OK at 29 — the `7328a0b` pin is intact and there was **NO
+cross-repo drift event**), **no `generate.mjs`, no `docs/Sync-Protocol.md`** (§6.1 already said what
+this code needed), **no `src/Sync/RelayClient.cs`, no `src/Sync/SyncPublisher.cs`, no
+`src/Sync/Protocol.cs`, no `src/Sync/InboundPump.cs`, no `src/Engine/Host.cs`, no
+`docs/autonomy/*`.** No engine C# outside the **new** `src/Sync/RelaySink.cs` and `Program.cs`'s
+`BuildSyncBridge` seam. **No merge in either repo** — #46 remains a **DRAFT**, and CI green is not
+the merge condition, which needs a full *local* gate (`-IncludePublish -IncludePackage`) that is out
+of reach here; the android repo is **never-self-merge** regardless. No force-push, no history
+rewrite, no branch deleted; draft PRs **#26 and #32–#45** in the engine repo and **#1–#6** here were
+left exactly as found — not merged, retargeted or rebased. No deploy of any kind (Cloudflare,
+Workers, relay, site, Pages), and **the production relay was not contacted at all, not even
+`GET /v1/health`** — **not one byte was sent to a relay, an engine or a phone this run.** Every
+`RelayPushResult` in evidence came from a recording double, never from a network. No Play, Google or
+OAuth console; no accounts, no purchases, no Play Billing code; no Gmail, no email; no MSIX or
+certificate-store action; no emulator, no `sdkmanager`, no keystore use. **No secret was read,
+printed or referenced.** `Documents\CareerSeeker` and Terra's worktrees were never touched, and
+`autonomy/codex-state` was **read and not written** — Terra reports COMPLETE with **no files
+claimed**, so there was no collision and no rebase was owed.

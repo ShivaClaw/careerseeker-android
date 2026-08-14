@@ -6802,6 +6802,14 @@ when exactly one does.
 that one call site fails no test in this repo. This is the sharpest gap in the slice and #46's
 self-audit names it.
 
+> **AMENDED by the thirty-first run — the second half of that expectation is now FALSE, deliberately.**
+> `RelaySink.Create` extracts the sink's decision, and reverting the `ReconcileTo` call site now
+> fails **6** assertions (**C-SNK-1**). The first half still reproduces: `tests/` matches
+> `SyncHarness/Program.cs` only, and the *composition* in `BuildSyncBridge` remains unexecuted
+> (**C-SNK-8**). Left in place rather than rewritten, because the entry is the record of what was
+> true at `834adcd` — but an expectation that no longer holds has stopped testing what it claims,
+> so the pointer forward is mandatory rather than courteous.
+
 ### C-S6-11 — no android source changed
 
 ```bash
@@ -6810,3 +6818,154 @@ git -C <android-clone> diff --stat origin/claude/android-a0-probe..HEAD -- core/
 
 *Expected:* **empty**. This repo took records only, which is why the android gate did not run and
 was not attempted (**B-7**).
+
+## Thirty-first run — the sink's call site (draft PR #46, `dee32f8`, `ca868e8`, `63ec8a5`)
+
+**Every command below runs in the ENGINE clone** (`ShivaClaw/careerseeker`, branch
+`claude/s6-counter-reconciliation`) unless it says otherwise. An audit command must be executed
+where it will be read — the sixth recurrence of that mistake was a `git diff -- core/ app/` run in
+the engine repo, where those paths do not exist, so it asserted nothing and would have been
+recorded as proof. Prerequisite for all of them:
+`apt-get update && apt-get install -y dotnet-sdk-8.0` — **note the `update`**, without which the
+archive serves a **404** on the SDK package (measured again this run: the first attempt failed
+exactly that way, and the wrapper's "exit 0" was a trailing `tail`, not the install).
+
+### C-SNK-1 — the gap this slice closed was real, and the new assertion is what closes it
+
+```bash
+git diff --quiet -- src/Sync/RelaySink.cs || echo "ABORT: commit first"
+perl -0pi -e 's/log\(reconcileTo\(latest\)\n(\s+)\?/log(false\n$1?/' src/Sync/RelaySink.cs
+dotnet build CareerSeeker.sln -c Release 2>&1 | tail -3
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 \
+  | grep -E "^  FAIL|=== "
+git checkout -- src/Sync/RelaySink.cs
+```
+
+*Expected:* deleting the `ReconcileTo` call fails **6** assertions, `A 409 CALLS ReconcileTo — the
+call site, not just the rule` first among them, and the run still **reaches its summary line**.
+Before this slice the same deletion failed **nothing**.
+
+**A committed baseline is mandatory** — the script restores with `git checkout`, so running it
+against uncommitted work reverts the code under test and reports meaningless results as
+measurements (the thirtieth run's lesson, applied here as the first line of the command).
+
+### C-SNK-2 — the correction: the first reading of M1 was a false "caught"
+
+```bash
+git show ca868e8 -- tests/SyncHarness/Program.cs | grep -A3 "reconciledTo.Count == 1"
+```
+
+*Expected:* the assertion is **count-guarded** before indexing. Unguarded, `reconciledTo[0]` throws
+under the very mutation it exists to catch, taking the harness down **after one FAIL line** — which
+a fail-counting reader scores as a tidy "CAUGHT (1 failing)" while the rest of the suite never runs.
+The detector must check for the **missing summary line first**, and the FAIL count second. An
+assertion that cannot survive its own target mutation is not an assertion.
+
+### C-SNK-3 — SyncHarness 256 → 277, and the baseline is re-measured, not carried
+
+```bash
+dotnet build CareerSeeker.sln -c Release 2>&1 | tail -3
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 | tail -1
+git stash list >/dev/null; git checkout -q 834adcd -- tests/SyncHarness/Program.cs src/Sync src/Engine/Program.cs
+dotnet build CareerSeeker.sln -c Release 2>&1 | tail -3
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 | tail -1
+git checkout -q HEAD -- tests/SyncHarness/Program.cs src/Sync src/Engine/Program.cs
+```
+
+*Expected:* **`=== 277 passed, 0 failed ===`** on this tree, **`=== 256 passed, 0 failed ===`** on
+`834adcd`. Build is **0 warnings / 0 errors** both times. **Rebuild between the two** — the
+thirtieth run nearly recorded a stale count because `--no-build` reused binaries from a mutation
+build, and the mission's `--rerun-tasks` rule applies verbatim to `dotnet --no-build`.
+
+### C-SNK-4 — ten mutations, ten caught
+
+The script is reproduced in the LOG entry for this run. *Expected:* **M1…M10 all CAUGHT**, tree
+byte-identical afterwards (`git status --porcelain -- src/Sync/RelaySink.cs` empty). M1 fails 6,
+M2 (reconcile to the refused seq) fails 5, M3 (call it on an unusable mark) fails 2, M10 (swallow
+the result) fails 14.
+
+**M3's first draft did not compile** and was rewritten rather than recorded as a survivor:
+`... is { } latest && ... || true` leaves `latest` unassigned on the `true` arm. The working form is
+`(conflict.Latest ?? 0) is { } latest`. A mutation that does not compile has measured nothing.
+
+### C-SNK-5 — zero vector bytes moved (no cross-repo drift event)
+
+```bash
+node docs/sync-vectors/generate.mjs --check
+git diff --stat 834adcd..HEAD -- docs/sync-vectors/
+```
+
+*Expected:* **`OK: 29 vector files match the generator`**, and the diff is **empty**. The android
+repo's `core/src/test/resources/sync-vectors/VECTORS.lock` pin **`7328a0b`** is untouched, so there
+was **no cross-repo drift event**. (The pin is `7328a0b`, **not** `679a317` — that has been stale in
+the iteration prompt for seven runs now.)
+
+### C-SNK-6 — the offline pin sweep 724 → 745 is complete
+
+```bash
+grep -rn "745\|SyncHarness | 277" --include="*.md" --include="*.ps1" . | grep -v node_modules
+grep -rn "SyncHarness | 256" --include="*.md" --include="*.ps1" .
+```
+
+*Expected:* the first lists `$ExpectedOfflineTotal = 745`, the verifier's `Assert-Contains`
+literals, and the four count-reporting docs (`README.md`, `src/Engine/README.md`,
+`docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`). The second is **empty**.
+
+**Two deliberate non-edits.** `docs/Codex-Resume-Handoff.md:80` contains `724` **inside a commit
+SHA** (`5661342b1263089a1724fa1eb0cc22e85db7201e`) and must not be swept; and a bare `grep -rn 724`
+still matches the verifier's **previous** comment paragraphs, which record the pin *as of those
+slices*. That is correct history, not drift — the trap is about the strings the verifier
+**asserts**, which are the quoted ones.
+
+### C-SNK-7 — 745 is CORROBORATED, not measured
+
+```bash
+which pwsh ; apt-cache policy powershell
+dotnet build CareerSeeker.sln -c Release 2>&1 | tail -3
+for h in Slice EngineHarness ResearcherHarness HookHarness StoreParityHarness \
+         GatewayGateHarness DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  echo -n "$h: "
+  dotnet run --project tests/$h/$h.csproj -c Release --no-build 2>&1 \
+    | grep -oE "=== [0-9]+ passed, [0-9]+ failed" | tail -1
+  echo
+done
+```
+
+*Expected:* the first two print **nothing** — `Verify-Alpha.ps1` **cannot run here and did not**,
+re-checked this session. The sweep prints 28 / **(EngineHarness: no count)** / 57 / 16 / 28 / 36 /
+35 / 45 / 6 / 277 = **Linux sum 528**. `EngineHarness` aborts with `InvalidOperationException:
+Refusing full-data deletion for a volume root` (`src/Engine/FullDataDeletion.cs:81`) — correct
+behaviour on Linux — so its **217 is CARRIED, not measured**. 528 + 217 = **745**, agreeing
+independently with 724 + 21. **CI's `windows-latest` job is what settles it.**
+
+### C-SNK-8 — the composition is STILL never executed, and that is now the sharpest gap
+
+```bash
+cp src/Engine/Program.cs /tmp/Program.cs.bak
+perl -0pi -e 's/persistSeq: seq => vault\.RecordE2pSeq\(seq\),/persistSeq: _ => { },/' src/Engine/Program.cs
+dotnet build CareerSeeker.sln -c Release 2>&1 | grep -E "error CS|Build succeeded"
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 | tail -1
+cp /tmp/Program.cs.bak src/Engine/Program.cs
+```
+
+*Expected:* **`Build succeeded`** and **`=== 277 passed, 0 failed ===`**. Neutering the engine's
+high-water-mark persistence to a no-op **fails no test in this repo** — the engine would silently
+stop recording where it got to, and nothing would notice. The gap this slice closed **moved one
+level up**: the sink's *decision* is now tested, and the host's *composition* of it is not.
+`SyncPairingVault` is DPAPI/Windows and there is no pairing here, so `BuildSyncBridge` has never
+executed — not locally and not in CI, since a runner has no pairing vault either.
+
+**A correction against my own draft, caught before it stood.** #46's self-audit first named
+*"swapping the `persistSeq` and `reconcileTo` arguments"* as the attack. **Measured, that is wrong:**
+they are **named** arguments, and named arguments in C# are order-independent, so swapping them
+compiles *and changes nothing at all*. The real vector is the one above — a delegate wired to the
+wrong body, not to the wrong position. The PR body was corrected rather than left standing.
+
+### C-SNK-9 — no android source changed
+
+```bash
+git -C <android-clone> diff --stat origin/claude/android-a0-probe..HEAD -- core/ app/
+```
+
+*Expected:* **empty** — run this in the **android** clone, where `core/` and `app/` exist. This repo
+took records only, which is why the android gate did not run and was not attempted (**B-7**).
