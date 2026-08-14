@@ -1574,3 +1574,16 @@ build that on one bad afternoon.
 **What this does NOT license.** It does not make "CI was red, probably infrastructure" an acceptable
 reading of any future red. **This entry exists because the signature was checked and found to differ
 from the recorded one** — that check is the point, not the conclusion.
+
+**Attempt 2 outcome, recorded rather than rounded up.** The re-run **cleared dependency resolution**
+— `Set up Android SDK` ✓ (26 s) and `Set up Gradle` ✓ — which **confirms the 403 was transient**, as
+diagnosed. But it then **hung in step 6, `Assert :core has no Android dependency`, for 21+ minutes**
+(started 13:53:30, still `in_progress`), against a normal runtime of well under a minute. So the
+network trouble did not clear so much as **change shape**: fast 403s became a stall, presumably on the
+same CDN reads.
+
+**Therefore: the android gate has NO result for `370ecfe`, and this run does not claim one.** Not
+green, not red — **unfinished**. That distinction is the entire reason this paragraph exists; "the
+re-run went green" would have been the flattering reading and it is not what happened. The push is
+records-only, so nothing about the engine work depends on it. **Next session: re-run and read the
+signature. If step 6 stalls again, that is the moment this stops being weather and becomes B-11.**
