@@ -7725,3 +7725,35 @@ Billing code; no Gmail, no email; no MSIX or certificate-store action; no emulat
 no keystore use. **No secret was read, printed or referenced.** `Documents\CareerSeeker` and Terra's
 worktrees were never touched, and `autonomy/codex-state` was **read and not written** — Terra reports
 COMPLETE with **no files claimed**, so there was no collision and no rebase was owed.
+
+**Addendum — CI settles the 762 pin, same session, and it discharges BOTH caveats.** Run
+[31772421928](https://github.com/ShivaClaw/careerseeker/actions/runs/31772421928) on **`head_sha`
+`9394ca1`**, read from the run's own field rather than the PR check-runs view (which follows the
+current head and lags a push), `run_attempt` **1**: **both jobs `success`**. The `windows-latest` job
+runs `Verify-Alpha.ps1`, **which throws on a pin mismatch**, and its log prints
+**`=== 294 passed, 0 failed ===`** and **`=== Offline total: 762 passed, 0 failed ===`**, followed by
+`CareerSeeker alpha verification complete.`
+
+**So this run's "762 is CORROBORATED, NOT MEASURED" caveat is discharged: 762 is CONFIRMED**, on the
+one platform this sandbox cannot reach, and `EngineHarness` = 762 − 545 = **217** is re-confirmed as
+carried rather than guessed. The log names the new assertions individually — `PUSH PATH PERSISTS THE
+MARK -- the wiring, not just the sink's rule`, `push path: the seq PERSISTED is the seq SENT, read
+from the envelope header` and `push path: the 409 moved the REAL publisher's counter -- the mutual
+reference is tied` among them — so they pass **on Windows**, not only in the Linux measurement taken
+here.
+
+**And it discharges the second caveat too, which matters more.** `EngineHarness` contributed its full
+**217** on Windows, and its seven sync-pairing-vault assertions sit inside that number at
+`Program.cs:2462` — the ones that **did not execute in this sandbox** because the Linux volume-root
+guard stops the harness at `Program.cs:221`. **So `SyncPairingVault : IE2pSeqStore` is no longer
+compile-verified only; it is assertion-verified on Windows** (**C-WIR-7**, whose expectation should
+now be read as "did not run *here*", not "has not run"). Ordered-intent item 3 stands regardless: the
+gap is that a *cloud* session cannot see those assertions, and CI closing it after the fact is not the
+same as a session being able to check its own work.
+
+**What CI does not change.** It is **not** the merge condition — the main-repo policy needs a full
+*local* gate (`-IncludePublish -IncludePackage`), out of reach here, and the android repo is
+never-self-merge regardless; **#46 stays a DRAFT**. And it does not touch the standing limit: the
+runner has no pairing vault either, so `BuildSyncBridge` is **built and never constructed** there too.
+**The composition is exactly as unexecuted in CI as it is in this sandbox** — which is the gap the
+next session's item 1 names.
