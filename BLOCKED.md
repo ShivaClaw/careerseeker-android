@@ -1636,3 +1636,38 @@ branch with `cancel-in-progress: true` and then try to read CI.** Batch the reco
 push once, and let the run settle. **This correction is itself another push and will cancel the
 in-flight run** — so the run to read is the one for whatever commit is HEAD when you arrive, and the
 earlier cancellations are noise I created, not signal.
+
+### RESOLVED — the gate is **GREEN**, and the "slow resolution" theory is withdrawn too
+
+Run [31807155069](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31807155069) on
+`head_sha` **`0ffe3b5`** — the commit carrying all of this run's records — **`conclusion: success`,
+attempt 1, ALL THIRTEEN STEPS**, 13:57:59 → 14:06:21. **No re-run was needed.**
+
+*Set up Android SDK* ✓ (27 s) · *Set up Gradle* ✓ · *Assert :core has no Android dependency* ✓ (1m45s)
+· ***Assert vendored sync vectors match the pinned main-repo commit* ✓** — the `7328a0b` pin resolving
+on a third machine, independently confirming this iteration moved no vector byte · *Unit tests (:core)*
+✓ · ***Unit tests (:app, Robolectric)* ✓** — **the standing flake did not fire** · *Assemble debug APK*
+✓ · *Lint* ✓ · *Assert no analytics or tracking SDKs ship* ✓ · *Upload debug APK* ✓.
+
+**Two corrections this closes.**
+
+**(1) "The gate has NO result for this work" is now superseded** — it was true when written and is not
+true now. The gate is green.
+
+**(2) The slow-dependency-resolution theory is WITHDRAWN.** The correction above said the `f28a276`
+run "reached step 6 at 13:55:48 and was still there ~30 minutes later," and inferred that *something*
+was making resolution crawl. **That was the same stale-snapshot mistake a second time**: that run was
+`cancelled` at 13:57:56, about two minutes in, by my own next push. And this green run settles it
+positively — steps 4–7 completed in **113 seconds total**, at entirely normal speed. **There is no
+slow-resolution problem. There never was.** Step 6 simply takes ~1m45s, which is why a run killed
+inside it always looked "stuck in step 6".
+
+**So the whole afternoon reduces to one real event:** attempt 1's **transient 403** from Maven Central,
+which cleared by itself. Everything else — three cancelled runs, two "hangs", one crawl — was **my own
+churn under `cancel-in-progress: true`, read through a cache**. The comparison table further up is
+still worth keeping, because distinguishing a 403 from the `ScreensFromFixtureTest` flake is a real
+skill this program needs; but **B-11 was never warranted and is not filed.**
+
+**The lesson, stated once and plainly, because it cost most of an iteration:** *I generated the
+symptoms I then investigated.* Batch records into one commit, push once, and read `conclusion` — never
+a step's start time against a wall clock.
