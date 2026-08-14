@@ -7885,3 +7885,34 @@ Billing code; no Gmail, no email; no MSIX or certificate-store action; no emulat
 no keystore use. **No secret was read, printed or referenced.** `Documents\CareerSeeker` and Terra's
 worktrees were never touched, and `autonomy/codex-state` was **read and not written** — Terra reports
 COMPLETE with **no files claimed**, so there was no collision and no rebase was owed.
+
+**Addendum — the android gate went red after the slice was pushed, and the red was the standing
+flake, proven rather than assumed.** Run
+[31788519473](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31788519473) on
+`head_sha` **`94ed7e6`**, the records-only commit above. **Attempt 1 `failure`**, sole failing step
+**9, `Unit tests (:app, Robolectric)`**, signature **byte-identical** to the entry already under
+*Standing gate hazard* in `BLOCKED.md`: `ScreensFromFixtureTest >
+theProvenanceBannerIsShownOnEveryTab FAILED`, `java.lang.AssertionError at
+ScreensFromFixtureTest.kt:69`, `35 tests completed, 1 failed, 3 skipped`. Steps 10–13 were
+**skipped**, not passed.
+
+**The signature was checked against the recorded one before the flake was claimed**, which is the
+whole point — "it's probably the flake" is exactly the reasoning that lets a real regression through,
+and this program has been caught by the flattering reading four times already. Two facts settle it.
+`git diff --stat e7c78ba..94ed7e6 -- app/ core/` is **empty**: three Markdown files, no source at
+all, so this push structurally could not have failed a `:app` test. And **attempt 2 passed all
+thirteen steps on the identical tree with no push between** (09:38:45 → 09:46:11) — *Assert :core has
+no Android dependency* ✓, *Assert vendored sync vectors match the pinned main-repo commit* ✓
+(**the `7328a0b` pin resolving on a THIRD machine**, after the sandbox's `--check` and the engine
+repo's own CI step), *:core* ✓, ***:app Robolectric* ✓ — the step that failed attempt 1** — *Assemble
+debug APK* ✓, *Lint* ✓, *no analytics or tracking SDKs* ✓. **The re-run is the recorded remedy, and it
+is neither a merge nor a deploy.** This is the **fifth** recorded instance; the recurrence is written
+into `BLOCKED.md` with what it cost, because five sessions paying the same tax is now the argument
+for fixing the test rather than re-running it. Re-verify: **C-DSP-13**.
+
+**What this addendum does NOT change.** It is a *records-only* push in the android repo, so nothing
+about the engine slice moves: PR **#47** is still a **DRAFT**, the offline pin is still **781**
+(CI-confirmed on `windows-latest`), and the halt policy is still the open decision at the top of the
+ordered intent. The android gate still cannot be run from this sandbox (**B-7**) — CI ran it, I did
+not, and that distinction is the reason this paragraph exists rather than a claim that "the gate
+passed".

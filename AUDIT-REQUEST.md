@@ -7315,3 +7315,21 @@ git -C <engine-clone> reflog --date=iso | grep -iE 'push --force|rebase' | head
 *Expected:* **empty** (this repo took records only, so the android gate did not run and was not
 attempted — **B-7**); `origin/main` still at **`aac05f3`**; **NOT MERGED**; and no force-push or
 rebase in the reflog. #47 is a **DRAFT**, and #26 and #32–#46 were left exactly as found.
+
+### C-DSP-13 — the android red was the STANDING FLAKE, proven by a re-run on an identical tree
+
+```bash
+git -C <android-clone> diff --stat e7c78ba..94ed7e6 -- app/ core/
+```
+
+*Expected:* **empty** — three Markdown files changed and no source at all, so this push could not
+have caused a `:app` test failure. Then read run
+[31788519473](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31788519473),
+`head_sha` **`94ed7e6`**: **attempt 1 `failure`** with sole failing step **9,
+`Unit tests (:app, Robolectric)`** — `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab
+FAILED`, `java.lang.AssertionError at ScreensFromFixtureTest.kt:69`, `35 tests completed, 1 failed,
+3 skipped`, steps 10–13 **skipped** — and **attempt 2 `success` across all thirteen steps** on the
+**same `head_sha` with no push between**. That identity is what makes it a *proven* flake instance
+rather than an assumed one; the signature is the one already recorded under **Standing gate hazard**
+in `BLOCKED.md`, and this is its **fifth** instance. Attempt 2's *Assert vendored sync vectors match
+the pinned main-repo commit* step also passed, confirming the `7328a0b` pin on a **third** machine.

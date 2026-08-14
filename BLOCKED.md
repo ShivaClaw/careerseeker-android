@@ -1108,6 +1108,29 @@ the evidence's reach is not the same thing as an obstruction.
 unrepairable from a cloud sandbox (`:app` needs the SDK). This iteration touched no `:app` file, so
 a red on that test against this branch is still the hazard and not this slice.
 
+**RECURRENCE 2026-08-14 (thirty-third cloud iteration) — the fifth recorded instance, and PROVEN
+again rather than assumed.** Run
+[31788519473](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31788519473) on
+`claude/android-a0-probe`, `head_sha` **`94ed7e6`**. **Attempt 1 `failure`** 09:32:46 → 09:36:55,
+sole failing step **9, `Unit tests (:app, Robolectric)`**, signature **byte-identical** to the
+symptom above: `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab FAILED`,
+`java.lang.AssertionError at ScreensFromFixtureTest.kt:69`, `35 tests completed, 1 failed,
+3 skipped`. Steps 10–13 were **skipped**, not passed. **Attempt 2 `success`, ALL THIRTEEN STEPS**,
+09:38:45 → 09:46:11, **identical tree, no push between** — which is what makes this a *proven* flake
+instance rather than an assumed one. **This push could not have caused it:**
+`git diff --stat e7c78ba..94ed7e6 -- app/ core/` is **empty** — three Markdown files changed
+(`LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`) and **no source at all**. The re-run was the recorded
+remedy, and it is neither a merge nor a deploy.
+
+**What it cost this time, stated because it is the argument for fixing it.** The failure arrived
+*after* the slice was complete and pushed, and closing it out consumed several wait cycles at the end
+of an otherwise finished iteration. **Still not a blocker on any slice** — nothing was obstructed —
+but it has now cost five sessions the same tax, and the smallest human unblock is unchanged: open
+`app/src/test/kotlin/app/careerseeker/dashboard/ui/ScreensFromFixtureTest.kt:69` on a machine with
+the SDK and make the provenance-banner assertion wait for composition to settle rather than sampling
+it.
+
+
 ---
 
 ## B-6 RESOLVED — 2026-08-12 (twenty-second cloud iteration)
