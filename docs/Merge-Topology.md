@@ -170,10 +170,18 @@ needs a rebase, and nothing here needs a force-push.
 
 **26 identical, 0 differing, 0 missing.**
 
-Upstream `docs/sync-vectors/v1/` now holds **28** files — the two `entitlement-ack` vectors added by
-[careerseeker#32](https://github.com/ShivaClaw/careerseeker/pull/32) (still a draft, unmerged). The
-26/28 gap is the pin doing its job, not drift. Re-vendoring belongs in the same slice as the Kotlin
-applier that consumes the new files.
+Upstream `docs/sync-vectors/v1/` now holds **29** files (**corrected 2026-08-14, thirty-sixth run**;
+this line read 28 and was one vector stale) — the two `entitlement-ack` vectors added by
+[careerseeker#32](https://github.com/ShivaClaw/careerseeker/pull/32) and the `invalid-unknown-field`
+vector added by [#37](https://github.com/ShivaClaw/careerseeker/pull/37) (`7328a0b`), all still
+draft and unmerged. The 26/29 gap is the pin doing its job, not drift. Re-vendoring belongs in the
+same slice as the Kotlin applier that consumes the new files.
+
+**Measured again this run, and the result is stronger than "unchanged": the restack in §10 cannot
+cause drift.** `origin/main` has touched **no vector file at all** since the stack forked, and the
+whole stack's effect on `docs/sync-vectors/` is **three added payloads plus the `index.json`
+manifest** — **zero existing payloads modified**, byte-identical to pin `679a317`. Re-verify:
+**C-RST-7**.
 
 ## 9. What this document does not establish
 
@@ -186,3 +194,130 @@ applier that consumes the new files.
 - **Not that PR bases are what they should be.** #3–#6 target sibling branches. Whether to retarget
   them at `main` as the stack lands is a decision, not a measurement.
 - **Not a merge.** Nothing was merged, rebased, retargeted, force-pushed, or deleted.
+
+## 10. The engine repo's `claude/s2-*` stack — costed, 2026-08-14 (thirty-sixth run)
+
+Sections 1–9 measure **this** repo. This section measures the **engine** repo
+(`ShivaClaw/careerseeker`), because `STATE.md`'s ordered intent carried "the restack is real work
+that is growing, and **no run has yet costed it**" for three revisions. It is costed here. As
+everywhere in this document: **measured, not merged.** Refs taken after `git fetch --all --prune`;
+`origin/main` = `aac05f3`.
+
+### 10.1 It is not sixteen deep, and it is not a line
+
+The record said "sixteen PRs deep". Measured: **eleven** open chained PRs (#32–#39, #45–#47) plus
+**#48** standalone, and they form a **tree of depth 7**, not a chain of sixteen:
+
+```
+main (aac05f3)
+└── #32 s5-entitlement-ack-spec        (4)
+    ├── #33 s4-pull-request-semantics  (12)
+    │   └── #36 s2-transport-vocabulary (15)   ← see §10.5
+    ├── #34 s2-relay-retention         (6)
+    │   └── #35 s2-seq-bound           (9)
+    └── #37 s5-engine-wire-parser      (8)
+        └── #38 s5-entitlement-ack-emitter (12)
+            └── #39 s5-inbound-pump    (17)
+                └── #45 s2-relay-pull-result (26)
+                    └── #46 s6-counter-reconciliation (37)
+                        └── #47 s2-push-disposition   (43)
+```
+
+Every one of the eleven forks from the **same** commit `00b3705`, and `origin/main` is **16 ahead**
+of it. #48 is off **fresh** main: 1 commit, **0 behind**, merge-probe **clean** — it is unaffected by
+everything below. Re-verify: **C-RST-1**, **C-RST-2**, **C-RST-9**.
+
+### 10.2 The entire cost is the pin, and nothing else
+
+`git merge-tree` against `origin/main`, per branch — and the correlation is exact:
+
+| PR | Ahead | Pin sweeps | Merge probe |
+| --- | --- | --- | --- |
+| #32 | 4 | 0 | **CLEAN** |
+| #33 | 12 | 0 | **CLEAN** |
+| #34 | 6 | 0 | **CLEAN** |
+| #35 | 9 | 0 | **CLEAN** |
+| #36 | 15 | 0 | **CLEAN** |
+| #37 | 8 | 1 | conflicts |
+| #38 | 12 | 2 | conflicts |
+| #39 | 17 | 3 | conflicts |
+| #45 | 26 | 6 | conflicts |
+| #46 | 37 | 9 | conflicts |
+| #47 | 43 | 11 | conflicts |
+
+**Conflicts appear exactly where a pin sweep does, and nowhere else.** The conflicting set is the
+*same five files* for every branch from #37 on, and it is the drift trap's own file family:
+`README.md`, `docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`,
+`scripts/Verify-Alpha.ps1`, `src/Engine/README.md`.
+
+**Five of the eleven PRs have zero restack cost.** Re-verify: **C-RST-3**, **C-RST-4**.
+
+**The code half is free.** `src/Engine/Host.cs` (+134 on main) and `src/Engine/Program.cs` (+95)
+**auto-merge** — they appear in the probe as `Auto-merging`, not `CONFLICT`, despite main having
+rewritten both. No `src/Sync/`, no `relay/`, no test file conflicts anywhere. Re-verify: **C-RST-6**.
+
+### 10.3 The conflict is additive, and it resolves to one derivable number
+
+This is the part worth reading before touching it. Both sides moved the **same** counter from the
+**same** base, by editing **different** harnesses:
+
+| | EngineHarness | SyncHarness | `$ExpectedOfflineTotal` |
+| --- | --- | --- | --- |
+| fork point `00b3705` | 217 | 130 | **598** |
+| `origin/main` `aac05f3` | **230** | 130 | **611** (+13, the `/pair` page, PR #42) |
+| stack tip #47 `1951313` | 217 | **325** | **793** (+195) |
+| **restacked** | **230** | **325** | **806** ← derived |
+
+The two deltas are **disjoint** — main moved `EngineHarness` only, the stack moved `SyncHarness`
+only — so **neither side's number is the answer and "take theirs"/"take mine" are both wrong.**
+The resolution is arithmetic: `598 + 13 + 195 = 806`.
+
+**806 is DERIVED, NOT MEASURED.** `Verify-Alpha.ps1` cannot run in a Linux sandbox and did not run.
+It **throws** on a pin mismatch, so a wrong value is a hard CI failure rather than silent drift —
+here the drift trap is protective, and it is the thing that will confirm or refute 806 on
+`windows-latest`. Re-verify: **C-RST-5**, and settle with **C-RST-11** on Windows.
+
+The conflicting hunks also carry **prose**: each sweep's comment block explains what it added. Both
+sides' prose must be **kept**, not chosen between. This is not a pure number merge.
+
+### 10.4 Merging costs 5 resolutions; rebasing costs 55 — an 11× difference
+
+The two integration strategies do **not** cost the same, and the record never separated them:
+
+- **Merge into `main`** (as §7 recommends for this repo): the cumulative tree conflicts **once**,
+  on **5 files**. Intermediate pin values never surface.
+- **Rebase** (as S1 used for PRs #27–#30): each of the **11 pin-sweep commits** conflicts in turn —
+  every sweep states a *from* value that the previous resolution has just invalidated, so the
+  arithmetic is re-derived at each step. **11 sequential resolutions × 5 files = 55 hunks**, to
+  reach the same tree.
+
+The 11 intermediate values are **bookkeeping**: CI runs on PR heads, never on a stack's interior
+commits, so no intermediate pin was ever independently gated. **A local session may therefore
+collapse the 11 sweeps into one sweep at the tip** and pay the 5-hunk cost instead of 55 — but that
+rewrites draft branch history, which this session is forbidden from doing and did not do.
+
+**Growth rate, now quantified:** the stack gained **one conflict per assertion-adding run** — 11
+sweeps across 11 such runs. The cost grows linearly in *runs*, not in PRs, which is why "before it
+is twenty deep" measured the wrong axis.
+
+### 10.5 One anomaly: #36's declared base is not its actual base
+
+GitHub declares #36's base as `claude/s4-pull-request-semantics` (#33), but **#36 does not contain
+#33's tip.** #36 forked at `b114d11`; #33 has since gained **one** commit, `3a8dfdd`
+("S4/S5: 6.4's carve-out was drawn at the parse, and a failed tag fell through it — PQ-CUR-1").
+
+Restacking #36 onto a rebased #33 **includes** `3a8dfdd`; restacking it onto its actual fork point
+silently **drops** that commit from #36's line. The two are not the same tree, and the PR page shows
+no sign of the difference. Re-verify: **C-RST-8**.
+
+### 10.6 What this section recommends (it does not decide)
+
+1. **#48 first** — off fresh main, clean, independent, and it unblocks `EngineHarness` on Linux
+   (B-10). Nothing below affects it.
+2. **#32 → #34 → #35, and #32 → #33 → #36**, in that order: **zero conflicts**, subject only to the
+   local gate. Fixing #36's base (§10.5) is a prerequisite for #36, not for the others.
+3. **#37 → #47 last**, as one costed unit, resolving the pin **once** to a value the gate measures.
+   **Prefer merge over rebase** — §10.4 is an 11× difference for an identical tree.
+4. The gate is Brandon's and the merge condition is a **full local** `Verify-Alpha.ps1
+   -IncludePublish -IncludePackage`, which no cloud session can run. **Nothing here is a
+   go-ahead.**
