@@ -8538,3 +8538,171 @@ gh run view 31897428719 --repo ShivaClaw/careerseeker --log | grep -E "Offline t
 230**, the one number C-CC-6 quotes rather than measures: 617 measured minus 387 measured here
 leaves exactly 230, so the quoted figure was right and is now observed rather than inherited. **This does not retire C-CC-8**: the gate ran on
 `windows-latest`, as it always must, and it is the offline half only.
+
+---
+
+## Forty-second run — PQ-S6-1's engine half (`claude/s6-outcome-disposition`, draft PR #52)
+
+`<engine>` is a clone of `ShivaClaw/careerseeker` at `claude/s6-outcome-disposition`; `<android>` is
+this repo. Every command below was executed this session unless it is explicitly marked as one that
+does **not** run here.
+
+### C-OD-1 — .NET is installable here; "no .NET on this machine" is a per-session cost, not a bound
+
+```bash
+which dotnet                                  # empty on a fresh sandbox
+apt-cache policy dotnet-sdk-8.0
+apt-get update -qq && apt-get install -y --no-install-recommends dotnet-sdk-8.0
+dotnet --version
+```
+
+*Expected:* `which dotnet` empty before install; candidate **8.0.125-0ubuntu1~24.04.1** from
+`noble-updates`; `dotnet --version` → **8.0.129**. Third run to confirm this.
+
+### C-OD-2 — the defect, on `main`, before any edit
+
+```bash
+cd <engine> && git fetch --all --prune && git show origin/main:src/Sync/InboundDispatcher.cs | sed -n '98,111p'
+```
+
+*Expected:* both `return`s sit **outside** their null checks — `OutcomeApplied` is returned whether or
+not `_outcomeApplier` ran, and `SnapshotRepublished` whether or not `_republisher` ran. `main` is
+`aac05f3`.
+
+### C-OD-3 — the finding: the real applier had six silent no-ops, not just the null seam
+
+```bash
+cd <engine> && git show origin/main:src/Engine/StoreOutcomeApplier.cs | grep -n "return;"
+```
+
+*Expected:* **six** bare `return;` lines (non-object body, unparseable `app_id`, missing `outcome`,
+missing `at`, `JsonException`, outcome outside `PhoneSettable`). This is the measured strengthening of
+PQ-S6-1: the over-reporting was **not** conditional on the seam being unwired.
+
+### C-OD-4 — build and the full offline set, measured on Linux
+
+```bash
+cd <engine> && dotnet build CareerSeeker.sln -c Release
+for h in Slice ResearcherHarness HookHarness StoreParityHarness GatewayGateHarness \
+         DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  dotnet run --project tests/$h/$h.csproj -c Release --no-build | tail -1
+done
+```
+
+*Expected:* **0 Warning(s), 0 Error(s)**; then 28 / 57 / 16 / 28 / 36 / 35 / 45 / 6 / **134**, all
+`0 failed`. Sum **385**.
+
+### C-OD-5 — the baseline was measured, not inherited
+
+```bash
+cd <engine> && git stash && dotnet build tests/SyncHarness/SyncHarness.csproj -c Release \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -1 \
+  && git stash pop
+```
+
+*Expected:* **`=== 130 passed, 0 failed ===`** — so the delta this run adds is exactly **4**.
+
+### C-OD-6 — the four assertions have teeth (mutation, both directions)
+
+```bash
+cd <engine> && cp src/Sync/InboundDispatcher.cs /tmp/ID.bak
+# revert BOTH dispositions to the pre-fix form: move each `return` outside its null check
+dotnet build tests/SyncHarness/SyncHarness.csproj -c Release \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep -E "FAIL|==="
+cp /tmp/ID.bak src/Sync/InboundDispatcher.cs && diff /tmp/ID.bak src/Sync/InboundDispatcher.cs
+```
+
+*Expected:* **`=== 130 passed, 4 failed ===`** with all four new assertions named in the FAIL lines,
+and the pass count landing exactly on C-OD-5's baseline. `diff` clean after restore, and
+`git diff --stat src/Sync/InboundDispatcher.cs` unchanged from the committed version.
+
+**A first draft of the fourth assertion failed this test by passing it.**
+`InboundOutcome.OutcomeApplied != InboundOutcome.OutcomeNotApplied` survived the mutation because the
+enum members still existed — a tautology, replaced by the `ReceiveError is null` assertion. The 4/4 is
+the re-test.
+
+### C-OD-7 — the pin, and the one number that is not measured here
+
+```bash
+cd <engine> && grep -n "ExpectedOfflineTotal = " scripts/Verify-Alpha.ps1
+dotnet run --project tests/EngineHarness/EngineHarness.csproj -c Release --no-build 2>&1 | tail -5
+```
+
+*Expected:* pin **615**. EngineHarness prints **no summary** — it throws
+`InvalidOperationException: Refusing full-data deletion for a volume root` at
+`src/Engine/FullDataDeletion.cs:81`, reached from `tests/EngineHarness/Program.cs:221` (**B-10**,
+re-confirmed live this run). So **385 measured + 230 quoted = 615**, and the 230 comes from
+`Verify-Alpha.ps1`'s own comment block. The old pin decomposes identically: 381 + 230 = 611.
+
+### C-OD-8 — the drift sweep moved as one unit, and the historical records did not
+
+```bash
+cd <engine> && grep -rn "615\|SyncHarness | 134" README.md src/Engine/README.md \
+  docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md scripts/Verify-Alpha.ps1
+grep -rn "611" docs/P1-Evidence.md docs/P2-Evidence.md docs/autonomy/ docs/Codex-Resume-Handoff.md
+```
+
+*Expected:* **615** in all five live count surfaces (the pin, three `**Total**` rows, the
+`Pinned offline verifier` line) and `SyncHarness | 134` in all three assertion tables plus all three
+docs. The historical evidence records are **deliberately not rewritten** — `P1-Evidence.md` still says
+68 and `P2-Evidence.md` still says 88, because those are what those runs measured.
+
+### C-OD-9 — no cross-repo drift; this run is not even a vector consumer
+
+```bash
+cd <engine> && node docs/sync-vectors/generate.mjs --check && git diff --stat -- docs/sync-vectors/
+cd <android> && git diff --stat -- core/src/test/resources/
+```
+
+*Expected:* **`OK: 26 vector files match the generator.`** and **both diffs empty**. 26 rather than 27
+because this branch is cut from `main` and the twenty-seventh vector is on the unmerged PR #50. The
+android vendored corpus (pin `679a317`) was never opened for writing.
+
+### C-OD-10 — the wire half was NOT taken, and the spec was not touched
+
+```bash
+cd <engine> && git diff main...claude/s6-outcome-disposition --stat -- docs/Sync-Protocol.md
+git diff main...claude/s6-outcome-disposition --stat
+```
+
+*Expected:* the **spec diff is empty** — no `outcome_ack` kind was added to §4.3 and no §4.3.x section
+was written. The full diff is **nine files**: two `src/`, three `tests/`, `scripts/Verify-Alpha.ps1`
+and three count-reporting docs. PQ-S6-1's option (a)/(b) fork remains **open and unanswered**; see the
+2026-08-15 amendment in `docs/protocol-questions.md`.
+
+### C-OD-11 — what did NOT run, and what remains the gate
+
+```bash
+cd <engine>  && pwsh -File scripts/Verify-Alpha.ps1
+cd <android> && ./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug --rerun-tasks
+```
+
+*Expected:* **both fail to start here.** `pwsh` is absent and not in the Ubuntu archive, so
+`Verify-Alpha.ps1` was **not run and could not be parse-checked** — a PowerShell syntax error in this
+run's edits to it would not have been caught locally, which PR #52's self-audit names as the most
+likely defect in the diff. The android gate needs the SDK (**B-7**); `:core` was not run and did not
+need to be — **nothing in `:core` changed**. **CI on `windows-latest` is the gate for the 615 pin.**
+
+### C-OD-12 — CI
+
+```bash
+gh run list --repo ShivaClaw/careerseeker --branch claude/s6-outcome-disposition
+gh run view <run-id> --repo ShivaClaw/careerseeker --log | grep -E "Offline total|134 passed"
+```
+
+*Expected:* both jobs green, with `=== 134 passed, 0 failed ===` and
+**`=== Offline total: 615 passed, 0 failed ===`** in the `windows-latest` log.
+
+**Both lines were OBSERVED**, not merely expected, in run
+[`31908682006`](https://github.com/ShivaClaw/careerseeker/actions/runs/31908682006) (job
+`95070361787`, `windows-latest`) at 2026-08-15T21:11:44Z, with all four new assertions appearing as
+**PASS** by name. `Verify-Alpha.ps1` **throws** on a pin mismatch (`:926-927`), so a green run *is* the
+pin check — which **settles the 230** that C-OD-7 quotes rather than measures: 615 measured minus 385
+measured on Linux leaves exactly 230, so the quoted figure was right and is now observed rather than
+inherited.
+
+**This also retires the specific risk C-OD-11 raises** — that a PowerShell syntax error in this run's
+edits could not be caught locally. The verifier parsed and executed on `windows-latest`. **It does not
+retire C-OD-11 itself**: the gate ran on CI, as it always must, and it is the offline half only
+(no `-IncludePublish`, `-IncludePackage`, `-IncludeLive`), so the merge condition remains a **full local
+gate** and remains Brandon's.

@@ -507,6 +507,55 @@ PQ-S6-1's fix, since it is the same three lines of reasoning twice.
 **Not fixed here: it is C#, and this sandbox has no .NET.** Unblocked, merely unwritten — a local
 session can do it. Re-verify the symptom with `AUDIT-REQUEST.md` **C-S4S-5**.
 
+### Amendment 2026-08-15 (forty-second run) — the shared half is FIXED; the fork is still open
+
+**Two things changed. The question is not closed.**
+
+**1. The engine half is written and landed as draft PR #52** (`claude/s6-outcome-disposition`). This is
+the fix this question's own text calls for *"regardless of which is chosen"*, for both kinds:
+`IOutcomeApplier.ApplyAsync` now returns an `OutcomeVerdict`, `InboundDispatcher` derives its
+`InboundOutcome` from that verdict rather than from reaching the `case`, and the null-republisher path
+reports `SnapshotNotRepublished`. `OutcomeReject` mirrors `EntitlementReject` (`None` + named reasons).
+Behaviour is unchanged; what changed is that a dropped mark is now distinguishable from an applied one.
+Four `SyncHarness` assertions pin it, mutation-verified 4/4 (**C-OD-6**). **The sandbox note above is
+stale**: .NET *is* installable here (**C-OD-1**), which is what made this half reachable.
+
+**2. The severity argument is stronger than this entry claimed, and the correction is measured.**
+This entry frames the over-reporting as a property of the **null seam**. It is not. `StoreOutcomeApplier`
+— the real, shipping applier — had **six bare `return`s** (**C-OD-3**): non-object body, unparseable
+`app_id`, missing `outcome`, missing `at`, `JsonException`, and an outcome outside `PhoneSettable`.
+Each dropped a mark and the dispatcher reported it applied. So "nothing is broken today because no
+shipping caller marks outcomes yet" is true only because the **sender** is unwritten — **not** because
+the receiving path was sound, and **not** because the seam is inert. A `no_reply` or a malformed body
+from a buggy or hostile client would have been dropped-and-reported-applied on the shipping path.
+
+**What is still open, and why it was NOT decided by an agent.** The fork itself:
+
+- **(a)** add an `outcome_ack` kind to §4.3, or
+- **(b)** declare marks fire-and-forget and say so in §4.3.
+
+Adding a payload kind to §4.3 binds a second implementation to a wire contract. Unlike **PQ-A6-1**,
+which carries Brandon's explicit *default-proceed*, **this question has no human answer** and does not
+appear in the mission's §2 gate list. The forty-second run therefore took the half that needs no
+product decision and **left the fork alone**. `docs/Sync-Protocol.md` was read only (**C-OD-10**).
+
+**What the fix changes about the decision.** Option (a)'s case is now *weaker in one way and stronger
+in another*, and whoever answers should weigh both:
+
+- **Weaker:** the engine-internal blindness that motivated much of (a) is gone. A host that wires the
+  pull loop can already log, audit, and act on a refused mark without any wire change.
+- **Stronger:** there are now **named reasons** on the engine side, so an `outcome_ack` body could
+  carry something a phone can act on differently (`NotPhoneSettable` means *stop resending this*;
+  `NoApplier` means *the desktop is misconfigured, retrying may work*) rather than a bare boolean. The
+  minimal `{app_id, outcome, applied}` this entry proposed would throw that distinction away.
+
+**If (b) is chosen**, the engine fix stands on its own and nothing in PR #52 is wasted; §4.3 gains a
+paragraph and `OutcomeMarkPolicy`'s `disagreementLimit` stays the mechanism rather than the fallback.
+
+**Whoever answers this also answers whether `IOutcomeApplier`'s verdict should reach the wire.** That is
+the one design coupling: the ack body and the applier's return type want to be decided together, which
+is the second reason the wire half was not written blind.
+
 ---
 
 ## PQ-S6-2 — §6.1 spells out counter reconciliation for the engine only, and the relay enforces it symmetrically

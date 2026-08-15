@@ -9376,3 +9376,175 @@ Terra's worktrees were never touched, and `autonomy/codex-state` was **read** �
 `2026-08-12T20:28:36`, **COMPLETE, files claimed: none** — so there was no collision and no rebase was
 owed. **One machine change**: `apt-get install -y --no-install-recommends dotnet-sdk-8.0` (8.0.129),
 the command C-WP-1 prescribes. Nothing else was installed.
+
+---
+
+## Forty-second run — 2026-08-15 (Linux sandbox): the dispatcher stopped reporting that it reached a `case`
+
+**Rung: S6 / PQ-S6-1 (engine half).** The prompt's assigned slice was **S5 — and S5's spec, vectors
+and phone applier have been DONE since the ninth run** (PR #32, PR #37). This is the **fifteenth
+consecutive run routed by `STATE.md`'s ordered intent rather than by the prompt**, and the prompt's
+assigned slice was already landed for the **seventh** run running. Item 1 of that list — PQ-S6-1 —
+was taken here.
+
+### Milestone 0 — rule one, and the standing correction earning its keep again
+
+`git fetch --all --prune` in both trees **before anything was read**. The android tree took no ref
+changes; the engine tree moved `main` **`00b3705..aac05f3`**, and the previous session's warning about
+27-commit staleness was not hypothetical.
+
+The list's own standing correction says: *before inheriting any environmental impossibility from this
+file, re-run the one command that would disprove it.* `which dotnet` was **empty** — the same
+measurement that cost B-6 seven iterations. `apt-cache policy dotnet-sdk-8.0` printed candidate
+**8.0.125** from `noble-updates`, so the sandbox installed it (**8.0.129**) and C# ran here. **A fresh
+sandbox starts without .NET; that is a per-session cost, not a bound.** This is now the third run to
+record that the same restatement-of-a-fresh-sandbox is not a blocker.
+
+### Milestone 1 — the defect, measured on `main` before anything was written
+
+PQ-S6-1 describes `InboundDispatcher` reporting `OutcomeApplied` whenever it reaches `case "outcome"`.
+Read on `origin/main` at `aac05f3`, it is exactly that: `src/Sync/InboundDispatcher.cs:98-103` and
+`:105-111` both put the `return` **outside** the null check, so the documented inert seams accept a
+signed, device-verified envelope, do nothing, and report success.
+
+**The measurement found more than the question described, and this is the finding of the run.**
+PQ-S6-1 frames the problem as the *null seam*. `src/Engine/StoreOutcomeApplier.cs` — the **real,
+shipping** applier, not a seam — had **six bare `return`s**: body not an object, unparseable `app_id`,
+missing `outcome`, missing `at`, `JsonException`, and an outcome outside `PhoneSettable`. Every one of
+them dropped a user's mark and the dispatcher reported it applied. **So the over-reporting was never
+conditional on the seam being unwired**; it was the shipping path's behaviour too, and PQ-S6-1's
+severity note ("nothing is broken today because no shipping caller marks outcomes yet") is true only
+because the *sender* is unwritten, not because the receiver was sound.
+
+### Milestone 2 — the half that needs no product decision, and the half that does
+
+PQ-S6-1 offers **(a)** add an `outcome_ack` wire kind, or **(b)** declare marks fire-and-forget. Its
+own text says the `InboundDispatcher` result fix is worth making **"regardless of which is chosen"**,
+and says the same of the `pull_request` shape in its 2026-08-10 extension.
+
+**That shared half was taken. The wire half was deliberately not taken.** Adding a payload kind to
+§4.3 binds a second implementation, and PQ-S6-1 — unlike PQ-A6-1, which carries Brandon's explicit
+default-proceed — **has no human answer**. The mission's gate list (§2) does not contain it. Minting a
+wire kind on my own authority is the kind of unilateral scope decision the house rules exist to
+prevent, so it stays open and is now sharpened by Milestone 1's finding.
+
+`IOutcomeApplier.ApplyAsync` returns an `OutcomeVerdict`; the dispatcher derives its `InboundOutcome`
+from that verdict. `OutcomeReject` mirrors the existing `EntitlementReject` shape (`None` + named
+reasons) rather than inventing a second idiom. **Behaviour is unchanged** — nothing that applied before
+stops applying — and what changed is that a caller can tell a persisted mark from a dropped one.
+
+### Milestone 3 — the assertions were watched failing before they were believed
+
+`SyncHarness` **130 → 134**, and the baseline was **measured, not inherited**: the diff was stashed,
+the harness rebuilt and re-run, and it printed `130 passed, 0 failed`.
+
+Then the fix itself was reverted — both `return`s put back outside their null checks — and the harness
+re-run:
+
+```
+=== 130 passed, 4 failed ===
+```
+
+**All four new assertions failed, and the pass count landed exactly on the pre-change baseline.** The
+dispatcher was restored from a byte-identical copy afterwards (`diff` clean).
+
+**That exercise found a defect in my own first draft.** The fourth assertion was originally
+`InboundOutcome.OutcomeApplied != InboundOutcome.OutcomeNotApplied` — which **passed under the
+mutation**, because the enum members still existed. It was a tautology wearing the shape of a test. It
+was replaced with one that has teeth: a refused outcome carries **no `ReceiveError`**, so "the wire
+rejected it" stays distinguishable from "the wire accepted it and the applier declined". The 4/4 above
+is the re-test, not the first attempt.
+
+### Milestone 4 — the drift trap, and the one number that is arithmetic
+
+Four assertions move `$ExpectedOfflineTotal` **611 → 615**. Measured here, harness by harness:
+
+| harness | passed |
+| --- | --- |
+| Slice / ResearcherHarness / HookHarness / StoreParityHarness | 28 / 57 / 16 / 28 |
+| GatewayGateHarness / DispatcherNoSendHarness / LifecycleHarness / RendererHarness | 36 / 35 / 45 / 6 |
+| SyncHarness | **130 → 134** |
+| **Linux-measurable sum** | **381 → 385** |
+| EngineHarness | **no summary** — aborts at `tests/EngineHarness/Program.cs:221` (B-10) |
+
+**385 + 230 = 615**, and the old pin checks out the same way: 381 + 230 = 611. **The 230 is quoted
+from `Verify-Alpha.ps1`'s comment block, not re-measured** — the single non-observed number in this
+run. B-10 was re-confirmed live: EngineHarness threw `InvalidOperationException: Refusing full-data
+deletion for a volume root` at `FullDataDeletion.cs:81`, reached from `Program.cs:221`.
+
+Moved in the same commit: the pin, its running comment, `README.md`, `src/Engine/README.md`,
+`docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`, and the verifier's
+`Assert-Contains` expectations for all three harness tables. **`docs/P1-Evidence.md` and
+`docs/P2-Evidence.md` were deliberately left alone** — they quote 68 and 88 as what a specific past run
+measured, and rewriting a measurement to match a later one falsifies the record.
+
+Also executed: `dotnet build CareerSeeker.sln -c Release` → **0 Warning(s), 0 Error(s)**.
+
+### Milestone 5 — no cross-repo drift, and this run is not even a vector consumer
+
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 26 vector files match the generator.`**
+`git diff --stat -- docs/sync-vectors/` is **empty**. No vector byte moved, none added, none removed —
+**no cross-repo drift event**, and the android tree's vendored corpus was never opened at all. (26, not
+27: the twenty-seventh vector is on PR #50, which is unmerged, and this branch is cut from `main`.)
+
+**Base chosen deliberately: `origin/main`, not the #50→#51 stack.** Stacking would have inherited a
+617 pin and deepened a tree `docs/Merge-Topology.md` §10 already measures at depth 7. Branching from
+`main` keeps this at depth 1 and makes the pin collision with #51 the **additive** kind §10 describes —
+615 and 617 both derive from 611, and the resolution is arithmetic on measured numbers.
+
+### Milestone 6 — CI, and what it can and cannot settle
+
+Draft PR **#52**. Milestone 4's 615 was arithmetic on top of a quoted 230. **CI then measured it.**
+PR #52's Windows job (`ci.yml` runs `./scripts/Verify-Alpha.ps1`, which throws on a pin mismatch at
+`:926-927`):
+
+| run | job | result |
+| --- | --- | --- |
+| [31908682006](https://github.com/ShivaClaw/careerseeker/actions/runs/31908682006) job `95070361787` | Build and offline harnesses (`windows-latest`) | **success** |
+| same run | Blind relay (Worker) — incl. *sync vectors match their generator* | **success** |
+
+Observed in the log at 21:11:44Z:
+
+```
+=== 134 passed, 0 failed ===
+
+=== Offline total: 615 passed, 0 failed ===
+```
+
+**615 measured − 385 measured here = 230**, so EngineHarness's Windows contribution — the single figure
+this run quoted rather than observed — is settled by measurement. All four new assertions appear as
+**PASS** by name in the Windows log, so they are green on the platform that runs EngineHarness too, not
+only on Linux.
+
+**`Verify-Alpha.ps1` was edited this run and was NOT run here** — deliberately edited, because the drift
+trap requires it; not run, because `pwsh` is absent and not in the Ubuntu archive, so the file could not
+even be **parse-checked** locally. PR #52's self-audit named that as the most likely defect in the diff.
+**CI has now retired that specific risk** — the verifier parsed and executed on `windows-latest` — but
+**the attribution stays exact: CI ran the gate, I did not**, and it is the offline half only (no
+`-IncludePublish`, `-IncludePackage`, `-IncludeLive`), so the merge condition remains a full local gate
+and remains Brandon's.
+
+### Prohibition — what this iteration did not touch
+
+**Nothing was merged, in either repo**, and no PR was merged, retargeted, closed or marked ready. **No
+force-push, no history rewrite, no rebase, no branch deleted.** The android repo's drafts **#1–#6 were
+left exactly as found** and **not one android source file was changed** — this run's only android write
+is these records. In the engine repo, **PRs #50, #51 and the S5 stack's four branches were read only**;
+the one new branch is `claude/s6-outcome-disposition`, opened as **draft PR #52**.
+
+**No vector byte moved, none was added, and the android vendored corpus was never opened for
+writing — NO cross-repo drift event.** No `relay/`, no TypeScript, no Kotlin, no `:core`, no `:app`, no
+Gradle invocation. **No wire kind was minted**: `docs/Sync-Protocol.md` was **read only**, and PQ-S6-1's
+option (a)/(b) fork was left open for Brandon rather than decided here.
+
+`scripts/Verify-Alpha.ps1` **was edited** — the drift trap requires it — and **the gate itself was not
+run; no claim here says it was.** The android gate was not run either (**B-7**).
+
+No deploy of any kind (Cloudflare, Workers, relay, site, Pages), no `wrangler`, and **the production
+relay was not contacted at all, not even `GET /v1/health`**. No Google, Play or OAuth console; no
+accounts, no purchases, no Play Billing code; no Gmail, no email; no MSIX or certificate action; no
+emulator, no `sdkmanager`, no `avdmanager`, no keystore. **No secret was read, printed or referenced.**
+Terra's worktrees were never touched, and `autonomy/codex-state` was **read** — the R0–R7 ladder is
+recorded exhausted, **next intent: none, files claimed: none** — so there was no collision and no
+rebase was owed. **One machine change**: `apt-get install -y --no-install-recommends dotnet-sdk-8.0`
+(8.0.129). Nothing else was installed.
