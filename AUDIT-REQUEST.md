@@ -8159,12 +8159,44 @@ python3 scratch/reverify.py    # clean run, then M3 re-applied
 ### C-PD-9 — the shared vectors cannot distinguish a signed reduction from an unsigned one
 
 **A finding about the corpus, not about this module, and it is not fixed here.** Under M1 the
-reduction is signed, yet every pre-existing conformance test passed — including those pinning exact
-confirm codes from `docs/sync-vectors/v1/`. That is only possible if **no pairing vector's confirm
-derivation has its top byte set**. The engine is correct (C-PD-6) but the shared corpus does not
-prove it has to be, on either implementation.
+reduction is signed, yet every pre-existing conformance test passed — including
+`ProtocolVectorsTest`, which asserts `expected.str("confirm")` against `keys.confirmCode` by strict
+equality (`ProtocolVectorsTest.kt:97`).
 
-Re-verify by re-running M1 and reading which tests fail:
+**Measured directly rather than left as that inference**, with an independent Python HKDF:
+
+```bash
+python3 -c "
+import json,glob,base64,hmac,hashlib
+def b64u(s): return base64.urlsafe_b64decode(s + '='*(-len(s)%4))
+def hkdf(ikm, salt, info, length):
+    prk = hmac.new(salt, ikm, hashlib.sha256).digest()
+    okm=b''; t=b''; c=1
+    while len(okm)<length:
+        t = hmac.new(prk, t+info+bytes([c]), hashlib.sha256).digest(); okm+=t; c+=1
+    return okm[:length]
+for f in sorted(glob.glob('core/src/test/resources/sync-vectors/v1/pairing-*.json')):
+    d=json.load(open(f)); exp=d.get('expected')
+    if not exp or not exp.get('confirm'): print(f, '-> no expected confirm'); continue
+    cb=hkdf(bytes.fromhex(exp['ss_hex']), b64u(d['secret_b64u']), b'careerseeker/v1/confirm', 4)
+    print(f, cb.hex(), hex(cb[0]), cb[0]>=0x80, str(int.from_bytes(cb,'big')%1000000).zfill(6), exp['confirm'])"
+```
+
+```
+pairing-basic.json        confirm bytes 5fd509b6 | top byte 0x5f | high bit set: False
+                          recomputed 797174 == vector 797174
+pairing-mitm-keyswap.json no expected confirm code (error vector)
+```
+
+**The corpus carries exactly ONE confirm code**, and its top byte is `0x5f`. The finding is therefore
+stronger than the inference: not "no vector happens to have the high bit set" but "there is a single
+confirm derivation in the whole corpus, and it is a coin flip that landed the wrong way". The
+recomputation reproducing `797174` is what makes this a measurement rather than a coincidence.
+
+The engine is correct (C-PD-6); the shared corpus does not prove it has to be, on either
+implementation.
+
+Re-verify the mutation half by re-running M1 and reading which tests fail:
 
 ```bash
 python3 scratch/mutate.py 2>&1 | sed -n '/M1/,/M2/p'   # 2 failures, both in PairingDerivationTest

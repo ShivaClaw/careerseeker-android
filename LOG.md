@@ -8929,9 +8929,28 @@ two screens.
 
 **And that is a measurement about the shared vectors, not just about this module.** The pre-existing
 conformance tests pin exact confirm codes from `docs/sync-vectors/v1/`, and they passed under M1.
-The only way that happens is if **no pairing vector's confirm derivation has its top byte set**, so
-the vector suite as it stands **cannot distinguish a signed reduction from an unsigned one — on
-either implementation**. The engine reduces as a `uint`
+
+**This was first written down as an inference and then checked, because the self-audit flagged it as
+the load-bearing claim and the check was cheap.** Recomputing the corpus directly, with an
+independent Python HKDF rather than the module under test:
+
+```
+pairing-basic.json       -> confirm bytes 5fd509b6 | top byte 0x5f | high bit set: False
+                            recomputed 797174 == vector 797174
+pairing-mitm-keyswap.json -> no expected confirm code (error vector)
+
+pairing vectors carrying an expected confirm code: 1
+```
+
+**The corpus contains exactly ONE confirm code.** So the finding is stronger than the inference was:
+it is not that no vector *happens* to have the high bit set — it is that there is a **single**
+confirm derivation in the entire shared corpus, and its top byte is `0x5f`. A coin flip decided
+whether this program's vector suite could detect a signed reduction, and it landed the wrong way.
+The recomputation also reproduces the vector's `797174` exactly, which is what makes the measurement
+trustworthy rather than merely consistent.
+
+The vector suite as it stands therefore **cannot distinguish a signed reduction from an unsigned one
+— on either implementation**. The engine reduces as a `uint`
 (`PairingCrypto.cs:65`, `BinaryPrimitives.ReadUInt32BigEndian`) and is correct; nothing in the shared
 corpus proves it has to be. Recorded as a finding, **not fixed here** — adding a vector is a
 `generate.mjs` change in the main repo, which is a cross-repo artifact and a separate slice.
