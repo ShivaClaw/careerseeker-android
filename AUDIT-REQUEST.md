@@ -8361,24 +8361,47 @@ Expected: **the identical five files in both runs** — `README.md`,
 `Sync-Protocol.md` and every vector auto-merge in both. The five are the S5 stack's staleness against
 `main`, not this change.
 
-### C-HB-8 — NOT VERIFIED HERE: that `$ExpectedOfflineTotal` stays 611
+### C-HB-8 — that `$ExpectedOfflineTotal` stays 611 — **UPGRADED FROM INSPECTION TO EXECUTION BY CI**
 
-**This is the run's one inspection-only claim and its most attackable.** The reasoning is that
-`SyncHarness` selects pairing vectors by name (`tests/SyncHarness/Program.cs:75`, `:120`) while its
-generic loops iterate only `envelope`/`entitlement` types (`:141`, `:168`, `:198`, `:204`, `:447`,
-`:507`), and that *"every declared vector exists on disk"* (`:55`) is a set equality rather than a
-count — so a `pairing`-type vector adds no assertion. **Re-verify on Windows**, which this sandbox is
-not:
+**I did not run the gate; CI did, and this claim is no longer inspection-only.** Written first as the
+run's most attackable claim, it was measured minutes later by the PR's own CI:
+
+| run | job | result |
+| --- | --- | --- |
+| [31886331917](https://github.com/ShivaClaw/careerseeker/actions/runs/31886331917) (pull_request) | **Build and offline harnesses** (`windows-latest`) | **success** |
+| [31886305938](https://github.com/ShivaClaw/careerseeker/actions/runs/31886305938) (push) | **Build and offline harnesses** (`windows-latest`) | **success** |
+
+`.github/workflows/ci.yml:46-48` runs `./scripts/Verify-Alpha.ps1`, and that script **throws** if the
+measured offline sum differs from `$ExpectedOfflineTotal` (`Verify-Alpha.ps1:926-927`). The job
+passing therefore *is* the measurement: the total still reads **611** with this branch's vector on
+disk, which is exactly what the inspection predicted. Both runs also passed **Blind relay (Worker)**,
+whose *sync vectors match their generator* step is an independent clean-checkout confirmation of
+C-HB-2.
+
+Re-verify locally on Windows if you want it off CI's word:
 
 ```powershell
 scripts\Verify-Alpha.ps1        # expect: offline total 611, unchanged; 0 warnings / 0 errors
 ```
 
-If that measures anything other than **611**, this branch owes a `$ExpectedOfflineTotal` bump **and**
-a sweep of every count-reporting doc, in the same change, per the drift trap in `CLAUDE.md`.
+**The original reasoning, kept because it is what a reviewer should attack if the number ever moves.**
+The argument was that
+`SyncHarness` selects pairing vectors by name (`tests/SyncHarness/Program.cs:75`, `:120`) while its
+generic loops iterate only `envelope`/`entitlement` types (`:141`, `:168`, `:198`, `:204`, `:447`,
+`:507`), and that *"every declared vector exists on disk"* (`:55`) is a set equality rather than a
+count — so a `pairing`-type vector adds no assertion. **CI's green agrees with it**, which is the
+outcome that matters: the prediction and the measurement match.
+
+If any future change measures anything other than **611**, it owes a `$ExpectedOfflineTotal` bump
+**and** a sweep of every count-reporting doc, in the same change, per the drift trap in `CLAUDE.md`.
+Adding the consuming assertion (next intent item 1) is exactly such a change.
 
 ### NOT RUN HERE
 
 `scripts\Verify-Alpha.ps1` (**no `pwsh`, no .NET** on this host) and the **android gate** in all four
 tasks (**B-7** — no Android SDK). This run added **no C# and no Kotlin**, so the only gate its content
 touches is the Node vector check, which **was** run (C-HB-2) and which CI re-runs independently.
+
+**The distinction is kept deliberately: I ran no gate, and no claim here says I did.** The Windows
+verifier ran on **CI's** machine, not mine (C-HB-8), and that is how it is attributed. The android
+gate ran nowhere — this run changed no android file but these records, so it had nothing to gate.

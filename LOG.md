@@ -9130,9 +9130,21 @@ a **set equality** between `index.json` and the directory, not a count, and the 
 sides. So `$ExpectedOfflineTotal` stays **611** and the drift trap is not engaged — **no
 `Verify-Alpha.ps1` edit, no count-reporting doc sweep**.
 
-**This is an inspection claim and is labelled as one.** `which pwsh` is empty and there is no .NET on
-this host, so the gate was not run and no result for it is reported. It is the single most attackable
-claim in the change and the PR's self-audit says so first.
+**This was written as an inspection claim, and CI then measured it.** `which pwsh` is empty and there
+is no .NET on this host, so **I ran no gate and no claim here says I did** — but PR #50's own CI runs
+`./scripts/Verify-Alpha.ps1` on `windows-latest` (`ci.yml:46-48`), and that script **throws** when the
+measured offline sum differs from `$ExpectedOfflineTotal` (`Verify-Alpha.ps1:926-927`):
+
+| run | job | result |
+| --- | --- | --- |
+| [31886331917](https://github.com/ShivaClaw/careerseeker/actions/runs/31886331917) (`pull_request`) | Build and offline harnesses (`windows-latest`) | **success** |
+| [31886305938](https://github.com/ShivaClaw/careerseeker/actions/runs/31886305938) (`push`) | Build and offline harnesses (`windows-latest`) | **success** |
+| both | Blind relay (Worker) — incl. *sync vectors match their generator* | **success** |
+
+So the total still reads **611** with the new vector on disk: **prediction and measurement agree**,
+and the run's most attackable claim is now execution-backed rather than inspection-backed. The
+attribution stays exact — **CI ran it, I did not.** The relay job's vector step is also an
+independent clean-checkout confirmation of Milestone 4's `--check`.
 
 ### Milestone 6 — additive only, and conflict-neutral, both measured
 
