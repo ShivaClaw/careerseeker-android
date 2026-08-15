@@ -8454,3 +8454,166 @@ collision and no rebase was owed.
 
 **No machine change this run** — `dotnet` was not needed and not installed, because nothing here
 compiled anything.
+
+---
+
+## Thirty-seventh run — 2026-08-15 (Linux sandbox): the stack's containment invariant was false in exactly one place, and the self-audit that should have caught it had looked at the wrong question
+
+**Fourth consecutive run to find its assigned slice already landed.** The stored prompt assigned
+S5's spec half — §4.3's `entitlement_ack` body, PQ-A2-1/-2, and PQ-A2-3's vector. All of it is on
+`claude/s5-entitlement-ack-spec` (draft PR #32) and was verified here rather than assumed:
+`docs/Sync-Protocol.md:307` carries §4.3.3 with the `{product_id, acknowledged_at, order_id?}` body,
+`:601` carries the `decrypt_failed` structural rule, `:111` measures the cap on the **decoded
+ciphertext**, and `node docs/sync-vectors/generate.mjs --check` printed **`OK: 29 vector files match
+the generator.`** at the stack tip with `invalid-unknown-field.json`, `entitlement-ack.json` and
+`entitlement-ack-no-order-id.json` all present. The prompt's ladder summary is now **thirteen runs
+stale**.
+
+Took `STATE.md`'s ordered next intent **item 2** — *#36's base must be fixed before #36 is
+restacked* — **eleventh consecutive run routed by this list rather than by the prompt.** Item 1 was
+closed as a measurement last run and explicitly says *do not re-measure*; item 3 says in terms *do
+not implement it blind from a cloud session*; items 5 and 6 need gates this sandbox does not have.
+Item 2 was the topmost workable one, and it is the only item on the list described as **a latent
+defect rather than a decision**.
+
+### Milestone 1 — the defect is real, and exactly one commit was at risk
+
+Confirmed by measurement, not by re-reading C-RST-8. PR #36 (`claude/s2-transport-vocabulary`)
+declares `claude/s4-pull-request-semantics` (#33) as its base. It forked at `b114d11`; #33 has since
+gained `3a8dfdd`. `git merge-base --is-ancestor` returns **non-zero**, and the set of commits in #33
+but not in #36 is **exactly one**: `3a8dfdd` (**C-B36-1**).
+
+**The PR page shows nothing wrong**, which is the whole hazard — GitHub diffs against the merge-base,
+so #36 rendered correctly while silently not containing its base's tip.
+
+**What was at risk is not cosmetic.** `3a8dfdd` closes PQ-CUR-1: §6.4's carve-out was drawn at the
+*parse*, and an element that parses cleanly then fails its AEAD tag fell through it — no
+authenticated `seq`, so the MUST forbade advancing the cursor; not a parse failure, so the carve-out
+did not reach it. Read literally, the cursor may not move at all for a forged-but-well-formed
+element: **the permanent stall §6.2 forbids in as many words, reachable by serving one crafted
+element** (**C-B36-2**).
+
+### Milestone 2 — the risk is in the merge plan, not in #36's diff
+
+§10.6's recommended order reads the chain as **#32 ⊂ #33 ⊂ #36**. That containment is **false**, so
+anyone merging tips-only — or restacking #36 onto its actual fork point, which is what §10.5 warned
+of — drops `3a8dfdd` **with no conflict and no UI signal**. A dropped commit that conflicts is a
+nuisance; one that merges silently is a defect.
+
+### Milestone 3 — fixed by merge, because rebase is the forbidden operation here
+
+`claude/s2-transport-vocabulary` `9176b04..b0b6c77`, a **merge commit, fast-forward push, no
+rewrite, no force**. Rebasing #36 onto #33's tip is the obvious fix and is exactly the history
+rewrite this session is forbidden to perform; §10.4 had also already measured merge as the cheaper
+strategy for this stack (5 resolutions vs 55). The two agree, which is why this was a fix and not a
+BLOCKED entry.
+
+**The merge is provably correct, which is stronger than "clean".** A clean merge is only trustworthy
+if each side's diff is reproduced verbatim, so both were checked (**C-B36-4**):
+
+| comparison | result |
+| --- | --- |
+| `3a8dfdd..b0b6c77` vs `b114d11..9176b04` (#36's own change) | **byte-identical** |
+| `9176b04..b0b6c77` vs `b114d11..3a8dfdd` (PQ-CUR-1) | **identical once `@@` headers are stripped** — offsets only, because #36's additions shift §6.4 down ~110 lines |
+
+### Milestone 4 — what the merge could not have damaged, measured rather than asserted
+
+The merge touched **one file**, `docs/Sync-Protocol.md` (**C-B36-3**). Measured empty:
+`docs/sync-vectors/` and `scripts/Verify-Alpha.ps1`. So **no cross-repo drift event is possible from
+this change** — no vector byte moved, the android vendored pin `679a317` is untouched — and **the
+drift trap is not engaged**: the offline pin is unchanged, and `Verify-Alpha.ps1` carries **no
+assertion against `Sync-Protocol.md` at all** (`grep -n "Sync-Protocol" scripts/Verify-Alpha.ps1` is
+empty), so no doc/verifier pair moved out of step.
+
+`node docs/sync-vectors/generate.mjs --check` on this branch prints **`OK: 28 vector files match the
+generator.`** — **28, not the tip's 29**, and that is correct rather than a discrepancy:
+`invalid-unknown-field.json` is added in #37, which is *downstream* of #36. Recording the tip's
+number here would have been the easy false claim.
+
+**Last run's costing survives**: `git merge-tree` of the fixed #36 against `origin/main` is still
+**exit 0, zero conflicts**, so §10's "five of the eleven cost nothing" is unchanged (**C-B36-5**).
+
+### Milestone 5 — the instance is not the class, so the class was swept
+
+C-RST-8 found #36 by looking at it. That is not evidence about the other ten. Every open PR was
+swept for the same defect — is the declared base's *tip* contained in the head? (**C-B36-6**)
+
+| PR | #32 | #33 | #34 | #35 | #36 | #37 | #38 | #39 | #45 | #46 | #47 | #48 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| base tip contained | *n/a* | OK | OK | OK | **fixed** | OK | OK | OK | OK | OK | OK | OK |
+
+**#36 was the only one.** #32's base is `main`, which is **16 ahead** — that is the known restack
+gap, already costed in §10, and a different condition from a base whose tip was skipped. The class is
+now closed by measurement, not by inference from one instance.
+
+### Milestone 6 — the finding: the self-audit had already declared this topology examined
+
+#36's own PR body, self-audit item 5, is titled *"a stack-topology hazard that predates this PR and
+that no PR in the stack mentions"* — and it names the **wrong hazard**. It describes #34/#35 as
+siblings off #32, checks that the two lines `merge-tree` cleanly, and concludes the topology is
+sound. That check is true and is not this defect: **it asked whether the lines conflict, never
+whether the base was contained.** A conflict-shaped question cannot see a silent-drop defect.
+
+So the defect sat for four days *underneath a self-audit paragraph asserting the topology had been
+looked at*, which is worse than an unexamined topology — it is a paragraph that discourages the next
+reader from looking. This was written into the PR comment as the thing an auditor should attack
+first, rather than folded away.
+
+### Milestone 7 — evidence
+
+```
+$ git merge-base --is-ancestor origin/claude/s4-pull-request-semantics \
+    origin/claude/s2-transport-vocabulary        → non-zero BEFORE, exit 0 AFTER
+$ git log --oneline <#36>..<#33>                 → 3a8dfdd BEFORE, empty AFTER
+$ git diff --name-only 9176b04..b0b6c77          → docs/Sync-Protocol.md  (one file)
+$ git diff --name-only 9176b04..b0b6c77 -- docs/sync-vectors/ scripts/Verify-Alpha.ps1
+                                                 → empty
+$ node docs/sync-vectors/generate.mjs --check    → OK: 28 vector files match the generator.
+$ node …/generate.mjs --check  (at stack tip)    → OK: 29 vector files match the generator.
+$ git merge-tree --write-tree --name-only origin/main b0b6c77 → exit 0, zero conflicts
+$ grep -n "Sync-Protocol" scripts/Verify-Alpha.ps1 → empty
+$ git push origin claude/s2-transport-vocabulary → 9176b04..b0b6c77 (fast-forward)
+```
+
+**Every C-B36-* command was dry-run before it was written down.** No gate ran: `Verify-Alpha.ps1`
+needs Windows (`which pwsh` empty) and the android gate is unrunnable here (B-7). Neither was
+attempted and neither is claimed.
+
+### Ladder movement
+
+**None, and correctly so.** No rung moved. This slice removed a **latent defect from the restack
+path** — the thing that would have made Brandon's gated merge silently lose a normative commit. The
+merge condition for the stack is unchanged and remains a full local `Verify-Alpha.ps1
+-IncludePublish -IncludePackage`, which is Brandon's gate and out of reach here.
+
+### Prohibition — what this iteration did not touch
+
+**Nothing was merged into `main`, in either repo**, and no PR was merged, retargeted, closed or
+marked ready. The one merge was **branch-into-branch within my own draft stack** —
+`claude/s4-pull-request-semantics` into `claude/s2-transport-vocabulary` — pushed as a
+**fast-forward**. **No force-push, no history rewrite, no rebase, no branch deleted.** Draft PRs
+**#26, #32–#35, #37–#39, #45–#48** were **read and left exactly as found**; only **#36** was touched,
+and only by a push plus one comment. **The android repo is never-self-merge regardless.**
+
+**Not one byte of source changed in either repo.** No `src/`, no `core/`, no `app/`, no `relay/`, no
+`tests/`, no `scripts/`, no Kotlin, no C#, no TypeScript. The engine change is **one Markdown file**
+carried in by a merge whose content was authored in `3a8dfdd`, not here — **this session composed no
+protocol prose of its own.** This repo received Markdown only, so **the android gate did not run and
+was correctly not attempted** (**B-7**), and no compile-only or "should pass" claim appears above.
+
+**`generate.mjs` and every byte of `docs/sync-vectors/` are unchanged** — `--check` OK at 28 on the
+branch and 29 at the tip, no vector added, removed or edited: **NO cross-repo drift event**, and the
+android vendored pin `679a317` is intact. **`scripts/Verify-Alpha.ps1` was read and NOT edited**;
+no count-reporting doc was swept, and **806 remains a prediction that has still never been written
+into any file**.
+
+No deploy of any kind (Cloudflare, Workers, relay, site, Pages), no `wrangler` invocation, and **the
+production relay was not contacted at all, not even `GET /v1/health`**. No Google, Play or OAuth
+console; no accounts, no purchases, no Play Billing code; no Gmail, no email; no MSIX or
+certificate-store action; no emulator, no `sdkmanager`, no keystore. **No secret was read, printed or
+referenced.** `Documents\CareerSeeker` and Terra's worktrees were never touched, and
+`autonomy/codex-state` was **read** — Terra reports **COMPLETE with no files claimed**, so there was
+no collision and no rebase was owed.
+
+**No machine change this run** — nothing was installed; `node` was already present and is all this
+slice needed.

@@ -7751,3 +7751,108 @@ scripts\Verify-Alpha.ps1        # must print: === Offline total: 806 passed, 0 f
 If it prints anything else, §10.3's arithmetic is wrong and the doc/verifier sweep must take the
 **measured** number, per `CLAUDE.md`'s rule. **No cloud session can run this**; no cloud session
 should claim it.
+
+---
+
+## Thirty-seventh run (2026-08-15) — #36's base fix, C-B36-1…6
+
+All commands run from a clone of `ShivaClaw/careerseeker` after `git fetch --all --prune`.
+`b0b6c77` is #36's head after the fix; `9176b04` is its head before.
+
+### C-B36-1 — the defect was real, and exactly one commit was at risk
+
+```bash
+git merge-base --is-ancestor origin/claude/s4-pull-request-semantics 9176b04 \
+  && echo CONTAINS || echo "DOES NOT CONTAIN"     # DOES NOT CONTAIN  (the pre-fix state)
+git log --oneline 9176b04..origin/claude/s4-pull-request-semantics   # exactly one: 3a8dfdd
+```
+
+### C-B36-2 — what `3a8dfdd` carries, i.e. what a silent drop would have cost
+
+```bash
+git show --stat 3a8dfdd | head -20
+```
+
+PQ-CUR-1: §6.4's carve-out was drawn at the parse, so an element that parses cleanly and then fails
+its AEAD tag was covered by neither the MUST nor the exception — the cursor may not advance at all
+for a forged-but-well-formed element, the permanent stall §6.2 forbids.
+
+### C-B36-3 — the fix is one Markdown file, no vector, no pin
+
+```bash
+git diff --name-only 9176b04..b0b6c77                      # docs/Sync-Protocol.md  (and nothing else)
+git diff --name-only 9176b04..b0b6c77 -- docs/sync-vectors/ scripts/Verify-Alpha.ps1   # empty
+node docs/sync-vectors/generate.mjs --check                # OK: 28 vector files match the generator.
+grep -n "Sync-Protocol" scripts/Verify-Alpha.ps1           # empty -- no doc/verifier pair moved
+```
+
+**28 is correct on this branch, not a discrepancy with §8's 29**: `invalid-unknown-field.json` is
+added in #37, downstream of #36. At the stack tip the same command prints `OK: 29 …`:
+
+```bash
+# in a scratch worktree, so no existing checkout is disturbed:
+git worktree add /tmp/cs-tip origin/claude/s6-counter-reconciliation
+(cd /tmp/cs-tip && node docs/sync-vectors/generate.mjs --check)   # OK: 29 vector files match the generator.
+git worktree remove /tmp/cs-tip
+```
+
+### C-B36-4 — the merge preserved both sides *exactly* (the claim worth attacking)
+
+A clean merge is only trustworthy if each side's diff is reproduced verbatim. Both halves:
+
+```bash
+# (a) #36's own changes, byte-identical:
+diff <(git diff 3a8dfdd..b0b6c77 -- docs/Sync-Protocol.md | grep -v '^index ') \
+     <(git diff b114d11..9176b04 -- docs/Sync-Protocol.md | grep -v '^index ')     # no output
+
+# (b) PQ-CUR-1, identical in content; @@ headers differ by offset only:
+diff <(git diff 9176b04..b0b6c77 -- docs/Sync-Protocol.md | grep '^[+-]' | grep -v '^\(+++\|---\)') \
+     <(git diff b114d11..3a8dfdd -- docs/Sync-Protocol.md | grep '^[+-]' | grep -v '^\(+++\|---\)')   # no output
+```
+
+(b) **without** stripping `@@` headers deliberately does *not* match — the four hunk offsets move by
+~110 lines because #36's additions precede §6.4. Anyone re-running this should expect that and check
+the content lines, which is what the second form does.
+
+### C-B36-5 — the fix did not disturb §10's costing
+
+```bash
+git merge-tree --write-tree --name-only origin/main b0b6c77 >/dev/null; echo $?   # 0 -- zero conflicts
+```
+
+#36 was one of the five zero-cost PRs in §10 and still is.
+
+### C-B36-6 — the class, not just the instance: every open PR swept
+
+For each open PR, is the declared base branch's **tip** contained in the head?
+
+```bash
+for pair in \
+  "48 s8-harness-linux-reach:main" \
+  "47 s2-push-disposition:claude/s6-counter-reconciliation" \
+  "46 s6-counter-reconciliation:claude/s2-relay-pull-result" \
+  "45 s2-relay-pull-result:claude/s5-inbound-pump" \
+  "39 s5-inbound-pump:claude/s5-entitlement-ack-emitter" \
+  "38 s5-entitlement-ack-emitter:claude/s5-engine-wire-parser" \
+  "37 s5-engine-wire-parser:claude/s5-entitlement-ack-spec" \
+  "36 s2-transport-vocabulary:claude/s4-pull-request-semantics" \
+  "35 s2-seq-bound:claude/s2-relay-retention" \
+  "34 s2-relay-retention:claude/s5-entitlement-ack-spec" \
+  "33 s4-pull-request-semantics:claude/s5-entitlement-ack-spec" \
+  "32 s5-entitlement-ack-spec:main" ; do
+  pr=${pair%% *}; hb=${pair#* }; h=${hb%%:*}; b=${hb#*:}
+  git merge-base --is-ancestor origin/$b origin/claude/$h 2>/dev/null \
+    && echo "#$pr OK" || echo "#$pr NOT CONTAINED"
+done
+```
+
+Expected after the fix: every line `OK` **except `#32 NOT CONTAINED`**, which is the known restack
+gap (base is `main`, 16 ahead of the fork `00b3705`) and not this defect. If any line other than #32
+reports `NOT CONTAINED`, a new instance has appeared and §10.6's merge order is unsafe until it is
+fixed.
+
+### NOT RUN HERE
+
+`scripts\Verify-Alpha.ps1` (needs Windows; `which pwsh` empty) and the android gate (B-7). The change
+is doc prose carried by a merge, touching no pin and no vector, so the strongest claim available is
+"no pin, no vector, no code" — **not** that any harness passed.
