@@ -8744,6 +8744,29 @@ territory and the owner's machine. Both §5 proposals change shipping C# signatu
 local `Verify-Alpha.ps1 -IncludePublish -IncludePackage`; they are queued, not done, and are
 **unverified by construction**.
 
+### Milestone 6 — CI ran the offline gate, and it is CI's result, not mine
+
+The push triggered [run **31866169984**](https://github.com/ShivaClaw/careerseeker/actions/runs/31866169984)
+(`push` event, attempt **1**, **both jobs green**) — `.github/workflows/ci.yml` fires on `claude/**`,
+so a branch push gets the same treatment a PR to `main` would (**C-CR-12**).
+
+| Job | Runner | Result |
+| --- | --- | --- |
+| Build and offline harnesses | `windows-latest` | Release build **warnings-as-errors** ✓, **offline alpha verification** ✓ |
+| Blind relay (Worker) | `ubuntu-latest` | typecheck ✓, test ✓, config validate (**no deploy**) ✓, *no decryption path* ✓, *vectors match generator* ✓ |
+
+**The wording is deliberate: I did not run a gate — CI did.** No sentence in this entry claims a
+locally-executed harness, because there is no .NET and no Windows on this host. But CI's green is real
+evidence and it **upgrades two claims from inspection to execution**: the offline verification step
+passing means `Verify-Alpha.ps1`'s own drift check measured the sum equal to `$ExpectedOfflineTotal =
+793` on this branch, and the vector step is an independent clean-checkout confirmation of the
+by-hand `--check`.
+
+**What it does not cover, stated so nobody reads more into it:** the CI job is the **offline** half
+only — no `-IncludePublish`, no `-IncludePackage`, no `-IncludeLive`. §10.6's merge condition is still
+a **full local gate** and is still Brandon's. And CI cannot execute `BuildSyncBridge` either, for the
+same reason the decision doc gives — no DPAPI vault, no relay.
+
 ### Prohibition — what this iteration did not touch
 
 **Nothing was merged, in either repo**, and no PR was merged, retargeted, closed or marked ready.

@@ -7988,3 +7988,37 @@ branch adds one Markdown file and no assertion, so the strongest available claim
 vector, no code"* — **not** that any harness passed. Every proposal in
 `Composition-Root-Decision.md` §5 changes shipping C# signatures and is **unverified by
 construction**; each needs a full local `Verify-Alpha.ps1 -IncludePublish -IncludePackage`.
+
+### C-CR-12 — CI ran the offline gate on this branch, and it passed on the first attempt
+
+**I did not run a gate; CI did.** The distinction matters and is preserved everywhere above: the
+sandbox has no .NET and no Windows, so nothing in this run's prose claims a locally-executed harness.
+What follows is CI's result, cited as CI's.
+
+Run [**31866169984**](https://github.com/ShivaClaw/careerseeker/actions/runs/31866169984), event
+`push`, attempt **1**, both jobs **success**:
+
+| Job | Runner | Steps that matter |
+| --- | --- | --- |
+| Build and offline harnesses | `windows-latest` | *Build Release with warnings as errors* ✓ · **Run offline alpha verification** ✓ |
+| Blind relay (Worker) | `ubuntu-latest` | Typecheck ✓ · Test ✓ · Validate config (**no deploy**) ✓ · *Assert the relay has no decryption path* ✓ · **Assert sync vectors match their generator** ✓ |
+
+```bash
+gh run list --branch claude/s6-composition-root-decision --workflow ci.yml
+gh run view 31866169984 --json conclusion,jobs
+```
+
+**This upgrades two claims from inspection to execution:**
+
+- **C-CR-10** said the pin does not move because no assertion was added. *Run offline alpha
+  verification* passing means `Verify-Alpha.ps1`'s own drift check found the measured sum equal to
+  `$ExpectedOfflineTotal = 793` **on this branch**. The pin is confirmed by running the verifier, not
+  by reading it.
+- **C-CR-11** said no vector byte moved. *Assert sync vectors match their generator* passing is CI's
+  independent confirmation, on a clean checkout, of the `--check` this session ran by hand.
+
+**What it still does not cover:** the CI job runs the **offline** verification only — not
+`-IncludePublish`, not `-IncludePackage`, and not `-IncludeLive`. The merge condition in
+`docs/Merge-Topology.md` §10.6 remains a **full local gate**, which is Brandon's and is unchanged by
+this green. And CI cannot execute `BuildSyncBridge` either, for exactly the reason the decision doc
+gives: no DPAPI vault, no relay.
