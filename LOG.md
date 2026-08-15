@@ -8617,3 +8617,159 @@ no collision and no rebase was owed.
 
 **No machine change this run** — nothing was installed; `node` was already present and is all this
 slice needed.
+
+---
+
+## Thirty-eighth run — 2026-08-15 (Linux sandbox): the seam question was answered no, and the residue it was asked about turned out to be the wrong residue
+
+**Fetched first, both trees, before anything was read** (rule one). `careerseeker` moved
+`00b3705..aac05f3` on `main` and gained the `codex/*` set; `careerseeker-android` had no ref changes.
+Terra's `autonomy/codex-state:STATE.md` reports **COMPLETE, no files claimed** — no collision, no
+rebase owed.
+
+**Assigned slice DECLINED because it is landed, for the FIFTH consecutive run**, and verified rather
+than inherited from last run's note. On `origin/claude/s5-entitlement-ack-spec`, `Sync-Protocol.md`
+carries §4.3.3's `{product_id, acknowledged_at, order_id?}` (`:319`, `:658`); `:601` carries PQ-A2-2's
+`decrypt_failed` structural rule; `:111` measures the cap on the **decoded ciphertext** (PQ-A2-1);
+`entitlement-ack.json` and `entitlement-ack-no-order-id.json` are present, and PQ-A2-3's
+`invalid-unknown-field.json` is present on the six branches downstream of #37. Executed here:
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the generator.`** The
+stored prompt's ladder summary is now **fourteen runs stale**.
+
+Took `STATE.md`'s ordered next intent **item 3** — **twelfth consecutive run routed by this list
+rather than by the prompt**. Item 1 needs Brandon's gate and says *do not re-measure*; item 2 says in
+terms *do not implement it blind from a cloud session*; items 4–5 need gates this sandbox does not
+have. Item 3 was the topmost workable one, and the list itself had already named it *"the strongest
+candidate for the next run"* and *"a decision a cloud session is allowed to make."* It is the oldest
+surviving item, unchanged across five revisions.
+
+### Milestone 1 — the question, and the answer
+
+Item 3: *"`BuildSyncBridge` has still never executed anywhere, and CI cannot execute it either. **Do
+not extract a further seam without first deciding whether that is worth it** — at some point a
+composition root is a composition root. **Write that decision down either way.**"*
+
+**Decided: it is a composition root; no further seam for the sake of the argument identities.**
+Written down as `docs/Composition-Root-Decision.md` in the main repo, draft **PR #49**.
+
+The argument is that **extraction relocates an identity rather than retiring it.** A test of an
+extracted function supplies its own arguments, so it can prove the function uses what it was given and
+never that the production caller gave it the right thing. `BuildSyncBridgeCore(vault, relay, log,
+resumeSeq, …)` moves *"does `SyncPushPath.Create` get the right token"* to *"does
+`BuildSyncBridgeCore` get the right token"* — one frame out, same question.
+
+**It is not quite a shell game, and the record was checked rather than assumed** (**C-CR-6**): two
+commits, `dee32f8` (rule → `RelaySink`) and `0d369eb` (wiring → `SyncPushPath`), took the residue from
+five delegate bodies to four identities. Extraction *does* reduce, when the new function derives
+internally what the call site passed. But it converges to a floor of **one** — the root's choice of
+the real DPAPI vault, which no test can ever make — so the whole remaining move is **3 → 1**, bought
+with a public type, harness scaffolding, and another frame of indirection on a path that still cannot
+execute. That is the "not worth it."
+
+### Milestone 2 — the step that mattered was not an extraction, which is what decides the *alternative*
+
+4 → 3 came from `SyncPairingVault` implementing `IE2pSeqStore`: `seqStore: vault` compiles only
+because the interface is there. **One type retired one identity at zero structural cost.** So the
+decision's second half is *retire identities with types, not seams* — `startSeq` first (a
+`ResumeSeq` struct: `startSeq`, `paired.LastE2pSeq` and `0` are all `long` today, so the wrong one
+compiles, and a wrong resume value is precisely the 409-on-recovery-snapshot failure §6.1 exists to
+prevent), then the direction string. `log: Console.WriteLine` gets **nothing**, deliberately: a
+misrouted log is an observability defect, not a correctness one.
+
+**The weakest link is named rather than buried** (**C-CR-3**): the M8 build-error claim is the
+evidence for this whole milestone and it was **cited from this repo's `LOG.md`, not re-measured** —
+there is no .NET on this host. An auditor doubting the alternative should re-run M8 on Windows first.
+
+### Milestone 3 — the finding: the item was reasoning about the wrong residue
+
+`src/Sync/SyncPushPath.cs:47` states the reduction **with its scope attached** — *"four argument
+identities **at a single call site**."* `src/Engine/Program.cs:301-302` restates it **with the
+qualifier dropped** — *"What stays **here** is only the four argument identities."* Read plainly,
+*"here"* is `BuildSyncBridge`, and the sentence is false. `STATE.md` item 3 inherited the unqualified
+reading and framed the entire seam question around three identities (**C-CR-7**).
+
+Comments stripped, the method is eighteen statements, and **seven of them are behaviours, not
+identities** — each unexecuted **and** unasserted; the five operator strings appear once in `src/` and
+**zero** times in `tests/` (**C-CR-4**).
+
+**The sharpest is `Program.cs:286`.** `RelayClient.PullAsync` takes an unconstrained `string` for the
+direction, and the relay computes `latest` as `SELECT MAX(seq) … WHERE dir = ?`
+(`relay/src/channel.ts:206-208`). So **`"e2p"` → `"p2e"` compiles, passes every test, and is accepted
+by the relay** — the engine reconciles its *outbound* counter against the *inbound* high-water mark
+(**C-CR-8**).
+
+**The blast radius is stated at its real size rather than inflated** (**C-CR-9**): §6
+(`Sync-Protocol.md:568-570`) makes gaps legitimate and forbids them stalling the stream, so the cost
+is a **spurious snapshot request, not a stall**. Reasoned from the SQL and the spec; **no engine ran**.
+
+So the answer splits in a way the item's framing could not reach: **no** for the composition, **yes-in-principle**
+for the report and the pull arguments. Recorded as part 3 of the decision so a future session does not
+re-open part 1 having read only the item.
+
+### Milestone 4 — evidence
+
+```
+$ git fetch --all --prune                     (both trees, first action)
+$ node docs/sync-vectors/generate.mjs --check → OK: 29 vector files match the generator.
+$ git diff --stat …s6-counter-reconciliation …s2-push-disposition -- src/Engine/Program.cs → empty
+$ grep -c 'SyncPublisher.ResumeSeq' tests/SyncHarness/Program.cs → 12   (rule assertions)
+$ grep -rn 'SyncPublisher.ResumeSeq(' src/ | wc -l               → 1    (production call sites)
+$ <five operator strings> in tests/                              → 0 hits each
+$ git log --oneline --diff-filter=A -- src/Sync/{RelaySink,SyncPushPath}.cs → 0d369eb, dee32f8
+$ grep -n 'at a single call site' src/Sync/SyncPushPath.cs       → 47
+$ sed -n '301,302p' src/Engine/Program.cs                        → qualifier absent
+$ grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1     → 338:$ExpectedOfflineTotal = 793
+$ git merge-base --is-ancestor origin/claude/s2-push-disposition \
+      origin/claude/s6-composition-root-decision                 → exit 0 (base contained)
+$ git push -u origin claude/s6-composition-root-decision         → new branch
+```
+
+**Every C-CR-* command was dry-run before it was written into `AUDIT-REQUEST.md`.** No gate ran:
+`Verify-Alpha.ps1` needs Windows (`which pwsh` empty) and the android gate is unrunnable here
+(**B-7**). Neither was attempted and neither is claimed.
+
+### Milestone 5 — base containment, checked because last run found it false once
+
+C-B36-1 found #36 not containing its declared base's tip. That makes containment a thing to **verify
+on every new PR**, not a thing to assume, so #49's was checked at creation:
+`merge-base --is-ancestor origin/claude/s2-push-disposition origin/claude/s6-composition-root-decision`
+→ **exit 0**, and the base∖head commit set is **empty**.
+
+### Ladder movement
+
+**S6 gains a closed decision; no rung changes status.** The slice retired the oldest surviving item on
+the ordered list — a decision, not code. `BuildSyncBridge` **still has never executed anywhere**, and
+this run does not claim otherwise: executing it needs a real pairing vault and a relay, which is B-2's
+territory and the owner's machine. Both §5 proposals change shipping C# signatures and need a full
+local `Verify-Alpha.ps1 -IncludePublish -IncludePackage`; they are queued, not done, and are
+**unverified by construction**.
+
+### Prohibition — what this iteration did not touch
+
+**Nothing was merged, in either repo**, and no PR was merged, retargeted, closed or marked ready.
+**No force-push, no history rewrite, no rebase, no branch deleted.** Draft PRs **#26, #32–#39,
+#45–#48** were **read and left exactly as found**; the only write to the main repo was one new branch
+`claude/s6-composition-root-decision` and one new draft PR **#49**.
+
+**Not one byte of source changed in either repo.** No `src/`, no `core/`, no `app/`, no `relay/`, no
+`tests/`, no `scripts/`, no Kotlin, no C#, no TypeScript. The main repo received **one new Markdown
+file** and nothing else. This repo received Markdown only, so **the android gate did not run and was
+correctly not attempted** (**B-7**), and no compile-only or "should pass" claim appears above.
+
+**`generate.mjs` and every byte of `docs/sync-vectors/` are unchanged** — `--check` OK at 29, no
+vector added, removed or edited: **NO cross-repo drift event**, and the android vendored pin
+`679a317` is intact. **`scripts/Verify-Alpha.ps1` was read and NOT edited**; the offline pin stays
+**793**, no count-reporting doc was swept, and the verifier carries **no assertion against
+`Composition-Root-Decision.md`**, so the drift trap is not engaged. **806 remains a prediction that
+has still never been written into any file.**
+
+No deploy of any kind (Cloudflare, Workers, relay, site, Pages), no `wrangler` invocation, and **the
+production relay was not contacted at all, not even `GET /v1/health`**. No Google, Play or OAuth
+console; no accounts, no purchases, no Play Billing code; no Gmail, no email; no MSIX or
+certificate-store action; no emulator, no `sdkmanager`, no keystore. **No secret was read, printed or
+referenced.** `Documents\CareerSeeker` and Terra's worktrees were never touched, and
+`autonomy/codex-state` was **read** — Terra reports **COMPLETE with no files claimed**, so there was
+no collision and no rebase was owed.
+
+**No machine change this run** — nothing was installed; `node` and `git` were already present and are
+all this slice needed.

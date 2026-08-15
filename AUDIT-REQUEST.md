@@ -7856,3 +7856,135 @@ fixed.
 `scripts\Verify-Alpha.ps1` (needs Windows; `which pwsh` empty) and the android gate (B-7). The change
 is doc prose carried by a merge, touching no pin and no vector, so the strongest claim available is
 "no pin, no vector, no code" — **not** that any harness passed.
+
+---
+
+## C-CR-* — the `BuildSyncBridge` composition-root decision (thirty-eighth run, 2026-08-15)
+
+Slice: `STATE.md` ordered-intent **item 3**, closed as a **decision**. Deliverable is
+`docs/Composition-Root-Decision.md` in the **main** repo, on `claude/s6-composition-root-decision`
+(draft **PR #49**, base `claude/s2-push-disposition`). Documentation only — no C#, no vector, no
+`Verify-Alpha.ps1` edit, nothing compiled.
+
+All commands below run from a clone of `ShivaClaw/careerseeker` checked out at
+`origin/claude/s6-composition-root-decision`, after `git fetch --all --prune`.
+
+### C-CR-1 — `BuildSyncBridge` is `Program.cs:256-323` and is identical at #46's and #47's heads
+
+```bash
+git diff --stat origin/claude/s6-counter-reconciliation origin/claude/s2-push-disposition \
+  -- src/Engine/Program.cs                      # empty -- #47 does not touch Program.cs
+sed -n '256p;323p' src/Engine/Program.cs        # the signature line and the closing brace
+```
+
+The line numbers in the decision doc are only stable because of the first command. If #47 ever gains
+a `Program.cs` change, every citation in `Composition-Root-Decision.md` §1 must be re-derived.
+
+### C-CR-2 — the call site is seven arguments, four of them named
+
+```bash
+sed -n '310,317p' src/Engine/Program.cs
+sed -n '310,317p' src/Engine/Program.cs | grep -cE '^\s+(push|seqStore|log|startSeq):'   # 4
+```
+
+### C-CR-3 — M8 is **cited, not re-measured** (the weakest link in the argument)
+
+```bash
+grep -n 'mutation M8' src/Engine/Program.cs                    # the citation, Program.cs:306
+grep -n 'M8 takes one of those four off the list' LOG.md       # the register, android repo
+```
+
+The claim *"deleting `: IE2pSeqStore` is a build error, not a silent no-op"* is **not verified by this
+run** — no .NET on this host. It is the evidence for "the decisive step was not an extraction," so an
+auditor who doubts §2 of the decision doc should re-run M8 on Windows first. Note also that the
+register lives in the **android** repo while the citation lives in the **main** repo's C#.
+
+### C-CR-4 — the five operator strings are unexecuted *and* unasserted
+
+```bash
+for s in 'nothing will be published' 'publishing turns on once' \
+         'resuming the e2p counter above' 'could not read the relay' 'Sync: publishing to'; do
+  printf '%-34s src:%s tests:%s\n' "$s" "$(grep -rl "$s" src/ | wc -l)" "$(grep -rl "$s" tests/ | wc -l)"
+done
+```
+
+Expected: `src:1 tests:0` on every line. A `tests:` count above zero means one of §3's seven
+behaviours has since gained coverage and the decision's part 3 should be re-read.
+
+### C-CR-5 — the rule is covered twelve times; its one production call site is not covered at all
+
+```bash
+grep -c 'SyncPublisher.ResumeSeq' tests/SyncHarness/Program.cs   # 12
+grep -rn 'SyncPublisher.ResumeSeq(' src/ | wc -l                 # 1  -> Program.cs:287
+```
+
+### C-CR-6 — the extraction history is exactly two commits
+
+```bash
+git log --oneline --diff-filter=A -- src/Sync/RelaySink.cs src/Sync/SyncPushPath.cs
+# 0d369eb  S6: extract the push path's wiring so the composition is reachable from a harness
+# dee32f8  S6: extract the push sink so its ReconcileTo call site is testable
+```
+
+This is what makes "5 → 4 → 3" a measurement rather than a story.
+
+### C-CR-7 — the finding: the scoping qualifier is present in one file and absent in the other
+
+```bash
+grep -n 'at a single call site' src/Sync/SyncPushPath.cs   # 1 hit, line 47
+sed -n '301,302p' src/Engine/Program.cs                    # same claim, qualifier absent
+```
+
+`SyncPushPath.cs:47` says *"four argument identities **at a single call site**"*; `Program.cs:301-302`
+says *"What stays **here** is only the four argument identities."* Read plainly, *"here"* is the
+method, and the sentence is false — §1's table lists seven behaviours that also stay.
+
+### C-CR-8 — `"e2p"` → `"p2e"` compiles, tests clean, and reconciles against the wrong mark
+
+```bash
+grep -n 'string bearer, string dir' src/Sync/RelayClient.cs   # dir is an unconstrained string
+sed -n '286p' src/Engine/Program.cs                           # the literal, passed positionally
+sed -n '206,208p' relay/src/channel.ts                        # SELECT MAX(seq) ... WHERE dir = ?
+```
+
+The three together are the claim: nothing types the direction, nothing tests the call, and the relay
+answers with the *other* direction's high-water mark rather than an error.
+
+### C-CR-9 — the blast radius, stated at its real size rather than inflated
+
+```bash
+sed -n '568,570p' docs/Sync-Protocol.md
+```
+
+§6 makes gaps legitimate and forbids them stalling the stream — a large gap signals a fresh
+`snapshot`. So C-CR-8's consequence is a **spurious snapshot request, not a stall**. This command
+exists so nobody upgrades the finding on re-telling. **Reasoned, not executed** — no engine ran.
+
+### C-CR-10 — doc-only: the drift trap is not engaged
+
+```bash
+git diff --name-only origin/claude/s2-push-disposition origin/claude/s6-composition-root-decision
+# docs/Composition-Root-Decision.md   -- one file, and it is new
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1     # 338:$ExpectedOfflineTotal = 793
+grep -n 'Composition-Root-Decision' scripts/Verify-Alpha.ps1   # empty -- no assertion targets it
+```
+
+No assertion added or removed, so the pin does not move and no count-reporting doc is swept.
+
+### C-CR-11 — no vector byte moved, so no cross-repo drift event is possible
+
+```bash
+git diff --name-only origin/claude/s2-push-disposition origin/claude/s6-composition-root-decision \
+  -- docs/sync-vectors/                          # empty
+node docs/sync-vectors/generate.mjs --check      # OK: 29 vector files match the generator.
+```
+
+The android vendored pin `679a317` is untouched by construction.
+
+### NOT RUN HERE
+
+`scripts\Verify-Alpha.ps1` (needs Windows; `which pwsh` empty) and the android gate (**B-7**). This
+branch adds one Markdown file and no assertion, so the strongest available claim is *"no pin, no
+vector, no code"* — **not** that any harness passed. Every proposal in
+`Composition-Root-Decision.md` §5 changes shipping C# signatures and is **unverified by
+construction**; each needs a full local `Verify-Alpha.ps1 -IncludePublish -IncludePackage`.

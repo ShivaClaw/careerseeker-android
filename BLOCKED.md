@@ -1763,3 +1763,32 @@ One of, in a local session (either is ~1 minute):
 **(2) is the one that matches the record's intent** — #36 was written as a child of #33 — but it is a
 force-push, so it is a human's call and not a cloud session's. Either way, verify afterwards with
 **C-RST-8**: the check must flip to `CONTAINS`.
+
+---
+
+### B-7 status 2026-08-15 (thirty-eighth run, S6 composition-root decision) — unchanged, and it bounded exactly two claims
+
+**No new blocker this run, and none is invented.** The slice was a *decision*, and a decision is
+precisely the kind of work this environment can finish — the deliverable
+(`docs/Composition-Root-Decision.md`, draft PR #49) is complete and needs no gate to be true.
+
+What B-7 did bound, named so the next session does not have to re-derive it:
+
+1. **Mutation M8 was cited, not re-measured** (**C-CR-3**). The claim *"deleting `: IE2pSeqStore` is a
+   build error, not a silent no-op"* is the evidence for the decision's alternative — *retire
+   identities with types, not seams* — and no .NET exists on this host to re-run it. If M8 is wrong,
+   §2 of the decision doc loses its support. **Smallest human unblock:** on Windows, delete
+   `: IE2pSeqStore` from `SyncPairingVault` and run `dotnet build CareerSeeker.sln -c Release`;
+   expect a compile error, not 0/0.
+2. **Both §5 proposals are unverified by construction.** A `ResumeSeq` wrapper struct and a typed
+   pull direction change shipping C# signatures on the engine's startup path. Writing them from a
+   cloud session would be a compile-only claim, which the house rules forbid. **Smallest human
+   unblock:** a local session with `scripts\Verify-Alpha.ps1 -IncludePublish -IncludePackage`.
+
+**Neither is a new blocker** — both are B-7 in its ordinary form (no toolchain here). They are
+recorded because the decision doc's value depends on the first, and because the second is now queued
+work with a named gate rather than an open question.
+
+**Still true and worth restating:** `BuildSyncBridge` has never executed anywhere — not in a harness,
+not on a CI runner, not in this run. That is **B-2's** territory (a real pairing vault and a relay on
+the owner's machine), it is unchanged by this decision, and the decision does not claim to move it.
