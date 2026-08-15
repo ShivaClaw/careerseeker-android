@@ -8405,3 +8405,136 @@ touches is the Node vector check, which **was** run (C-HB-2) and which CI re-run
 **The distinction is kept deliberately: I ran no gate, and no claim here says I did.** The Windows
 verifier ran on **CI's** machine, not mine (C-HB-8), and that is how it is attributed. The android
 gate ran nowhere — this run changed no android file but these records, so it had nothing to gate.
+
+---
+
+## C-CC — the confirm code's consumer (forty-first run, 2026-08-15, draft PR #51)
+
+Like the C-WP block, these commands need **.NET**, and **C-CC-1 is how you get it**. `<engine>` is a
+checkout of `ShivaClaw/careerseeker`; `<vector>` is branch `claude/s3-pairing-confirm-vector` (PR #50,
+the base) and `<consumer>` is `claude/s3-pairing-confirm-consumer` (PR #51, this run). See **C-CC-8**
+for what did not run.
+
+### C-CC-1 — .NET 8 installs here; PowerShell does not
+
+```bash
+apt-cache policy dotnet-sdk-8.0
+apt-get update -qq && apt-get install -y --no-install-recommends dotnet-sdk-8.0 && dotnet --version
+apt-cache policy powershell; command -v pwsh
+```
+
+*Expected:* candidate `8.0.125-0ubuntu1~24.04.1`, installed `dotnet --version` **8.0.129**, and
+**nothing** for `powershell`/`pwsh`. This is the pair of facts that splits the fortieth run's
+inherited "neither compiles here" into a true half and a false half.
+
+### C-CC-2 — the gap: the pre-change suite is blind to both slips
+
+```bash
+cd <engine> && git checkout <vector> && cp src/Sync/PairingCrypto.cs /tmp/pc.orig
+sed -i 's|var confirm = (BinaryPrimitives.ReadUInt32BigEndian(confirmBytes) % 1_000_000u).ToString("D6");|var confirm = ((int)BinaryPrimitives.ReadUInt32BigEndian(confirmBytes) % 1_000_000).ToString("D6");|' src/Sync/PairingCrypto.cs
+dotnet build CareerSeeker.sln -c Release && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -2
+cp /tmp/pc.orig src/Sync/PairingCrypto.cs
+sed -i 's|% 1_000_000u).ToString("D6");|% 1_000_000u).ToString();|' src/Sync/PairingCrypto.cs
+dotnet build CareerSeeker.sln -c Release && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -2
+cp /tmp/pc.orig src/Sync/PairingCrypto.cs && git status --porcelain
+```
+
+*Expected:* **`=== 130 passed, 0 failed ===` twice** — the signed reduction and the dropped zero-pad
+both pass the whole suite — then a clean `git status`. This is the measurement PR #50 predicted.
+
+### C-CC-3 — with the consumer, both mutations fail, and the detail names the wrong rendering
+
+Same as C-CC-2 but on `<consumer>`.
+
+*Expected:* **`=== 135 passed, 1 failed ===` twice**, the failing line being
+`pairing-high-bit-confirm: confirm re-derives from that vector's own secret and scalars`, with detail
+`derived -936782, vector 030514` under M1 and `derived 30514, vector 030514` under M7.
+
+### C-CC-4 — the clean run, and the six new assertions by name
+
+```bash
+cd <engine> && git checkout <consumer> && dotnet build CareerSeeker.sln -c Release
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build \
+  | sed -n '/every published confirm re-derives/,/^$/p'
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -2
+```
+
+*Expected:* build **0 Warning(s), 0 Error(s)**; six `PASS` lines under
+`[ pairing: every published confirm re-derives, and both failure modes are pinned ]`; and
+**`=== 136 passed, 0 failed ===`**.
+
+### C-CC-5 — the corpus guard reports rather than throws
+
+```bash
+cd <engine> && cp docs/sync-vectors/v1/index.json /tmp/i.orig \
+  && cp docs/sync-vectors/v1/pairing-high-bit-confirm.json /tmp/h.orig
+rm docs/sync-vectors/v1/pairing-high-bit-confirm.json
+python3 -c "import json;p='docs/sync-vectors/v1/index.json';d=json.load(open(p));d['vectors']=[v for v in d['vectors'] if v['name']!='pairing-high-bit-confirm'];open(p,'w').write(json.dumps(d,indent=2)+'\n')"
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | grep -E "FAIL|=== [0-9]+ passed"
+cp /tmp/i.orig docs/sync-vectors/v1/index.json; cp /tmp/h.orig docs/sync-vectors/v1/pairing-high-bit-confirm.json
+```
+
+*Expected:* **four** `FAIL` lines and **`=== 131 passed, 4 failed ===`** — a printed summary, **not**
+an unhandled exception. The first draft of this section used `.First(...)` and aborted the harness
+here; that is the defect this command exists to keep closed.
+
+### C-CC-6 — the offline pin: 387 + 230 = 617
+
+```bash
+cd <engine> && for h in Slice EngineHarness ResearcherHarness HookHarness StoreParityHarness \
+    GatewayGateHarness DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  echo -n "$h: "; dotnet run --project tests/$h/$h.csproj -c Release --no-build 2>&1 \
+    | grep -oE "=== [0-9]+ passed" | tail -1; echo
+done
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1
+```
+
+*Expected:* nine harnesses summing to **387** (`28+57+16+28+36+35+45+6+136`), **EngineHarness
+producing no summary** (it aborts at `tests/EngineHarness/Program.cs:221`, B-10), and the pin reading
+**617**. EngineHarness's **230** is quoted from `Verify-Alpha.ps1`'s comment block, **not
+re-measured** — arithmetic corroborated by measurement, **not** a verifier run. The same arithmetic
+reproduces the old pin: 381 + 230 = 611.
+
+### C-CC-7 — the drift sweep moved together, and the historical records did not
+
+```bash
+cd <engine> && git diff main...<consumer> --stat
+grep -rn "617" README.md src/Engine/README.md docs/CareerSeeker-Project-Summary.md \
+  docs/External-Audit-Handoff.md scripts/Verify-Alpha.ps1
+grep -rln "611" docs/autonomy/CODEX-STATE.md docs/Codex-Resume-Handoff.md docs/BETA-AUDIT-REQUEST.md
+git diff --stat -- docs/sync-vectors/
+node docs/sync-vectors/generate.mjs --check
+```
+
+*Expected:* six changed files; `617` in all five live count surfaces (pin, three `**Total**` rows,
+the `Pinned offline verifier` line, and three `SyncHarness | 136` assertions); `611` **still present**
+in the three historical evidence records, which report past measurements and are deliberately not
+rewritten; **empty** vector diff; and `OK: 27 vector files match the generator.`
+
+### C-CC-8 — what did NOT run, and what remains the gate
+
+```bash
+cd <engine>  && pwsh -File scripts/Verify-Alpha.ps1
+cd <android> && ./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug --rerun-tasks
+```
+
+*Expected:* **both fail to start here.** PowerShell is absent and not in the Ubuntu archive (C-CC-1),
+so `Verify-Alpha.ps1` was not run and could not be parse-checked; the android gate needs the SDK
+(**B-7**). `:core:test` was not run and did not need to be — nothing in `:core` changed, and the new
+vector is not in the android tree at all (**B-14**). **CI on `windows-latest` is the gate for the 617
+pin**, and for every claim in this section that depends on it.
+
+### C-CC-9 — CI ran the Windows gate and confirmed the pin
+
+```bash
+gh run view 31897428719 --repo ShivaClaw/careerseeker
+gh run view 31897428719 --repo ShivaClaw/careerseeker --log | grep -E "Offline total|136 passed"
+```
+
+*Expected:* both jobs **success**, and the log containing `=== 136 passed, 0 failed ===` and
+**`=== Offline total: 617 passed, 0 failed ===`**. Both lines were **observed** in run
+`31897428719` (job `95042792228`, `windows-latest`), at 2026-08-15T17:09:39Z. `Verify-Alpha.ps1`
+**throws** on a pin mismatch (`:926-927`), so a green run *is* the pin check — which **settles the
+230**, the one number C-CC-6 quotes rather than measures: 617 measured minus 387 measured here
+leaves exactly 230, so the quoted figure was right and is now observed rather than inherited. **This does not retire C-CC-8**: the gate ran on
+`windows-latest`, as it always must, and it is the offline half only.

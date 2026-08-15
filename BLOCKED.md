@@ -1819,6 +1819,42 @@ The one caveat that *does* travel with it: adding a `Check()` to `SyncHarness` *
 count-reporting doc must move in the same change. This branch adds no assertion precisely so that it
 does not owe that sweep from a host that cannot measure the new total.
 
+## B-14 — the phone cannot assert the confirm vector it does not have
+
+**New 2026-08-15 (forty-first run).** Found by closing the C# half of the same item and checking
+what the Kotlin half would actually need.
+
+**Symptom.** `:core` has no test asserting `pairing-high-bit-confirm`, and one cannot be written.
+The vendored corpus under `core/src/test/resources/sync-vectors/` is pinned at `679a317`, which
+**predates the vector** — the file is not in this repo at all. A test naming it fails to find it,
+and a test that silently skips when it is absent asserts nothing.
+
+**Why the obvious diagnosis is wrong.** The inherited note said this half needs an Android SDK
+(B-7). It does not: `:core` is Android-free by construction (`checkCoreIsAndroidFree`), its tests
+run on the JVM, and this sandbox has run them before after installing JDK 17. **The blocker is the
+pin, not the toolchain** — which matters, because B-7 has no human unblock inside this window and
+this does.
+
+**Attempts.** One, deliberately not two. Vendoring the vector by hand was considered and
+**refused**: hand-copying a file into a corpus whose whole purpose is byte-identity with an
+upstream pin is the drift event `CLAUDE.md` and the mission both forbid, and it would move the pin
+without the decision that moving a pin represents.
+
+**Smallest human unblock.** Merge PR #50 (`claude/s3-pairing-confirm-vector`) into `careerseeker`
+`main`, then re-pin this repo's vendored corpus to the merge commit and re-run the vendored-vector
+drift check. Both steps are Brandon's: the main-repo merge policy is conditional on a full local
+`Verify-Alpha.ps1 -IncludePublish -IncludePackage`, which no cloud session can run, and a re-pin is
+a cross-repo decision rather than a coding task. **PR #51 (the C# consumer) does not depend on
+this** and stands on its own.
+
+**Not blocked by this:** the engine-side assertion, which is done and CI-green (run `31897428719`,
+offline total 617/0).
+
+Re-verify: **C-CC-8**, and `git -C . log -1 --format=%H -- core/src/test/resources/sync-vectors/`
+against `679a317`.
+
+---
+
 ### B-7 status 2026-08-15 (fortieth run) — unchanged, and it bounded exactly one claim
 
 No Android SDK, so the android gate did not run and was not attempted. It bounded **one** claim this

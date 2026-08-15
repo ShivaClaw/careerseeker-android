@@ -9203,3 +9203,176 @@ email; no MSIX or certificate action; no emulator, no `sdkmanager`, no `avdmanag
 `autonomy/codex-state` was **read** — heartbeat `2026-08-12T20:28:36`, **COMPLETE, files claimed:
 none** — so there was no collision and no rebase was owed. **No machine change this run**: nothing
 was installed.
+
+---
+
+## Forty-first run — 2026-08-15 (Linux sandbox): the vector got its consumer, because "cannot compile here" was one toolchain check away from false
+
+The fortieth run added `pairing-high-bit-confirm` and wrote its own successor into this file: *"give
+the new vector a consumer, in both implementations… **no cloud session should attempt it because
+neither compiles here.**"* **Half of that sentence was wrong, and the check that disproves it costs
+one command.** This run is the C# half, executed.
+
+### Milestone 0 — rule one, and the toolchain probe that reordered the run
+
+`git fetch --all --prune` in **both** checkouts before anything was read. Neither tree moved: android
+`main`/`a0-probe` unchanged, main-repo `main` still `aac05f3`. Every count below is post-fetch.
+
+Then the check the inherited instruction did not survive:
+
+```
+$ apt-cache policy dotnet-sdk-8.0
+  Candidate: 8.0.125-0ubuntu1~24.04.1
+$ apt-get install -y --no-install-recommends dotnet-sdk-8.0 && dotnet --version
+8.0.129
+```
+
+This is not a discovery — it is **C-WP-1**, written into `AUDIT-REQUEST.md` by the twenty-second run
+and used again by the thirty-fourth. The fortieth run's own prohibition paragraph says *"no .NET on
+this host"*, which was a true **measurement of a fresh sandbox** restated as a **bound**, exactly the
+mistake B-6's entry already names in another context. **`pwsh` is genuinely absent and not in the
+archive**, so the *gate* claim in that sentence stands; the *compiler* claim did not.
+
+### Milestone 1 — the gap, measured on #50's head before anything was written
+
+`SyncHarness` at `b85d21f` reads exactly one confirm code (`pairing-basic`, `Program.cs:97`). To
+find out what that costs, `PairingCrypto.Derive` was mutated and the **unmodified** harness run:
+
+| mutation | SyncHarness |
+| --- | --- |
+| M1 — reduce the confirm digest as a **signed** `int32` | `=== 130 passed, 0 failed ===` |
+| M7 — drop the six-digit **zero pad** | `=== 130 passed, 0 failed ===` |
+
+**The entire suite stayed green under both.** The vector that separates them shipped in #50 and sat
+on disk unread — which is precisely what #50's self-audit item 2 said, and now it is measured rather
+than predicted.
+
+### Milestone 2 — six assertions, and why the loop is generic
+
+`tests/SyncHarness/Program.cs`, one new section. It re-derives from **each vector's own** secret and
+scalars instead of naming a vector, so a confirm added later cannot arrive unchecked:
+
+```
+[ pairing: every published confirm re-derives, and both failure modes are pinned ]
+  PASS  the corpus publishes more than one confirm code
+  PASS  pairing-basic: confirm re-derives from that vector's own secret and scalars
+  PASS  pairing-high-bit-confirm: confirm re-derives from that vector's own secret and scalars
+  PASS  a SIGNED int32 reduction is separable: some published digest exceeds 0x7fffffff
+  PASS  a DROPPED zero-pad is separable: some published confirm has a leading zero
+  PASS  pairing-high-bit-confirm: both wrong renderings disagree with the vector
+
+=== 136 passed, 0 failed ===
+```
+
+`generate.mjs` audits the same property, but **that runs in the relay CI job**. This runs in the
+**offline gate**, which is where `PairingCrypto` actually lives.
+
+### Milestone 3 — the guards were watched failing, in both directions
+
+With the section in place, each mutation now fails and prints the wrong rendering in its detail:
+
+```
+M1:  FAIL  pairing-high-bit-confirm: confirm re-derives ...  -- derived -936782, vector 030514
+M7:  FAIL  pairing-high-bit-confirm: confirm re-derives ...  -- derived 30514, vector 030514
+     both: === 135 passed, 1 failed ===
+```
+
+`src/Sync/PairingCrypto.cs` was restored from a pre-mutation copy after each run, `git status
+--porcelain` clean.
+
+And the corpus direction — witness vector and its index entry stripped:
+
+```
+=== 131 passed, 4 failed ===
+```
+
+**That run found a defect in my own first draft.** `confirmFacts.First(...)` **threw**, so the harness
+died before printing a summary — a guard that aborts the run is worse than one that fails it, and I
+would not have known without running the negative case. Fixed to `FirstOrDefault` with a
+null-rendered verdict; the 131/4 above is the re-test, not the first attempt.
+
+### Milestone 4 — the drift trap, and the one number that is arithmetic
+
+Six assertions move `$ExpectedOfflineTotal` **611 → 617**. Measured here, harness by harness:
+
+| harness | passed |
+| --- | --- |
+| Slice / ResearcherHarness / HookHarness / StoreParityHarness | 28 / 57 / 16 / 28 |
+| GatewayGateHarness / DispatcherNoSendHarness / LifecycleHarness / RendererHarness | 36 / 35 / 45 / 6 |
+| SyncHarness | **130 → 136** |
+| **Linux-measurable sum** | **381 → 387** |
+| EngineHarness | **no summary** — aborts at `tests/EngineHarness/Program.cs:221` (B-10) |
+
+**387 + 230 = 617**, and the old pin checks out the same way: 381 + 230 = 611. **The 230 is quoted
+from `Verify-Alpha.ps1`'s comment block, not re-measured** — the single non-observed number in this
+run, and the reason CI is the gate. Moved in the same commit: the pin, its running comment,
+`README.md`, `src/Engine/README.md`, `docs/CareerSeeker-Project-Summary.md`,
+`docs/External-Audit-Handoff.md`, and the verifier's own `Assert-Contains` expectations for all three
+harness tables. **Three docs that quote 611 were deliberately left alone** — `docs/autonomy/CODEX-STATE.md`,
+`docs/Codex-Resume-Handoff.md`, `docs/BETA-AUDIT-REQUEST.md` record what a specific past run
+*measured*, and rewriting a measurement to match a later one falsifies the record.
+
+Also executed: `dotnet build CareerSeeker.sln -c Release` → **0 Warning(s), 0 Error(s)**;
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 27 vector files match the generator.`**
+
+### Milestone 5 — no cross-repo drift, and the Kotlin half is blocked for the wrong-guess reason
+
+`git diff --stat -- docs/sync-vectors/` is **empty**. No vector byte moved, none added, none removed:
+this run is a **consumer only**. Draft PR **#51**, stacked on #50 (base
+`claude/s3-pairing-confirm-vector`).
+
+The phone-side assertion is **not** blocked on the Android SDK, which is what I would have guessed.
+`:core`'s vendored corpus is pinned at `679a317`, which **predates the vector** — `pairing-high-bit-confirm`
+is not in the android tree at all. Writing the Kotlin test requires #50 to merge and the vendored pin
+to move, and a re-pin is a cross-repo decision, not a coding task. Recorded as **B-14**.
+
+### Milestone 6 — CI measured the one number this run could only compute
+
+Milestone 4's 617 was arithmetic on top of a quoted 230. **CI then measured it.** PR #51's Windows
+job (`ci.yml:46-48` runs `./scripts/Verify-Alpha.ps1`, which throws on a pin mismatch at `:926-927`):
+
+| run | job | result |
+| --- | --- | --- |
+| [31897428719](https://github.com/ShivaClaw/careerseeker/actions/runs/31897428719) job `95042792228` | Build and offline harnesses (`windows-latest`) | **success** |
+| same run | Blind relay (Worker) — incl. *sync vectors match their generator* | **success** |
+
+Observed in the log at 17:09:39Z:
+
+```
+=== 136 passed, 0 failed ===
+
+=== Offline total: 617 passed, 0 failed ===
+```
+
+**617 measured − 387 measured here = 230**, so EngineHarness's Windows contribution — the single
+figure this run quoted rather than observed — is now settled by measurement, and the sweep is
+confirmed complete rather than merely believed complete. **The attribution stays exact: CI ran the
+gate, I did not**, and it is the offline half only (no `-IncludePublish`, `-IncludePackage`,
+`-IncludeLive`), so the merge condition remains a full local gate and remains Brandon's.
+
+### Prohibition — what this iteration did not touch
+
+**Nothing was merged, in either repo**, and no PR was merged, retargeted, closed or marked ready.
+**No force-push, no history rewrite, no rebase, no branch deleted.** The android repo's drafts
+**#1–#6 were left exactly as found** and **not one android source file was changed** — this run's only
+android write is these records. In the main repo, **PR #50 and the S5 stack's four branches were read
+only**; the one new branch is `claude/s3-pairing-confirm-consumer`, opened as **draft PR #51**.
+
+**No `src/` change is in the diff.** `PairingCrypto.cs` was mutated four times and restored from a
+pre-mutation copy each time; `git status --porcelain` proves it. **No vector byte moved** and the
+android vendored corpus was never opened for writing — **NO cross-repo drift event**. No `relay/`, no
+TypeScript, no Kotlin, no `:app`, no Gradle invocation.
+
+**`scripts/Verify-Alpha.ps1` was edited this run** — deliberately, because the drift trap requires it:
+the pin moved 611 → 617 and every count-reporting doc moved in the same commit. **The gate itself was
+not run and no claim here says it was**: `pwsh` is absent and not in the Ubuntu archive, so
+`Verify-Alpha.ps1` could not even be parse-checked. The android gate was not run either (**B-7**).
+
+No deploy of any kind (Cloudflare, Workers, relay, site, Pages), no `wrangler`, and **the production
+relay was not contacted at all, not even `GET /v1/health`**. No Google, Play or OAuth console; no
+accounts, no purchases, no Play Billing code; no Gmail, no email; no MSIX or certificate action; no
+emulator, no `sdkmanager`, no `avdmanager`, no keystore. **No secret was read, printed or referenced.**
+Terra's worktrees were never touched, and `autonomy/codex-state` was **read** — heartbeat
+`2026-08-12T20:28:36`, **COMPLETE, files claimed: none** — so there was no collision and no rebase was
+owed. **One machine change**: `apt-get install -y --no-install-recommends dotnet-sdk-8.0` (8.0.129),
+the command C-WP-1 prescribes. Nothing else was installed.
