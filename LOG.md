@@ -8826,9 +8826,17 @@ directory*. This sandbox ships **JDK 21 only**, and `:core` pins `jvmToolchain(1
 cannot auto-provision here (`api.foojay.io` is denied, B-7). Fixed with exactly the command the
 script's own failure message prescribes — `apt-get update -qq && apt-get install -y
 --no-install-recommends openjdk-17-jdk-headless` — after which `/usr/lib/jvm/java-17-openjdk-amd64`
-exists and the probe runs. **Logged as a machine change** (mission §3a). Recorded because it is new:
-no prior run's LOG mentions installing a JDK, so the image changed under the program. The next cloud
-session should expect to spend one command on this before any `:core` claim.
+exists and the probe runs. **Logged as a machine change** (mission §3a).
+
+**Correction, made against this entry's own first draft.** It originally said *"no prior run's LOG
+mentions installing a JDK, so the image changed under the program."* **That is false, and the
+records say so plainly:** the **twentieth** run logged *"One machine change, logged: `apt-get install
+openjdk-17-jdk-headless` (`:core` pins `jvmToolchain(17)`; foojay is denied by B-7's policy), exactly
+as `core-probe.sh`'s header prescribes."* Same command, same reason, nineteen runs earlier. **Nothing
+changed under the program — each fresh cloud sandbox simply starts without it**, which is a
+*recurring* per-session cost rather than a new event. Caught while re-reading `STATE.md`'s twentieth
+heartbeat to check an unrelated claim; it is exactly the kind of "this is new" flourish that sends a
+later session hunting for a change that never happened.
 
 ### Milestone 1 — the gap, measured rather than inherited
 

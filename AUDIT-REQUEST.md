@@ -8041,8 +8041,15 @@ apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-
 ls -d /usr/lib/jvm/*17*                      # after:  /usr/lib/jvm/java-17-openjdk-amd64
 ```
 
-That is the command `core-probe.sh` prints in its own failure message. **No prior LOG entry records
-installing a JDK**, so a future cloud session should expect this step before any `:core` claim.
+That is the command `core-probe.sh` prints in its own failure message. **This is recurring, not new
+— a first draft of this claim said no prior LOG entry recorded installing a JDK, and that was
+wrong:** the twentieth run logged the same command for the same reason. Verify:
+
+```bash
+grep -o "apt-get install openjdk-17-jdk-headless" STATE.md | head -2
+```
+
+So a cloud session should expect this step **every** time, before any `:core` claim.
 
 ### C-PD-1 — `PairingDerivation` had no test file of its own
 
