@@ -8022,3 +8022,183 @@ gh run view 31866169984 --json conclusion,jobs
 `docs/Merge-Topology.md` §10.6 remains a **full local gate**, which is Brandon's and is unchanged by
 this green. And CI cannot execute `BuildSyncBridge` either, for exactly the reason the decision doc
 gives: no DPAPI vault, no relay.
+
+---
+
+## Thirty-ninth run (2026-08-15) — `PairingDerivationTest`, the `:core` lane's last named gap
+
+Every claim below was executed in this session unless the line says otherwise. Commands run from the
+android repo root on `claude/android-a0-probe` unless stated.
+
+### C-PD-0 — the sandbox has no JDK 17, and `core-probe.sh` cannot run until it does
+
+**New this run, and it is an environment change, not a repo change.** The image ships JDK 21 only;
+`:core` pins `jvmToolchain(17)` and Gradle cannot auto-provision one (`api.foojay.io` denied, B-7).
+
+```bash
+ls -d /usr/lib/jvm/*17*                      # before: "No such file or directory"
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+ls -d /usr/lib/jvm/*17*                      # after:  /usr/lib/jvm/java-17-openjdk-amd64
+```
+
+That is the command `core-probe.sh` prints in its own failure message. **No prior LOG entry records
+installing a JDK**, so a future cloud session should expect this step before any `:core` claim.
+
+### C-PD-1 — `PairingDerivation` had no test file of its own
+
+```bash
+git ls-tree --name-only origin/claude/android-a0-probe core/src/test/kotlin/app/careerseeker/core/ \
+  | grep -c PairingDerivation        # 0 at the parent commit 61d5804
+ls core/src/main/kotlin/app/careerseeker/core/**/*.kt | wc -l   # 18 production files
+```
+
+The twentieth iteration's standing answer named two such files, `SyncCrypto` and this one.
+`SyncCryptoTest.kt` closed the first; this run closes the second.
+
+### C-PD-2 — the suite moved 276 → 288, measured from the XML and not counted by eye
+
+```bash
+scripts/core-probe.sh --rerun
+```
+
+- parent commit `61d5804`: `core-probe: 276 tests, 0 failed, 0 skipped, across 18 classes`
+- this commit: `core-probe: 288 tests, 0 failed, 0 skipped, across 19 classes`
+
+**This is `:core:test` only** — one of the android gate's four tasks. `checkCoreIsAndroidFree`,
+`:app:assembleDebug` and `:app:lintDebug` did **not** run (B-7). Do not read this as a gate result.
+
+### C-PD-3 — every pre-existing `derive` caller passes a one-element list
+
+The claim that `concat`'s loop body had never run twice:
+
+```bash
+grep -rn -A2 "PairingDerivation.derive(" core/src app/src
+```
+
+Five call sites — `PairingSession.kt:123`, `ProtocolVectorsTest.kt:93` and `:117`,
+`PairingSessionTest.kt:136` and `:196` — and every one wraps a single secret in `listOf(...)`.
+
+### C-PD-4 — the confirm code's modulo bias, in exact integers
+
+Recomputed independently of the test before it was written down:
+
+```bash
+python3 -c "
+space=2**32; m=10**6; small=space//m; biased=space%m
+print(small, biased, m-biased, biased*(small+1)+(m-biased)*small==space, (small+1)/(space/m))"
+# 4294 967296 32704 True 1.00000761449337
+```
+
+967,296 codes have 4295 preimages, 32,704 have 4294, the identity closes on 2³², and the most likely
+code is over-represented by a factor under **1.0000077**. **No change proposed.**
+
+**Known limit, stated rather than left to be discovered:** the test carrying these numbers is a pin
+by construction and cannot fail from a production edit. What holds the modulus and the derived
+length in place is C-PD-5's recomputation test.
+
+### C-PD-5 — the reduction is recomputed by a second mechanism, not transcribed
+
+`confirm code is the unsigned big-endian reduction of four HKDF bytes` derives the four bytes through
+`Hkdf.deriveKey(..., length = 4)`, reads them with `ByteBuffer` (big-endian by default), clears the
+sign with a 32-bit mask and compares to `derive(...).confirmCode` over 32 independent inputs.
+
+**What it does not prove, stated so it is not read as wider:** both sides are Kotlin, so it pins the
+expression against the rule, not the phone against the engine. Engine agreement is the vectors' job
+and `ProtocolVectorsTest` already holds it.
+
+### C-PD-6 — the engine's construction, read rather than assumed
+
+In `ShivaClaw/careerseeker` at `origin/main`:
+
+```bash
+grep -n "ReadUInt32BigEndian\|CompletionAad" src/Sync/PairingCrypto.cs
+grep -n "CommandSigPrefix" src/Sync/DeviceSignature.cs
+```
+
+- `PairingCrypto.cs:65` — `BinaryPrimitives.ReadUInt32BigEndian(confirmBytes) % 1_000_000u`, i.e.
+  **unsigned**; the phone's `Long` + `and 0xFF` is what matches it.
+- `PairingCrypto.cs:85-86` — `$"{PairAadPrefix}|{pairing}|{suite}|{phonePubB64u}"`.
+- `DeviceSignature.cs:18` — `Convert.ToHexString(SHA256.HashData(ciphertext)).ToLowerInvariant()`,
+  i.e. **lower-case**; Kotlin's `"%02x"` is the same choice in another language.
+
+### C-PD-7 — the mutation pass, and the harness that cannot fabricate a survivor
+
+```bash
+python3 scratch/mutate.py     # nine mutations, one at a time, full suite each, source restored
+```
+
+The harness **aborts** if a mutation's target string is not found, so "SURVIVED" can never be
+produced by a mutation that silently failed to apply. First pass:
+
+| # | Mutation | Failed | Mine? |
+| --- | --- | --- | --- |
+| M1 | `and 0xFF` dropped on the top byte | 2 | **both mine** |
+| M2 | confirm bytes read little-endian | 5 | 1 mine + 4 pre-existing |
+| M3 | `concat(sharedSecrets)` → `sharedSecrets[0]` | 1 | 1 mine — **and it was the wrong one** |
+| M4 | digest hex `%02X` | 4 | 1 mine + 3 pre-existing |
+| M5 | both directional keys under one label | 6 | 1 mine + 5 pre-existing |
+| M6 | `completionAad` field order swapped | 2 | 1 mine + 1 pre-existing |
+| M7 | `.padStart(6, '0')` dropped | 2 | **both mine** |
+| M8 | modulus 10⁶ → 10⁵ | 5 | 1 mine + 4 pre-existing |
+| M9 | provisional token's salt changed | 3 | **none mine** |
+
+### C-PD-8 — M3 found a real gap in my own test, which was then closed and re-measured
+
+The ordering test passed under a mutation that collapses the concatenation, because `[a, b]` → `a`
+and `[b, a]` → `b` still differ. A third assertion was added (`[a, b]` must not derive what `[a]`
+derives) and the test renamed.
+
+```bash
+python3 scratch/reverify.py    # clean run, then M3 re-applied
+```
+
+- clean run: **no failures**
+- M3 re-applied: **2 failures**, `shared secrets concatenate in list order, and every element
+  reaches the ikm` now among them.
+
+### C-PD-9 — the shared vectors cannot distinguish a signed reduction from an unsigned one
+
+**A finding about the corpus, not about this module, and it is not fixed here.** Under M1 the
+reduction is signed, yet every pre-existing conformance test passed — including those pinning exact
+confirm codes from `docs/sync-vectors/v1/`. That is only possible if **no pairing vector's confirm
+derivation has its top byte set**. The engine is correct (C-PD-6) but the shared corpus does not
+prove it has to be, on either implementation.
+
+Re-verify by re-running M1 and reading which tests fail:
+
+```bash
+python3 scratch/mutate.py 2>&1 | sed -n '/M1/,/M2/p'   # 2 failures, both in PairingDerivationTest
+```
+
+Closing it means a new vector via `docs/sync-vectors/generate.mjs` in the **main** repo — a
+cross-repo artifact and a separate slice. **Not attempted this run.**
+
+### C-PD-10 — M9 is a miss in this file, reported as one
+
+Changing the provisional token's salt is caught by three pre-existing tests and by none of mine: my
+test asserts relationships (differs from the final token, deterministic, varies with the secret) and
+all survive a salt change. The **value** is pinned by `ProtocolVectorsTest` against
+`provisional_token_b64u`, which is the better authority — deliberate non-duplication, but a limit of
+this file.
+
+### C-PD-11 — no vector byte moved, in either repo
+
+```bash
+# main repo, origin/main
+node docs/sync-vectors/generate.mjs --check     # OK: 26 vector files match the generator.
+# android repo
+git status --porcelain                          # one line: the new test file, untracked
+git diff --stat core/src/main/                  # empty — the mutation harness restored the source
+```
+
+The vendored copy under `core/src/test/resources/sync-vectors/` was never opened for writing. **No
+cross-repo drift event.**
+
+### NOT RUN HERE
+
+`scripts\Verify-Alpha.ps1` (needs Windows; no `pwsh`, no .NET on this host) and **three of the
+android gate's four tasks** (`checkCoreIsAndroidFree`, `:app:assembleDebug`, `:app:lintDebug` —
+B-7). This slice adds **no C# assertion and no vector**, so `$ExpectedOfflineTotal` is untouched and
+the drift trap is not engaged. **CI is the gate**; if its `:app` Robolectric step reds on attempt 1
+with `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab`, that is the standing flake
+already recorded in `BLOCKED.md`, not this change.

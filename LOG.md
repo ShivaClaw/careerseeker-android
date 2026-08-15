@@ -8796,3 +8796,191 @@ no collision and no rebase was owed.
 
 **No machine change this run** — nothing was installed; `node` and `git` were already present and are
 all this slice needed.
+
+## Thirty-ninth run — 2026-08-15 (Linux sandbox): the confirm code's bias was asked about at last, and the test that proved the concatenation proved less than it said
+
+**Fetched first, both trees, before anything was read** (rule one). `careerseeker` gained the
+`codex/*` set and `main` at **`aac05f3`**; `careerseeker-android` had no ref changes and
+`claude/android-a0-probe` was at **`61d5804`**. Terra's `autonomy/codex-state:STATE.md` still reports
+**COMPLETE, no files claimed** — no collision, no rebase owed.
+
+**Assigned slice DECLINED because it is landed, for the SIXTH consecutive run**, and verified here
+rather than inherited. On `origin/claude/s5-entitlement-ack-spec`, `Sync-Protocol.md:307-344` carries
+§4.3.3's `{product_id, acknowledged_at, order_id?}` (PQ-A6-1), `:601` the `decrypt_failed` structural
+rule (PQ-A2-2), `:103-105` the cap read on the ciphertext (PQ-A2-1); `entitlement-ack.json` and
+`entitlement-ack-no-order-id.json` are both present, and PQ-A2-3's `invalid-unknown-field.json` is
+present downstream of #37. The stored prompt's ladder summary is now **fifteen runs stale**.
+
+Routed by `STATE.md`'s ordered next intent, **thirteenth consecutive run**. Items 1–6 are each
+explicitly not a cloud slice — item 1 says *do not re-measure this; it is measured* and needs
+Brandon's gate; item 2 says *implement them in a local session, or leave them*; item 3 says *do not
+implement it blind from a cloud session*; item 4 is a Windows build; item 5 needs the full local
+gate; item 6 says in terms that **neither** phone-side item is a cloud-session slice. **Item 7 — the
+`:core` lane — was the topmost workable rung**, and its standing question is *"which `:core`
+behaviour is unwritten, untested, or asserted only by reading?"*
+
+### Milestone 0 — a machine change, and the sandbox image is not what the last runs had
+
+`scripts/core-probe.sh` **refused to run**: `ls -d /usr/lib/jvm/*17*` printed *No such file or
+directory*. This sandbox ships **JDK 21 only**, and `:core` pins `jvmToolchain(17)` which Gradle
+cannot auto-provision here (`api.foojay.io` is denied, B-7). Fixed with exactly the command the
+script's own failure message prescribes — `apt-get update -qq && apt-get install -y
+--no-install-recommends openjdk-17-jdk-headless` — after which `/usr/lib/jvm/java-17-openjdk-amd64`
+exists and the probe runs. **Logged as a machine change** (mission §3a). Recorded because it is new:
+no prior run's LOG mentions installing a JDK, so the image changed under the program. The next cloud
+session should expect to spend one command on this before any `:core` claim.
+
+### Milestone 1 — the gap, measured rather than inherited
+
+The twentieth iteration's standing answer named **two** `:core` files with no test file of their own,
+`SyncCrypto` and `PairingDerivation`, and predicted the second was *not* thin: *"`signatureInput`,
+`completionAad` and the confirm-code reduction (`% 1_000_000`, which has a modulo-bias question
+nobody has asked) are all one-line-per-claim surfaces."* `SyncCryptoTest.kt` has since been written.
+`PairingDerivationTest.kt` did not exist. **This run closes the pair.**
+
+**"Untested" was the wrong reading and the record never claimed it.** `ProtocolVectorsTest` and
+`PairingSessionTest` call `derive`, `provisionalRelayToken`, `completionAad` and `signatureInput` and
+pin every output byte-for-byte against `docs/sync-vectors/v1/`. What the vectors cannot reach is
+what they do not contain, and measured that is three things: the confirm code's *reduction* (each
+vector fixes one input, so unsignedness is invisible wherever the top byte happens to be below
+0x80), `concat` with **more than one** shared secret, and the two `|`-joined strings' field
+structure.
+
+**The concat measurement is the sharp one.** `grep -rn -A2 "PairingDerivation.derive(" core/src
+app/src` returns five call sites and **every one passes a one-element list**. So `concat`'s loop body
+had run exactly once, forever, in production and in the suite — while `PairingDerivation.kt:18-20`
+says the concatenation exists for the post-quantum hybrid suite and must not be collapsed.
+
+### Milestone 2 — the modulo-bias question, asked and answered
+
+Answered in exact integers rather than intuition. 2³² is not a multiple of 10⁶; it splits as
+`2³² = 4294 × 10⁶ + 967296`, so **967,296** codes have **4295** preimages and **32,704** have
+**4294**. The identity `967296 × 4295 + 32704 × 4294 = 2³²` is asserted, which is what makes it a
+proof rather than a claim. **The bias is one preimage wide:** the most likely code's probability
+exceeds a uniform 10⁻⁶ by a factor of **1.0000076**, under one part in 130,000.
+
+**No change is proposed, and that is the answer.** Against a six-digit code whose security argument
+is a ~10⁻⁶ guess and a human comparing two screens, one part in 130,000 is not a finding. Rejection
+sampling would remove it exactly and is deliberately refused: it makes the derivation non-total, and
+the engine would have to make the identical choice or the two screens stop matching.
+
+**Stated against my own interest:** that test is a **pin by construction** and cannot fail from a
+production edit — it reads no production code. What holds the modulus and the derived length in
+place is the recomputation test beside it, which recomputes `% 1_000_000L` over 4 bytes through
+`ByteBuffer` and compares. The two are a pair; neither is sufficient alone, and the doc comment says
+so rather than leaving a reader to assume the arithmetic is load-bearing.
+
+### Milestone 3 — the finding: a test that proved less than its name
+
+**M3 is the entry worth reading.** Replacing `concat(sharedSecrets)` with `sharedSecrets[0]` — the
+exact collapse the source comment warns against — was caught by **one** test, and *not* by the one
+named `shared secrets concatenate in list order`.
+
+The reason is that the ordering test asserted the wrong thing. Under the collapse, `[a, b]` derives
+from `a` and `[b, a]` from `b`; they still differ, so an order-only assertion still passes. What the
+collapse destroys is the **second element's contribution**, which nothing asserted. Corrected in
+place: `[a, b]` must not derive what `[a]` alone derives, and the test renamed to say so. **The
+mutation pass is what found this, not review** — the file went green on its first run with the weaker
+assertion in it.
+
+### Milestone 4 — where the delimiter guard actually lives
+
+`completionAad` joins three caller-supplied strings with `|` and validates none of them, so read
+locally it is ambiguous. Measured, it is unreachable on the production path, and the test pins the
+three reasons instead of adding a fourth check: `parseInvite` refuses a pairing id that is not `p_` +
+16 base64url characters (`PairingSession.kt:75-76`) and a suite outside `SUPPORTED_SUITES` (`:71-73`),
+and `buildCompletion` base64url-**encodes** the public key rather than passing it through. None of
+those alphabets contains `|`.
+
+**Deliberately not "fixed."** Adding validation inside `completionAad` is the *phone more correct
+than the engine* mistake the mission's interpretation rule forbids: `PairingCrypto.cs:85-86`
+validates nothing here either, and an AAD that the two sides build differently is a decryption
+failure with no diagnostic. The guard belongs upstream, it is upstream, and the test now says where.
+
+### Milestone 5 — the mutation pass, and what it says about the shared vectors
+
+Nine mutations, applied one at a time to `PairingDerivation.kt` by a harness that **aborts if a
+mutation's target string is not found** — a mutation that silently failed to apply would be reported
+as "survived", and that is the one result that must never be fabricated.
+
+| # | Mutation | Failed | Caught by this file? |
+| --- | --- | --- | --- |
+| M1 | `and 0xFF` dropped on the top byte (unsigned → signed) | **2** | **yes — and by nothing else** |
+| M2 | confirm bytes read little-endian | 5 | yes (+4 pre-existing) |
+| M3 | `concat(sharedSecrets)` → `sharedSecrets[0]` | 1 | **partly — see below** |
+| M4 | digest hex rendered `%02X` | 4 | yes (+3 pre-existing) |
+| M5 | both directional keys derive under one label | 6 | yes (+5 pre-existing) |
+| M6 | `completionAad` field order swapped | 2 | yes (+1 pre-existing) |
+| M7 | `.padStart(6, '0')` dropped | **2** | **yes — and by nothing else** |
+| M8 | modulus `10⁶` → `10⁵` | 5 | yes (+4 pre-existing) |
+| M9 | provisional token's salt changed | 3 | **no — pre-existing only** |
+
+**9 of 9 caught by the suite. 7 of 9 by this file on the first pass, 8 of 9 after M3's gap was
+closed.** The table above is the **first** pass, recorded as it ran. Re-running M3 against the
+strengthened file fails **two** tests rather than one — `shared secrets concatenate in list order,
+and every element reaches the ikm` now among them — and the clean suite re-run before it reported
+**no failures**, so the new assertion is not merely failing for its own sake.
+
+**M1 and M7 are the coverage this file actually adds, and they are the alarming pair.** Each was
+caught by **two tests, both new**. So before this run: making the confirm reduction *signed* — which
+renders `-12345` for any derivation whose top byte is ≥ 0x80 — passed the entire module, and so did
+dropping the zero-pad that keeps the code six characters. Both would have reached a user comparing
+two screens.
+
+**And that is a measurement about the shared vectors, not just about this module.** The pre-existing
+conformance tests pin exact confirm codes from `docs/sync-vectors/v1/`, and they passed under M1.
+The only way that happens is if **no pairing vector's confirm derivation has its top byte set**, so
+the vector suite as it stands **cannot distinguish a signed reduction from an unsigned one — on
+either implementation**. The engine reduces as a `uint`
+(`PairingCrypto.cs:65`, `BinaryPrimitives.ReadUInt32BigEndian`) and is correct; nothing in the shared
+corpus proves it has to be. Recorded as a finding, **not fixed here** — adding a vector is a
+`generate.mjs` change in the main repo, which is a cross-repo artifact and a separate slice.
+
+**M9 is reported as a miss rather than dressed up.** Changing the provisional token's salt is caught
+by three pre-existing tests and by **none** of mine: my provisional-token test asserts *relationships*
+(it differs from the final token, it is deterministic, it varies with the secret) and every one of
+those survives a salt change. The **value** is pinned by `ProtocolVectorsTest` against
+`provisional_token_b64u` in the vectors, which is the better authority, so this is deliberate
+non-duplication rather than an oversight — but it is a limit of this file and is written down as one.
+
+### Verification actually executed
+
+`scripts/core-probe.sh --rerun` — `:core:test` only, on a probe build with `google()` absent:
+
+- **before:** `276 tests, 0 failed, 0 skipped, across 18 classes`
+- **after:** `288 tests, 0 failed, 0 skipped, across 19 classes`
+
+**The android gate did NOT run and was correctly not attempted.** `core-probe.sh` runs **one** of its
+four tasks; `checkCoreIsAndroidFree`, `:app:assembleDebug` and `:app:lintDebug` all need the Android
+SDK, which B-7 says is unreachable here. **CI remains the gate.** No claim above is a compile-only or
+"should pass" claim.
+
+### Prohibition — what this iteration did not touch
+
+**Nothing was merged, in either repo**, and no PR was merged, retargeted, closed or marked ready.
+**No force-push, no history rewrite, no rebase, no branch deleted.** This repo's open drafts were
+enumerated (**#1–#6**) and **#1–#5 were left exactly as found**; the only PR touched anywhere was
+this repo's existing draft **#6**, refreshed in place and left **draft**. The main repo's PRs were
+**not enumerated and not touched** — its branch list was read and nothing else. The only write
+anywhere was one new test file on `claude/android-a0-probe` plus these records.
+
+**Not one byte of production source changed, in either repo.** `core/src/main` is untouched — the
+mutation harness restored it and `git status` proves it. No `:app`, no `src/`, no `relay/`, no
+`tests/`, no `scripts/`, no C#, no TypeScript. **The main repo received nothing at all** this run
+except the coordination heartbeat on `autonomy/claude-state`.
+
+**`generate.mjs` and every byte of `docs/sync-vectors/` are unchanged** — verified `OK: 26 vector
+files match the generator.` on `main`, no vector added, removed or edited, and the android repo's
+vendored copy under `core/src/test/resources/sync-vectors/` was never opened for writing: **NO
+cross-repo drift event**. **`scripts/Verify-Alpha.ps1` was neither read for editing nor edited**; the
+offline pin is untouched and the drift trap is not engaged — this run added no C# assertion.
+
+No deploy of any kind (Cloudflare, Workers, relay, site, Pages), no `wrangler` invocation, and **the
+production relay was not contacted at all, not even `GET /v1/health`**. No Google, Play or OAuth
+console; no accounts, no purchases, no Play Billing code; no Gmail, no email; no MSIX or
+certificate-store action; no emulator, no `sdkmanager`, no `avdmanager`, no keystore. **No secret was
+read, printed or referenced.** Terra's worktrees were never touched, and `autonomy/codex-state` was
+**read** — **COMPLETE, no files claimed**, so there was no collision and no rebase was owed.
+
+**One machine change, recorded in Milestone 0**: `openjdk-17-jdk-headless` installed from the Ubuntu
+archive, which is what `core-probe.sh`'s own failure message prescribes. Nothing else was installed.
