@@ -8241,3 +8241,144 @@ B-7). This slice adds **no C# assertion and no vector**, so `$ExpectedOfflineTot
 the drift trap is not engaged. **CI is the gate**; if its `:app` Robolectric step reds on attempt 1
 with `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab`, that is the standing flake
 already recorded in `BLOCKED.md`, not this change.
+
+---
+
+## Fortieth run — 2026-08-15: the confirm-code vector (main repo `claude/s3-pairing-confirm-vector`, draft PR #50)
+
+Every command below is run from a clone of **`ShivaClaw/careerseeker`** on branch
+`claude/s3-pairing-confirm-vector` unless stated otherwise. Node is the only tool needed for
+C-HB-1…7; C-HB-8 needs Windows and is explicitly **not** claimed by this run.
+
+### C-HB-1 — the gap existed: the corpus carried exactly one confirm code, high bit clear
+
+```bash
+git checkout origin/main
+node -e '
+const fs=require("fs"),g="docs/sync-vectors/v1/";
+const n=fs.readdirSync(g).filter(f=>f!=="index.json")
+ .map(f=>JSON.parse(fs.readFileSync(g+f,"utf8")))
+ .filter(v=>v.type==="pairing"&&v.expected&&v.expected.confirm);
+console.log("confirm codes on main:",n.length, n.map(v=>v.name+"="+v.expected.confirm).join(" "));'
+```
+
+Expected: `confirm codes on main: 1 pairing-basic=797174`.
+
+### C-HB-2 — the generator produces 27 files and the tree matches it
+
+```bash
+node docs/sync-vectors/generate.mjs          # Wrote 27 files to docs/sync-vectors/v1/ (8 valid, 18 invalid).
+node docs/sync-vectors/generate.mjs --check   # OK: 27 vector files match the generator.
+echo $?                                       # 0
+```
+
+Baseline for comparison, on `origin/main`: `OK: 26 vector files match the generator.`
+This is the same command as `.github/workflows/ci.yml:103`, so CI re-runs it on every push.
+
+### C-HB-3 — the new vector renders `030514`, and both errors render something else
+
+```bash
+node -e '
+const v=require("./docs/sync-vectors/v1/pairing-high-bit-confirm.json");
+const {createECDH,hkdfSync}=require("crypto");
+const k=createECDH("prime256v1"); k.setPrivateKey(Buffer.from(v.engine.d_hex,"hex"));
+const pub=Buffer.from(v.phone.pub_b64u.replace(/-/g,"+").replace(/_/g,"/"),"base64");
+const ss=k.computeSecret(pub);
+const sec=Buffer.from(v.secret_b64u.replace(/-/g,"+").replace(/_/g,"/"),"base64");
+const d=Buffer.from(hkdfSync("sha256",ss,sec,"careerseeker/v1/confirm",4));
+const raw=d.readUInt32BE(0);
+console.log("digest 0x"+raw.toString(16),"top 0x"+(raw>>>24).toString(16));
+console.log("published :",v.expected.confirm);
+console.log("unsigned  :",String(raw%1e6).padStart(6,"0"));
+console.log("signed    :",String((raw|0)%1e6));
+console.log("unpadded  :",String(raw%1e6));'
+```
+
+Expected: digest `0x9010f572`, top `0x90`, published `030514`, unsigned `030514`,
+signed `-936782`, unpadded `30514`.
+
+### C-HB-4 — the corpus now detects both errors (property, not vector)
+
+```bash
+node -e '
+const fs=require("fs"),g="docs/sync-vectors/v1/";
+const n=fs.readdirSync(g).filter(f=>f!=="index.json")
+ .map(f=>JSON.parse(fs.readFileSync(g+f,"utf8")))
+ .filter(v=>v.type==="pairing"&&v.expected&&v.expected.confirm);
+console.log("codes:",n.length,"| leading-zero:",n.filter(v=>v.expected.confirm[0]==="0").length);'
+```
+
+Expected: `codes: 2 | leading-zero: 1`. Combine with C-HB-3 for the high-bit half.
+
+### C-HB-5 — the guard fires; it is not decorative
+
+Strip the new vector from `generate.mjs` and run it. The object to remove begins
+`{ type: 'pairing', name: 'pairing-high-bit-confirm',` and ends at its `expect_error: null,`.
+
+```bash
+python3 - <<'EOF'
+src=open('docs/sync-vectors/generate.mjs').read()
+s=src.index("  {\n    type: 'pairing',\n    name: 'pairing-high-bit-confirm',")
+e=src.index("    expect_error: null,\n  },\n];",s)+len("    expect_error: null,\n  },\n")
+open('/tmp/gen-without-vector.mjs','w').write(src[:s]+src[e:])
+EOF
+node /tmp/gen-without-vector.mjs; echo "exit=$?"
+```
+
+Expected: throws `confirm audit: no vector's confirm digest has the high bit set, so a SIGNED int32
+reduction would pass the whole suite. Add or restore a vector whose digest exceeds 0x7fffffff.`,
+`exit=1`. (It writes to `/tmp/v1`, never to the repo.)
+
+### C-HB-6 — additive only: no existing vector byte moved, so no cross-repo drift
+
+```bash
+git diff --stat origin/main...HEAD -- docs/sync-vectors/v1/
+git diff origin/main...HEAD -- docs/sync-vectors/v1/index.json
+git diff --name-only origin/main...HEAD -- docs/sync-vectors/v1/ | grep -v index.json
+```
+
+Expected: exactly one changed file (`index.json`, **+6/-0**, a single appended entry) and one new
+file (`pairing-high-bit-confirm.json`). All 25 pre-existing vectors byte-identical. In the **android**
+clone, the vendored copy is untouched and still pinned at `679a317`:
+
+```bash
+git -C ../careerseeker-android status --porcelain core/src/test/resources/sync-vectors/   # empty
+```
+
+### C-HB-7 — this branch adds ZERO merge conflicts against the unmerged S5 stack
+
+```bash
+git merge --no-commit --no-ff origin/claude/s5-inbound-pump >/dev/null 2>&1
+git diff --name-only --diff-filter=U ; git merge --abort
+git checkout -B probe origin/main                      # control: main WITHOUT this branch
+git merge --no-commit --no-ff origin/claude/s5-inbound-pump >/dev/null 2>&1
+git diff --name-only --diff-filter=U ; git merge --abort
+```
+
+Expected: **the identical five files in both runs** — `README.md`,
+`docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`,
+`scripts/Verify-Alpha.ps1`, `src/Engine/README.md`. `generate.mjs`, `index.json`,
+`Sync-Protocol.md` and every vector auto-merge in both. The five are the S5 stack's staleness against
+`main`, not this change.
+
+### C-HB-8 — NOT VERIFIED HERE: that `$ExpectedOfflineTotal` stays 611
+
+**This is the run's one inspection-only claim and its most attackable.** The reasoning is that
+`SyncHarness` selects pairing vectors by name (`tests/SyncHarness/Program.cs:75`, `:120`) while its
+generic loops iterate only `envelope`/`entitlement` types (`:141`, `:168`, `:198`, `:204`, `:447`,
+`:507`), and that *"every declared vector exists on disk"* (`:55`) is a set equality rather than a
+count — so a `pairing`-type vector adds no assertion. **Re-verify on Windows**, which this sandbox is
+not:
+
+```powershell
+scripts\Verify-Alpha.ps1        # expect: offline total 611, unchanged; 0 warnings / 0 errors
+```
+
+If that measures anything other than **611**, this branch owes a `$ExpectedOfflineTotal` bump **and**
+a sweep of every count-reporting doc, in the same change, per the drift trap in `CLAUDE.md`.
+
+### NOT RUN HERE
+
+`scripts\Verify-Alpha.ps1` (**no `pwsh`, no .NET** on this host) and the **android gate** in all four
+tasks (**B-7** — no Android SDK). This run added **no C# and no Kotlin**, so the only gate its content
+touches is the Node vector check, which **was** run (C-HB-2) and which CI re-runs independently.

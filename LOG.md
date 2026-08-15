@@ -9011,3 +9011,183 @@ read, printed or referenced.** Terra's worktrees were never touched, and `autono
 
 **One machine change, recorded in Milestone 0**: `openjdk-17-jdk-headless` installed from the Ubuntu
 archive, which is what `core-probe.sh`'s own failure message prescribes. Nothing else was installed.
+
+---
+
+## Fortieth run — 2026-08-15 (Linux sandbox): the coin flip was fixed, and one vector closes both halves of it
+
+The thirty-ninth run measured that the shared corpus carries **exactly one confirm code** and that a
+**signed** reduction and a **dropped zero-pad** are both invisible to it, then declined to fix it
+because the fix is a `generate.mjs` change in the main repo — "a cross-repo artifact and a separate
+slice". **This run is that slice.** It is the first item on this file's own ordered intent list, and
+the first time in fourteen runs that item 1 was reachable from a sandbox.
+
+### Milestone 0 — rule one, and what the fetch changed
+
+`git fetch --all --prune` in **both** checkouts before anything was read. The android tree gained no
+ref movement. The main tree moved `main` **`00b3705..aac05f3`** and pulled down the `codex/r*` and
+`codex/beta-*` branch sets. Every count below is post-fetch.
+
+### Milestone 1 — the assigned slice, declined for the SEVENTH consecutive run, and verified not inherited
+
+The stored prompt assigns S5: amend §4.3 with `entitlement_ack`, add its vector, close PQ-A2-1/2/3.
+**All of it is already written**, and I checked rather than trusting the previous six runs' verdict:
+
+```
+git diff --stat origin/main...origin/claude/s5-entitlement-ack-spec
+  docs/Sync-Protocol.md | 136 ++++-  docs/sync-vectors/v1/entitlement-ack.json | 29 +
+  docs/sync-vectors/v1/entitlement-ack-no-order-id.json | 28 +   ...
+git diff --stat origin/main...origin/claude/s5-engine-wire-parser
+  docs/sync-vectors/v1/invalid-unknown-field.json | 42 +   ...      <- PQ-A2-3
+```
+
+The stack is linear and intact — `s5-entitlement-ack-spec ⊂ s5-engine-wire-parser ⊂
+s5-entitlement-ack-emitter ⊂ s5-inbound-pump`, all four `merge-base --is-ancestor` exit 0 — and the
+three vector blobs are **byte-identical across all four branches** (same SHAs), so there is no
+divergent-generation hazard inside the stack. **None is merged into `main`.** The prompt's summary
+("S5 is NOT STARTED") is now **sixteen runs stale**. Writing it again would have produced a fourth
+copy of the same vectors on a fifth branch.
+
+### Milestone 2 — the gap, stated as the corpus states it
+
+| vector | digest | top byte | code | signed reduction | unpadded |
+| --- | --- | --- | --- | --- | --- |
+| `pairing-basic` | `0x5fd509b6` | `0x5f` | `797174` | `797174` — **same** | `797174` — **same** |
+
+One confirm code in the whole corpus, high bit clear, six significant digits. Both errors reproduce
+it exactly. The engine is correct (`PairingCrypto.cs:65`, `ReadUInt32BigEndian`) and so is the phone
+after the thirty-ninth run's test, but **nothing shared required either to stay that way**, and the
+confirm code is the one derived value a human reads off two screens and compares.
+
+### Milestone 3 — one vector, both halves
+
+`pairing-high-bit-confirm`: digest **`0x9010f572`** → code **`030514`**. High bit set **and** leading
+zero, so a single vector separates three implementations:
+
+| implementation | renders |
+| --- | --- |
+| conforming (unsigned, zero-padded) | `030514` |
+| signed `int32` reduction (M1) | `-936782` |
+| dropped `padStart` (M7) | `30514` |
+
+The secret is **reproducible, not magic**: the first `i` where
+`SHA-256("careerseeker/v1/vector-search/high-bit-confirm/" + i)` gives a digest with the high bit set
+and a reduction below 100000, which is `i = 31`. Same ECDH scalars as `pairing-basic`, so the only
+input that changes is the salt.
+
+**The generator now audits the property instead of merely carrying it.** It re-derives every
+published confirm from *that vector's own* secret and scalars — not from the constants above — and
+requires (a) each published code to equal the unsigned reduction, (b) at least one digest with the
+high bit set, (c) at least one code with a leading zero. So the blind spot cannot be restored by
+deleting the vector; generation fails first.
+
+### Milestone 4 — verification actually executed
+
+```
+$ node docs/sync-vectors/generate.mjs
+Wrote 27 files to docs/sync-vectors/v1/ (8 valid, 18 invalid).
+
+$ node docs/sync-vectors/generate.mjs --check
+OK: 27 vector files match the generator.
+```
+
+That is the command `.github/workflows/ci.yml:103` runs, so this change is gated by CI with the
+check I could run by hand. Baseline before the change, on `main`: `OK: 26 vector files match the
+generator.`
+
+**Independent re-derivation, in Python** — hand-rolled HKDF and a from-scratch P-256 scalar multiply,
+no crypto library, deliberately not Node, because a generator verified by its own language proves
+only that the language agrees with itself:
+
+```
+vector                           digest   top  published recomputed  keys  | signed-> unpadded->
+pairing-basic                0x5fd509b6  0x5f     797174     797174  OK    |    797174    797174   OK
+pairing-high-bit-confirm     0x9010f572  0x90     030514     030514  OK    |   -936782     30514   OK
+
+vectors publishing a confirm code: 2
+with high bit set (detects SIGNED reduction): 1
+with leading zero (detects DROPPED zero-pad): 1
+ALL published pairing values independently re-derived in Python: PASS
+```
+
+**Negative test, because a guard nobody has seen fail is not evidence.** Stripping the new vector and
+re-running the generator:
+
+```
+Error: confirm audit: no vector's confirm digest has the high bit set, so a SIGNED int32
+reduction would pass the whole suite. Add or restore a vector whose digest exceeds 0x7fffffff.
+exit=1
+```
+
+### Milestone 5 — why the offline pin does NOT move, and the honest label on that claim
+
+**Derived by reading the harness, not by running it.** `SyncHarness` picks pairing vectors **by
+name** — `pairingVectors.Single(v => name == "pairing-basic")` (`Program.cs:75`) and `"…-mitm-keyswap"`
+(`:120`) — and its generic loops iterate only `envelope` and `entitlement` types (`:141`, `:168`,
+`:198`, `:204`, `:447`, `:507`). A new **`pairing`**-type vector therefore enters no loop and adds
+**no `Check()`**. The one enumerating assertion, *"every declared vector exists on disk"* (`:55`), is
+a **set equality** between `index.json` and the directory, not a count, and the generator writes both
+sides. So `$ExpectedOfflineTotal` stays **611** and the drift trap is not engaged — **no
+`Verify-Alpha.ps1` edit, no count-reporting doc sweep**.
+
+**This is an inspection claim and is labelled as one.** `which pwsh` is empty and there is no .NET on
+this host, so the gate was not run and no result for it is reported. It is the single most attackable
+claim in the change and the PR's self-audit says so first.
+
+### Milestone 6 — additive only, and conflict-neutral, both measured
+
+```
+$ git diff --stat -- docs/sync-vectors/v1/
+ docs/sync-vectors/v1/index.json | 6 ++++++
+ 1 file changed, 6 insertions(+)
+```
+
+**Twenty-five pre-existing vector files are byte-identical**; `index.json` gains exactly one appended
+entry; one file is new. The android repo's vendored copy stays pinned at `679a317` and **was not
+opened for writing** — no re-pin is proposed. **Not a cross-repo drift event.**
+
+And the question the previous runs could not answer without measuring — whether this collides with
+the unmerged S5 stack (29 vectors, pin 793). Test-merged locally and aborted:
+
+| merged into `origin/claude/s5-inbound-pump` | conflicts |
+| --- | --- |
+| this branch | `README.md`, `docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`, `scripts/Verify-Alpha.ps1`, `src/Engine/README.md` |
+| **`origin/main` alone (control)** | **the identical five** |
+
+`generate.mjs`, `index.json`, `Sync-Protocol.md` and every vector file **auto-merged in both runs**.
+So this change adds **zero** new conflicts: the five are the S5 stack's own staleness against `main`
+— count-reporting docs and the verifier pin — and they exist whether or not this branch lands.
+
+### What this run deliberately did NOT do
+
+**No C# applier and no Kotlin consumer assertion.** The vector closes the *corpus* gap and the
+generator enforces the property, but neither `SyncHarness` nor the `:core` tests yet assert against
+`pairing-high-bit-confirm`. Writing either means compiling C# or running Gradle, and **neither is
+possible here** — so it is left for a local session rather than pushed unverified. It is **not
+BLOCKED**: nothing external prevents it, no human decision is owed, and calling it blocked would send
+the next session hunting a phantom. It is simply the next slice, and it is now item 1.
+
+### Prohibition — what this iteration did not touch
+
+**Nothing was merged, in either repo**, and no PR was merged, retargeted, closed or marked ready.
+**No force-push, no history rewrite, no rebase, no branch deleted.** The android repo's drafts
+**#1–#6 were left exactly as found** and **not one android file was changed** — this run's only
+android write is these records. In the main repo the one new branch is
+`claude/s3-pairing-confirm-vector`, opened as **draft PR #50**; the S5 stack's four branches and
+their PRs were **read only** and left untouched, and the local test-merge was **aborted** (`git status
+--porcelain` empty afterwards).
+
+**`scripts/Verify-Alpha.ps1` was read, never edited** — no C# assertion added, `$ExpectedOfflineTotal`
+untouched, drift trap not engaged. **No `src/`, no `tests/`, no `relay/`, no C#, no Kotlin, no
+TypeScript** — the change is `generate.mjs`, its regenerated output, and one spec paragraph. **No
+existing vector byte moved**, and the android vendored corpus was never opened for writing.
+
+**No gate was run and none is claimed**: `scripts\Verify-Alpha.ps1` needs Windows (`which pwsh`
+empty, no .NET) and the android gate needs the SDK (**B-7**). No deploy of any kind (Cloudflare,
+Workers, relay, site, Pages), no `wrangler`, and **the production relay was not contacted at all, not
+even `GET /v1/health`**. No Google, Play or OAuth console; no accounts, no purchases; no Gmail, no
+email; no MSIX or certificate action; no emulator, no `sdkmanager`, no `avdmanager`, no keystore.
+**No secret was read, printed or referenced.** Terra's worktrees were never touched, and
+`autonomy/codex-state` was **read** — heartbeat `2026-08-12T20:28:36`, **COMPLETE, files claimed:
+none** — so there was no collision and no rebase was owed. **No machine change this run**: nothing
+was installed.
