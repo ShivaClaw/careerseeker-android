@@ -9394,3 +9394,18 @@ the step's own `conclusion: success` from the jobs API. The log grep is left abo
 command that upgrades this from a status to a transcript once the job finishes — **the next session
 should run it, and should also confirm the remaining steps went green**, since `:core:test`,
 `:app:test`, `assembleDebug` and `lintDebug` had not reported when this run stopped.
+
+**Correction, same run:** pointing at run `31948926844` by number is stale advice the moment another
+commit lands — this repo's workflow cancels an in-flight run when the branch moves, and the records
+commit that follows this one does exactly that. **Read the newest run on the branch instead**, which
+is what this resolves to:
+
+```bash
+gh run list --repo ShivaClaw/careerseeker-android --branch claude/android-a0-probe --limit 1
+gh run view --repo ShivaClaw/careerseeker-android <id> --log \
+  | grep -E "pinned main-repo commit|OK: [0-9]+ vendored|paginated"
+```
+
+The step-7 `conclusion: success` recorded above is **not** invalidated by the cancellation — that step
+had already completed before the branch moved — but its *log text* may no longer be retrievable, which
+is precisely why it is written up as a status and not quoted as a transcript.
