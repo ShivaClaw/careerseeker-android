@@ -1,5 +1,27 @@
 # MISSION — Sync + Android ladder (S0–S8), unattended window Aug 7–18
 
+> ## ⛔ STATUS BANNER — added at run 48 (2026-08-16). The mission below is unchanged; this is state, not law.
+>
+> **§7's stop condition is MET.** It fires at 45 iterations logged; **47 are logged**, and the final
+> handoff was written at run 47 as [`../RETURN-DAY.md`](../RETURN-DAY.md). **Read that first** — it
+> carries the ladder table, the landing plan for the 17 open draft PRs, and the human queue.
+>
+> **If your prompt just assigned you S5's spec half** — amend §4.3 with the `entitlement_ack` body,
+> add the vector via `generate.mjs`, close PQ-A2-1/-2/-3 — **stop and verify before building it.**
+> It has been built since **2026-08-09**: `8575539` (body + PQ-A2-1 + PQ-A2-2), `22b028e` (both ack
+> vectors), `7328a0b` (`invalid-unknown-field`, PQ-A2-3), all on the `claude/s5-*` draft branches.
+> **Thirteen runs have now been assigned it.** The one-command check is **C-STOP-1** in
+> [`../AUDIT-REQUEST.md`](../AUDIT-REQUEST.md). It is unbuilt only in the sense that it is **not on
+> `main`** — the 17 PRs are unmerged because the merge condition is a Windows gate no cloud session
+> can run, and that is a *landing* problem, not a *building* one.
+>
+> Two other details in the recurring prompt are **stale, measurably**: the vendored vector pin moved
+> `679a317` → **`7328a0b`** on 2026-08-12 (**C-PIN-1**), and S5 is not "NOT STARTED" — its emitter
+> landed too. Re-derive from the repo, never from the prompt's summary; the prompt itself says so.
+>
+> **What actually remains needs a human** — see `RETURN-DAY.md` §5: a Windows gate, an emulator
+> (**B-4**), a relay deploy, and two design decisions. Recorded as **B-18**.
+
 You are the Claude Code agent for the CareerSeeker Android program. Brandon is out until 2026-08-18. You have two working trees: this session's root `C:\Users\bkirk\Documents\careerseeker-android` (private repo, currently on `claude/android-a0-probe` — the A0→A7 alpha ladder ran here 2026-07-30: 99/0 tests, debug APK builds, HANDOFF-Android-Alpha.md at root), and `C:\Users\bkirk\Documents\careerseeker-sync` — YOUR dedicated clone of `ShivaClaw/careerseeker` for the engine-side sync track. **Never touch `Documents\CareerSeeker`** — that working tree belongs to the Codex agent running the beta track in parallel.
 
 **First action of every iteration: `git fetch --all --prune` in BOTH trees.** The stale-refs incident of 2026-08-06 (a session nearly opened an empty PR off unfetched refs, and missed that main had moved 33 commits) is why this is rule one.
