@@ -9845,3 +9845,108 @@ was the deliverable. No relay was contacted at all, not even `/v1/health`. No de
 console, no keystore, no emulator, no secret read, printed, or echoed. Terra's territory untouched:
 `autonomy/codex-state` was read, never written; its heartbeat still reports the ladder complete and
 **files claimed: none**, so no collision to rebase around.
+
+---
+
+## The forty-fifth run — 2026-08-16, Linux sandbox
+
+**The assigned slice was landed for the TENTH consecutive run. This run's deliverable is a defect in
+the mechanism that was supposed to have caught that, found by measuring it instead of trusting it.**
+
+### Milestone 0 — the fetch, and the tenth stale assignment
+
+`git fetch --all --prune` in both checkouts before any count (the standing rule; a previous session
+nearly acted on refs 27 commits stale). Every number below is post-fetch.
+
+The stored prompt assigned S5's spec half: amend §4.3 with the `entitlement_ack` body, add the vector
+via `generate.mjs`, and close PQ-A2-1, PQ-A2-2, PQ-A2-3. **All five are built.** `8575539` defines the
+body *and* settles the cap-measures-ciphertext question (PQ-A2-1); `22b028e` adds both ack vectors,
+generated not hand-written; `7328a0b` adds `invalid-unknown-field` (PQ-A2-3); §7.2's error table and
+§3's structural-rejection sentence carry explicit `S5 / PQ-A2-2` and `S5 / PQ-A2-1` markers
+(**C-S5-1**). Writing them again would have produced a fifth divergent spec edit. **Declined, and the
+count is now ten runs, not nine.**
+
+### Milestone 1 — the vendored pin is not where three documents say it is
+
+The prompt names `679a317` as the vendored pin and warns that changing an existing vector is a
+cross-repo drift event. **The pin moved to `7328a0b` on 2026-08-12**, and `VECTORS.lock` — the file CI
+actually reads — has said so, correctly and with its reasoning, the whole time. `docs/Merge-Topology.md`
+§8 did not: it was edited on **2026-08-14**, two days *after* `056a1dd` re-vendored the three post-pin
+vectors, and still reported "26 identical", pin `679a317`, and "re-vendoring belongs in the same slice
+as the Kotlin applier" — a task already done. `docs/S-Ladder.md` §2.2 carried the same stale SHA. Both
+corrected (**C-PIN-1**). `EntitlementVectorsTest.kt:18` also says `679a317` and was **left alone**: it
+attributes the five Play-signed vectors to the commit that actually added them, which is true history,
+not drift.
+
+### Milestone 2 — the drift check was one-directional, and blind in the direction that matters
+
+`.github/workflows/ci.yml` re-fetched each vendored vector at the pin and diffed it. It iterated
+**`core/src/test/resources/sync-vectors/v1/*.json`** — the vendored side — so it could never enumerate
+a name it did not already have. **A vector added upstream and never vendored was structurally
+invisible to it.**
+
+That is not hypothetical. It is exactly what S5 did: upstream added `entitlement-ack`,
+`entitlement-ack-no-order-id` and `invalid-unknown-field`, the phone had none of them, **and this step
+stayed green for the entire period.** The check that exists to make cross-repo drift a CI failure
+rather than a field bug could not see the drift that was actually present.
+
+Measured, not argued (**C-CI-1**). Same tree — the real android tree with one vendored vector removed —
+run through both versions of the step body, extracted verbatim from `ci.yml`:
+
+```
+OLD LOGIC: PASS  — the missing vector was invisible
+NEW LOGIC: FAIL  — ::error::upstream has vector(s) that were never vendored: entitlement-ack.json
+```
+
+The step now enumerates the upstream directory at the pin and compares the two sides as **sets**, then
+diffs content for every shared name. Three cases, all run against the verbatim step body with the
+contents API stood in for by a local git-backed stub (**C-CI-2**):
+
+| case | expected | observed |
+| --- | --- | --- |
+| real tree, untouched | pass | `OK: 29 vendored vectors match 7328a0b…, and the sets agree` |
+| a vendored vector deleted | fail | `::error::upstream has vector(s) that were never vendored` |
+| a vendored vector hand-edited | fail | `::error::vendored entitlement-ack.json differs from the pinned copy` |
+
+`grep -oE '[0-9a-f]{40}' … | head -1` still returns `7328a0b…` after the lock edit — checked, because
+the comment I added sits below the `Pinned commit:` line and a 40-hex string in the wrong place would
+have silently re-pointed CI.
+
+### Milestone 3 — one word in the lock, and it is the word the guarantee rests on
+
+`VECTORS.lock` claims the 26 previously-vendored files are "byte-identical across `679a317`,
+`origin/main`, and `7328a0b`". Measured blob-to-blob: **25 are. `index.json` is not** — it is a
+manifest, and it necessarily changed when the three vectors were added (**C-PIN-2**). The load-bearing
+claim is *zero existing **payloads** modified*, which is how §8 words it and which **holds**. The lock
+said "vector" where it meant "payload". Corrected in place rather than quietly, because a safety file
+that overstates by one word teaches the next reader to round off.
+
+### Milestone 4 — what this does not establish
+
+**The android gate did not run and cannot (B-7).** No Android SDK, no JBR, no Gradle here. So: the
+edited `ci.yml` is **YAML-valid** (parsed, 12 steps, the vector step present) and its step body is
+**behaviourally verified against a local stub** — and it has **never executed on a runner**. In
+particular the real contents-API listing shape, `jq` on the runner, and the `?ref=` lookup against a
+commit on an unmerged branch are **unverified here**. That is the first thing to watch on the next CI
+run, and it is why this stays draft.
+
+### What this run did NOT touch
+
+**No vector byte, in either repo.** `docs/sync-vectors/` and
+`core/src/test/resources/sync-vectors/v1/` are untouched — all 29 vendored files still hash equal to
+`7328a0b`, verified after the edits, so no cross-repo drift was created or risked. `VECTORS.lock` was
+edited in its **comment block only**; the pin line is unchanged and CI still extracts the same SHA.
+No engine code, no Kotlin source, no test, no harness, no relay source, no relay test, no
+`scripts/Verify-Alpha.ps1`, and **no offline pin** — nothing this run changes is counted by that
+number. `docs/Sync-Protocol.md` was **read only** and not edited; the S5 spec work it was assigned is
+landed, and amending a normative document that binds two implementations to re-say what §4.3 already
+says is not a deliverable. **No C# applier and no Kotlin applier was written** — neither can be
+compiled here, and the prompt is right that they belong to a local session. No PR merged, closed, or
+taken out of draft, in either repo; the android repo is never-self-merge and the main-repo policy needs
+a gate this sandbox does not have. **#53 stays open and draft**, and §11.4's recommendation about its
+fate is still a recommendation. No branch deleted, no history rewritten, no force-push. The production
+relay was **not contacted at all, not even `/v1/health`** — ITEM 1's `since:` skew was not taken this
+run. No deploy, no Play or Google console, no keystore, no emulator, no OAuth, no Gmail, no secret
+read, printed, or echoed. Terra's territory untouched: `autonomy/codex-state` was **read, never
+written** — heartbeat `2026-08-12T20:28:36`, "COMPLETE… the ladder is exhausted", **files claimed:
+none**, so there was no collision to rebase around.

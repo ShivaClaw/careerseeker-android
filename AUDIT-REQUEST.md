@@ -9061,3 +9061,168 @@ cd <engine> && git checkout claude/s6-resume-reconciliation \
 *Expected:* `=== 146 passed, 0 failed ===`. **Observed**, matching the forty-third run's claim exactly
 (`dotnet-sdk-8.0` installed via `apt-get update && apt-get install -y dotnet-sdk-8.0`, **8.0.129** —
 the standing correction that a fresh sandbox has no .NET but can get it holds for a fourth run).
+
+---
+
+## Forty-fifth run (2026-08-16) — the cross-repo drift check, and the pin records
+
+Every command below was run in a Linux cloud sandbox with no Android SDK, no JDK, no PowerShell and no
+.NET installed for this slice. `<engine>` is a checkout of `ShivaClaw/careerseeker`, `<android>` of
+`ShivaClaw/careerseeker-android`. **Run `git fetch --all --prune` in both first** — every count here is
+post-fetch.
+
+### C-S5-1 — the assigned S5 spec work is landed (tenth consecutive stale assignment)
+
+```bash
+cd <engine>
+git log --oneline origin/main..origin/claude/s5-entitlement-ack-spec
+git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md | grep -n "PQ-A2-1\|PQ-A2-2"
+git log --oneline --all -- docs/sync-vectors/v1/invalid-unknown-field.json | tail -1
+```
+
+*Expected, and **observed**:* `8575539` "define the entitlement_ack body, and say what the size cap
+actually measures"; `22b028e` "pin section 4.3.3 with two entitlement_ack vectors, generated not
+hand-written"; §7.2 and §3 carrying explicit `S5 / PQ-A2-1` and `S5 / PQ-A2-2` markers; and
+`7328a0b` "add the invalid-unknown-field vector, closing PQ-A2-3 and B-6". **All four assigned items
+exist. None was rewritten this run.**
+
+### C-PIN-1 — the real pin, and the generator that anchors it
+
+```bash
+cd <android> && grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1
+cd <engine>  && git merge-base --is-ancestor 7328a0bc043335491cd96a67d634e8eea2a13af9 origin/main \
+                 && echo "on main" || echo "NOT on main"
+cd <engine>  && git worktree add -f --detach /tmp/pin 7328a0bc043335491cd96a67d634e8eea2a13af9 \
+                 && (cd /tmp/pin && node docs/sync-vectors/generate.mjs --check)
+diff -rq /tmp/pin/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1
+```
+
+*Expected, and **observed**:* the pin is `7328a0bc043335491cd96a67d634e8eea2a13af9`, **not** `679a317`
+as three documents said; it is **NOT on main** (neither was `679a317` — same posture, not a new one);
+`OK: 29 vector files match the generator.`; and the final `diff -rq` prints **nothing** — the vendored
+copy is byte-identical to the pin, before and after this run's edits.
+
+`--check` also passes on every branch that carries vectors, which is what makes the content
+generator-anchored rather than ref-anchored:
+
+```bash
+cd <engine> && for b in main claude/s5-entitlement-ack-spec claude/s5-entitlement-ack-emitter \
+  claude/s5-inbound-pump; do git worktree add -f --detach /tmp/wt-$$ origin/$b >/dev/null 2>&1 \
+  && echo -n "$b: " && (cd /tmp/wt-$$ && node docs/sync-vectors/generate.mjs --check) \
+  && git worktree remove --force /tmp/wt-$$; done
+```
+
+*Expected, and **observed**:* **26, 28, 29, 29** vector files match the generator, respectively.
+
+### C-PIN-2 — the one word `VECTORS.lock` had too strong
+
+```bash
+cd <engine>
+for f in $(git ls-tree --name-only 679a317 docs/sync-vectors/v1/ | xargs -n1 basename); do
+  h1=$(git cat-file blob 679a317:docs/sync-vectors/v1/$f | sha256sum | cut -d' ' -f1)
+  h2=$(git cat-file blob origin/main:docs/sync-vectors/v1/$f | sha256sum | cut -d' ' -f1)
+  h3=$(git cat-file blob 7328a0b:docs/sync-vectors/v1/$f | sha256sum | cut -d' ' -f1)
+  [ "$h1" = "$h2" ] && [ "$h2" = "$h3" ] || echo "DIVERGES: $f"
+done
+```
+
+*Expected, and **observed**:* exactly one line — **`DIVERGES: index.json`**. So of the 26 files the
+lock called byte-identical across all three commits, **25 are**. The twenty-sixth is the **manifest**,
+which necessarily changed when three vectors were added. **Zero existing payloads modified** — the
+claim that carries the guarantee — still holds, and is how `docs/Merge-Topology.md` §8 words it.
+
+### C-CI-1 — the drift check was blind to under-vendoring (the defect)
+
+Extract the pre-fix step body (`git show HEAD~N:.github/workflows/ci.yml`, any commit before this run)
+and run its loop against an android tree with one vendored vector deleted:
+
+```bash
+cp -r <android> /tmp/case2 && rm /tmp/case2/core/src/test/resources/sync-vectors/v1/entitlement-ack.json
+# old loop: for f in core/src/test/resources/sync-vectors/v1/*.json; do fetch; diff; done
+```
+
+*Expected, and **observed**: **PASS**.* The loop iterates the **vendored** side only, so a file present
+upstream and absent locally is never enumerated and never fetched. This is not a subtle failure: across
+S5 the phone was missing **three** upstream vectors and this step was green throughout.
+
+### C-CI-2 — the fixed check, three cases, verbatim step body
+
+The step body is extracted from `ci.yml` itself (so the test cannot drift from the workflow), with
+`curl` shadowed by a stub that serves the contents API from local git objects:
+
+```bash
+python3 -c "import yaml;d=yaml.safe_load(open('.github/workflows/ci.yml'));
+print([s['run'] for j in d['jobs'].values() for s in j['steps']
+       if 'vendored sync vectors' in (s.get('name') or '')][0])" > /tmp/step.sh
+# stub: PATH-shadowed curl mapping ?ref=SHA to `git cat-file blob SHA:path`,
+#       and the directory URL to a JSON [{name,type:"file"}] listing from `git ls-tree`
+PATH=/tmp/bin:$PATH bash /tmp/step.sh
+```
+
+*Expected, and **observed**:*
+
+| tree | exit | output |
+| --- | --- | --- |
+| untouched | `0` | `OK: 29 vendored vectors match 7328a0b…, and the sets agree` |
+| one vendored vector deleted | `1` | `::error::upstream has vector(s) that were never vendored: entitlement-ack.json` |
+| one vendored vector hand-edited | `1` | `::error::vendored entitlement-ack.json differs from the pinned main-repo copy` |
+
+Set equality on the real tree, independently:
+
+```bash
+cd <engine> && git ls-tree --name-only 7328a0b docs/sync-vectors/v1/ | xargs -n1 basename | sort > /tmp/up
+ls <android>/core/src/test/resources/sync-vectors/v1 | sort > /tmp/ven
+comm -23 /tmp/up /tmp/ven; comm -13 /tmp/up /tmp/ven
+```
+
+*Expected, and **observed**:* **29 and 29, both `comm` outputs empty** — the new check is green on
+today's tree, so this is a real defect fixed, not a false positive introduced.
+
+Also checked, because the lock edit sits in the file CI greps for the pin:
+
+```bash
+cd <android> && grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1
+python3 -c "import yaml;d=yaml.safe_load(open('.github/workflows/ci.yml'));print('steps:',sum(len(j.get('steps',[])) for j in d['jobs'].values()))"
+```
+
+*Expected, and **observed**:* `7328a0bc043335491cd96a67d634e8eea2a13af9`, and `steps: 12` — the YAML
+still parses.
+
+### C-CI-3 — what did NOT run, and what is therefore unverified
+
+```bash
+cd <android> && ./gradlew --no-daemon :core:test :app:assembleDebug :app:lintDebug
+```
+
+*Expected:* **fails to start here** — no Android SDK, no JBR (**B-7**).
+
+**The edited workflow has never executed on a runner.** Three things are verified only against a stub
+and must be confirmed on the first real CI run: the contents-API **directory listing shape**
+(`[{name,type}]`, and that 29 files stay inside one page), **`jq`'s presence** on the runner image, and
+that the `?ref=` **directory** lookup resolves for a commit on an unmerged branch — the per-file lookup
+is known to work there, the directory lookup is not independently confirmed. If any fails, the symptom
+is this step erroring rather than reporting drift, and **B-15** in `BLOCKED.md` says so.
+
+### C-INT-1 — the ordered intent's carried items were re-checked, not assumed
+
+The standing precondition ("before taking item 1, re-verify item 1") applied to the items this run
+did **not** take, since the list is what a future run will route by:
+
+```bash
+cd <android> && ./scripts/fleet-probe.sh symbol ../careerseeker \
+  "relay_version|relayVersion|since.*version skew|X-Relay-Version"
+cd <engine> && git show origin/main:relay/src/channel.ts | grep -n "latest"
+cd <engine> && git show origin/claude/s6-resume-reconciliation:src/Engine/Program.cs \
+  | grep -n -i "consult\|fall back"
+```
+
+*Expected, and **observed**:* **no relay-version guard exists on any unmerged branch**, so the
+`since:` version-skew item is **still open**; `latest` is computed identically on `main` and on #53
+(`channel.ts:202`), which is the property the skew turns on; and #53's startup consult still carries
+its deliberate soft failure (`Program.cs:283-286`), so that item is **still a question, not a task**.
+**Nothing on the carried list was found closed** — the two-run streak of stale item 1s ends here,
+which is itself worth recording, because "the list is usually stale" would be the wrong lesson to
+inherit.
+
+**This run took none of those items.** The slice it took was derived by measuring the cross-repo drift
+machinery (**C-CI-1**), which is what ITEM 3's "a target derived by measurement" asks for.

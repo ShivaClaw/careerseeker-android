@@ -1920,3 +1920,40 @@ and no android source file was changed at all.** B-7 therefore constrained no cl
 - **PQ-S6-1's wire fork** — `outcome_ack` (a) vs fire-and-forget (b). Left standing by #52 and left
   standing again here. **A question with no default-proceed, absent from mission §2's gate list.**
   Minting a payload kind that binds a second implementation is not an agent's call.
+
+---
+
+## B-15 — the rewritten vector drift check has never run on a runner (forty-fifth run, 2026-08-16)
+
+**Symptom.** `.github/workflows/ci.yml`'s "Assert vendored sync vectors match the pinned main-repo
+commit" step was rewritten this run to compare the vendored and upstream vector sets in **both**
+directions (it previously iterated the vendored side only and was structurally blind to a vector added
+upstream and never vendored — see **C-CI-1**). The new step is YAML-valid and behaviourally verified,
+but **only against a local stub** that serves the GitHub contents API out of git objects. No Android
+SDK, no JBR and no runner exists in this sandbox, so the workflow has not executed once.
+
+**Three specific things are unverified**, all in the part the stub had to fake:
+
+1. the contents-API **directory** listing shape — the step assumes a JSON array of
+   `{name, type}` and filters `select(.type == "file")`;
+2. **`jq` on the runner image** — used to parse that listing (it is present on
+   `ubuntu-latest` today, but nothing in this repo pins it);
+3. that the **directory** `?ref=<sha>` lookup resolves for a commit on an **unmerged branch**. The
+   per-file lookup at `7328a0b` is proven — the old step did it every run — but the directory form
+   is not independently confirmed against an off-`main` SHA.
+
+**Failure mode if any of the three is wrong**: the step **errors** rather than silently passing, so it
+fails loud, not quiet. It cannot regress the guarantee below what the old one gave; the worst case is
+a red build on a correct tree.
+
+**Attempts.** Extracted the step body verbatim from `ci.yml` (so the test cannot drift from the
+workflow) and ran it against three trees — untouched, under-vendored, hand-edited — with `curl`
+PATH-shadowed by a git-backed stub. All three behaved as specified (**C-CI-2**). That is as far as this
+environment reaches. `./gradlew` is unavailable for the same reason as **B-7**.
+
+**Smallest human unblock.** **Push the branch and read the first CI run** — nothing local is needed.
+The step prints `pinned main-repo commit: <sha>` then either
+`OK: 29 vendored vectors match <sha>, and the sets agree` or a `::error::` naming the drifting file.
+If it errors instead, item 1 or 3 above is the cause; adding `sudo apt-get install -y jq` or swapping
+the listing parse for `grep -oE '"name": *"[^"]+"'` resolves it without touching the logic. **This is
+a draft PR precisely so that read happens before anyone relies on it.**
