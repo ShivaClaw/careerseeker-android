@@ -136,6 +136,11 @@ the unmerged stack**. Consequences:
 - The android repo's vendored vectors are pinned to `679a317`, a commit that is reachable in the
   main repo but **not an ancestor of `main`**. Cross-repo drift is therefore currently measured
   against an unmerged branch — worth stating plainly in the S1 PR.
+  > **Superseded 2026-08-16, forty-fifth run.** The pin moved to `7328a0b` on 2026-08-12 and the
+  > three post-pin vectors were re-vendored by `056a1dd`. The off-`main` posture this bullet
+  > describes is unchanged — `7328a0b` is not an ancestor of `main` either — so the *finding*
+  > stands; only the SHA and the count are stale. `VECTORS.lock` is authoritative; see
+  > `docs/Merge-Topology.md` §8.
 
 ### 2.3 Gate `P0-BASE` — superseded, recorded
 

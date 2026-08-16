@@ -26,6 +26,14 @@
 # `diff -r`, not assumed -- so this re-vendor ADDED three files and changed no existing
 # vector byte.
 #
+# 2026-08-16, forty-fifth run: the sentence above is one word too strong, and the precise
+# version is worth having in the file that the guarantee rests on. Re-measured blob-to-blob:
+# 25 of those 26 are byte-identical across all three commits. The twenty-sixth is index.json,
+# which is a MANIFEST, not a payload -- it necessarily changed when the three vectors were
+# added, and it changed on every branch that added them. So: three payloads added, zero
+# existing PAYLOADS modified, one manifest updated. That is the claim that carries the
+# safety guarantee, and it holds. Re-verify: AUDIT-REQUEST C-PIN-2.
+#
 # ACTION WHEN PR #38's STACK MERGES: re-pin to the merge commit on main and re-run the
 # diff. Nothing breaks if this is forgotten -- CI still verifies against 7328a0b -- but the
 # lock stops describing where the vectors actually live.

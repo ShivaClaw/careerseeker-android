@@ -163,25 +163,36 @@ Not performed. The android repo is **never-self-merge** and every PR here is a d
 Each branch is 10 behind `main`; merging **into** `main` absorbs that automatically. Nothing here
 needs a rebase, and nothing here needs a force-push.
 
-## 8. Cross-repo pin — verified, unchanged
+## 8. Cross-repo pin — verified
+
+> **Corrected 2026-08-16, forty-fifth run.** Everything below the rule described the tree as it
+> stood *before* `056a1dd` (2026-08-12 21:11) re-vendored the three post-pin vectors. This section
+> was edited two days after that commit and still reported the pre-re-vendor state, so it named the
+> wrong pin, the wrong vendored count, and asked for a re-vendor that had already happened.
+> `VECTORS.lock` — which is what CI actually reads — was correct the whole time. **The lock is
+> authoritative; this section is commentary.** Measured state as of the forty-fifth run:
 
 `core/src/test/resources/sync-vectors/` is vendored from `ShivaClaw/careerseeker` at pin
-`679a3175590dcd021b21c85af9daf12114e131fd`. Blob-by-blob against that commit:
+**`7328a0bc043335491cd96a67d634e8eea2a13af9`** (moved from `679a317` on 2026-08-12; both are
+off-`main`, see §8.1). Blob-by-blob against that commit:
 
-**26 identical, 0 differing, 0 missing.**
+**29 identical, 0 differing, 0 missing.** Upstream `docs/sync-vectors/v1/` holds **29** files at
+that pin. The 26/29 gap this section used to report is **closed** — re-vendoring did not wait for
+the Kotlin applier. Re-verify: **C-PIN-1**.
 
-Upstream `docs/sync-vectors/v1/` now holds **29** files (**corrected 2026-08-14, thirty-sixth run**;
-this line read 28 and was one vector stale) — the two `entitlement-ack` vectors added by
-[careerseeker#32](https://github.com/ShivaClaw/careerseeker/pull/32) and the `invalid-unknown-field`
-vector added by [#37](https://github.com/ShivaClaw/careerseeker/pull/37) (`7328a0b`), all still
-draft and unmerged. The 26/29 gap is the pin doing its job, not drift. Re-vendoring belongs in the
-same slice as the Kotlin applier that consumes the new files.
+**The restack in §10 still cannot cause drift**, and that half was measured correctly: `origin/main`
+has touched no vector file at all since the stack forked, and the stack's whole effect on
+`docs/sync-vectors/` is **three added payloads plus the `index.json` manifest** — **zero existing
+payloads modified**. Re-verify: **C-RST-7**.
 
-**Measured again this run, and the result is stronger than "unchanged": the restack in §10 cannot
-cause drift.** `origin/main` has touched **no vector file at all** since the stack forked, and the
-whole stack's effect on `docs/sync-vectors/` is **three added payloads plus the `index.json`
-manifest** — **zero existing payloads modified**, byte-identical to pin `679a317`. Re-verify:
-**C-RST-7**.
+### 8.1 One correction the lock itself needs
+
+`VECTORS.lock` says the 26 previously-vendored files "are byte-identical across `679a317`,
+`origin/main`, and `7328a0b`". Measured this run, that is true of **25** of them: `index.json` is a
+**manifest**, and it necessarily changed when the three vectors were added. No existing *payload*
+changed — which is the claim that actually carries the safety guarantee, and is how this section
+words it above. The lock's wording is one word too strong; the guarantee is intact. Re-verify:
+**C-PIN-2**.
 
 ## 9. What this document does not establish
 
