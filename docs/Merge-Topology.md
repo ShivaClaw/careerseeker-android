@@ -426,3 +426,132 @@ number is whatever the gate reports after the design choice, and it cannot be de
    The duplication cost two iterations and would have been caught by one command.
 
 Re-verify: **C-FL-1 … C-FL-6**.
+
+---
+
+## 12. The landing sequence, measured 2026-08-16 (forty-seventh run)
+
+§10 probed each branch against **pristine `origin/main`**. §11 probed one leaf against every other
+leaf. **Neither probed the sequence a human actually performs**, and that is the number §10.4 states:
+
+> **Merge into `main`** … the cumulative tree conflicts **once**, on **5 files**.
+
+**That sentence is true of the single chain §10 costed and false of the fleet as it now stands.**
+Measured this run, and the difference is not a rounding error — it is 1 versus 3.
+
+### 12.1 Seventeen open PRs are seven merges
+
+A **leaf** is a fleet branch contained in no other. Merging a leaf lands every PR beneath it, so the
+leaf count — not the PR count — is the number of merges performed. `merge-base --is-ancestor`,
+every check exit 0:
+
+| Leaf (PR) | Subsumes |
+| --- | --- |
+| `s6-composition-root-decision` (#49) | #47, #46, #45, #39, #38, #37, #32 |
+| `s2-transport-vocabulary` (#36) | #33, #32 |
+| `s2-seq-bound` (#35) | #34, #32 |
+| `s3-pairing-confirm-consumer` (#51) | #50 |
+| `s8-harness-linux-reach` (#48) | — |
+| `s6-outcome-disposition` (#52) | — |
+| `s6-resume-reconciliation` (#53) | — |
+
+**17 open PRs → 7 merges.** Re-verify: **C-LAND-1**.
+
+`scripts/fleet-probe.sh leaves` derives this, and prints one extra name: `claude/p4-entitlement`,
+a leaf with **no open PR** — the pre-S1 branch whose successors landed as #27–#30. **A leaf is not
+an open PR**; cross-check the two lists before reading the output as a plan. Re-verify: **C-LAND-2**.
+
+### 12.2 Isolated cost says six of seven are free. The sequence says otherwise.
+
+Each leaf merged into **pristine** `origin/main`, working-tree merge, aborted after each:
+
+| Leaf | Isolated |
+| --- | --- |
+| #48, #35, #36, #51, #52, #53 | **clean** |
+| #49 | conflicts, **5 files** — exactly §10.2's pin family |
+
+That reproduces §10.2 and is where §10.4's "conflicts once" comes from. Now the same seven merged
+**cumulatively**, each onto the result of the last (`scripts/fleet-probe.sh land`):
+
+```
+  s8-harness-linux-reach                   clean
+  s2-seq-bound                             clean
+  s2-transport-vocabulary                  clean
+  s3-pairing-confirm-consumer              clean
+  s6-outcome-disposition                   STOP  README.md … scripts/Verify-Alpha.ps1 …
+  s6-resume-reconciliation                 STOP  … tests/SyncHarness/Program.cs
+  s6-composition-root-decision             STOP  … src/Sync/RelayClient.cs src/Sync/SyncPublisher.cs …
+
+conflicted merges (human stops): 3
+```
+
+**Three stops, not one.** Re-verify: **C-LAND-3**.
+
+### 12.3 Why: the pin is an absolute number, so pin-touchers collide pairwise
+
+Four of the seven leaves move `$ExpectedOfflineTotal`, each to a **different absolute value**:
+
+| Leaf | merge-base | tip | delta |
+| --- | --- | --- | --- |
+| `origin/main` | — | **611** | — |
+| #51 `s3-pairing-confirm-consumer` | 611 | 617 | +6 |
+| #52 `s6-outcome-disposition` | 611 | 615 | +4 |
+| #53 `s6-resume-reconciliation` | 611 | 627 | +16 |
+| #49 `s6-composition-root-decision` | **598** | 793 | +195 |
+
+The other three (#48, #35, #36) do not touch the file at all — #35/#36 show `598` only because they
+inherit it from the merge base; `main` moved it, they did not, so the merge is clean. Re-verify:
+**C-LAND-4**.
+
+Because the pin is an absolute value rather than a delta, **the first pin-toucher to land is free and
+every subsequent one conflicts.** N pin-touchers cost **N−1** stops. That is structural, not a
+property of any one branch, and it is why §10.2's per-branch probe could not see it: against pristine
+`main`, each of these four *is* the first.
+
+**Order changes the count.** Landing #49 first costs **4** stops, not 3 — #49 forked at `598` and
+`main` has since moved to `611`, so it conflicts even as the first merge and forfeits the free slot.
+**Land a fresh-off-`main` pin-toucher first.** Re-verify: **C-LAND-5**.
+
+### 12.4 Closing #53 removes a stop *and* the whole `src/Sync/` conflict class
+
+§11.4 recommends #53 be closed or reduced rather than landed. The landing cost now quantifies that
+recommendation. Same order, #53 omitted:
+
+```
+conflicted merges (human stops): 2
+```
+
+and the final merge's conflict set loses `src/Sync/RelayClient.cs`, `src/Sync/SyncPublisher.cs`,
+`src/Engine/Program.cs` and `tests/SyncLiveSmoke/Program.cs` — **the source-level collisions
+disappear entirely, leaving only the pin family plus `tests/SyncHarness/Program.cs`.** That is
+§11.2's duplication finding, reproduced from the other direction: those files conflict *because* two
+branches implement the same push-result design twice. Re-verify: **C-LAND-6**.
+
+### 12.5 What this section does NOT establish
+
+- **The file lists after the first STOP are probe artifacts, not forecasts.** To continue past a
+  conflict the probe keeps `merge-tree`'s conflicted tree — markers and all — as the next merge's
+  base. A human resolving properly would produce a different, smaller downstream conflict set. **The
+  count of stops is the robust number; the growing file lists are not.** This is stated because a
+  reader comparing 12.2's 10-file last line against §10.2's 5-file row would otherwise conclude the
+  cost had doubled. It has not; the two lines answer different questions.
+- **No gate ran.** `scripts/Verify-Alpha.ps1` needs PowerShell and .NET; this sandbox measured
+  **neither `pwsh` nor `dotnet` on `PATH`**. Re-verify: **C-LAND-7**.
+- **The landed pin value is still not derivable.** §10.3 predicted `806` for the chain alone;
+  adding #51/#52/#53's disjoint deltas would arithmetically give `832` — but §11.3 already showed the
+  deltas are **not** disjoint once #53 is in, and resolving `RelayClient.cs` means deleting one
+  side's assertions. **The landed total is whatever the Windows gate measures after the design choice
+  in §11.4 is made. Do not pre-fill it.**
+- **Nothing here is a go-ahead.** No merge was performed. Every probe ran on a throwaway ref or in
+  the object store; the scratch branch was deleted and nothing was pushed to either repo.
+
+### 12.6 What this section recommends (it does not decide)
+
+1. **Decide #53 first** (§11.4). It is worth one fewer stop and the entire `src/Sync/` conflict class.
+2. **Then land in this order**, which is the measured minimum:
+   `#48 → #35 → #36 → #51 → #52 → #49`, with a full local gate between merges.
+   The three zero-cost merges come first; #51 takes the free pin slot; #49 — the largest — lands last,
+   when the pin must be re-measured once regardless.
+3. **At each STOP: keep both sides' prose, and write the number the gate measures.** Never
+   "take theirs" / "take mine" — both are wrong (§10.3), and the probe's own continuation is not a
+   model to copy.
