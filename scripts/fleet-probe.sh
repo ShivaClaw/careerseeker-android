@@ -35,6 +35,8 @@
 #
 #   scripts/fleet-probe.sh symbol <engine-checkout> <regex> [<regex> ...]
 #   scripts/fleet-probe.sh matrix <engine-checkout> <branch>
+#   scripts/fleet-probe.sh leaves <engine-checkout>
+#   scripts/fleet-probe.sh land   <engine-checkout> <branch> [<branch> ...]
 #
 #   # Is the mechanism already built anywhere in the fleet?
 #   scripts/fleet-probe.sh symbol ../careerseeker ReconcileTo
@@ -156,8 +158,69 @@ case "$mode" in
     done < <(fleet)
     ;;
 
+  leaves)
+    # A leaf is a fleet branch contained in no OTHER fleet branch. Merging the
+    # leaves lands every PR beneath them, so the leaf set -- not the PR count --
+    # is the number of merges a human actually performs.
+    while read -r b; do
+      covered=0
+      while read -r other; do
+        [ "$other" = "$b" ] && continue
+        if git -C "$repo" merge-base --is-ancestor "$b" "$other" 2>/dev/null; then covered=1; break; fi
+      done < <(fleet)
+      [ "$covered" -eq 0 ] && echo "${b#origin/}"
+    done < <(fleet)
+    # A leaf is not the same thing as an OPEN PR: a superseded branch nobody
+    # closed is a leaf too (claude/p4-entitlement is one -- its successors
+    # landed as PRs #27-#30). Cross-check the list against the open-PR set
+    # before treating it as a landing plan.
+    true
+    ;;
+
+  land)
+    # CUMULATIVE landing probe -- the question 'matrix' does not ask.
+    #
+    # 'matrix' and Merge-Topology.md 10.2 probe each branch against PRISTINE
+    # main. That answers "what does this branch cost to land FIRST" and it is
+    # why 10.4 concluded the tree "conflicts once". It is not what a human
+    # doing the merges experiences: after the first pin-touching leaf lands,
+    # main's $ExpectedOfflineTotal has MOVED, so the next pin-touching leaf
+    # conflicts against the new value. N pin-touchers cost N-1 stops, not one.
+    #
+    # No working tree is touched: merge-tree/commit-tree are pure object-store
+    # operations. On a conflict the probe keeps merge-tree's conflicted tree so
+    # it can continue -- that is a PROBE ARTIFACT, NOT A RESOLUTION. The real
+    # resolution keeps both sides' prose and writes the pin value the Windows
+    # gate measures (CLAUDE.md's drift trap; Merge-Topology.md 10.3).
+    shift 2
+    [ "$#" -gt 0 ] || { echo "fleet-probe land: need at least one branch, in merge order" >&2; exit 2; }
+    acc=$(git -C "$repo" rev-parse origin/main) || exit 2
+    conflicts=0
+    echo "Cumulative landing probe onto origin/main, in the order given."
+    echo "A 'stop' is a merge a human must stop and resolve by hand."
+    echo
+    for leaf in "$@"; do
+      ref="origin/${leaf#origin/}"
+      git -C "$repo" rev-parse --verify -q "$ref" >/dev/null \
+        || { echo "fleet-probe: no such ref '$ref'" >&2; exit 2; }
+      out=$(git -C "$repo" merge-tree --write-tree "$acc" "$ref" 2>/dev/null)
+      rc=$?
+      tree=$(printf '%s\n' "$out" | head -1)
+      if [ "$rc" -ne 0 ]; then
+        conflicts=$((conflicts+1))
+        files=$(printf '%s\n' "$out" | sed -n 's/^CONFLICT ([^)]*): Merge conflict in //p' | tr '\n' ' ')
+        printf '  %-40s STOP  %s\n' "${ref#origin/claude/}" "${files:-(conflict, files unlisted)}"
+      else
+        printf '  %-40s clean\n' "${ref#origin/claude/}"
+      fi
+      acc=$(git -C "$repo" commit-tree "$tree" -p "$acc" -p "$ref" -m "probe: $leaf") || exit 2
+    done
+    echo
+    echo "conflicted merges (human stops): $conflicts"
+    ;;
+
   *)
-    echo "fleet-probe: unknown mode '$mode' (expected 'symbol' or 'matrix')" >&2
+    echo "fleet-probe: unknown mode '$mode' (expected 'symbol', 'matrix', 'leaves' or 'land')" >&2
     exit 2
     ;;
 esac
