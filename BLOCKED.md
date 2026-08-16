@@ -1957,3 +1957,44 @@ The step prints `pinned main-repo commit: <sha>` then either
 If it errors instead, item 1 or 3 above is the cause; adding `sudo apt-get install -y jq` or swapping
 the listing parse for `grep -oE '"name": *"[^"]+"'` resolves it without touching the logic. **This is
 a draft PR precisely so that read happens before anyone relies on it.**
+
+---
+
+## B-16 — nothing in either repo notices that the vendored pin has fallen behind upstream (forty-fifth run, 2026-08-16)
+
+**Symptom.** The android CI step compares the vendored vector set against **the pin recorded in
+`VECTORS.lock`**, never against upstream `HEAD`. That is correct and deliberate — the pin is what
+makes the corpus reproducible, and comparing against a moving head would make CI fail on the other
+repo's schedule. **But it means a pin that has fallen behind upstream is invisible to every automated
+check in both repos.**
+
+This is not theoretical, and it is the real history behind this run's slice (**C-CI-4**): from the
+addition of the two `entitlement-ack` vectors until `056a1dd` re-vendored on 2026-08-12, the phone
+lacked **three** upstream vectors. The vendored set matched the pin **exactly** the whole time, so the
+android step was green, the engine's `generate.mjs --check` was green, and both repos' documents
+correctly said "no drift". **Every check was right and the phone was still behind**, because no check
+was watching the thing that had moved. It was closed by a human noticing, not by a signal.
+
+**Why this run did not fix it.** A check for "is the pin behind upstream?" has to decide *which*
+upstream ref to compare against, and the honest answer today is **not `main`** — the entire sync track
+including every vector lives on **unmerged draft branches**, and both `679a317` and `7328a0b` are
+off-`main` by necessity, not by accident. So the check would have to name a branch, and naming a draft
+branch in CI makes the android build depend on a ref someone may rebase or delete. **That is a design
+decision about the two repos' release coupling, not a bug fix, and it is not an agent's to make
+unilaterally.**
+
+**Attempts.** Scoped only. The one-directional gap in the step (**C-CI-1**/**C-CI-2**) was fixed
+because it is unambiguous; this one was measured, attributed, and left. Recorded rather than quietly
+absorbed into the fix, because a reader seeing "drift check hardened" would reasonably assume this
+case was covered, and it is not.
+
+**Smallest human unblock — a decision, then a one-line check.** Brandon picks one:
+1. **advisory, non-blocking** — a scheduled job comparing the pin against a named engine branch and
+   opening an issue (or printing a warning) when it lags. Cheapest; no build depends on a draft ref.
+2. **blocking, after the stack merges** — once the sync track is on `main`, compare against `main` and
+   fail. Clean, but gated on the restack (§10.6/§11.4), which is itself waiting on the #53 decision.
+3. **accept it** — the pin moves when a human re-vendors, and that is the intended workflow. Then say
+   so in `VECTORS.lock`, so the next reader does not mistake the guarantee for something wider.
+
+Until one is chosen, **the guarantee is exactly "the phone matches the pin", never "the phone matches
+the engine"** — and `VECTORS.lock`'s own wording is close to implying the latter.

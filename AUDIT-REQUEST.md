@@ -9142,8 +9142,14 @@ cp -r <android> /tmp/case2 && rm /tmp/case2/core/src/test/resources/sync-vectors
 ```
 
 *Expected, and **observed**: **PASS**.* The loop iterates the **vendored** side only, so a file present
-upstream and absent locally is never enumerated and never fetched. This is not a subtle failure: across
-S5 the phone was missing **three** upstream vectors and this step was green throughout.
+**at the pin** and absent locally is never enumerated and never fetched. The reachable case is a
+**partial re-vendor** after a pin bump: copy two of three new files and this step passes.
+
+> **CORRECTED, same run.** An earlier draft of this entry said the failure was "not subtle: across S5
+> the phone was missing three upstream vectors and this step was green throughout." **The second
+> clause is true and the causal link is false** — see **C-CI-4**. At the time the vendored set matched
+> the pin *exactly*, so the old step was green **correctly**, and the fixed step would also have been
+> green. S5's gap was a **stale pin**, which neither version detects by design. **B-16.**
 
 ### C-CI-2 — the fixed check, three cases, verbatim step body
 
@@ -9226,3 +9232,23 @@ inherit.
 
 **This run took none of those items.** The slice it took was derived by measuring the cross-repo drift
 machinery (**C-CI-1**), which is what ITEM 3's "a target derived by measurement" asks for.
+
+
+### C-CI-4 — the correction: S5's gap was a stale pin, not under-vendoring
+
+```bash
+cd <android>
+git ls-tree --name-only 056a1dd^ core/src/test/resources/sync-vectors/v1/ | wc -l
+git show 056a1dd^:core/src/test/resources/sync-vectors/VECTORS.lock | grep -oE '[0-9a-f]{40}' | head -1
+cd <engine> && git ls-tree --name-only 679a317 docs/sync-vectors/v1/ | wc -l
+```
+
+*Expected, and **observed**:* **26**, `679a3175590dcd021b21c85af9daf12114e131fd`, **26**. The vendored
+set and the pin were **equal** before the re-vendor, so the pre-fix step passed **correctly** and the
+post-fix set comparison would have passed too. **This falsifies the causal claim in the first draft of
+C-CI-1**, and it is why **B-16** exists: both versions of the step compare against the **pin**, never
+against upstream HEAD, so a pin lagging upstream is invisible to CI in both repos.
+
+The fix in **C-CI-2** is unaffected — case 2 (a file present at the pin, absent locally) is a real
+condition the old step could not see, reachable via a partial re-vendor. Only the S5 attribution was
+wrong.

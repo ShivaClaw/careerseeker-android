@@ -53,13 +53,19 @@ jobs:
       #
       # The comparison is a SET comparison, in both directions, and that is deliberate.
       # Until the forty-fifth run this step iterated the vendored side only, so it could
-      # see a vector that was modified or deleted upstream but was structurally blind to
-      # one that was ADDED upstream and never vendored: the loop never enumerated a name
-      # it did not already have. That is not hypothetical -- it is exactly what happened
-      # across S5. Upstream added entitlement-ack, entitlement-ack-no-order-id and
-      # invalid-unknown-field; the phone lacked all three; this step stayed green the
-      # whole time. Under-vendoring is the drift that ships a phone which cannot parse
-      # what the engine emits, so it has to fail here too.
+      # see a vector that was modified, but was structurally blind to one present at the
+      # pin and absent locally: the loop never enumerated a name it did not already have.
+      # That gap is reachable whenever the pin is bumped and the re-vendor is partial --
+      # copy two of three new files and this step used to pass.
+      #
+      # READ THIS BEFORE TRUSTING THE STEP: it compares the vendored set against the PIN,
+      # not against upstream HEAD, and that is by design -- the pin is what makes the
+      # corpus reproducible. So a pin that has fallen BEHIND upstream is invisible here,
+      # and always was. That is the actual shape of the S5 gap: for ~4 days the phone
+      # lacked entitlement-ack, entitlement-ack-no-order-id and invalid-unknown-field,
+      # and this step was correctly green throughout, because the vendored set matched
+      # the pin exactly and the pin was the stale thing. Nothing in CI detects that.
+      # See BLOCKED.md B-16.
       - name: Assert vendored sync vectors match the pinned main-repo commit
         env:
           # The API is authenticated only to raise the anonymous rate limit; the main repo

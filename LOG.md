@@ -9950,3 +9950,30 @@ run. No deploy, no Play or Google console, no keystore, no emulator, no OAuth, n
 read, printed, or echoed. Terra's territory untouched: `autonomy/codex-state` was **read, never
 written** — heartbeat `2026-08-12T20:28:36`, "COMPLETE… the ladder is exhausted", **files claimed:
 none**, so there was no collision to rebase around.
+
+### Correction, same run, before push was final — the headline claim above was wrong
+
+**I wrote that this step "was green the whole time" while three vectors were missing, and framed the
+one-directional loop as the reason. The second half is false, and I caught it only by re-deriving the
+history I had called "reconstructed" in my own self-audit.**
+
+Measured (**C-CI-4**): at `056a1dd^` the vendored set was **26** and the pin was `679a317`, which
+itself holds **26**. **The two sides were equal.** So the old check was green *correctly*, and — this
+is the part that matters — **the new set comparison would have been green then too.** The S5 gap was
+never under-vendoring relative to the pin. **The pin itself was stale**, and both the old step and my
+replacement compare against the pin by design, because the pin is what makes the corpus reproducible.
+
+So the run splits into one real fix and one real finding that is **not** fixed:
+
+- **The fix stands, with a smaller claim.** The step genuinely could not detect a file present at the
+  pin and absent locally — reachable whenever a pin bump is re-vendored *partially*. Case 2 proves the
+  new step catches it and the old one does not. That is worth having; it is not what happened in S5.
+- **The finding I actually walked past: nothing in CI notices that the pin has fallen behind
+  upstream.** That is the mechanism by which the phone went ~4 days lacking three vectors while every
+  check in both repos was green and every document said "no drift". It is uncovered now, it was
+  uncovered before this run, and my change does not touch it. **B-16.**
+
+Recorded at this length because the failure mode is the one this book exists to catch: I had a tidy
+narrative, the measurement was one `git ls-tree` away, and I wrote the narrative first and reached for
+the measurement only when the self-audit forced the question. The corrected records are `ci.yml`'s
+step comment, `C-CI-1`/`C-CI-4`, **B-16**, and the STATE heartbeat, all in this run.
