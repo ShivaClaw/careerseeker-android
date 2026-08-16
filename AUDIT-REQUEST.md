@@ -9409,3 +9409,28 @@ gh run view --repo ShivaClaw/careerseeker-android <id> --log \
 The step-7 `conclusion: success` recorded above is **not** invalidated by the cancellation — that step
 had already completed before the branch moved — but its *log text* may no longer be retrievable, which
 is precisely why it is written up as a status and not quoted as a transcript.
+
+**Resolved before hand-off — the transcript is in hand after all.** The run on the final head
+`bbde8e2` completed while this session was still open: run
+[`31949137250`](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31949137250), job
+`95169758965`, `ubuntu-latest`, **job conclusion `success`, all 13 steps green**, `13:12:02 → 13:19:47`.
+The edited step (step 7, `13:14:16 → 13:14:25`) printed verbatim:
+
+```
+pinned main-repo commit: 7328a0bc043335491cd96a67d634e8eea2a13af9
+OK: 29 vendored vectors match 7328a0bc043335491cd96a67d634e8eea2a13af9, and the sets agree
+```
+
+**No `::error::` line appears anywhere in the step**, and in particular the new pagination assertion
+did **not** fire at 29 — the below-threshold behaviour of **C-CI-7**, now confirmed on the real image
+rather than only locally. Five `BUILD SUCCESSFUL` lines cover `checkCoreIsAndroidFree`, `:core:test`,
+`:app:test`, `assembleDebug` and `lintDebug`.
+
+**This upgrades a status to a transcript; it does not upgrade B-7.** None of those gradle results was
+produced by me — they are read out of a runner log, and this sandbox still cannot run the android gate
+(**C-ENV-1**). The distinction is the whole point of the B-7 bound: *observing* a gate is not
+*running* one.
+
+**Nothing in this run's claims depends on the CI run that this final records commit triggers.** It is
+expected to reproduce the step output above; if it does not, that is a finding for the next session,
+not a retraction of the transcript quoted here, which is anchored to `bbde8e2`.
