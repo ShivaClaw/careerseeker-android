@@ -321,3 +321,97 @@ no sign of the difference. Re-verify: **C-RST-8**.
 4. The gate is Brandon's and the merge condition is a **full local** `Verify-Alpha.ps1
    -IncludePublish -IncludePackage`, which no cloud session can run. **Nothing here is a
    go-ahead.**
+
+---
+
+## 11. The thirteenth leaf: leaf-vs-leaf cost, measured 2026-08-16 (forty-fourth run)
+
+§10 costed the fleet by probing **each branch against `origin/main`**. That is the right probe for
+"what does this branch cost to land on main", and its numbers still reproduce. It is not the probe for
+"what do two unmerged branches cost each other", and **nothing in §10 took that measurement.**
+
+PR **#53** (`claude/s6-resume-reconciliation`) was opened **2026-08-16**, two days after §10 was
+written, cut **depth 1 off `origin/main`** and deliberately not stacked. §10.2's audit could not have
+included it. This section adds the missing dimension and records what it found.
+
+### 11.1 The measurement
+
+`scripts/fleet-probe.sh matrix ../careerseeker claude/s6-resume-reconciliation` — every remote branch
+probed against #53 with `git merge-tree`, source conflicts counted apart from the pin/doc family:
+
+| Branch | PR | SRC | DOC | Conflicting source/test files |
+| --- | --- | --- | --- | --- |
+| `claude/s2-relay-pull-result` | #45 | **4** | 5 | `Program.cs`, `RelayClient.cs`, `SyncHarness`, `SyncLiveSmoke` |
+| `claude/s6-counter-reconciliation` | #46 | **5** | 5 | + `SyncPublisher.cs` |
+| `claude/s2-push-disposition` | #47 | **5** | 5 | + `SyncPublisher.cs` |
+| `claude/s6-composition-root-decision` | #49 | **5** | 5 | + `SyncPublisher.cs` |
+| `claude/s5-inbound-pump` | #39 | 2 | 5 | `Program.cs`, `SyncHarness` |
+| `claude/s5-entitlement-ack-emitter` | #38 | 1 | 5 | `SyncHarness` |
+| `claude/s3-pairing-confirm-consumer` | #51 | 1 | 5 | `SyncHarness` |
+| `claude/s5-engine-wire-parser` | #37 | 0 | 5 | — |
+| `claude/s6-outcome-disposition` | #52 | 0 | 5 | — |
+| #32, #33, #34, #35, #36, #48, #50 | | **0** | **0** | — |
+
+**§10.2's sentence "No `src/Sync/`, no `relay/`, no test file conflicts anywhere" is true of the probe
+it describes and false of the fleet as it now stands.** Four branches conflict with #53 inside
+`src/Sync/`, and four more conflict in a test file. The seven branches §10.2 called zero-cost are
+still zero-cost, against #53 as well as against main — that half of §10 is reconfirmed, not overturned.
+
+### 11.2 Why: #53 re-implemented work the fleet already held
+
+`scripts/fleet-probe.sh symbol ../careerseeker ReconcileTo RelayPushResult PushOutcome`:
+
+```
+=== 'ReconcileTo' ===        s2-push-disposition, s6-composition-root-decision, s6-counter-reconciliation
+=== 'RelayPushResult' ===    s2-push-disposition, s2-relay-pull-result, s6-composition-root-decision,
+                             s6-counter-reconciliation
+=== 'PushOutcome' ===        s6-resume-reconciliation          <- one branch, and it is #53
+```
+
+Both lines describe the same defect — *the 409's `latest` was discarded unread* — solved twice, in
+shapes that cannot both exist:
+
+| §6.1 piece | #45/#46 stack | #53 |
+| --- | --- | --- |
+| typed push result | `RelayPushResult`, abstract record, 7 cases (#45, `e083f86`) | `PushOutcome(PushStatus, long? Latest)` |
+| startup resume rule | `ResumeSeq(long, RelayPullResult)` | `ResumeFrom(long, long?)` |
+| runtime reconcile | `ReconcileTo(long)` + `RelaySink`, call site mutation-tested (#46, `6c3f8bb`) | **absent** |
+| sink composition | extracted `RelaySink.cs` + `SyncPushPath.cs` | inline lambda in `Program.cs` |
+
+**#53 holds two of the three pieces in its own shape and lacks the third** — and the third is exactly
+what `STATE.md`'s ordered ITEM 1 asked the forty-fourth run to write. Writing it would have completed
+a second parallel implementation of PR #46, which has been open since **2026-08-14**.
+
+The cause is not carelessness, and naming it as such would hide it. Thirteen draft PRs are open and
+none is merged, so **`origin/main` is not the state of the program.** A session that derives "what is
+still missing" by reading main — the honest, obvious move, and the one the house rules push toward —
+sees every solved-but-unmerged problem as open. Cutting #53 depth-1 off main *to keep the pin conflict
+additive* is what made the duplication invisible.
+
+### 11.3 The pin arithmetic §10.3 promises does not survive this
+
+§10.3's additive resolution holds when both sides add **distinct** assertions to a counter from a
+common base. Pins measured this run: main **611**, #53 **627**, #45 **704**, #46 **762**, #47/#49 **793**.
+
+#53's `+16` and the stack's `+182` are **not** disjoint: both include assertions covering the same
+push-answer behaviour through incompatible APIs (#46's line `acf9ebe` reads *"31 offline assertions for
+the push result"*). Resolving `RelayClient.cs` means choosing one representation and **deleting the
+other's assertions**, so the merged total is not `611 + 16 + 182`. **Derived, not measured** — the
+number is whatever the gate reports after the design choice, and it cannot be derived before it.
+
+### 11.4 What this section recommends (it does not decide)
+
+§10.6's order is unaffected for #48, #32→#34→#35, and #32→#33→#36 — all still zero-cost.
+
+1. **#53 is not in §10.6's plan and should not be merged as a thirteenth leaf.** Two typed push
+   results in one tree is not a merge conflict to resolve; it is a design choice to make.
+2. **The stack's shape is the more developed one** on every axis measurable here: `RelayPushResult`
+   carries 7 cases against `PushStatus`'s 6, `ReconcileTo` exists at all, its call site is
+   mutation-tested, and its composition is extracted to `RelaySink`/`SyncPushPath` rather than inline
+   in `Program.cs`. **On the evidence, #53 should be closed or reduced to whatever #45/#46 lack, not
+   landed alongside them.** That is a recommendation; the choice is Brandon's, and §10's own
+   distinction between a recommendation and a decision is load-bearing here.
+3. **Before any future session writes engine sync code, run `scripts/fleet-probe.sh symbol` first.**
+   The duplication cost two iterations and would have been caught by one command.
+
+Re-verify: **C-FL-1 … C-FL-6**.

@@ -8948,3 +8948,116 @@ parsed and executed on `windows-latest`.
 **It does not retire C-RR-11 itself.** This is the **offline half only** — no `-IncludePublish`,
 `-IncludePackage`, `-IncludeLive` — so the merge condition remains a **full local gate**, and remains
 Brandon's. `SyncLiveSmoke` is still unrun and its new `latest == 4` assertion still **UNVERIFIED**.
+
+---
+
+## Forty-fourth run (2026-08-16) — the fleet probe, and the duplication it found
+
+Every command below ran in a Linux cloud sandbox on `claude/android-a0-probe` with `../careerseeker`
+checked out alongside, **after `git fetch --all --prune` in both**. No gate ran; see **C-FL-6**.
+
+### C-FL-1 — the tool, and its own regression test
+
+```bash
+cd <android> && ./scripts/fleet-probe.sh self-test ../careerseeker
+```
+
+*Expected:* three `PASS` lines and `self-test: OK`, exit 0. **Observed:** `fleet() sees 31 branches`,
+`includes claude/* branches`, `excludes main, HEAD, codex/* and autonomy/*`.
+
+This test exists because the first draft of the script used `for-each-ref 'refs/remotes/origin/*'`,
+which matches only up to the next slash: the fleet narrowed to `origin/main` alone and `symbol` printed
+**"not present in any unmerged branch"** for three symbols present in four. The tool reproduced the
+false negative it was written to prevent. **A `FAIL` here means every `symbol` result is untrustworthy.**
+
+### C-FL-2 — ITEM 1 was already built, on three branches
+
+```bash
+cd <android> && ./scripts/fleet-probe.sh symbol ../careerseeker ReconcileTo RelayPushResult PushOutcome
+```
+
+*Expected, and **observed**:* `ReconcileTo` on `s2-push-disposition`,
+`s6-composition-root-decision`, `s6-counter-reconciliation` (4 files each); `RelayPushResult` on those
+three plus `s2-relay-pull-result`; **`PushOutcome` on `s6-resume-reconciliation` alone.**
+
+That last line is the finding in one output: #53 is the only holder of its own push type, while four
+branches already carry `RelayPushResult` for the same job.
+
+### C-FL-3 — the mechanism ITEM 1 asked for, read on the branch that has it
+
+```bash
+cd <engine> && git show origin/claude/s6-counter-reconciliation:src/Sync/SyncPublisher.cs \
+  | grep -nE "public (static )?(long|bool) [A-Z]"
+cd <engine> && git log --oneline origin/main..origin/claude/s6-counter-reconciliation | grep -E "6c3f8bb|e083f86|dee32f8"
+```
+
+*Expected:* `HighestSeq`, **`ReconcileTo(long)` at :81**, **`ResumeSeq(long, RelayPullResult)` at :121**.
+The log shows `e083f86 S2: give PushAsync a failure channel, and stop discarding the 409's latest`,
+`6c3f8bb S6: consume the typed results -- reconcile the e2p counter (PQ-S6-3's second bullet)`, and
+`dee32f8 S6: extract the push sink so its ReconcileTo call site is testable` — **all dated 2026-08-14**,
+against ITEM 1 written 2026-08-16. **Observed.**
+
+Note for the auditor: `ReconcileTo` there also carries a §3.2 range guard that **throws** rather than
+clamps, and `Protocol.MaxSeq` — neither of which exists on `main` or on #53, because PR **#35** (§3.2)
+is likewise unmerged. This is why writing the mechanism fresh on a depth-1 branch would also have
+re-derived a bound that already exists.
+
+### C-FL-4 — the leaf-vs-leaf conflict matrix (§11.1)
+
+```bash
+cd <android> && ./scripts/fleet-probe.sh matrix ../careerseeker claude/s6-resume-reconciliation
+```
+
+*Expected, and **observed**:* SRC/DOC of **4/5** for #45; **5/5** for #46, #47, #49; 2/5 for #39;
+1/5 for #38 and #51; 0/5 for #37 and #52; **0/0** for #32, #33, #34, #35, #36, #48, #50.
+
+Cross-check one row by hand, since this table is what corrects §10.2:
+
+```bash
+cd <engine> && git merge-tree --write-tree origin/claude/s6-resume-reconciliation \
+  origin/claude/s6-counter-reconciliation | sed -n 's/^CONFLICT ([^)]*): Merge conflict in /  /p'
+```
+
+*Expected:* exactly **ten** files — `README.md`, `docs/CareerSeeker-Project-Summary.md`,
+`docs/External-Audit-Handoff.md`, `scripts/Verify-Alpha.ps1`, `src/Engine/Program.cs`,
+`src/Engine/README.md`, `src/Sync/RelayClient.cs`, `src/Sync/SyncPublisher.cs`,
+`tests/SyncHarness/Program.cs`, `tests/SyncLiveSmoke/Program.cs`. **Observed**, and it is the row that
+falsifies §10.2's "no `src/Sync/`, no test file conflicts anywhere" **as a statement about the fleet**
+(it remains true of the branch-vs-main probe §10.2 actually ran).
+
+### C-FL-5 — the pins, and why they no longer add up (§11.3)
+
+```bash
+cd <engine> && for b in main claude/s6-resume-reconciliation claude/s2-relay-pull-result \
+  claude/s6-counter-reconciliation claude/s2-push-disposition claude/s6-composition-root-decision; do
+  echo -n "$b: "; git show origin/$b:scripts/Verify-Alpha.ps1 | grep -m1 "ExpectedOfflineTotal *=" | grep -oE '[0-9]+'
+done
+```
+
+*Expected, and **observed**:* **611, 627, 704, 762, 793, 793.**
+
+**The additive claim is where this stops being measured.** That `611 + 16 + 182` is *not* the merged
+total is **derived, not measured**: it follows from both sides asserting the same push-answer behaviour
+through incompatible APIs, so resolving `RelayClient.cs` deletes one side's assertions. The real number
+is whatever the gate reports **after** the design choice. Nobody should quote a merged pin before then.
+
+### C-FL-6 — what did NOT run
+
+```bash
+cd <engine>  && pwsh -File scripts/Verify-Alpha.ps1
+cd <android> && ./gradlew --no-daemon :core:test :app:assembleDebug :app:lintDebug
+```
+
+*Expected:* **both fail to start here.** `pwsh` is absent; the android gate needs the SDK (**B-7**).
+
+**No code was written in either repo this run, so neither gate has anything new to measure.** The
+engine baseline was re-measured only to confirm the record was not itself stale:
+
+```bash
+cd <engine> && git checkout claude/s6-resume-reconciliation \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release
+```
+
+*Expected:* `=== 146 passed, 0 failed ===`. **Observed**, matching the forty-third run's claim exactly
+(`dotnet-sdk-8.0` installed via `apt-get update && apt-get install -y dotnet-sdk-8.0`, **8.0.129** —
+the standing correction that a fresh sandbox has no .NET but can get it holds for a fourth run).

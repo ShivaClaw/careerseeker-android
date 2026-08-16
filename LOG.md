@@ -9739,3 +9739,109 @@ worktrees were never touched, and `autonomy/codex-state` was **read** — heartb
 recorded exhausted, **files claimed: none** — so there was no collision and no rebase was owed. **One
 machine change**: `apt-get update` + `apt-get install -y dotnet-sdk-8.0` (8.0.129), and `npm ci` in
 `relay/`. Nothing else was installed.
+
+---
+
+## Forty-fourth run — 2026-08-16, Linux cloud sandbox
+
+**The assigned slice was already built, and so was the slice this file's own ordered intent
+substituted for it. This run wrote no engine code on purpose.**
+
+### Milestone 1 — fetch, and the assigned slice declined for the ninth consecutive run
+
+`git fetch --all --prune` in both checkouts before anything else. Android `main` `ebfaf81`; engine
+`main` `aac05f3`. Every count below is post-fetch.
+
+The stored prompt assigned **S5** — amend §4.3 for `entitlement_ack`, add the vector, close
+PQ-A2-1/-2/-3. All of it landed: spec and vectors in PR **#32**, PQ-A2-3 in **#37** (`7328a0b`), the
+phone applier on 2026-08-09. The prompt's ladder summary is now **eighteen runs stale**; this is the
+**ninth** consecutive run to decline it. `STATE.md` says so and says the cheaper fix is the prompt.
+Recorded again only because a skip that goes unrecorded reads as an oversight.
+
+### Milestone 2 — routed by this file's ordered ITEM 1, which was also closed
+
+`STATE.md`'s ordered intent named **ITEM 1 — "nothing consumes the 409's `latest` at runtime yet"**,
+with the honest split *"the mechanism is a task and the policy is a question"*. Its own standing
+instruction, added by the forty-third run after the same trap sprung: **"before taking item 1,
+re-verify item 1."**
+
+Re-verified, and it is **CLOSED**. `SyncPublisher.ReconcileTo` at `:81`,
+`ResumeSeq(long, RelayPullResult)` at `:121`, a `RelaySink` whose `ReconcileTo` call site is
+**mutation-tested**, and `SyncPushPath` wiring — all on `claude/s6-counter-reconciliation`,
+**PR #46, dated 2026-08-14**, two days before the intent naming it as open was written (**C-FL-3**).
+
+I had the replacement code designed — a CAS loop, raise-never-lower, reusing the §6.1 max rule — before
+checking. #46's version is strictly better than what I was about to write: it adds a §3.2 range guard
+that **throws rather than clamps**, over `Protocol.MaxSeq`, a constant that exists on four branches and
+on neither `main` nor #53. Writing mine would have made a **fourth** divergent implementation.
+
+### Milestone 3 — the cause, measured: `origin/main` is not the state of the program
+
+Thirteen draft PRs are open; **none is merged**. A session deriving "what is missing" by reading main —
+the obvious and honest move — sees every solved-but-unmerged problem as open. PR **#53** (the
+forty-third run's own) was cut **depth 1 off main** *to keep the pin conflict additive*, and that is
+precisely what hid the duplication. It re-implemented **two of §6.1's three pieces** in incompatible
+shapes: `PushOutcome` against #45's `RelayPushResult` (`e083f86`), `ResumeFrom(long, long?)` against
+#46's `ResumeSeq(long, RelayPullResult)`. ITEM 1 asked me to add the third. Full table: §11.2.
+
+`PushOutcome` exists on **one** branch in the whole fleet — #53's. `RelayPushResult` exists on **four**
+(**C-FL-2**).
+
+### Milestone 4 — `scripts/fleet-probe.sh`, and the false negative it caught in itself
+
+Neither question that would have caught this had a one-command form. Both do now: `symbol` (is this
+built anywhere in the fleet?), `matrix` (what would this branch cost the branches it overlaps?),
+`self-test`.
+
+The `self-test` is not ceremony. The first draft used `for-each-ref 'refs/remotes/origin/*'`, which
+matches only up to the next slash — the fleet silently narrowed to `origin/main` alone and `symbol`
+reported **"not present in any unmerged branch"** for three symbols present in four. The tool
+reproduced, inside itself, the exact false negative it exists to prevent. It was caught only because
+the manual `git grep` had already been run and disagreed. `self-test` now asserts the fleet is more
+than one branch, includes `claude/*`, and excludes `main`/`HEAD`/`codex`/`autonomy` (**C-FL-1**).
+
+### Milestone 5 — §10.2's "the code half is free" no longer holds, and §10.3's arithmetic does not either
+
+§10 costed the fleet **branch-vs-main**. That probe reproduces. It is not the probe for
+**leaf-vs-leaf**, and nothing in §10 took it — #53 postdates §10 by two days.
+
+Measured (**C-FL-4**): #53 conflicts with **#45 (4 src), #46, #47, #49 (5 src each)** — inside
+`src/Sync/RelayClient.cs`, `src/Sync/SyncPublisher.cs`, `src/Engine/Program.cs`,
+`tests/SyncHarness/Program.cs`, `tests/SyncLiveSmoke/Program.cs`. §10.2's sentence *"No `src/Sync/`, no
+`relay/`, no test file conflicts anywhere"* is true of the probe it describes and **false of the fleet
+as it now stands**. The seven zero-cost branches are **reconfirmed** at 0/0 against #53 too — §10 was
+half right and the right half still stands.
+
+Pins: main **611**, #53 **627**, #45 **704**, #46 **762**, #47/#49 **793** (**C-FL-5**). §10.3's
+additive resolution assumed both sides add *distinct* assertions. They do not: both cover the same
+push-answer behaviour through incompatible APIs, so resolving `RelayClient.cs` **deletes** one side's
+assertions and `611 + 16 + 182` is not the merged total. That consequence is **derived, not measured** —
+labelled as such in §11.3, because the honest number is whatever the gate reports after the design
+choice, and no session should quote one before then.
+
+### Milestone 6 — evidence baseline, and what remains unverified
+
+`dotnet-sdk-8.0` installed (**8.0.129**) — the standing correction that a fresh sandbox has no .NET but
+can get it holds a fourth time. `SyncHarness` on #53 re-measured at **146 passed, 0 failed**, matching
+the forty-third run's claim exactly, so the record is not itself stale (**C-FL-6**).
+
+**Nothing else was verified, because nothing else was written.** No `Verify-Alpha.ps1` (`pwsh` absent),
+no android gate (**B-7**). The recommendation in §11.4 — that #53 be closed or reduced to whatever
+#45/#46 lack rather than landed beside them — is a **recommendation**, and §10's own distinction
+between recommending and deciding is the reason it stops there.
+
+### What this run did NOT touch
+
+No engine code, no test, no harness, no relay source, no relay test, no `scripts/Verify-Alpha.ps1`, and
+**no offline pin** — the 627 on #53 is untouched and still what CI measured. **No vector byte, and no
+`docs/sync-vectors/` change of any kind**; the vendored pin `679a317` is unmoved and no cross-repo
+drift was created or risked. `docs/Sync-Protocol.md` was **read only** — §3.1, §3.2's absence from
+main, §6.1, §7.2 — and not edited, despite this slice reasoning about §6.1's two halves: amending a
+normative document that binds two implementations is not this run's to do. No PR was merged, closed, or
+taken out of draft, in either repo; **#53 stays open and draft**, and the recommendation about its fate
+is written down rather than executed. No branch was deleted, no history rewritten, no force-push. No
+`Protocol.MaxSeq`, no `ReconcileTo`, no fourth push-result type was written — declining to write code
+was the deliverable. No relay was contacted at all, not even `/v1/health`. No deploy, no Play or Google
+console, no keystore, no emulator, no secret read, printed, or echoed. Terra's territory untouched:
+`autonomy/codex-state` was read, never written; its heartbeat still reports the ladder complete and
+**files claimed: none**, so no collision to rebase around.
