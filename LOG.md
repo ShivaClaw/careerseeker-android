@@ -10101,3 +10101,138 @@ console, no keystore, no emulator, no OAuth, no Gmail, no secret read, printed, 
 territory untouched: `autonomy/codex-state` was **read, never written** — heartbeat
 `2026-08-12T20:28:36`, "COMPLETE… the ladder is exhausted", **files claimed: none**, so there was no
 collision to rebase around.
+
+---
+
+## Forty-seventh run — 2026-08-16 (Linux sandbox): the window's stop condition had been due for two runs, and the merge plan it was supposed to produce was costing one number too few
+
+**The assigned slice was declined for the twelfth time, on evidence taken this run rather than
+inherited. What replaced it: mission §7's final handoff, which was due at run 45 and never written —
+and, in producing its merge plan, a measurement that corrects a load-bearing sentence in
+`Merge-Topology.md` §10.4.**
+
+### Milestone 0 — the fetch, and the twelfth stale assignment
+
+`git fetch --all --prune` in both checkouts before any count. Every number below is post-fetch.
+
+The stored prompt again assigned S5's spec half: amend §4.3 with the `entitlement_ack` body, add the
+vector, close PQ-A2-1/-2/-3. **All of it is built**, and I verified that directly rather than reading
+it out of the records (**C-LAND-8**): `git branch -r --contains` places `8575539` (body + PQ-A2-1),
+`22b028e` (both ack vectors) and `7328a0b` (`invalid-unknown-field`) on the `claude/s5-*` draft
+branches. `git ls-tree origin/main docs/sync-vectors/v1/` returns **26** files with **no**
+`entitlement-ack*` and **no** `invalid-unknown-field`. `node docs/sync-vectors/generate.mjs --check`
+→ **`OK: 26 vector files match the generator.`**, exit 0 — run because the prompt asked; it describes
+`main`, and it is green.
+
+**The work exists and is reviewable; it is not on the trunk.** That sentence is the whole reason this
+slice has been re-assigned twelve times, and it is now the first thing `RETURN-DAY.md` §7 tells an
+auditor to attack.
+
+### Milestone 1 — the stop condition nobody executed
+
+Mission §7: *"All rungs DONE/BLOCKED, **or 45 iterations logged** → final `LOG.md` handoff entry
+(ladder table, evidence index, PR stack order with self-audits, HUMAN-QUEUE, boundary paragraph) →
+clear the goal."*
+
+**46 runs were logged before this one** (**C-LAND-9**; the ordinal in the last run heading, not the
+`##` count — that returns 65, because early runs used one heading per milestone, and the first draft
+of my own re-verification command got this wrong and had to be rewritten). Runs 45 and 46 both did
+rung work instead. Brandon returns **2026-08-18**, in two days.
+
+So this run's slice is the handoff — chosen over another rung because the mission's own stop
+condition outranks rung selection once crossed, and because a return-day reader facing **seventeen
+open draft PRs** needs a landing plan more than an eighteenth branch. Written as
+[`RETURN-DAY.md`](RETURN-DAY.md).
+
+### Milestone 2 — seventeen PRs are seven merges
+
+`merge-base --is-ancestor`, every check exit 0 (**C-LAND-1**): #49 subsumes #47, #46, #45, #39, #38,
+#37 and #32; #36 subsumes #33; #35 subsumes #34; #51 subsumes #50. **17 open PRs → 7 leaf merges.**
+
+`scripts/fleet-probe.sh leaves` (new this run) derives that set, and printed one name I did not
+expect: **`claude/p4-entitlement`**, a leaf with no open PR — the pre-S1 branch whose successors
+landed as #27–#30. **A leaf is not an open PR.** The probe now says so in its own output comment, and
+**C-LAND-2** exists so the next reader cross-checks the two lists instead of merging a ghost.
+
+### Milestone 3 — the correction: "conflicts once" is three
+
+§10.2 probed each branch against **pristine `origin/main`**. §11 probed one leaf against every other.
+**Neither probed the sequence a human performs**, which is what §10.4 asserts:
+
+> **Merge into `main`** … the cumulative tree conflicts **once**, on **5 files**.
+
+Isolated, six of seven leaves are clean and only #49 conflicts — §10.2 reproduces exactly. Run
+cumulatively (`scripts/fleet-probe.sh land`, **C-LAND-3**), the same seven give:
+
+```
+  s8-harness-linux-reach                   clean
+  s2-seq-bound                             clean
+  s2-transport-vocabulary                  clean
+  s3-pairing-confirm-consumer              clean
+  s6-outcome-disposition                   STOP  README.md … scripts/Verify-Alpha.ps1 …
+  s6-resume-reconciliation                 STOP  … tests/SyncHarness/Program.cs
+  s6-composition-root-decision             STOP  … src/Sync/RelayClient.cs src/Sync/SyncPublisher.cs …
+
+conflicted merges (human stops): 3
+```
+
+**Three, not one.** The cause is that `$ExpectedOfflineTotal` is an **absolute** number: four leaves
+move it — to 617, 615, 627, 793 from bases 611/611/611/598 (**C-LAND-4**) — so the first to land is
+free and every later one collides. **N pin-touchers cost N−1 stops**, structurally, regardless of how
+disjoint their code is. §10.4 is correct about the single chain it costed and stale about the fleet,
+which grew three more pin-touching leaves after it was written. Recorded as **§12** rather than by
+editing §10.4, because the older section is right about its own probe and the difference between the
+two questions is the finding.
+
+**Order is load-bearing** (**C-LAND-5**): landing #49 first costs **4**, because it forked at pin
+`598` while `main` moved to `611`, so it conflicts even as the first merge and forfeits the free slot.
+
+### Milestone 4 — the recommendation that is now priced
+
+§11.4 recommended #53 be closed or reduced, on design grounds. Re-running the probe without it
+(**C-LAND-6**): **2 stops**, and the final merge's conflict set loses `src/Sync/RelayClient.cs`,
+`src/Sync/SyncPublisher.cs`, `src/Engine/Program.cs` and `tests/SyncLiveSmoke/Program.cs`. **Closing
+#53 removes a hand-resolution and the entire `src/Sync/` conflict class** — §11.2's duplication
+finding reproduced from the opposite direction. The decision stays Brandon's; it now has a price tag.
+
+### Milestone 5 — what this run does not establish, stated before it can be misread
+
+**The file lists after the first STOP are probe artifacts, not forecasts.** To continue past a
+conflict the probe keeps `merge-tree`'s conflicted tree — markers and all — as the next merge's base.
+A human resolving properly produces a different, smaller downstream set. **The count of stops is the
+robust number.** My first version of this measurement used a real working-tree merge resolved with
+`--theirs`, and it reported the last merge as 6 files where the object-store probe reports 10; both
+are continuation artifacts and neither is a forecast. Written into §12.5 and into the probe's own
+header comment, because a reader comparing that 10 against §10.2's 5 would otherwise conclude the
+cost had doubled.
+
+**No gate ran, and that is measured rather than assumed** (**C-LAND-7**): neither `pwsh` nor `dotnet`
+is on `PATH`; only `node`. **No `Verify-Alpha.ps1` result is claimed anywhere in this entry**, and
+the landed pin value is therefore not derivable here. §10.3 predicted `806` for the chain and
+arithmetic would suggest `832` for the fleet — **§12.5 declines to record either as a forecast**,
+because §11.3 already showed the deltas stop being disjoint once #53 is in the set. The landed total
+is whatever the Windows gate reports after the design choice is made.
+
+**B-16 is untouched and still open.** Nothing watches whether the vendored pin has fallen behind
+upstream. **B-17 is new**: the pin collision compounds by one hand-resolution per pin-touching branch,
+so the cost of not landing grows with every assertion-adding run.
+
+### What this run did NOT touch
+
+**No engine file of any kind.** The engine checkout was read-only: `git` queries, `merge-tree`,
+`commit-tree`, and `node docs/sync-vectors/generate.mjs --check`. The two scratch refs used for the
+merge probes (`trial-landing`, `seqtest`) were **local only, never pushed, and deleted** — verified
+with `git branch -D` and a clean `git status`. **Nothing was merged in either repo**; the android repo
+is never-self-merge and the main-repo policy needs a gate this sandbox does not have. **No vector
+byte, in either repo** — `docs/sync-vectors/` and `core/src/test/resources/sync-vectors/v1/` are
+untouched and the vendored corpus still matches pin `7328a0b`. `VECTORS.lock` not edited. No
+`scripts/Verify-Alpha.ps1` edit and **no offline pin edit** — nothing here is counted by that number.
+`docs/Sync-Protocol.md` was **not opened for edit**; the S5 spec work it is repeatedly assigned is
+built. **No C# applier and no Kotlin applier** — neither compiles here, and the prompt is right that
+they belong to a local session. No PR merged, closed, or taken out of draft; **#53 stays open and
+draft**, and §11.4/§12.6's recommendation about its fate is still a recommendation. No branch deleted
+on any remote, no history rewritten, no force-push. The production relay was **not contacted at all,
+not even `/v1/health`**. No deploy, no Play or Google console, no keystore, no emulator, no OAuth, no
+Gmail, no secret read, printed, or echoed. Terra's territory untouched: `autonomy/codex-state` was
+**read, never written** — heartbeat `2026-08-12T20:28:36`, "COMPLETE… the ladder is exhausted",
+**files claimed: none**, so there was no collision to rebase around.

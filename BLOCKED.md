@@ -2030,3 +2030,47 @@ case was covered, and it is not.
 
 Until one is chosen, **the guarantee is exactly "the phone matches the pin", never "the phone matches
 the engine"** — and `VECTORS.lock`'s own wording is close to implying the latter.
+
+---
+
+## B-17 — the landing cost compounds by one hand-resolution per pin-touching branch (forty-seventh run, 2026-08-16)
+
+**Symptom.** `$ExpectedOfflineTotal` in `scripts/Verify-Alpha.ps1` is an **absolute** number, and the
+drift trap requires every branch that adds an assertion to update it *and* the four docs that report
+it. So any two unmerged branches that add assertions conflict with each other **by construction**,
+even when their code is disjoint and both merge cleanly into `main` in isolation.
+
+Measured this run (**C-LAND-3**, **C-LAND-4**): four of the seven leaves move the pin — to `617`,
+`615`, `627` and `793`, from bases `611`/`611`/`611`/`598`. The first to land is free; the other
+three each stop the merge on the same five files. **N pin-touchers cost N−1 hand-resolutions.**
+
+**Why this is a blocker entry and not just a costing.** The number is not static. The fleet went from
+one pin-touching leaf to four over this window, and **each future run that adds harness assertions on
+a new branch adds one more stop** to whatever a human eventually merges. The cost grows in *runs*,
+not in PRs (§10.4 measured that growth rate for the chain; §12.3 shows it now applies across leaves
+too). Nothing in the sandbox can discharge it: resolving a pin conflict correctly means writing **the
+number the gate measures**, and the gate is `Verify-Alpha.ps1` — PowerShell and .NET, neither of
+which is on this machine (**C-LAND-7**, measured, not assumed).
+
+**Attempts.**
+1. **Measure it properly rather than estimate.** Done — `scripts/fleet-probe.sh land` (new this run)
+   probes the cumulative sequence in the object store, touching no working tree. It reproduces 3
+   stops, 4 if the order is wrong, 2 if #53 is closed.
+2. **Find an ordering that costs zero.** There is none. Landing a fresh-off-`main` pin-toucher first
+   claims the one free slot; every other pin-toucher conflicts regardless of order. The best case is
+   N−1 and this run's ordering achieves it.
+3. **Compute the landed value so a human could pre-fill it.** Refused as unsound, not merely
+   unavailable: §11.3 already showed the deltas are not disjoint once #53 is in the set, so the
+   arithmetic §10.3 relied on does not close. A pre-filled wrong pin is a hard gate failure, which is
+   the drift trap working — but it would waste a return-day cycle.
+
+**Smallest human unblock — land the fleet, and prefer sooner to later.** One Windows session:
+decide #53 (**H1**, `RETURN-DAY.md` §3 step 0), then merge the six leaves in the measured order with
+a full local `Verify-Alpha.ps1 -IncludePublish -IncludePackage` between merges, writing the measured
+pin at each stop. That is 2 hand-resolutions today. It is 3 if #53 stays open, and one more for every
+assertion-adding branch opened before it happens.
+
+**A cheaper structural fix exists but is a design decision, not a bug fix:** if the pin were expressed
+as a per-harness count summed at runtime rather than one hand-maintained absolute total, disjoint
+branches would stop colliding. That changes what the drift trap guarantees, and `CLAUDE.md` names the
+single pinned total as the thing that makes a dropped assertion a hard failure. **Not an agent's call.**

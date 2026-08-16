@@ -9434,3 +9434,132 @@ produced by me — they are read out of a runner log, and this sandbox still can
 **Nothing in this run's claims depends on the CI run that this final records commit triggers.** It is
 expected to reproduce the step output above; if it does not, that is a finding for the next session,
 not a retraction of the transcript quoted here, which is anchored to `bbde8e2`.
+
+---
+
+## Forty-seventh run — 2026-08-16 (Linux sandbox): the landing sequence
+
+All commands assume `git fetch --all --prune` in **both** checkouts first, and an engine checkout at
+`../careerseeker`. Every count below was taken after that fetch.
+
+### C-LAND-1 — 17 open PRs reduce to 7 leaf merges
+
+Subsumption, `merge-base --is-ancestor`; every check must exit 0:
+
+```bash
+cd ../careerseeker
+for x in s2-push-disposition s6-counter-reconciliation s2-relay-pull-result s5-inbound-pump \
+         s5-entitlement-ack-emitter s5-engine-wire-parser s5-entitlement-ack-spec; do
+  git merge-base --is-ancestor origin/claude/$x origin/claude/s6-composition-root-decision \
+    && echo "#49 contains $x"
+done
+git merge-base --is-ancestor origin/claude/s4-pull-request-semantics origin/claude/s2-transport-vocabulary
+git merge-base --is-ancestor origin/claude/s2-relay-retention        origin/claude/s2-seq-bound
+git merge-base --is-ancestor origin/claude/s3-pairing-confirm-vector origin/claude/s3-pairing-confirm-consumer
+```
+
+Expected: #49 subsumes all seven; the three trailing checks exit 0. Leaves = #49, #36, #35, #51,
+#48, #52, #53.
+
+### C-LAND-2 — a leaf is not an open PR
+
+```bash
+scripts/fleet-probe.sh leaves ../careerseeker
+```
+
+Expected: the seven leaves **plus `claude/p4-entitlement`**, which has no open PR — its successors
+landed as #27–#30. Cross-check against `list_pull_requests` before reading the output as a plan.
+
+### C-LAND-3 — the cumulative landing costs 3 stops, not 1
+
+```bash
+scripts/fleet-probe.sh land ../careerseeker \
+  claude/s8-harness-linux-reach claude/s2-seq-bound claude/s2-transport-vocabulary \
+  claude/s3-pairing-confirm-consumer claude/s6-outcome-disposition \
+  claude/s6-resume-reconciliation claude/s6-composition-root-decision
+```
+
+Expected: first four `clean`, last three `STOP`, final line `conflicted merges (human stops): 3`.
+Touches no working tree — `merge-tree`/`commit-tree` only. **This contradicts `Merge-Topology.md`
+§10.4's "conflicts once"**, which is correct for the single chain it costed and stale for the fleet.
+
+### C-LAND-4 — four leaves move the pin, to four different absolute values
+
+```bash
+cd ../careerseeker
+for b in s3-pairing-confirm-consumer s6-outcome-disposition s6-resume-reconciliation s6-composition-root-decision; do
+  mb=$(git merge-base origin/main origin/claude/$b)
+  echo "$b  base=$(git show $mb:scripts/Verify-Alpha.ps1 | grep -m1 -o 'ExpectedOfflineTotal = [0-9]*')" \
+       " tip=$(git show origin/claude/$b:scripts/Verify-Alpha.ps1 | grep -m1 -o 'ExpectedOfflineTotal = [0-9]*')"
+done
+git show origin/main:scripts/Verify-Alpha.ps1 | grep -m1 -o 'ExpectedOfflineTotal = [0-9]*'
+```
+
+Expected: main **611**; #51 611→617, #52 611→615, #53 611→627, #49 **598**→793. #48/#35/#36 do not
+appear because they never touch the file. N pin-touchers cost **N−1** stops.
+
+### C-LAND-5 — the stop count is order-dependent
+
+```bash
+scripts/fleet-probe.sh land ../careerseeker \
+  claude/s6-composition-root-decision claude/s8-harness-linux-reach claude/s2-seq-bound \
+  claude/s2-transport-vocabulary claude/s3-pairing-confirm-consumer \
+  claude/s6-outcome-disposition claude/s6-resume-reconciliation
+```
+
+Expected: `conflicted merges (human stops): 4`. #49 forked at pin `598` and `main` is at `611`, so
+it conflicts even as the first merge and forfeits the free slot. **Land a fresh-off-`main`
+pin-toucher first.**
+
+### C-LAND-6 — closing #53 removes a stop and the whole `src/Sync/` conflict class
+
+```bash
+scripts/fleet-probe.sh land ../careerseeker \
+  claude/s8-harness-linux-reach claude/s2-seq-bound claude/s2-transport-vocabulary \
+  claude/s3-pairing-confirm-consumer claude/s6-outcome-disposition claude/s6-composition-root-decision
+```
+
+Expected: `conflicted merges (human stops): 2`, and the final `STOP` line no longer names
+`src/Sync/RelayClient.cs`, `src/Sync/SyncPublisher.cs`, `src/Engine/Program.cs` or
+`tests/SyncLiveSmoke/Program.cs`. Corroborates §11.2's duplication finding from the other direction.
+
+### C-LAND-7 — no gate ran, and that is measured
+
+```bash
+which pwsh dotnet node; echo "exit=$?"
+```
+
+Expected in this sandbox: `node` only. **No `Verify-Alpha.ps1` result is claimed anywhere in this
+run**, and the landed pin value is therefore *not* derivable here — see `Merge-Topology.md` §12.5.
+
+### C-LAND-8 — the assigned slice is built, for the twelfth consecutive run
+
+```bash
+cd ../careerseeker
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l          # 26
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | grep -cE 'entitlement-ack|invalid-unknown-field'   # 0
+for c in 8575539 22b028e 7328a0b; do git branch -r --contains $c | head -3; done
+node docs/sync-vectors/generate.mjs --check                                 # OK: 26 …, exit 0
+```
+
+Expected: `main` carries 26 vectors and **neither** `entitlement-ack*` nor `invalid-unknown-field`;
+all three commits resolve on `claude/s5-*` draft branches. **The work exists and is reviewable; it is
+not on the trunk.** That distinction is why the slice has been re-assigned twelve times.
+
+### C-LAND-9 — the stop condition was crossed two runs ago
+
+```bash
+# in the ANDROID checkout -- C-LAND-8's block leaves you in ../careerseeker
+cd -                              # or: cd /path/to/careerseeker-android
+grep -E '^#{2} ' LOG.md \
+  | grep -oiE '(twenty|thirty|forty|fifty)-(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)' \
+  | tail -3
+```
+
+Expected: the last ordinal is **forty-sixth**, i.e. 46 runs were logged before this one.
+
+**Do not count `##` headings for this** — `grep -cE '^#{2} ' LOG.md` returns **65**, because the early
+runs used one `##` per milestone rather than one per run. The ordinal in the last run heading is the
+only reliable counter, and the first draft of this very command got it wrong.
+
+Mission §7 fires the final handoff at **45**. `RETURN-DAY.md` is that handoff, written two runs late.
