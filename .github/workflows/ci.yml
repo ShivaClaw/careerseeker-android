@@ -93,9 +93,8 @@ jobs:
           drift=0
 
           # Enumerate the upstream directory at the pin so the two sides can be compared as
-          # sets. 29 files is far inside the contents API's single-page limit, so no
-          # pagination is needed; if that ever stops being true this listing silently
-          # truncates and the count assertion below is what catches it.
+          # sets. 29 files is far inside the contents API's 1000-entry page limit, so no
+          # pagination is needed today.
           for attempt in 1 2 3 4 5; do
             if curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
                  -H "Accept: application/vnd.github+json" \
@@ -107,6 +106,23 @@ jobs:
 
           jq -r '.[] | select(.type == "file") | .name' /tmp/listing.json | sort > /tmp/upstream.names
           ls core/src/test/resources/sync-vectors/v1 | sort > /tmp/vendored.names
+
+          # If that directory ever outgrows one page, the listing truncates silently.
+          # Truncation is not invisible -- the vendored-only branch below fires, because
+          # every dropped name then looks like a vendored file absent upstream -- but it
+          # reports the wrong cause, and a reader would go hunting for a vendoring error
+          # that does not exist. This assertion names the real cause first.
+          #
+          # The comment this replaces claimed a count assertion already sat here. It did
+          # not. Measured 2026-08-16 (C-CI-6) by truncating the listing to 10 of 29 names
+          # against the real vendored tree: the step failed, and the only diagnosis it
+          # emitted was "::error::vendored vector(s) absent upstream at $PIN".
+          upstream_count=$(wc -l < /tmp/upstream.names)
+          if [ "$upstream_count" -ge 1000 ]; then
+            echo "::error::the upstream listing returned $upstream_count entries and is probably paginated;"
+            echo "::error::this step must follow pages before its set comparison can be trusted"
+            exit 1
+          fi
 
           # Upstream-only == under-vendored: the engine ships a vector the phone has never
           # seen. Vendored-only == a local invention, or a file deleted upstream.
