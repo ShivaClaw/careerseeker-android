@@ -8706,3 +8706,245 @@ edits could not be caught locally. The verifier parsed and executed on `windows-
 retire C-OD-11 itself**: the gate ran on CI, as it always must, and it is the offline half only
 (no `-IncludePublish`, `-IncludePackage`, `-IncludeLive`), so the merge condition remains a **full local
 gate** and remains Brandon's.
+
+---
+
+## Forty-third run — 2026-08-16 (S6 / PQ-S6-3, resume reconciliation)
+
+Branch `claude/s6-resume-reconciliation` (engine repo), **draft PR #53**, cut from `origin/main` at
+`aac05f3`. `<engine>` = the careerseeker checkout, `<android>` = careerseeker-android.
+
+### C-RR-1 — the ordered intent's item 1 was already closed, and the check is one command
+
+> **Claim.** `STATE.md`'s forty-second revision names **NEW ITEM 1 — PQ-S2-3**. That question was
+> closed on **2026-08-11** by `cc6d966` on `claude/s2-transport-vocabulary`, which added §2.3. This
+> repo's own `AUDIT-REQUEST.md` says so at C-S6C-5. **The list went stale in the same way the prompt
+> did.**
+
+```bash
+cd <engine>
+git log --oneline origin/claude/s2-transport-vocabulary | grep -i "PQ-S2-3"
+git show origin/claude/s2-transport-vocabulary:docs/Sync-Protocol.md | grep -n "^### 2.3"
+cd <android> && grep -n "PQ-S2-3 is now" AUDIT-REQUEST.md
+```
+
+*Expected:* `cc6d966 S2: pin the transport vocabulary for every route -- close PQ-S2-3`; §2.3
+**"Transport responses for the remaining routes"** at line **172**; and C-S6C-5's correction reading
+*"PQ-S2-3 is now **closed** by §2.3."* All three **observed** this run.
+
+### C-RR-2 — PQ-S2-4 was refused as a decision, not skipped as hard
+
+> **Claim.** The next list item examined was **PQ-S2-4**, and it was declined because its own text
+> ends with a decision for Brandon, not a task. Recorded so no future run reads the skip as an
+> oversight.
+
+```bash
+cd <android> && sed -n '/^## PQ-S2-4/,/^## PQ-S6-3/p' docs/protocol-questions.md | grep -n "Brandon decides\|Not filed in"
+```
+
+*Expected:* *"**Smallest human unblock — a decision, then two small changes…** Brandon decides whether…"*
+and *"**Not filed in `BLOCKED.md`:** nothing is blocked. This is a decision that has not been made."*
+
+### C-RR-3 — the toolchain, re-tested in both directions
+
+> **Claim.** `.NET` is installable here (**8.0.129**, after `apt-get update` — the first attempt 404'd
+> on a stale index). **PowerShell is not**, so `Verify-Alpha.ps1` genuinely cannot run in this sandbox.
+
+```bash
+which dotnet || echo "absent on a fresh sandbox"
+apt-cache policy dotnet-sdk-8.0 | head -3
+apt-get update && apt-get install -y dotnet-sdk-8.0 && dotnet --version
+apt-cache policy powershell ; echo "powershell exit=$?"
+```
+
+*Expected:* `dotnet` absent before install, candidate `8.0.125-0ubuntu1~24.04.1`, `8.0.129` after.
+`apt-cache policy powershell` prints **nothing**. **Both observed.**
+
+### C-RR-4 — the defect, on `main`, before anything was written
+
+> **Claim.** `Program.cs:288` passed the persisted term only, while `:239-243` stated the full §6.1
+> rule; and `RelayClient.PushAsync` returned a bare `bool`, so the 409's `latest` was unread.
+
+```bash
+cd <engine>
+git show origin/main:src/Engine/Program.cs | sed -n '239,243p;286,290p'
+git show origin/main:src/Sync/RelayClient.cs | sed -n '51,60p'
+git show origin/main:src/Engine/Program.cs | grep -c "PullAsync"
+```
+
+*Expected:* the comment states `startSeq = max(vault.last_e2p_seq, relay latest e2p)`; the code passes
+`startSeq: paired.LastE2pSeq`; `PushAsync` ends `return res.StatusCode is HttpStatusCode.Created;`;
+and **`0`** `PullAsync` occurrences in `Program.cs` — no startup consult existed.
+
+### C-RR-5 — `SyncHarness` 130 → 146, with the baseline measured by stashing
+
+> **Claim.** Baseline **130/0** measured on this tree by stashing, not read off the record; **146/0**
+> with the change. Delta **+16**.
+
+```bash
+cd <engine> && dotnet build CareerSeeker.sln -c Release
+git stash -u && dotnet build CareerSeeker.sln -c Release \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -2
+git stash pop && dotnet build CareerSeeker.sln -c Release \
+  && dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -2
+```
+
+*Expected:* build **0 warnings / 0 errors** throughout; `=== 130 passed, 0 failed ===` stashed;
+`=== 146 passed, 0 failed ===` restored. **All observed.**
+
+### C-RR-6 — the mutation table, including the one that is NOT caught
+
+> **Claim.** M1–M6 are each caught by the assertion counts below. **M7 is not caught**, by design,
+> after the hardening it provoked.
+
+```bash
+cd <engine>
+# each: apply the edit, dotnet build -c Release, run SyncHarness, then revert
+# M1 delete the HttpStatusCode.Conflict arm of PushAsync's switch          -> 5 FAIL
+# M2 ReadLatestAsync returns 0 instead of null (both the ternary and catch) -> 4 FAIL
+# M3 ResumeFrom => relayLatest ?? 0                                         -> 2 FAIL
+# M4 ResumeFrom => persistedSeq                                             -> 2 FAIL
+# M5 pass ReadLatestAsync's result on every switch arm, not just Conflict   -> 5 FAIL
+# M6 delete the Unauthorized/Forbidden arm                                  -> 1 FAIL
+# M7 delete `&& latest.ValueKind == JsonValueKind.Number`                   -> 146 PASS
+```
+
+*Expected:* `=== 140 passed, 5 failed ===`, `141/4`, `143/2`, `143/2`, `141/5`, `145/1`, and for M7
+**`=== 146 passed, 0 failed ===`**. All observed.
+
+**M7 is expected to pass and that is the point.** `TryGetInt64` throws on a non-number element rather
+than returning false, so before the hardening M7 **crashed** the harness with an unhandled
+`InvalidOperationException` at `RelayClient.cs:134` — the `ValueKind` guard was the only thing
+preventing a `{"latest":"42"}` body from taking down the engine's push path. That catch now exists, so
+guard-present and guard-absent are observationally identical and no behavioural assertion can separate
+them. To see the crash, revert the `catch (InvalidOperationException)` arm first.
+
+### C-RR-7 — the relay property the engine now depends on, and the relay suite
+
+> **Claim.** `latest` is `MAX(seq)` for the direction, independent of `since`; the 409 body carries
+> that mark per **direction**, not per pairing. Relay suite **32 → 34**, 0 failed. **No relay source
+> ships in this change.**
+
+```bash
+cd <engine>/relay && npm ci && npx vitest run 2>&1 | grep -E "Tests "
+git -C .. show origin/main:relay/src/channel.ts | sed -n '200,205p'
+git -C .. diff origin/main -- relay/src/ ; echo "relay src diff exit=$?"
+```
+
+*Expected:* `Tests  34 passed (34)`; the `latest` query reading
+`SELECT MAX(seq) AS m FROM envelopes WHERE dir = ?` with **no `since` term**; and an **empty** diff for
+`relay/src/`. **Both mutations** (compute `latest` from the returned page; report the attempted seq in
+the 409) were applied, each failing exactly one new test, then reverted and the suite re-measured at
+**34/0**. All observed.
+
+### C-RR-8 — no cross-repo drift
+
+> **Claim.** No vector was added, removed or edited. The android vendored corpus was never opened for
+> writing.
+
+```bash
+cd <engine> && node docs/sync-vectors/generate.mjs --check
+git diff origin/main -- docs/sync-vectors/ ; echo "vector diff exit=$?"
+cd <android> && git status --porcelain
+```
+
+*Expected:* `OK: 26 vector files match the generator.` (**26 is the `main` figure** — branch figures of
+27 and 28 exist elsewhere in this book and reading one as a `main` figure is the drift trap one repo
+over); an **empty** vector diff; and the android tree showing **only** `LOG.md`, `STATE.md`,
+`AUDIT-REQUEST.md`, `BLOCKED.md`. All observed.
+
+### C-RR-9 — the offline pin 611 → 627, derived and stated so it can be attacked
+
+> **Claim.** Nine Linux-runnable harnesses measure **397**; `EngineHarness` contributes **230** on
+> Windows; 397 + 230 = **627**, and 611 + 16 agrees. `EngineHarness` cannot run here.
+
+```bash
+cd <engine>
+for h in Slice ResearcherHarness HookHarness StoreParityHarness GatewayGateHarness \
+         DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  dotnet run --project tests/$h/$h.csproj -c Release --no-build | tail -1
+done
+dotnet run --project tests/EngineHarness/EngineHarness.csproj -c Release --no-build | tail -5
+grep -n 'ExpectedOfflineTotal =' scripts/Verify-Alpha.ps1
+grep -rn "611" README.md src/Engine/README.md docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md
+```
+
+*Expected:* 28, 57, 16, 28, 36, 35, 45, 6, 146 — **sum 397**, all `0 failed`. `EngineHarness` **aborts**
+with `System.InvalidOperationException: Refusing full-data deletion for a volume root` at
+`FullDataDeletion.ResolveAllowedWorkspace`, from `Program.cs:221` — a Windows-path assumption, **not a
+defect**. `$ExpectedOfflineTotal = 627`. **No `611` in any of the four docs.** All observed.
+
+### C-RR-10 — the verifier's doc expectations, checked without running it
+
+> **Claim.** `Verify-Alpha.ps1` was **not** run. Instead all **230** single-quoted `Assert-Contains`
+> literals were extracted and confirmed present in their target docs.
+
+```bash
+cd <engine>
+python3 - <<'PY'
+import re
+src = open('scripts/Verify-Alpha.ps1').read()
+varmap = dict(re.findall(r'\$(\w+)\s*=\s*Get-Content\s+-LiteralPath\s+"([^"]+)"', src))
+for d, b in re.findall(r'\$(\w+)\s*=\s*\[regex\]::Replace\(\$(\w+)', src):
+    if b in varmap: varmap[d] = varmap[b]
+miss = n = 0
+for var, body, label in re.findall(r'Assert-Contains\s+\$(\w+)\s+@\((.*?)\)\s+"([^"]*)"', src, re.S):
+    p = varmap.get(var)
+    if not p: continue
+    try: t = open(p, encoding='utf-8').read()
+    except FileNotFoundError: continue
+    hay = re.sub(r'[ \t]+', ' ', t) if 'Collapsed' in var else t
+    for lit in re.findall(r"'((?:[^']|'')*)'", body):
+        n += 1
+        if lit.replace("''", "'") not in hay: miss += 1; print("MISSING", p, lit[:60])
+print(f"{n} literals checked, {miss} missing")
+PY
+```
+
+*Expected:* **`230 literals checked`**, with the only reported misses being two fragments from a
+mixed-quote block in `src/Engine/BetaSetupWebFlow.cs` assertions about `gmail.compose` — **artifacts of
+this checker's single-quote regex, unrelated to counts, not drift.** No count literal is missing.
+**This is not a substitute for running the verifier**; it cannot catch a PowerShell syntax error.
+
+### C-RR-11 — what did NOT run, and what remains the gate
+
+```bash
+cd <engine>  && pwsh -File scripts/Verify-Alpha.ps1
+cd <engine>  && dotnet run --project tests/SyncLiveSmoke/SyncLiveSmoke.csproj -c Release --no-build
+cd <android> && ./gradlew --no-daemon :core:test :app:assembleDebug :app:lintDebug
+```
+
+*Expected:* **all three fail to start or cannot pass here.** `pwsh` absent (C-RR-3), so a PowerShell
+syntax error in this run's verifier edits **would not have been caught locally**. `SyncLiveSmoke`
+compiles but needs a live relay — its replay check now asserts `Replayed` **and** `latest == 4`, and
+that assertion is **UNVERIFIED**. The android gate needs the SDK (**B-7**); **nothing in `:core` or
+`:app` changed**. **CI on `windows-latest` is the gate for 627.**
+
+### C-RR-12 — CI
+
+```bash
+gh run list --repo ShivaClaw/careerseeker --branch claude/s6-resume-reconciliation
+gh run view <run-id> --repo ShivaClaw/careerseeker --log | grep -E "Offline total|146 passed"
+```
+
+*Expected:* green, with `=== 146 passed, 0 failed ===` and
+**`=== Offline total: 627 passed, 0 failed ===`** in the `windows-latest` log. `Verify-Alpha.ps1`
+**throws** on a pin mismatch, so a green run *is* the pin check — and it is what would settle whether
+`EngineHarness` is still 230.
+
+**Both lines were OBSERVED**, not merely expected, in run
+[`31919261549`](https://github.com/ShivaClaw/careerseeker/actions/runs/31919261549) (job
+`95096310491`, `windows-latest`) at **2026-08-16T01:19:51Z**: `=== 146 passed, 0 failed ===` and
+**`=== Offline total: 627 passed, 0 failed ===`**. The `Blind relay (Worker)` job (`95096310523`,
+`ubuntu-latest`) was green in the same run, including its **"Assert sync vectors match their
+generator"** and **"Assert the relay has no decryption path"** steps.
+
+**This upgrades C-RR-9 from derived to measured**, and settles the one figure it could only quote:
+627 observed minus 397 measured on Linux leaves exactly **230** for `EngineHarness`, so the number the
+verifier asserts is confirmed rather than inherited. It also retires the specific risk C-RR-11 names —
+that a PowerShell syntax error in this run's verifier edits could not be caught locally. The verifier
+parsed and executed on `windows-latest`.
+
+**It does not retire C-RR-11 itself.** This is the **offline half only** — no `-IncludePublish`,
+`-IncludePackage`, `-IncludeLive` — so the merge condition remains a **full local gate**, and remains
+Brandon's. `SyncLiveSmoke` is still unrun and its new `latest == 4` assertion still **UNVERIFIED**.

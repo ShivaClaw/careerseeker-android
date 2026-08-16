@@ -9548,3 +9548,194 @@ Terra's worktrees were never touched, and `autonomy/codex-state` was **read** �
 recorded exhausted, **next intent: none, files claimed: none** — so there was no collision and no
 rebase was owed. **One machine change**: `apt-get install -y --no-install-recommends dotnet-sdk-8.0`
 (8.0.129). Nothing else was installed.
+
+## Forty-third run — 2026-08-16 (Linux sandbox): the ordered intent's own item 1 had been closed for five days
+
+**Rung: S6 / PQ-S6-3.** The prompt's assigned slice was **S5 again — landed since the twenty-second
+run** (spec/vectors PR #32, phone applier, PQ-A2-3 PR #37). That is the **eighth consecutive run** to
+decline it, and the prompt's ladder summary is now **seventeen runs stale**. This is the **sixteenth
+consecutive run routed by `STATE.md`'s ordered intent** rather than by the prompt.
+
+**But this run could not follow that list either, and that is the finding it opens with.**
+
+### Milestone 0 — rule one, and the list itself measured rather than believed
+
+`git fetch --all --prune` in **both** trees before anything was read. Neither tree moved: engine `main`
+stayed **`aac05f3`**, android `main` stayed **`ebfaf81`**. Every count below is post-fetch.
+
+The forty-second run's list names **NEW ITEM 1 — PQ-S2-3**, the relay's transport error vocabulary,
+promoted from item 2 because it was "the topmost item that is a task rather than a question."
+
+**PQ-S2-3 was closed on 2026-08-11.** `origin/claude/s2-transport-vocabulary` carries `cc6d966`,
+titled *"S2: pin the transport vocabulary for every route — close PQ-S2-3"*, plus `4db3543` pinning
+§2.3 with eleven tests. `git show origin/claude/s2-transport-vocabulary:docs/Sync-Protocol.md` has
+**§2.3 "Transport responses for the remaining routes"** at line 172. The android register says so
+itself, and so does this repo's own `AUDIT-REQUEST.md` — C-S6C-5's 2026-08-11 correction ends
+*"PQ-S2-3 is now **closed** by §2.3 — see **C-S2T-1**."*
+
+**So the forty-second run promoted an item to the top of the list without re-checking it, and the
+check was one `git show`.** The class of error this book has warned about for sixteen runs — a
+statement about the world that was true when written and was inherited rather than re-measured —
+**had reached the list that exists to correct it.** The prompt is stale by seventeen runs; the list
+was stale by five days. Neither is a reason to trust the other; both are a reason to measure.
+
+**What was done instead.** The rest of the list was read for the topmost item that is (a) a task, not
+a decision, and (b) verifiable *here*. Items 2–8 each say in their own words that they need a gate this
+sandbox lacks — the restack (Brandon's full local gate), two typed-refactor items, the halt-policy
+WINDOW, mutation M8 on Windows, the `RelayClient` construction guard, two phone-side items (B-7), and
+the `:core` lane. **PQ-S2-4 was considered and refused**: its own text says the fix "touches the relay,
+the phone and a product decision", and it ends *"Brandon decides"*. **A decision is not a slice.**
+
+**PQ-S6-3 was chosen** — engine-side, unblocked, marked in `protocol-questions.md` as *"unblocked and
+merely unwritten"*, and its "needs a local session" note dates from 2026-08-11, when the note's own
+reason was *"there is no .NET in this sandbox."* Per the standing correction, that reason was re-tested
+rather than inherited (Milestone 1).
+
+### Milestone 1 — the toolchain, re-tested both ways
+
+`which dotnet` was **empty**, as on every fresh sandbox. `apt-cache policy dotnet-sdk-8.0` offered
+**8.0.125**; the first install **failed** (404s — a stale index pinning point releases the mirror had
+dropped), `apt-get update` fixed it, and **8.0.129** installed. **Fourth run to record that a fresh
+sandbox starts without .NET and that this is a per-session cost, not a bound.**
+
+The mirror-image check was also run, and it went the other way: **`apt-cache policy powershell` finds
+nothing.** `pwsh` is genuinely absent, so `Verify-Alpha.ps1` genuinely cannot run here. **An inherited
+impossibility that survived re-testing is worth recording as loudly as one that did not.**
+
+### Milestone 2 — the defect, read on `main` before anything was written
+
+§6.1 requires a sender to resume above `max(persisted, relay latest)`. `src/Engine/Program.cs:288`
+passed `startSeq: paired.LastE2pSeq` — **the persisted term only** — while the comment block at
+`:239-243` states the full rule. **The comment and the code disagreed, and the comment was right.**
+
+The second half compounded it. `src/Sync/RelayClient.cs:51-60` returned
+`res.StatusCode is HttpStatusCode.Created`, a bare `bool`, so a 409 `replay_rejected` was
+indistinguishable from a timeout, a 400 or a 413, and the `latest` the relay sends **for the express
+purpose of reconciliation** was discarded unread. The phone reads it (`RelayClient.conflictLatest`);
+the engine, which §6.1 asks to reconcile, could not.
+
+**Blast radius, stated precisely, because it is milder than it looks.** `SyncPublisher` assigns seq
+before the sink runs and the vault records only on success, so each refused push burns one seq and the
+counter climbs back on its own. The cost is **one dropped envelope per burned seq** — a vault behind by
+N discards N envelopes, the recovery `snapshot` among them, each returning `false` to a caller with no
+retry. **A window, not a deadlock, and nothing reported the window.**
+
+### Milestone 3 — the fix, and one place it deliberately departs from the question
+
+`PushAsync` now returns `PushOutcome(PushStatus, long? Latest)` over v1's six answers. `Latest` is
+populated **only** for `Replayed`: §2.2 pins `latest` to the 409 and omits it from 400 and 413, so a
+number anywhere else would be the client inventing one. It is **nullable rather than 0** on an
+unparseable 409 body, because 0 is a legal seq meaning "the relay holds nothing" — the exact
+misreading §6.1 exists to prevent.
+
+`SyncPublisher.ResumeFrom(persisted, relayLatest)` implements the rule; `BuildSyncBridge` consults the
+relay and resumes above both.
+
+**The departure.** PQ-S6-3 prescribes `PullAsync(dir: "e2p", since: 0)`. That drags the entire retained
+direction across the wire to read one number. `relay/src/channel.ts:202-204` computes `latest` as
+`MAX(seq) WHERE dir = ?` — **independently of `since`** — so `since: LastE2pSeq` reads the same number
+and transfers only what is above our mark. **This was a property of the implementation that no test
+pinned**, so relying on it would have been the cross-implementation drift this book keeps cataloguing;
+it is now pinned in the relay suite (Milestone 5).
+
+**Failure is soft, and that is a choice, not a derivation.** An unreachable relay contributes `null`,
+not 0, and startup falls back to the vault alone with one printed line. Defensible — the consulted
+value can only *raise* the counter — but it means §6.1's catastrophe is still reachable when the relay
+is down **and** the vault is stale. Flagged in the PR's self-audit as a decision someone should
+confirm rather than inherit.
+
+### Milestone 4 — sixteen assertions, and two findings that came out of doubting them
+
+`SyncHarness` **130 → 146**, 0 failed. Baseline **measured by stashing**, not read off the record:
+`git stash -u` → `=== 130 passed, 0 failed ===`. `RelayClient` takes an `HttpClient`, so a stub handler
+drives every branch offline; no relay involved.
+
+Mutations, because an assertion is vacuous until something says otherwise:
+
+| | mutation | caught by |
+| --- | --- | --- |
+| M1 | 409 mapped to `Unavailable` (the old bug's shape) | 5 |
+| M2 | unparseable 409 body degrades to `0` instead of null | 4 |
+| M3 | `ResumeFrom` returns `relayLatest ?? 0` | 2 |
+| M4 | `ResumeFrom` returns the persisted term only (pre-fix) | 2 |
+| M5 | `latest` read off **any** body, not just the 409 | 5 |
+| M6 | 401 folded into the retryable bucket | 1 |
+| M7 | drop the `ValueKind` guard | **NOT caught — see below** |
+
+**Finding one: four of these assertions were vacuous when first written.** The "carries no latest"
+checks used stub bodies containing **no `latest` at all**, so a wrong client that read `latest` off
+every body would still have passed them. They now send a `latest` the relay would never send on those
+statuses, which is the only thing that makes them load-bearing. **Same trap as the forty-second run's
+enum tautology, two runs later, in a different disguise.**
+
+**Finding two: M7 did not fail — it crashed the push path.** `JsonElement.TryGetInt64` **throws** on a
+non-number element rather than returning false, so with the `ValueKind` guard removed the body
+`{"latest":"42"}` took the harness down with an unhandled `InvalidOperationException` at
+`RelayClient.cs:134`. The guard was the **only** thing between a relay — or a proxy, or a captive
+portal — and an exception on the engine's send path, while the method's own doc-comment claimed it was
+"total by construction". `ReadLatestAsync` now catches it too.
+
+**And M7 is consequently no longer caught, which is recorded rather than dressed up.** Once both
+versions return `null`, guard-present and guard-absent are observationally identical and **no
+behavioural assertion can separate them**. That is what defence in depth *means*. Reporting it as a
+caught mutation would have been the more flattering sentence and the false one.
+
+### Milestone 5 — the relay property the engine now leans on
+
+Relay suite **32 → 34**, 0 failed, under miniflare in this session. Two tests: `latest` is the
+direction's high-water mark independent of `since` (the property Milestone 3 departed toward), and the
+409 body carries that mark **per direction, not per pairing** — with `p2e` at 90, a replayed `e2p`
+answers 3.
+
+Both proven against a **mutated relay**: computing `latest` from the returned page fails the first;
+reporting the attempted seq instead of the mark fails the second. **`relay/src/` was then restored and
+the suite re-measured at 34/0** — no relay source ships in this change.
+
+### Milestone 6 — the drift trap, and what was deliberately left alone
+
+Sixteen assertions move `$ExpectedOfflineTotal`: **611 → 627**, swept together with the verifier's
+`Assert-Contains` expectations and the four count-reporting docs, per `CLAUDE.md`.
+
+**627 is derived, not measured, and the derivation is stated so it can be attacked:** the nine
+harnesses that run on Linux measure **397** (28+57+16+28+36+35+45+6+146); `EngineHarness` contributes
+**230** on Windows — *the figure the verifier itself asserts* — and 397 + 230 = 627, with 611 + 16
+agreeing independently. `EngineHarness` **cannot run here**: it aborts at
+`tests/EngineHarness/Program.cs:221`, where `FullDataDeletion.PlanInstalledWorkspace` resolves
+`%LOCALAPPDATA%` to a volume root and the deletion guard refuses. **A Windows-path assumption, not a
+defect.**
+
+**`Verify-Alpha.ps1` was NOT run and nothing here claims it was.** What was done instead is a check
+this sandbox *can* run: all **230** single-quoted `Assert-Contains` literals were extracted from the
+verifier and confirmed present in their target docs. **CI on `windows-latest` is the gate for 627.**
+
+**Three files quoting 611 were deliberately not swept** — `docs/autonomy/CODEX-STATE.md`,
+`docs/Codex-Resume-Handoff.md`, `docs/BETA-AUDIT-REQUEST.md`. They record what a past run *measured*,
+and rewriting a measurement to match a later one falsifies the record. Two are Terra's.
+
+### Prohibition — what this iteration did not touch
+
+**Nothing was merged, in either repo**, and no PR was merged, retargeted, closed or marked ready. **No
+force-push, no history rewrite, no rebase, no branch deleted.** The android repo's drafts were left
+exactly as found, and **not one android source file was changed** — this run's only android write is
+these records. In the engine repo the S5 stack, #50, #51 and #52 were **read only**; the one new branch
+is `claude/s6-resume-reconciliation`, opened as **draft PR #53**, cut from `origin/main` at depth 1.
+
+**No vector byte moved, none was added, and the android vendored corpus was never opened for writing —
+NO cross-repo drift event.** `node docs/sync-vectors/generate.mjs --check` printed **`OK: 26 vector
+files match the generator.`** and `git diff origin/main -- docs/sync-vectors/` is **empty**.
+`docs/Sync-Protocol.md` was **read only — no wire kind was minted and no normative text changed**, which
+is worth stating because this slice touched the counter rules §6.1 governs.
+
+**No relay source changed** — `relay/src/channel.ts` was mutated twice for evidence and **restored**,
+with the suite re-measured at 34/0 afterwards. No Kotlin, no `:core`, no `:app`, no Gradle invocation,
+**no android gate** (B-7).
+
+`scripts/Verify-Alpha.ps1` **was edited** — the drift trap requires it — and **the gate itself was not
+run.** No deploy of any kind (Cloudflare, Workers, relay, site, Pages), no `wrangler`, and **the
+production relay was not contacted at all, not even `GET /v1/health`**. No Google, Play or OAuth
+console; no accounts, no purchases; no Gmail; no MSIX or certificate action; no emulator, no
+`sdkmanager`, no `avdmanager`, no keystore. **No secret was read, printed or referenced.** Terra's
+worktrees were never touched, and `autonomy/codex-state` was **read** — heartbeat 2026-08-12, ladder
+recorded exhausted, **files claimed: none** — so there was no collision and no rebase was owed. **One
+machine change**: `apt-get update` + `apt-get install -y dotnet-sdk-8.0` (8.0.129), and `npm ci` in
+`relay/`. Nothing else was installed.

@@ -1873,3 +1873,50 @@ on the Windows machine and confirm the offline total reads 611.
 This slice went nowhere near the `/pair` page, the Play licence key, the Windows-only `EngineHarness`
 assertions, the halt-policy window, or #36's declared base. None of their statuses changed, and none
 was re-derived, so the last recorded status for each stands.
+
+---
+
+## No new blocker arose 2026-08-16 (S6 / PQ-S6-3 resume reconciliation, forty-third cloud iteration)
+
+**Nothing in this slice is blocked, and nothing new is filed.** PQ-S6-3 was engine-side C#, and C#
+compiles and runs here. Both halves shipped, `SyncHarness` 130 → 146, relay 32 → 34, and CI measured
+the pin at 627. Recorded here only so the next run does not go looking for a blocker behind an
+un-merged PR: **#53 is unmerged because the merge condition is Brandon's full local gate, which is a
+policy, not a blocker.**
+
+### Three things are UNVERIFIED rather than blocked, and the distinction is the point
+
+1. **`SyncLiveSmoke`'s new assertion.** Its replay check now asserts the 409 reads as `Replayed` **and**
+   that `latest == 4`. It **compiles** but was **not run** — it needs a live relay, and the standing
+   prohibition allows at most `GET /v1/health` against production, which was not exercised either.
+   **Unverified, not blocked**: any machine with a local relay closes it (`C-RR-11`).
+2. **`Verify-Alpha.ps1` did not run**, so a PowerShell syntax error in this run's edits to it would not
+   have been caught locally. **CI retired this specific risk** — the verifier parsed and executed on
+   `windows-latest` in run `31919261549` — but the *full* gate (`-IncludePublish -IncludePackage
+   -IncludeLive`) still has not run anywhere.
+3. **`EngineHarness` did not run here.** It aborts at `tests/EngineHarness/Program.cs:221` —
+   `FullDataDeletion.PlanInstalledWorkspace` resolves `%LOCALAPPDATA%` to a volume root on Linux and
+   the deletion guard refuses. **A Windows-path assumption in a test's setup, not a defect, and not a
+   blocker**: CI runs it on Windows every push, and its 230 is now confirmed by subtraction
+   (627 measured − 397 measured on Linux).
+
+### The PowerShell limit, re-tested rather than inherited — and it HELD
+
+`apt-cache policy powershell` finds **nothing**; there is no `snap` either. Unlike `.NET` and the two
+other inherited impossibilities this book has overturned, **this one survived re-testing.** Recorded as
+loudly as the ones that fell, because "an inherited limit is usually false" is itself becoming an
+inherited claim, and it is not always true. **`Verify-Alpha.ps1` genuinely cannot run in this sandbox.**
+
+### B-7 status 2026-08-16 (forty-third run) — unchanged, and it bounded nothing this time
+
+Re-read, not assumed. Nothing in this slice is Kotlin: **no `:core`, no `:app`, no Gradle invocation,
+and no android source file was changed at all.** B-7 therefore constrained no claim here.
+
+### Two items this run declined, and neither is blocked
+
+- **PQ-S2-4** — the relay answers `401` for a purged pairing, so the phone's terminal `PAIRING_GONE` is
+  unreachable. Its own text ends *"Brandon decides"* and *"nothing is blocked. This is a decision that
+  has not been made."* **Still true. Still not a blocker.**
+- **PQ-S6-1's wire fork** — `outcome_ack` (a) vs fire-and-forget (b). Left standing by #52 and left
+  standing again here. **A question with no default-proceed, absent from mission §2's gate list.**
+  Minting a payload kind that binds a second implementation is not an agent's call.
