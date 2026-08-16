@@ -50,6 +50,16 @@ jobs:
       # re-fetches the pinned commit's copies and diffs, so a hand-edited vector -- which
       # would silently desynchronise the phone from the engine -- fails here rather than in
       # someone's hands. The pin lives in VECTORS.lock.
+      #
+      # The comparison is a SET comparison, in both directions, and that is deliberate.
+      # Until the forty-fifth run this step iterated the vendored side only, so it could
+      # see a vector that was modified or deleted upstream but was structurally blind to
+      # one that was ADDED upstream and never vendored: the loop never enumerated a name
+      # it did not already have. That is not hypothetical -- it is exactly what happened
+      # across S5. Upstream added entitlement-ack, entitlement-ack-no-order-id and
+      # invalid-unknown-field; the phone lacked all three; this step stayed green the
+      # whole time. Under-vendoring is the drift that ships a phone which cannot parse
+      # what the engine emits, so it has to fail here too.
       - name: Assert vendored sync vectors match the pinned main-repo commit
         env:
           # The API is authenticated only to raise the anonymous rate limit; the main repo
@@ -75,14 +85,48 @@ jobs:
           }
 
           drift=0
+
+          # Enumerate the upstream directory at the pin so the two sides can be compared as
+          # sets. 29 files is far inside the contents API's single-page limit, so no
+          # pagination is needed; if that ever stops being true this listing silently
+          # truncates and the count assertion below is what catches it.
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+                 -H "Accept: application/vnd.github+json" \
+                 "https://api.github.com/repos/ShivaClaw/careerseeker/contents/docs/sync-vectors/v1?ref=$PIN" \
+                 -o /tmp/listing.json; then break; fi
+            echo "retry $attempt for the upstream listing"; sleep 5
+            [ "$attempt" = 5 ] && { echo "::error::cannot list upstream vectors at $PIN"; exit 1; }
+          done
+
+          jq -r '.[] | select(.type == "file") | .name' /tmp/listing.json | sort > /tmp/upstream.names
+          ls core/src/test/resources/sync-vectors/v1 | sort > /tmp/vendored.names
+
+          # Upstream-only == under-vendored: the engine ships a vector the phone has never
+          # seen. Vendored-only == a local invention, or a file deleted upstream.
+          missing=$(comm -23 /tmp/upstream.names /tmp/vendored.names)
+          extra=$(comm -13 /tmp/upstream.names /tmp/vendored.names)
+          if [ -n "$missing" ]; then
+            echo "::error::upstream has vector(s) that were never vendored: $(echo $missing | tr '\n' ' ')"
+            echo "::error::re-vendor them and bump the pin in VECTORS.lock"
+            drift=1
+          fi
+          if [ -n "$extra" ]; then
+            echo "::error::vendored vector(s) absent upstream at $PIN: $(echo $extra | tr '\n' ' ')"
+            drift=1
+          fi
+
+          # Content equality, for every file the two sides share.
           for f in core/src/test/resources/sync-vectors/v1/*.json; do
             name=$(basename "$f")
+            grep -qxF "$name" /tmp/upstream.names || continue   # already reported as extra
             fetch "$name" /tmp/upstream.json || { echo "::error::cannot fetch upstream $name at $PIN"; drift=1; continue; }
             if ! diff -q "$f" /tmp/upstream.json >/dev/null; then
               echo "::error::vendored $name differs from the pinned main-repo copy"; drift=1
             fi
           done
-          [ "$drift" -eq 0 ] && echo "OK: all vendored vectors match $PIN" || exit 1
+
+          [ "$drift" -eq 0 ] && echo "OK: $(wc -l < /tmp/vendored.names) vendored vectors match $PIN, and the sets agree" || exit 1
 
       - name: Unit tests (:core)
         run: ./gradlew :core:test
