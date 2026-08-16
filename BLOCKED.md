@@ -2074,3 +2074,48 @@ assertion-adding branch opened before it happens.
 as a per-harness count summed at runtime rather than one hand-maintained absolute total, disjoint
 branches would stop colliding. That changes what the drift trap guarantees, and `CLAUDE.md` names the
 single pinned total as the thing that makes a dropped assertion a hard failure. **Not an agent's call.**
+
+## B-18 — the recurring prompt re-issues a completed slice, and its reading list omits the handoff (forty-eighth run, 2026-08-16)
+
+**Symptom.** The scheduled prompt that starts each cloud iteration assigns S5's spec half — amend
+`docs/Sync-Protocol.md` §4.3 with the `entitlement_ack` body, add the vector via `generate.mjs`,
+close PQ-A2-1/-2/-3. **That work has existed since 2026-08-09** (`8575539`, `22b028e`, `7328a0b`,
+**C-STOP-1**). This is the **thirteenth** consecutive run to be assigned it. `RETURN-DAY.md` §7.5
+already names the loop as the defect that cost this window the most iterations; run 47 could describe
+it but could not stop it, and neither can this run.
+
+**The mechanism, which is new here and is the actionable part.** The prompt tells a fresh session to
+read `docs/CLAUDE-ANDROID-MISSION.md`, `STATE.md`, `LOG.md`'s tail, `BLOCKED.md`, `docs/S-Ladder.md`
+and `AUDIT-REQUEST.md`. **`RETURN-DAY.md` is on none of those lists** (**C-STOP-2**), and until this
+run neither `STATE.md`'s pointer line nor the mission doc named it. So the closing handoff — the one
+document written specifically to stop this — was **invisible to the reading path that needs it**. A
+session could follow its instructions exactly and still spend the run re-deriving a conclusion that
+was written down two runs earlier.
+
+Two further prompt details are **stale against the repo**, both cheap to check: the vendored pin is
+`7328a0b`, not `679a317` (moved 2026-08-12, **C-PIN-1**), and S5 is described as "NOT STARTED" when
+its spec half and its emitter are both built. The prompt's own rule — *"verify it; do not trust this
+summary"* — is correct and is what caught all three.
+
+**Attempts.**
+1. **Do the assigned slice anyway.** Refused, and this is the substantive judgement of the run: it
+   would produce a duplicate §4.3 amendment competing with `8575539`, and re-running the generator to
+   "add" existing vectors risks touching the corpus the android repo vendors at `7328a0b` — the
+   prompt itself classes any change to an existing vector's content as a **cross-repo drift event**.
+   The correct response to "build the thing that is built" is to prove it is built and stop.
+2. **Fix the prompt.** Not possible from here. It is stored scheduler configuration, not a file in
+   either repo; nothing in either checkout can edit it, and the sandbox has no access to the schedule.
+3. **Put the pointer where the reader actually looks.** Done, and it is this run's deliverable — a
+   banner at the top of `docs/CLAUDE-ANDROID-MISSION.md` (first file on the list) and of `STATE.md`
+   (second), each naming `RETURN-DAY.md`, the three commits, and the one-command check. This makes
+   the next firing **cheap** rather than preventing it: the session still starts, but it should reach
+   the truth in its first read instead of its fifth derivation.
+
+**Smallest human unblock — turn the routine off, or repoint it.** Mission §7's terminal instruction
+is *"clear the goal"*, and the stop condition was crossed at run 45 and executed at run 47. The
+schedule is the only part of this program still running, and everything left on the board needs a
+Windows gate, an emulator (**B-4**), a relay deploy, or a decision only Brandon can make
+(`RETURN-DAY.md` §5). **If the routine is meant to keep running**, the prompt's "YOUR SLICE THIS
+ITERATION" section should be replaced with: *read `RETURN-DAY.md` §5 and pick from the human queue
+what a Linux sandbox can actually advance* — which today is very little, and that is the honest state,
+not a failure.

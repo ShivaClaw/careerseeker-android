@@ -10236,3 +10236,121 @@ not even `/v1/health`**. No deploy, no Play or Google console, no keystore, no e
 Gmail, no secret read, printed, or echoed. Terra's territory untouched: `autonomy/codex-state` was
 **read, never written** — heartbeat `2026-08-12T20:28:36`, "COMPLETE… the ladder is exhausted",
 **files claimed: none**, so there was no collision to rebase around.
+
+## Forty-eighth run — 2026-08-16 (Linux sandbox): the assigned slice was built seven days ago, and the reading list that assigns it does not name the handoff that says so
+
+**Rule one, first, both trees.** `git fetch --all --prune` in `/home/user/careerseeker` and
+`/home/user/careerseeker-android`, before any derivation. Both checkouts arrived **detached and
+stale** — the android tree at `ebfaf81`, a docs-only commit with four files at root, nothing of the
+program in it. Every count below was taken after the fetch and after
+`git checkout -B claude/android-a0-probe origin/claude/android-a0-probe`, which is the branch the
+window's work actually lives on. **Terra read first, as the bus requires:** `autonomy/codex-state`
+heartbeat `2026-08-12T20:28:36`, *"COMPLETE… the ladder is exhausted"*, **files claimed: none** — no
+collision, nothing to rebase around. Read, never written.
+
+### Milestone 1 — the assigned slice, verified built rather than assumed built
+
+The prompt assigned S5's spec half: amend `docs/Sync-Protocol.md` §4.3 with the `entitlement_ack`
+body, add the vector through `generate.mjs`, close PQ-A2-1/-2/-3. **All of it has existed since
+2026-08-09**, and I verified it directly from the object store rather than reading it out of the
+records (**C-STOP-1**): `8575539` touches **only** `docs/Sync-Protocol.md`, +114/−3, and its diff
+carries §4.3.3's `{product_id, acknowledged_at, order_id?}` (PQ-A6-1), the 1 MiB cap re-stated on the
+**decoded ciphertext** (PQ-A2-1) and structural rejection reported as `decrypt_failed` (PQ-A2-2);
+`22b028e` adds both ack vectors **and** the generator lines that emit them; `7328a0b` adds
+`invalid-unknown-field.json` (PQ-A2-3). **Four gates, all closed, none of them by this run.**
+
+This is the **thirteenth** consecutive run assigned that slice. Run 47 called the loop the costliest
+defect in these records; this run is one more instance of it, and declining again is not the finding.
+
+**What is new is the check nobody had run.** Every prior record of
+`node docs/sync-vectors/generate.mjs --check` was taken on `main` — **`OK: 26 vector files match the
+generator.`** — and `main` carries **none** of the three new vectors, so that result says nothing
+about them. Run on the branch that carries them:
+
+```
+$ git checkout -B claude/s5-entitlement-ack-emitter origin/claude/s5-entitlement-ack-emitter
+$ node docs/sync-vectors/generate.mjs --check
+OK: 29 vector files match the generator.
+=== EXIT: 0 ===
+```
+
+**29, exit 0**, and 26 + 3 reconciles the two numbers. That is the first executed evidence that the
+three added vectors are **deterministic generator output and not hand-written JSON** — which is the
+property the whole vendoring scheme rests on, and the one a hand-edit would silently break.
+
+### Milestone 2 — why building it anyway would have been the wrong call
+
+Not caution, a specific hazard. A second §4.3 amendment would compete with `8575539` on the same
+lines in a fleet where three merges already stop on hand-resolutions (**B-17**). And re-running the
+generator to "add" vectors that exist puts a regenerated corpus beside the one the android repo
+vendors at pin `7328a0b` — which the prompt itself classes as a **cross-repo drift event**, the one
+thing it says to stop for. Verified the corpus is intact instead (**C-STOP-3**):
+
+```
+$ git archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pin-check
+$ diff -r /tmp/pin-check/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1
+$ echo $?
+0                      # 29 files, no output
+```
+
+Byte-identical, re-confirmed after today's fetch. **The correct response to "build the thing that is
+built" is to prove it is built, and stop.**
+
+### Milestone 3 — the mechanism, which is the actual deliverable
+
+Run 47 described the re-assignment loop. It did not find *why* a session following its instructions
+exactly still misses the answer. **The prompt's reading list does not contain the handoff.** It names
+`docs/CLAUDE-ANDROID-MISSION.md`, `STATE.md`, `LOG.md`'s tail, `BLOCKED.md`, `docs/S-Ladder.md`,
+`AUDIT-REQUEST.md` — and `RETURN-DAY.md` is on **none** of them (**C-STOP-2**, and at the parent
+commit neither `STATE.md`'s pointer line nor the mission doc named it either: `grep -c` returns `0`
+for all three). The document written specifically to end the loop was **unreachable from the path
+that needed it**.
+
+Fixed where the reader actually looks: a banner at the top of `docs/CLAUDE-ANDROID-MISSION.md` (first
+file on the list) and of `STATE.md` (second), each naming `RETURN-DAY.md`, the three commits, and
+**C-STOP-1** as the one-command check. The mission's law below the banner is **unchanged** — it is
+marked as status, not law, because rewriting a mission Brandon wrote is not an agent's call.
+
+This makes the next firing **cheap**; it does not prevent it. The prompt is stored scheduler
+configuration, not a file in either repo, and nothing here can edit it. Recorded as **B-18** with the
+smallest human unblock: mission §7's own terminal instruction is *"clear the goal"*, and it came due
+three runs ago.
+
+### Milestone 4 — two more stale details in the prompt, both cheap to check
+
+The prompt states the vendored pin is `679a317`; it moved to **`7328a0b`** on 2026-08-12
+(**C-PIN-1**), and `VECTORS.lock` records the move and the reasoning. It states S5 is "NOT STARTED
+and genuinely NOT blocked"; the spec half is built and the emitter landed on a draft branch. **The
+prompt's own instruction — "verify it; do not trust this summary" — is what caught all three**, and
+it is the reason this run has an entry rather than a duplicate commit.
+
+### Milestone 5 — what this run does not establish
+
+**No gate ran, measured rather than assumed:** `which pwsh dotnet` finds neither, there is no Android
+SDK, no emulator, no Windows. **No `Verify-Alpha.ps1` result and no android gate result is claimed
+anywhere in this entry**, and none of the numbers above depends on one. The `--check` and the `diff`
+are the only executed verifications in this run, and both are recorded with their literal output.
+
+**No rung status changed**, and no rung advanced. S5's spec half was already built; its C# and Kotlin
+appliers remain unwritten because neither compiles here — the prompt is right that they belong to a
+local session, and that is unchanged from run 47. Everything left on the board still needs a Windows
+gate, an emulator (**B-4**), a relay deploy, or a decision only Brandon can make (`RETURN-DAY.md` §5).
+
+### What this run did NOT touch
+
+**No engine file of any kind.** The engine checkout was read-only: `git` queries, `git archive`, and
+`node docs/sync-vectors/generate.mjs --check`. A local branch ref was created there to run that check
+against an existing remote branch — **no commit, no push, no engine PR, and `git status` left clean**.
+**No vector byte in either repo** — `docs/sync-vectors/` and `core/src/test/resources/sync-vectors/`
+are untouched, `VECTORS.lock` not edited, and the vendored corpus still matches pin `7328a0b`
+(**C-STOP-3**). **`docs/Sync-Protocol.md` was read, never opened for edit** — the S5 spec work this
+run was assigned is built, and duplicating it was refused on the record. **No `scripts/Verify-Alpha.ps1`
+edit and no offline pin edit** — nothing here is counted by `$ExpectedOfflineTotal`, so this run adds
+**no** new pin-toucher and does **not** increase B-17's landing cost. **No C# applier and no Kotlin
+applier.** **Nothing merged, closed, or taken out of draft in either repo** — the android repo is
+never-self-merge and the main-repo condition is a gate this sandbox does not have; **#53 stays open
+and draft**, and the recommendation about its fate is still only a recommendation. No branch deleted,
+no history rewritten, no force-push. The production relay was **not contacted at all, not even
+`GET /v1/health`**. No deploy of any kind; no Play, Google or OAuth console; no accounts, no
+purchases, no keystore, no emulator, no Gmail. **No secret read, printed, or echoed** — none was
+opened. No `.appdata` original touched. Terra's territory read, never written.

@@ -9563,3 +9563,75 @@ runs used one `##` per milestone rather than one per run. The ordinal in the las
 only reliable counter, and the first draft of this very command got it wrong.
 
 Mission §7 fires the final handoff at **45**. `RETURN-DAY.md` is that handoff, written two runs late.
+
+### C-STOP-1 — the assigned slice is built, for the thirteenth consecutive run
+
+Run after `git fetch --all --prune` in **both** trees, or the counts are stale — that is rule one.
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  echo "== $c =="; git log -1 --format='%ad  %s' $c
+  git show --stat --format='' $c
+done
+```
+
+*Expected, and **observed** this run:* `8575539` (2026-08-09) amends **`docs/Sync-Protocol.md` only**,
++114/−3 — §4.3.3's `{product_id, acknowledged_at, order_id?}` body (**PQ-A6-1**), the 1 MiB cap
+re-stated on the **decoded ciphertext** (**PQ-A2-1**), and structural rejection reported as
+`decrypt_failed` (**PQ-A2-2**). `22b028e` adds `entitlement-ack.json`,
+`entitlement-ack-no-order-id.json`, `index.json` **and `generate.mjs`** — generated, not hand-written.
+`7328a0b` adds `invalid-unknown-field.json` (**PQ-A2-3**, closes **B-6**). **All four gates named in
+the recurring prompt are already closed.**
+
+That the vectors are generator-output rather than hand-written is the load-bearing half, and it is
+checked on the branch that **carries** them — not on `main`, which has none of them:
+
+```bash
+cd <engine> && git checkout -B s5-check origin/claude/s5-entitlement-ack-emitter
+node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`OK: 29 vector files match the generator.`**, `exit=0`. Prior runs
+recorded this only against `main` (**`OK: 26 …`** — see **C-LAND-8**), which by construction says
+nothing about the three added files. 26 + 3 = 29 reconciles the two.
+
+**Why this is a re-verification and not a build instruction:** the work is unmerged, not unwritten.
+`git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l` still returns **26**. The 17 open
+PRs are unmerged because the merge condition is a full local `Verify-Alpha.ps1`, which no cloud
+session can run (**C-LAND-7**, **C-ENV-1**). **Building it again would duplicate `8575539` and put a
+regenerated corpus next to the one the android repo vendors at `7328a0b`.**
+
+### C-STOP-2 — `RETURN-DAY.md` is on none of the reading lists that lead to it
+
+```bash
+cd <android>
+for f in docs/CLAUDE-ANDROID-MISSION.md docs/S-Ladder.md; do
+  echo -n "$f: "; git show HEAD~1:$f 2>/dev/null | grep -c 'RETURN-DAY'
+done
+git show HEAD~1:STATE.md | sed -n '3,5p' | grep -c 'RETURN-DAY'
+```
+
+*Expected, and **observed** at the parent of this run's commit:* **`0`** for every one of them. The
+recurring prompt names exactly `docs/CLAUDE-ANDROID-MISSION.md`, `STATE.md`, `LOG.md`, `BLOCKED.md`,
+`docs/S-Ladder.md` and `AUDIT-REQUEST.md`; the closing handoff written at run 47 to end the
+re-assignment loop was reachable from **none** of them. This run adds the banner to the first two, so
+the same command against `HEAD` returns non-zero. Recorded as **B-18**.
+
+**Attack this first if you doubt the run:** the claim is about *document reachability*, not about the
+prompt's contents, and it is falsifiable exactly as written — if any of those files named
+`RETURN-DAY.md` before this commit, the finding is wrong and the banner is redundant.
+
+### C-STOP-3 — the vendored corpus is still byte-identical to its pin, after today's fetch
+
+```bash
+cd <engine> && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pin-check
+diff -r /tmp/pin-check/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1
+echo "exit=$?"; ls /tmp/pin-check/docs/sync-vectors/v1 | wc -l
+```
+
+*Expected, and **observed**:* **no output, `exit=0`, 29 files.** This re-confirms **C-PIN-1** rather
+than establishing something new — it is here because rule one exists: the pin claim is only as fresh
+as the fetch behind it, and this one was taken after `git fetch --all --prune` in both trees on
+2026-08-16. **No vector byte was written by this run in either repo**; `git status` in the engine
+checkout is clean and the android diff touches no path under `core/src/test/resources/`.
