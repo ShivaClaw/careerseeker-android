@@ -9977,3 +9977,127 @@ Recorded at this length because the failure mode is the one this book exists to 
 narrative, the measurement was one `git ls-tree` away, and I wrote the narrative first and reached for
 the measurement only when the self-audit forced the question. The corrected records are `ci.yml`'s
 step comment, `C-CI-1`/`C-CI-4`, **B-16**, and the STATE heartbeat, all in this run.
+
+---
+
+## The forty-sixth run — 2026-08-16, Linux sandbox
+
+**The previous run shipped a CI fix it could not execute and said so. This run executed it, closed
+half of that blocker with runner output, and found that the same step's comment had been promising a
+safety net that was never written.**
+
+### Milestone 0 — the fetch, and the eleventh stale assignment
+
+`git fetch --all --prune` in both checkouts before any count. Every number below is post-fetch.
+
+The stored prompt assigned S5's spec half again: amend §4.3 with the `entitlement_ack` body, add the
+vector via `generate.mjs`, close PQ-A2-1/-2/-3. **All of it is built** — `8575539` (body + PQ-A2-1),
+`22b028e` (both ack vectors), `7328a0b` (`invalid-unknown-field`, PQ-A2-3). Verified directly this
+run rather than inherited from the records: `git branch -r --contains` places all three on the
+`claude/s5-*` and `claude/s2-*` branches. **Declined for the eleventh consecutive run.**
+
+One thing worth stating plainly, because "landed" has been doing double duty in these records: those
+commits are **on unmerged draft branches, not on `origin/main`**. `git ls-tree origin/main
+docs/sync-vectors/v1/` returns **26** files — no `entitlement-ack*`, no `invalid-unknown-field`. The
+work exists and is reviewable; it is not on the trunk. A reader of the prompt who checked `main` and
+concluded the slice was undone would be looking at the right evidence and drawing the wrong
+conclusion, which is exactly how this got re-assigned eleven times.
+
+`node docs/sync-vectors/generate.mjs --check` on the engine tree: **`OK: 26 vector files match the
+generator.`**, exit 0. Run because the prompt asked for it; it describes `main`, and it is green.
+
+### Milestone 1 — the run the last session asked someone to read
+
+B-15 existed because the rewritten drift check had never touched a runner. It has now. Run
+`31938526828` at `703e8f2`, job `95144180297` on `ubuntu-latest`, step 7, **success** (**C-CI-5**):
+
+```
+pinned main-repo commit: 7328a0bc043335491cd96a67d634e8eea2a13af9
+OK: 29 vendored vectors match 7328a0bc043335491cd96a67d634e8eea2a13af9, and the sets agree
+```
+
+That single line resolves all three of B-15's named unknowns at once — the contents-API directory
+listing shape parsed, `jq` is on the image, and the directory `?ref=` lookup resolves for a commit on
+an **unmerged branch**. It could not have printed otherwise.
+
+**It resolves them for the pass path only.** The deleted-vector and hand-edited-vector paths are still
+stub evidence. A green check proves it does not false-alarm; it does not prove it still fires, and for
+a drift check that is the half that matters. **B-15 is NARROWED, not closed**, and the remaining
+unblock is written down rather than taken, because runner-proving a failure path means pushing a
+deliberately-broken tree and leaving a red run plus an undeletable branch on a repo under review.
+
+### Milestone 2 — a defect I predicted, measured, and did not find
+
+Reading the step, the listing's retry loop looked wrong: `[ "$attempt" = 5 ] && { … }` as the last
+statement of a loop body is the classic `set -e` abort, which would mean the loop never retried and
+died silently on the first transient API hiccup. I wrote the repro before writing the finding.
+
+**The prediction was wrong** (**C-CI-8**). With `curl` stubbed to fail twice then succeed, run as
+GitHub runs it: `retry 1`, `retry 2`, `REACHED THE LINE AFTER THE LOOP (attempts used: 3)`, exit 0.
+A failing `[` that is not the final command of an `&&` list is exempt from `set -e`. **The retry loop
+is sound.** Recorded at this length because the first attempt at the repro invoked `bash script` and
+so **ignored the `-e` in its own shebang** — it proved nothing, and I nearly read its "pass" as
+confirmation of soundness rather than as a broken test. Re-running it as `bash -e` is what turned it
+into evidence, in both directions.
+
+### Milestone 3 — the comment was guarding something that was not there
+
+The step's comment read: *"if that ever stops being true this listing silently truncates and the count
+assertion below is what catches it."* **There is no count assertion below.** `grep -c "wc -l <
+/tmp/upstream.names"` over the step at `703e8f2` returns **0** (**C-CI-6**).
+
+What actually happens on a truncated listing, measured against the real vendored tree with the listing
+cut to 10 of 29 names and the set logic extracted verbatim:
+
+```
+::error::vendored vector(s) absent upstream at 7328a0b…: entitlement-wrong-product.json …
+STEP WOULD FAIL (exit 1)
+```
+
+So truncation **is** caught — every dropped name looks like a vendored file absent upstream, so the
+vendored-only branch fires. **The outcome was safe and the stated reason was wrong**, and the only
+diagnosis it prints sends the reader after a vendoring error that does not exist. That is the same
+species as the `VECTORS.lock` wording the last run corrected: a safety file describing a guarantee it
+does not implement teaches the next reader to trust the wrong thing.
+
+Fixed by writing the assertion the comment already promised, and rewriting the comment to describe the
+mechanism that genuinely protects the step. Exercised on both sides of its threshold, extracted
+**verbatim from the YAML** rather than retyped (**C-CI-7**): 29 entries → exit 0, the step continues;
+1000 entries → exit 1 with `::error::the upstream listing returned 1000 entries and is probably
+paginated`. YAML re-parses, 12 steps, stale comment gone.
+
+### Milestone 4 — what this run does not establish
+
+**The android gate did not run, and this time that is measured rather than assumed** (**C-ENV-1**):
+JDK **21.0.10** against the pinned **17**, Gradle **8.14.3** against the pinned **9.6.1**, and
+`dsl.maven.google.com` returns **`000`** — unreachable — against `200` for `repo1.maven.org`. **B-7
+holds.** No `:core`, `:app`, `assembleDebug` or `lintDebug` result is claimed anywhere above. Every
+android claim in this entry is either read out of a real runner log or established at the shell level.
+
+**B-16 is untouched and still open.** Nothing in either repo notices that the vendored pin has fallen
+behind upstream, and this run's change does not address it — it hardens the comparison *against the
+pin*, which is a different question. The fix still needs Brandon to choose which upstream ref a
+staleness check should name, and naming a draft branch in CI is a release-coupling decision, not a
+bug fix. Restating it here so the next reader does not mistake "drift check hardened, twice now" for
+"the pin is watched". It is not.
+
+### What this run did NOT touch
+
+**No vector byte, in either repo.** `docs/sync-vectors/` and
+`core/src/test/resources/sync-vectors/v1/` are untouched — the vendored corpus still matches
+`7328a0b`, which the runner itself confirmed this run, so no cross-repo drift was created or risked.
+`VECTORS.lock` was **not edited at all** this run, and the pin line is unchanged. No engine code, no
+Kotlin source, no C# source, no test, no harness, no relay source, no relay test, no
+`scripts/Verify-Alpha.ps1`, and **no offline pin** — nothing here is counted by that number.
+`docs/Sync-Protocol.md` was **not opened for edit**; the S5 spec work it is repeatedly assigned is
+built, and re-saying §4.3 a fifth way is not a deliverable. **No C# applier and no Kotlin applier was
+written** — neither can be compiled here, and the prompt is right that they belong to a local session.
+No PR was merged, closed, or taken out of draft, in either repo; the android repo is never-self-merge
+and the main-repo policy needs a gate this sandbox does not have. **No engine branch, no engine PR,
+and no engine file of any kind was written** — the engine tree was read only (`generate.mjs --check`,
+`git ls-tree`, `git branch -r --contains`). No branch deleted, no history rewritten, no force-push.
+The production relay was **not contacted at all, not even `/v1/health`**. No deploy, no Play or Google
+console, no keystore, no emulator, no OAuth, no Gmail, no secret read, printed, or echoed. Terra's
+territory untouched: `autonomy/codex-state` was **read, never written** — heartbeat
+`2026-08-12T20:28:36`, "COMPLETE… the ladder is exhausted", **files claimed: none**, so there was no
+collision to rebase around.

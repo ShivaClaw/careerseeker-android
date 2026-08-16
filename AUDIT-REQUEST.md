@@ -9252,3 +9252,120 @@ against upstream HEAD, so a pin lagging upstream is invisible to CI in both repo
 The fix in **C-CI-2** is unaffected — case 2 (a file present at the pin, absent locally) is a real
 condition the old step could not see, reachable via a partial re-vendor. Only the S5 attribution was
 wrong.
+
+---
+
+## Forty-sixth run — 2026-08-16 (Linux sandbox)
+
+### C-CI-5 — B-15 is closed on the pass path: the rewritten step ran on a real runner
+
+The previous run shipped the set-comparison rewrite stub-verified only, and named three things that
+could be confirmed **only** on a runner: the contents-API **directory listing shape**, **`jq`'s
+presence**, and whether the `?ref=` **directory** lookup resolves for a commit on an **unmerged
+branch**. All three executed.
+
+```bash
+gh api repos/ShivaClaw/careerseeker-android/actions/runs/31938526828 --jq '.conclusion,.head_sha'
+gh api repos/ShivaClaw/careerseeker-android/actions/jobs/95144180297 \
+  --jq '.steps[] | select(.name|test("vendored sync vectors")) | {name,conclusion}'
+gh run view 31938526828 --repo ShivaClaw/careerseeker-android --log \
+  | grep -E "pinned main-repo commit|OK: [0-9]+ vendored"
+```
+
+*Expected, and **observed**:* `success`, `703e8f222e3784c6da47a60a150311cee7033934`; the step
+`Assert vendored sync vectors match the pinned main-repo commit` → `success` (09:16:51 → 09:17:00,
+`ubuntu-latest`); and verbatim:
+
+```
+pinned main-repo commit: 7328a0bc043335491cd96a67d634e8eea2a13af9
+OK: 29 vendored vectors match 7328a0bc043335491cd96a67d634e8eea2a13af9, and the sets agree
+```
+
+**Scope, stated precisely, because the rest of B-15 does not close with it.** What ran on the runner
+is the **pass** path. The two **failure** paths (a vendored vector deleted; a vendored vector
+hand-edited) are still verified only against the local stub of **C-CI-2** — runner-confirming them
+means pushing a deliberately-broken tree, which would leave a red run and a stray branch on a repo
+whose PRs are under review. **Not done, and not silently implied.** B-15 is narrowed, not deleted.
+
+### C-CI-6 — the step's comment promised a count assertion that did not exist
+
+```bash
+cd <android> && git show 703e8f2:.github/workflows/ci.yml \
+  | grep -n "count assertion below"
+cd <android> && git show 703e8f2:.github/workflows/ci.yml \
+  | sed -n '/Assert vendored sync vectors/,/Unit tests/p' | grep -c "wc -l < /tmp/upstream.names"
+```
+
+*Expected, and **observed**:* the comment is present at `703e8f2`, and the grep count is **0** —
+there was no count assertion anywhere in the step. What actually happens on a truncated listing was
+measured against the **real** vendored tree, listing truncated to 10 of 29 names, set-comparison
+logic extracted verbatim:
+
+```
+::error::vendored vector(s) absent upstream at 7328a0b…: entitlement-wrong-product.json …
+STEP WOULD FAIL (exit 1)
+```
+
+So truncation **is** caught — every dropped name looks like a vendored file absent upstream, so the
+vendored-only branch fires — but the **only** diagnosis emitted points at a vendoring error that does
+not exist. Outcome safe, stated reason wrong.
+
+### C-CI-7 — the replacement assertion, exercised on both sides of its threshold
+
+The new assertion was extracted **verbatim from `ci.yml`** (parsed out of the YAML block scalar, not
+retyped) and run under `bash -e`, the shell GitHub uses:
+
+```bash
+cd <android>
+python3 -c "import yaml;s=[x for x in yaml.safe_load(open('.github/workflows/ci.yml'))['jobs']['build']['steps'] if 'vendored sync vectors' in x.get('name','')][0]['run'];l=s.split('\n');i=[n for n,v in enumerate(l) if v.startswith('upstream_count=')][0];j=[n for n,v in enumerate(l) if n>i and v.strip()=='fi'][0];open('/tmp/ca.sh','w').write('\n'.join(l[i:j+1]))"
+seq 29   > /tmp/upstream.names && bash -e /tmp/ca.sh; echo "EXIT=$?"
+seq 1000 > /tmp/upstream.names && bash -e /tmp/ca.sh; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* `EXIT=0` at 29 (the step continues, today's reality), and at 1000:
+
+```
+::error::the upstream listing returned 1000 entries and is probably paginated;
+::error::this step must follow pages before its set comparison can be trusted
+EXIT=1
+```
+
+YAML validity after the edit, and that the stale comment is gone:
+
+```bash
+cd <android> && python3 -c "import yaml;d=yaml.safe_load(open('.github/workflows/ci.yml'));s=[x for x in d['jobs']['build']['steps'] if 'vendored sync vectors' in x.get('name','')][0];print(len(d['jobs']['build']['steps']),'upstream_count' in s['run'],'count assertion below' not in s['run'])"
+```
+
+*Expected, and **observed**:* `12 True True`.
+
+### C-CI-8 — a defect I predicted, measured, and did not find
+
+Before finding C-CI-6 I predicted the listing's **retry loop** was broken: `[ "$attempt" = 5 ] && { … }`
+as the last statement of a loop body looked like the classic `set -e` abort, which would mean the loop
+never retried and died silently on the first transient API failure. **Measured, with `curl` stubbed to
+fail twice and succeed on the third attempt, run as GitHub runs it (`bash -e {0}`):**
+
+```bash
+bash -e /tmp/claude-scratch/retry-repro.sh; echo "EXIT=$?"
+```
+
+*Expected (my prediction):* abort after attempt 1. ***Observed:*** `retry 1`, `retry 2`, then
+`REACHED THE LINE AFTER THE LOOP (attempts used: 3)`, `EXIT=0`. **The retry loop is sound** — a
+failing `[` that is not the final command of an `&&` list is exempt from `set -e`. Recorded because
+the prediction was wrong and an unrecorded wrong prediction is how a phantom blocker gets born.
+
+**Note on method:** the first run of this repro invoked `bash script` and so **ignored the `-e` in the
+shebang** — it proved nothing, and re-running it as `bash -e` is what made it evidence.
+
+### C-ENV-1 — the android gate's absence is measured here, not assumed
+
+```bash
+java -version; gradle --version | head -3
+curl -s -o /dev/null -w "%{http_code}\n" https://dsl.maven.google.com/ --max-time 15
+```
+
+*Expected, and **observed**:* JDK **21.0.10** (the build pins **17**), Gradle **8.14.3** (the build
+pins **9.6.1**), and `000` for Google's Maven host — **unreachable**, against `200` for
+`repo1.maven.org`. So **B-7 holds by measurement this run**, and every android-side claim above is
+either runner-sourced or shell-level; **no `:core`, `:app`, `assembleDebug` or `lintDebug` result is
+claimed, because none was run.**

@@ -1958,8 +1958,40 @@ If it errors instead, item 1 or 3 above is the cause; adding `sudo apt-get insta
 the listing parse for `grep -oE '"name": *"[^"]+"'` resolves it without touching the logic. **This is
 a draft PR precisely so that read happens before anyone relies on it.**
 
----
+### B-15 NARROWED — 2026-08-16 (forty-sixth run): the pass path ran on a runner; the failure paths did not
 
+**The read this blocker asked for has happened.** Run
+[`31938526828`](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31938526828), job
+`95144180297`, `ubuntu-latest`, head `703e8f2` — the step succeeded (09:16:51 → 09:17:00) and printed
+verbatim (**C-CI-5**):
+
+```
+pinned main-repo commit: 7328a0bc043335491cd96a67d634e8eea2a13af9
+OK: 29 vendored vectors match 7328a0bc043335491cd96a67d634e8eea2a13af9, and the sets agree
+```
+
+**All three named unknowns are resolved, and resolved together** — the step could not have printed
+that line otherwise. (1) The contents-API **directory listing shape** parsed: `jq`'s
+`select(.type == "file")` produced 29 names, and the set comparison agreed with `ls`. (2) **`jq` is
+present** on the runner image. (3) The **directory** `?ref=` lookup **does** resolve for `7328a0b`, a
+commit on an unmerged branch. The "29 files stay inside one page" assumption also held.
+
+**What is still open, and it is the reason this is NARROWED rather than CLOSED.** Only the **pass**
+path executed. The two failure paths — a vendored vector deleted, a vendored vector hand-edited —
+remain verified **only** against the local stub of **C-CI-2**. A green step proves it does not
+false-alarm; it does not prove it still fires. That distinction is the whole point of a drift check,
+so it is not rounded off here.
+
+**Smallest human unblock for the remainder.** Runner-confirming a failure path means pushing a
+deliberately-broken tree. That is cheap but not free: it leaves a red run and a stray branch on a repo
+whose PRs are under review, and the house rule against deleting branches means the branch stays. **A
+cloud session should not do that unilaterally.** Either (a) Brandon pushes a throwaway branch with one
+vendored vector deleted and confirms the step reports
+`::error::upstream has vector(s) that were never vendored`, or (b) accept the stub evidence for the
+failure paths and say so here — the paths are three lines of `comm` and `diff -q`, and the pass path
+now proves the surrounding plumbing is real.
+
+---
 ## B-16 — nothing in either repo notices that the vendored pin has fallen behind upstream (forty-fifth run, 2026-08-16)
 
 **Symptom.** The android CI step compares the vendored vector set against **the pin recorded in
