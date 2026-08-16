@@ -9369,3 +9369,28 @@ pins **9.6.1**), and `000` for Google's Maven host — **unreachable**, against 
 `repo1.maven.org`. So **B-7 holds by measurement this run**, and every android-side claim above is
 either runner-sourced or shell-level; **no `:core`, `:app`, `assembleDebug` or `lintDebug` result is
 claimed, because none was run.**
+
+### C-CI-9 — the edited step ran on a runner too, and passed
+
+The change this run makes to `ci.yml` was itself exercised on `ubuntu-latest`, on the push of
+`f5465b8`:
+
+```bash
+gh api repos/ShivaClaw/careerseeker-android/actions/jobs/95169273279 \
+  --jq '.steps[] | select(.name|test("vendored sync vectors")) | {number,conclusion,started_at,completed_at}'
+gh run view 31948926844 --repo ShivaClaw/careerseeker-android --log \
+  | grep -E "pinned main-repo commit|OK: [0-9]+ vendored|paginated"
+```
+
+*Expected, and **observed** for the first command:* step **7**, `conclusion: success`,
+`13:09:51Z → 13:10:00Z`. So the new `upstream_count` assertion parses and runs on the real image, and
+does **not** fire at 29 — which is the behaviour **C-CI-7** predicted for the below-threshold side,
+now confirmed on a runner rather than only locally.
+
+**Stated honestly: the second command was not run by me.** Job `95169273279` was still executing
+`:core:test` at hand-off, and GitHub returns **HTTP 404** for a job's logs until the job completes, so
+the verbatim `OK: 29 vendored vectors …` line for *this* run is **not** in hand. What is in hand is
+the step's own `conclusion: success` from the jobs API. The log grep is left above because it is the
+command that upgrades this from a status to a transcript once the job finishes — **the next session
+should run it, and should also confirm the remaining steps went green**, since `:core:test`,
+`:app:test`, `assembleDebug` and `lintDebug` had not reported when this run stopped.
