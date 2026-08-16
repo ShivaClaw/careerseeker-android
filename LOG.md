@@ -10336,6 +10336,27 @@ appliers remain unwritten because neither compiles here — the prompt is right 
 local session, and that is unchanged from run 47. Everything left on the board still needs a Windows
 gate, an emulator (**B-4**), a relay deploy, or a decision only Brandon can make (`RETURN-DAY.md` §5).
 
+### Milestone 6 — I got C-STOP-2 wrong twice, and both are recorded rather than patched
+
+The re-verification command for this run's central finding was **wrong on the first draft and wrong
+again on the fix.** Both were caught by running it, not by reading it.
+
+1. **First draft used `HEAD~1` and expected `0`.** `HEAD~1` is the banner commit itself (`43a3bd5`),
+   so it returns **`2`** for the mission doc — the command proved the **opposite** of its claim the
+   moment a second commit existed. Repinned to the SHA `2e78dab` so it survives later commits.
+2. **The fix then over-claimed.** It asserted `STATE.md` returns `0` for the **whole file** — "a
+   stronger result than the claim needs". **It returns `2`**: run 47's heartbeat cell does name
+   `RETURN-DAY.md`, buried in a multi-thousand-character table cell. **The strong claim is withdrawn
+   and the scoped one stands** — the *navigational pointer line*, which is where a reader looks for
+   what to read next, named it zero times. Reaching for a stronger version of my own finding is a
+   worse error than the first, because the first was mechanical and this one flattered the argument.
+
+This is the same failure mode run 47 recorded against C-LAND-9 — a command that measures whether the
+window has ended being off by 19 — and it recurred one run later in the run that cited it. **The
+lesson these records keep re-learning is that a re-verification command is only evidence once it has
+been executed as written**; the corrected block now reports `0`, `0`, `0`, `2` and was run in that
+exact form before being committed.
+
 ### What this run did NOT touch
 
 **No engine file of any kind.** The engine checkout was read-only: `git` queries, `git archive`, and

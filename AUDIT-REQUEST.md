@@ -9606,13 +9606,32 @@ regenerated corpus next to the one the android repo vendors at `7328a0b`.**
 
 ```bash
 cd <android>
+# 2e78dab is run 47's records commit -- the parent of this run's first commit, pinned by SHA
 for f in docs/CLAUDE-ANDROID-MISSION.md docs/S-Ladder.md; do
-  echo -n "$f: "; git show HEAD~1:$f 2>/dev/null | grep -c 'RETURN-DAY'
+  echo -n "$f: "; git show 2e78dab:$f | grep -c 'RETURN-DAY'
 done
-git show HEAD~1:STATE.md | sed -n '3,5p' | grep -c 'RETURN-DAY'
+echo -n "STATE.md pointer line: "; git show 2e78dab:STATE.md | sed -n '3,5p' | grep -c 'RETURN-DAY'
+echo -n "STATE.md whole file:   "; git show 2e78dab:STATE.md | grep -c 'RETURN-DAY'
 ```
 
-*Expected, and **observed** at the parent of this run's commit:* **`0`** for every one of them. The
+> **CORRECTED, same run, before push of the fix.** The first draft of this block used `HEAD~1` and
+> expected `0`. **`HEAD~1` is the banner commit itself** (`43a3bd5`), so it returns **`2`** for the
+> mission doc — the command proved the opposite of what it claimed the moment a second commit
+> existed. Pinned to the **SHA** rather than `HEAD~2` so it stays correct however many commits land
+> after it. This is the same failure mode run 47 recorded against C-LAND-9, caught the same way: by
+> running the command instead of reading it. **Assume it can recur; re-run rather than trust.**
+
+> **CORRECTED TWICE, and the second one narrows the claim.** The fix above also asserted `STATE.md`
+> returns `0` for the **whole file** — "a stronger result than the claim needs". **It returns `2`.**
+> Run 47's heartbeat cell does name `RETURN-DAY.md`, inside a multi-thousand-character table cell.
+> So the honest claim is the **scoped** one the first draft made: the **navigational** pointer line
+> is where a reader looks for what to read next, and that line named it **zero** times. I reached for
+> a stronger version of my own finding and it was not there. **The scoped claim stands; the strong
+> one is withdrawn.**
+
+*Expected, and **observed** at `2e78dab`:* **`0`**, **`0`**, **`0`** for the mission doc, `S-Ladder.md`
+and `STATE.md`'s pointer line — and **`2`** for `STATE.md` whole-file, which is the correction above
+and is **not** a refutation: a mention buried in a heartbeat cell is not a reading instruction. The
 recurring prompt names exactly `docs/CLAUDE-ANDROID-MISSION.md`, `STATE.md`, `LOG.md`, `BLOCKED.md`,
 `docs/S-Ladder.md` and `AUDIT-REQUEST.md`; the closing handoff written at run 47 to end the
 re-assignment loop was reachable from **none** of them. This run adds the banner to the first two, so
