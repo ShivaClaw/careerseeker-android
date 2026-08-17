@@ -9654,3 +9654,114 @@ than establishing something new — it is here because rule one exists: the pin 
 as the fetch behind it, and this one was taken after `git fetch --all --prune` in both trees on
 2026-08-16. **No vector byte was written by this run in either repo**; `git status` in the engine
 checkout is clean and the android diff touches no path under `core/src/test/resources/`.
+
+## Forty-ninth run — 2026-08-17 (Linux sandbox): revalidating the landing plan the day before it is used
+
+The three commands below re-verify **`RETURN-DAY.md` §3**, which is the document Brandon acts on
+during what §1 calls "the single highest-value hour on return day". They are pure `git` — no gate, no
+toolchain — so they are runnable by any auditor on any machine with a clone.
+
+**All of them require `git fetch --all --prune` in both trees first.** That is rule one, and here it
+is load-bearing rather than ceremonial: a landing plan measured against stale refs is worse than no
+plan, because it reads as measured.
+
+### C-RD-1 — the landing plan's stop counts still hold, on a `main` fetched this morning
+
+```bash
+cd <android>
+# the order RETURN-DAY 3 recommends, with #53 closed -- expect 2 stops
+scripts/fleet-probe.sh land <engine> \
+  claude/s8-harness-linux-reach claude/s2-seq-bound claude/s2-transport-vocabulary \
+  claude/s3-pairing-confirm-consumer claude/s6-outcome-disposition \
+  claude/s6-composition-root-decision
+# the same order with #53 appended -- expect 3 stops
+scripts/fleet-probe.sh land <engine> \
+  claude/s8-harness-linux-reach claude/s2-seq-bound claude/s2-transport-vocabulary \
+  claude/s3-pairing-confirm-consumer claude/s6-outcome-disposition \
+  claude/s6-composition-root-decision claude/s6-resume-reconciliation
+```
+
+*Expected, and **observed** this run:* **`conflicted merges (human stops): 2`** and **`: 3`**. The
+first four merges are `clean` in both. The stopping merges carry the exact file sets §3 prints:
+`s6-outcome-disposition` conflicts on the five-file pin family (`README.md`,
+`docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`,
+`scripts/Verify-Alpha.ps1`, `src/Engine/README.md`); `s6-composition-root-decision` adds
+`tests/SyncHarness/Program.cs`; and `s6-resume-reconciliation` — the #53 leaf — is the only one that
+drags in `src/Sync/RelayClient.cs`, `src/Sync/SyncPublisher.cs`, `src/Engine/Program.cs` and
+`tests/SyncLiveSmoke/Program.cs`. **That is §3's central claim measured directly: closing #53 removes
+a stop and the entire `src/Sync/` conflict class.**
+
+`origin/main` was `aac05f3` before and after, unmoved since 2026-08-12, so this is the same base §3
+was written against — not a coincidental agreement across two different bases.
+
+### C-RD-2 — order-dependence, measured in the configuration §3 actually recommends
+
+```bash
+cd <android>
+# 49 first, all 7 leaves -- expect 4
+scripts/fleet-probe.sh land <engine> \
+  claude/s6-composition-root-decision claude/s8-harness-linux-reach claude/s2-seq-bound \
+  claude/s2-transport-vocabulary claude/s3-pairing-confirm-consumer \
+  claude/s6-outcome-disposition claude/s6-resume-reconciliation
+# 49 first, 53 closed -- expect 3
+scripts/fleet-probe.sh land <engine> \
+  claude/s6-composition-root-decision claude/s8-harness-linux-reach claude/s2-seq-bound \
+  claude/s2-transport-vocabulary claude/s3-pairing-confirm-consumer \
+  claude/s6-outcome-disposition
+```
+
+*Expected, and **observed**:* **`4`** and **`3`**. Read against C-RD-1's `3` and `2`, the full matrix
+is **all-7: 3 → 4** and **#53-closed: 2 → 3**; the penalty for putting #49 first is **+1 in both**.
+
+**§3's printed `4 instead of 3` is correct, and this does not contradict it** — it is the all-7
+figure. What was missing is that §3 *recommends closing #53*, and the order claim had never been
+measured in the recommended configuration. A reader who takes step 0's advice and then checks the
+order claim measures **3 vs 2** and finds neither printed number. **The penalty transfers between
+configurations; the absolute counts do not.** The added table in §3 prints both rows.
+
+*Withdrawn before it was written:* the first framing of this finding was "§3's order-dependence
+figure is wrong for the configuration it recommends". It is not wrong — it is measured on a
+different configuration and says so implicitly. Run 48's milestone 6 recorded exactly this failure
+mode one run earlier (reaching for a stronger version of one's own finding), and it was avoided here
+by measuring the all-7 case **before** claiming anything about the printed number, not after.
+
+### C-RD-3 — the plan was measured against the live PRs, not just local refs
+
+A landing plan is only as good as the correspondence between the branch names it simulates and the
+pull requests a human will actually click merge on. Nothing before this run checked that.
+
+```bash
+cd <engine>
+# heads from: list_pull_requests(ShivaClaw/careerseeker, state=open)
+for pair in \
+  35:claude/s2-seq-bound 36:claude/s2-transport-vocabulary 48:claude/s8-harness-linux-reach \
+  49:claude/s6-composition-root-decision 51:claude/s3-pairing-confirm-consumer \
+  52:claude/s6-outcome-disposition 53:claude/s6-resume-reconciliation; do
+  n=${pair%%:*}; br=${pair#*:}
+  echo "PR #$n  $br  $(git rev-parse origin/$br)"
+done
+```
+
+*Expected, and **observed**:* **7 of 7 match their PR head SHA, 0 mismatches** —
+`#35 2be00fc`, `#36 b0b6c77`, `#48 c93e88d`, `#49 f5e0c0a`, `#51 edee32b`, `#52 94fd979`,
+`#53 8177353`. **All 17 fleet PRs are still `state: open`, `draft: true`**; none merged, none closed,
+none taken out of draft since run 47 wrote the plan.
+
+**One count worth stating precisely, because it is easy to get wrong:** the repo shows **18** open
+PRs, not 17. The eighteenth is **#26 (`codex/r6-dependency-sbom`)**, which is **Terra's**, not part
+of this fleet and not part of any landing step. §1's "seventeen" counts the `claude/*` fleet
+(#32–#39, #45–#53) and is correct as written. An auditor recounting from the PR list will get 18 and
+should not read that as drift.
+
+### C-STOP-1 and C-STOP-3 — re-run at run 49, unchanged
+
+Both commands re-executed verbatim after this run's fetch, and both reproduce:
+`node docs/sync-vectors/generate.mjs --check` on `origin/claude/s5-entitlement-ack-emitter` reports
+**`OK: 29 vector files match the generator.`**, `exit=0`; the `git archive 7328a0b` / `diff -r`
+against the android repo's vendored corpus reports **no output, `exit=0`, 29 files**.
+`git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l` still returns **26**.
+
+**This is the fourteenth consecutive run assigned that slice**, and the first in which the banner
+added at run 48 did its job: this session reached the built-already conclusion from its **first**
+document read rather than by re-deriving it. That is B-18 attempt 3 working as designed — it makes
+the firing cheap, and it still does not stop the firing.
