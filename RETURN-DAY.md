@@ -166,6 +166,45 @@ any run of this window. The two-lineage merge hazard (`main` has diverged from t
 is not merely behind) is flagged in `docs/S-Ladder.md` §1.1 and deliberately unresolved — merge
 policy is yours.
 
+### REVALIDATED 2026-08-17 (run 52) — and it needed it more than §3 did
+
+§3 was re-measured at runs 49 and 51. **This section had not been re-measured since
+`docs/Merge-Topology.md` §§4–7 was written on 2026-08-09** — while `claude/android-a0-probe`, one
+side of the §6 hazard, grew to **183 commits past the fork, 156 of them after that date** (this
+window's own records commits). Every other android branch is byte-unmoved. Re-run as **real merges**,
+not `merge-tree` (**C-AND-1**, **C-AND-2**):
+
+| Claim, as written 2026-08-09 | Status 2026-08-17 |
+| --- | --- |
+| §4: 7 branches merge clean, `p1-runbook` conflicts on **one** file | **HOLDS**, row for row |
+| §6: the two siblings overlap in exactly **3** files, all auto-fused | **HOLDS** — still those 3 |
+| §7: recommended merge order | **unchanged** |
+
+**The plan holds. Nobody knew that until it was run**, and it is `git`-only — no gate, no SDK.
+
+### One thing §5 defers, now checked — read this before you resolve that conflict
+
+§5 tells you to resolve the `docs/Monetization-Decision.md` add/add conflict in favour of
+`p1-runbook`, then *"re-read `docs/store/Play-Listing.md` for the word 'Basic' before submission."*
+**That downstream check has now been run (C-AND-3), and it turns the recommendation into a much
+stronger one.** `Play-Listing.md` — the copy staged for the Play Console, living on **`p5-store`,
+which is neither side of the conflict** — opens with:
+
+> **Naming canon (enforced):** the Windows app is **"CareerSeeker"** — never "Basic". … Do not let
+> "Basic" appear in any user-facing string **(Monetization-Decision §3)**.
+
+**It cites the disputed section as its authority.** Take the `p1-runbook` side and §3 reads *"Naming
+— decided"* with a price row saying *"CareerSeeker (.exe) — the product, not a tier"*: coherent.
+Take the other side — **the tempting one, because it is the lineage carrying all 183 commits** — and
+`main` carries a price table printing **"CareerSeeker Basic"** next to a store listing that forbids
+the string and points at that very table as the rule's source.
+
+**Nothing will stop you.** `p5-store` merges clean and `a0-probe` merges clean; the only conflict git
+raises is on `Monetization-Decision.md` itself. **The contradiction is never a merge conflict** — it
+surfaces in copy pasted into the Console. §5's recommendation is unchanged; it now has a second,
+independent reason. **`Basic` appears in the whole `docs/store/` dossier exactly twice, and both are
+that guard clause.**
+
 ---
 
 ## 5. Human queue — what only you can do
@@ -176,6 +215,7 @@ policy is yours.
 | **H2** | **Run the gate and land §3's six merges** | `Verify-Alpha.ps1 -IncludePublish -IncludePackage` needs Windows + .NET; no cloud session can run it |
 | **H3** | **Decide B-16** — should anything watch the vendored pin for staleness? | naming a draft branch in CI couples the android build to a ref someone may rebase; three options are written out in `BLOCKED.md` B-16. **Landing §3 satisfies option 2's precondition** — the sync track reaches `main`, so "compare against `main` and fail" stops being gated on the restack, and would fire correctly on H7's vector |
 | **H7** | **Re-pin the phone's vectors, in the same sitting as H2** | §3's step 4 puts `pairing-high-bit-confirm.json` on `main`; the phone stays at 28 payloads and **no check in either repo reports it** (**C-POST-3**, **B-14**, **B-16**). Mechanical, ~5 min, expected `OK: 30` / `30` files — but only you can decide the pin moves |
+| **H8** | **Resolve §5's naming conflict toward `p1-runbook`** — take *"CareerSeeker"*, never *"Basic"* | it is a product-naming decision, so it is yours; but it is no longer 50/50. `docs/store/Play-Listing.md`, on a **third** branch, already enforces that side and cites the disputed section as its authority (**C-AND-3**). The other resolution puts a self-contradicting tree on `main` **through clean merges that raise no conflict**. §4's second box has the detail |
 | **H4** | **Install `sdkmanager`/`avdmanager`** (B-4) | unblocks S3, S4, S6 — the emulator lane is the single biggest unblock on the board |
 | **H5** | **`npx wrangler deploy --config relay/wrangler.jsonc`**, then re-run SyncLiveSmoke live | the production relay still self-reports `phase: p1`; it predates P2/P4. Deploys are embargoed for agents |
 | **H6** | **Room 2.8.4 / Robolectric** (B-5) | blocks S8's migration coverage |
@@ -225,6 +265,13 @@ Ranked by how much would be wrong if the claim is wrong.
    harder attack is the **resolution-independence** claim: re-run **C-POST-1** with `--ours` instead
    of `--theirs` and byte-compare the corpora. If any vector byte differs, the re-pin box's numbers
    are a forecast rather than a determination, and it should be re-read as one.
+7. **"§4's android plan still holds"** (added run 52). It rests on `a0-probe` having grown *only* by
+   records commits. Attack it by re-running **C-AND-2**'s intersection: if any **code** file entered
+   the overlap set since 08-09, §6's auto-fusion hazard is wider than three files and §7's *"order
+   between them does not matter"* needs re-deriving. Attack **C-AND-3** by scoping — it is a claim
+   about the **price-table row**, not about the string `Basic` anywhere in the file; the whole-file
+   grep reports *both* resolutions inconsistent and is wrong, for the reason the check records.
+   And note what neither check claims: **the fused android tree has still never been built** (§6).
 
 ---
 
