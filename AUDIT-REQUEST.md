@@ -9906,3 +9906,101 @@ prompt's `679a317` is **stale by five days** (moved 2026-08-12); the pin is **NO
 carries **26** vectors, the branches **29**. **Run the ancestry check in the *engine* checkout** — run
 in the android checkout it fails with `fatal: Not a valid commit name`, which a careless reader could
 mistake for a meaningful "NOT on main".
+
+## Fifty-first run — 2026-08-17 (Linux sandbox): what the landing plan does to the vendored pin
+
+Every prior vector check in this window compares the phone against **the pin**. None has ever asked
+what the corpus *becomes* when `RETURN-DAY.md` §3 is executed. This run measured that, because §3 is
+executed tomorrow.
+
+### C-POST-1 — the six merges of §3, run as real merges, not `merge-tree` probes
+
+```bash
+cd <engine> && git clone -q --no-checkout . /tmp/land && cd /tmp/land
+git fetch -q origin '+refs/remotes/origin/*:refs/remotes/origin/*'
+git checkout -q -B landsim origin/main
+for b in s8-harness-linux-reach s2-seq-bound s2-transport-vocabulary \
+         s3-pairing-confirm-consumer s6-outcome-disposition s6-composition-root-decision; do
+  echo "== $b"
+  git merge --no-edit -q origin/claude/$b >/dev/null 2>&1 && echo "  CLEAN" || {
+    echo "  CONFLICT:"; git diff --name-only --diff-filter=U | sed 's/^/    /'
+    echo "  vector files conflicted: $(git diff --name-only --diff-filter=U | grep -c sync-vectors)"
+    git checkout -q --theirs .; git -c core.editor=true merge --continue >/dev/null 2>&1 \
+      || git commit -q -am "sim"; }
+  echo "  vectors now: $(ls docs/sync-vectors/v1 | wc -l)"
+done
+```
+
+*Expected, and **observed** from base `aac05f3`:* merges 1–4 **`CLEAN`**; **#52
+(`s6-outcome-disposition`) stops on the five-file pin family** — `README.md`,
+`docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`, `scripts/Verify-Alpha.ps1`,
+`src/Engine/README.md`; **#49 (`s6-composition-root-decision`) stops on those five plus
+`tests/SyncHarness/Program.cs`**. **Two stops, and the file sets are exactly the ones §3 prints.**
+
+This **corroborates** §3 rather than establishing it, and it is worth having because §3's counts came
+from `fleet-probe.sh`, which uses `merge-tree`'s conflicted tree — a *textual* forecast. RETURN-DAY §7
+item 2 warns that "the file lists after the first stop are artifacts". Under real merges the lists
+reproduce exactly. **That warning is still the right posture**, though: this run resolved the first
+stop before reaching the second, so merge 6's list is measured *downstream of a resolution I chose*.
+The **counts** are robust; treat the second list as corroborated, not independent.
+
+**The vector line is the load-bearing one: `vector files conflicted: 0`, at every stop.** No file
+under `docs/sync-vectors/` conflicts in any of the six merges.
+
+### C-POST-2 — therefore the post-landing corpus is determined, whatever Brandon does at the stops
+
+Re-run C-POST-1 substituting `git checkout -q --ours .` for `--theirs`, then:
+
+```bash
+diff <(ls /tmp/land-ours/docs/sync-vectors/v1) <(ls /tmp/land/docs/sync-vectors/v1)
+for f in /tmp/land-ours/docs/sync-vectors/v1/*.json; do
+  cmp -s "$f" "/tmp/land/${f#/tmp/land-ours/}" || echo "BYTE DIFF: $f"; done
+cd /tmp/land && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **identical file set, zero byte differences**, and
+**`OK: 30 vector files match the generator.`**, `exit=0`. The two opposite resolutions of the prose
+conflicts produce a **byte-identical** vector corpus. **So the number below is not a forecast that
+depends on how the merges are resolved — it is determined by the merge set.**
+
+### C-POST-3 — after §3 lands, `main` carries one vector the phone does not, and nothing reports it
+
+```bash
+P=<android>/core/src/test/resources/sync-vectors/v1
+L=/tmp/land/docs/sync-vectors/v1
+for d in "$P" "$L"; do
+  echo "$d  files=$(ls $d | wc -l)  payloads=$(ls $d | grep -vc '^index.json$')"
+  node -e "console.log('  index.vectors[]: '+require('$d/index.json').vectors.length)"
+done
+comm -23 <(ls $L | grep -v '^index.json$') <(ls $P | grep -v '^index.json$')
+cd <engine> && git log --oneline origin/main..origin/claude/s3-pairing-confirm-consumer \
+  -- docs/sync-vectors/v1/pairing-high-bit-confirm.json
+```
+
+*Expected, and **observed**:* the phone is **29 files = 28 payloads + `index.json`**, `index.vectors[]`
+**28**; post-landing `main` is **30 files = 29 payloads + `index.json`**, `index.vectors[]` **29**. The
+single delta is **`pairing-high-bit-confirm.json`**, introduced by **`b95e83d`** on
+`claude/s3-pairing-confirm-consumer` — **step 4 of §3**, the merge §3 calls *clean*.
+
+**Read the counts carefully: `generate.mjs --check` counts `index.json` as one of its "vector files",
+so its `29`/`30` are file counts, not payload counts.** A reader who compares the generator's `30`
+against `index.vectors[]`'s `29` will think the manifest is stale. **It is not** — the manifest lists
+all 29 payloads, `pairing-high-bit-confirm` among them (`grep -c pairing-high-bit-confirm
+index.json` → `1`). This run drafted that false finding and killed it by looking; it is written down
+so the next reader does not re-derive it.
+
+**Why this matters and what is new.** That the phone lacks this vector is **not** new — it is
+**B-14**, filed 2026-08-15, and B-16 already records that every drift check compares against the pin
+rather than upstream. What is new is that the gap has now been **measured on the far side of the
+landing plan**, with the exact post-state Brandon can check against, and a date: **it opens the
+moment §3 step 4 lands.** `.github/workflows/ci.yml:127-133` contains a check written for precisely
+this case — *"Upstream-only == under-vendored: the engine ships a vector the phone has never
+[vendored]"* — but it queries `?ref=$PIN` (line 86, 101). **While the pin is `7328a0b`, that check
+compares the phone against a commit that also lacks the vector, so it passes and cannot fire.** The
+android CI stays green across the event it was written to catch. That is B-16's gap with a filename
+and a date on it.
+
+**Not claimed:** that anything breaks at runtime. `ProtocolVectorsTest` enumerates from the phone's
+own `index.json` (`core/src/test/kotlin/app/careerseeker/core/ProtocolVectorsTest.kt:35`), so an
+un-vendored vector is a **silently untested case**, not a failure. **No gate was run for this claim
+and none could be** (**C-ENV-1**); the Kotlin side is read, not executed.
