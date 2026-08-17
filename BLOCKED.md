@@ -2149,3 +2149,41 @@ now been wrong for eight days.
 routine is doing exactly what it was configured to do, and the configuration was correct when it was
 written. It has simply been overtaken by the work, and the only actor who can retire it is the one
 who created it.
+
+### B-18 status 2026-08-17 (fiftieth run) — fifteenth firing, and the first with a measured cost of skipping rule one
+
+**Unchanged as a blocker.** The stored prompt assigned S5's spec half for the **fifteenth**
+consecutive run. It is built (`8575539`, `22b028e`, `7328a0b`), it is an **open draft PR** (#32, with
+#37 for PQ-A2-3), and this session verified all of it after a fresh fetch rather than inheriting it
+(**C-STOP-1**, **C-STOP-3**: `OK: 29 vector files match the generator.`, `exit=0`; vendored corpus
+byte-identical to the pin, 29 files, `exit=0`).
+
+**The mitigation keeps working, and its ceiling is now visible.** Run 48's banner did its job for the
+second consecutive run: this session reached "already built" from its **first** document read. The
+cost of a firing is now roughly four commands. **The count is unchanged, because the prompt is stored
+scheduler configuration that no file in either repo can edit** — attempt 2 in the original entry, and
+still true.
+
+**One thing this run adds, and it is the sharpest evidence yet for why the reading list matters.**
+This session's android checkout started on a **detached HEAD 200 commits behind** the work branch
+(**C-FETCH-1**). At that ref, `RETURN-DAY.md`, run 48's banner and this B-18 entry **do not exist**.
+The banner mitigation is therefore **conditional on rule one**: a session that skips the fetch reads
+a repository where the last twelve runs never happened, finds no banner, finds the assigned slice
+genuinely absent from `main`, and builds it — producing the duplicate §4.3 amendment and the
+cross-repo drift risk that the prompt itself warns about. **The two mitigations are not independent;
+the fetch is what makes the banner reachable.** That is worth knowing before anyone concludes the
+banner alone has the problem contained.
+
+**A third route to the truth, added this run as C-STOP-4 — the cheapest so far.** The slice is
+visible as an **open draft PR title**: #32 reads *"S5 (first half): the `entitlement_ack` body,
+PQ-A2-1/-2, and the relay cap §3.1 turned out to require"*. One PR-list call, no clone, no fetch, no
+`git`. This does not close B-18 either; it lowers the floor on the cost of each firing once more.
+
+**Smallest human unblock — unchanged, and now due today.** Turn the routine off, or repoint it.
+Mission §7's terminal instruction is *"clear the goal"*; the stop condition was crossed at run 45 and
+executed at run 47. **Brandon returns 2026-08-18 — tomorrow.** If the routine is meant to keep
+running past that, the prompt's "YOUR SLICE THIS ITERATION" section should be replaced with: *read
+`RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox can actually advance* — and
+the honest answer today is **very little**, because everything left needs a Windows gate (**H2**), an
+emulator (**B-4**/**H4**), a relay deploy (**H5**), or a decision only Brandon can make (**H1**,
+**H3**). That is the state, not a failure.
