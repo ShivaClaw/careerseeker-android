@@ -10716,3 +10716,125 @@ history rewrite, no branch deleted. **No deploy of any kind** — Cloudflare, Wo
 OAuth console; no accounts, no purchases, no Play Billing code, no keystore, no emulator, no Gmail.
 **No secret was read, printed or echoed** — none was opened. No `.appdata` original touched. Terra's
 territory was read, never written.
+
+## Fifty-second run — 2026-08-17 (Linux sandbox): the engine's landing plan was revalidated for tomorrow; the android one had not been re-measured in 156 commits
+
+**Milestone 1 — rule one, then the banner.** `git fetch --all --prune` in both trees before any
+count. Both checkouts arrived **detached** — the android tree at `ebfaf81` (docs-only `main`), the
+engine at `aac05f3` — the trap **C-FETCH-1** records; the fetch defuses it. Checked out
+`claude/android-a0-probe` at `980689b`. Engine `origin/main` is still **`aac05f3`**, unmoved since
+2026-08-12. Android `origin/main` is still **`ebfaf81`**.
+
+**Milestone 2 — the assigned slice, verified built for the seventeenth time, and declined.**
+`C-STOP-1` reproduces exactly: `8575539` (2026-08-09) touches **`docs/Sync-Protocol.md` only**,
+**+114/−3**; `22b028e` adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`, `index.json`
+and `generate.mjs`; `7328a0b` adds `invalid-unknown-field.json`. On
+`origin/claude/s5-entitlement-ack-emitter`, `node docs/sync-vectors/generate.mjs --check` →
+**`OK: 29 vector files match the generator.`**, `exit=0` (node v22.22.2). `C-STOP-3` reproduces: the
+vendored corpus is **byte-identical to pin `7328a0b`**, `diff -r` **exit 0**, **29 files**. The
+prompt's pin `679a317` was also measured directly this run and carries **26** files — the three S5
+vectors are the delta (**C-PIN-1**). All four gates named in the recurring prompt (**PQ-A6-1**,
+**PQ-A2-1/-2/-3**) are closed on open draft PRs **#32** and **#37**. Building it again would
+duplicate `8575539` and regenerate a corpus the android repo vendors. Declined, as at runs 48–51.
+
+**Milestone 3 — the slice taken instead, and why it is not another revalidation.** Run 49 revalidated
+`RETURN-DAY.md` §3 — the **engine** landing plan — against live PR heads, and run 51 measured what
+executing it does to the vendored corpus. **The android landing plan got neither.**
+`docs/Merge-Topology.md` §§4–7 was measured **2026-08-09**; `RETURN-DAY.md` §4 still points a
+returning reader at it and calls the six drafts *"unchanged"*. Meanwhile **one side of its central
+merge hazard moved 20×**: `claude/android-a0-probe` is now **183 commits** past the fork `d9f95fd`,
+**156 of them authored on or after 2026-08-09** — this window's own records commits. Every other
+android branch is byte-unmoved (`p5-store` `bb7f4d0`, `p1-runbook` `ec0f73e`, `p0-scaffold`
+`59051a4`, `main` `ebfaf81`), exactly as the 08-09 record has them. **A plan measured against one
+branch, while that branch grew by 156 commits, had never been re-run.** It needs no Windows, no
+emulator, no .NET and no Android SDK — only `git` — and it is read tomorrow.
+
+**Milestone 4 — the plan holds, as real merges, not `merge-tree` (C-AND-1).** §4's eight-branch
+integration replayed from `ebfaf81` in a throwaway clone under `/tmp`, as real `git merge`: `p0-scaffold`,
+`p1-pairing`, `p2-replica`, `p5-store`, `android-a0-probe`, `p2-runbook`, `todos-pq1-pricing` all
+**CLEAN**, and `p1-runbook` **CONFLICT on `docs/Monetization-Decision.md`, one file**. That is §4's
+table reproduced **row for row**, seven days and 156 commits later. §4's original was
+`merge-tree --write-tree`; this is the real strategy, so the two corroborate by different means.
+
+**Milestone 5 — the sibling overlap is still exactly three files (C-AND-2).** §6's hazard set,
+recomputed today as the intersection of `d9f95fd..p5-store` (21 files) and `d9f95fd..a0-probe`
+(**73** files, up from the 08-09 measurement): **`ui/HomeScreen.kt`,
+`ui/ApplicationsScreen.kt`, `test/…/ScreensFromFixtureTest.kt`** — **3**, unchanged. The 156 records
+commits touched `LOG.md`/`STATE.md`/`AUDIT-REQUEST.md`/`BLOCKED.md`/`docs/` and **added no new file
+that `p5-store` also touches**. §6's warning is unchanged and still the important one: all three
+**auto-fuse without asking**, and **no gate has ever run on the fused tree** — this run could not run
+one either (**C-ENV-1**).
+
+**Milestone 6 — the finding: §5's conflict is already decided downstream, and the clean merge is what
+hides it (C-AND-3).** §5 recommends resolving the add/add conflict in favour of `p1-runbook`, arguing
+from recency — *"the later, more specific record"* — and defers a downstream check to submission time:
+*"then re-read `docs/store/Play-Listing.md` for the word 'Basic'."* **Nobody had.** Read this run:
+`docs/store/Play-Listing.md` — the copy staged for paste into the Play Console, and it exists only on
+`p5-store`, a **different branch from either side of the conflict** — opens with
+
+> **Naming canon (enforced):** the Windows app is **"CareerSeeker"** — the product — never "Basic".
+> … Do not let "Basic" appear in any user-facing string **(Monetization-Decision §3)**.
+
+**It cites as its authority the very section the two sides disagree about.** On the `p1-runbook` side
+(blob `2322ce8`) §3 reads *"Naming — **decided** 2026-07-23"* and the price table prints
+*"**CareerSeeker** (.exe) — the product, not a tier"*. On the `a0-probe`/`p0-scaffold` side (blob
+`973a1dc`, and it is the version on the branch carrying all 183 commits) §3 reads *"Naming note
+(worth a decision, **not urgent**)"* and the price table prints *"**CareerSeeker Basic** (.exe)"*.
+
+Both resolutions were built and inspected. Under `--theirs` the tree is coherent: the price row drops
+the tier name and §3's three remaining occurrences are prose *explaining the drop* (*"was briefly on
+the table and dropped"*). Under `--ours` `main` would carry a price table printing **"CareerSeeker
+Basic"** beside a store listing that forbids the string and cites that same document as the rule's
+source. **Every merge that brings the two files into one tree is CLEAN** — `p5-store` merges clean,
+`a0-probe` merges clean, and the only conflict git raises is on `Monetization-Decision.md` itself.
+So the contradiction never surfaces as a conflict; it surfaces, if at all, in submitted store copy.
+
+**What is new, stated narrowly.** §5's recommendation is **unchanged and now better-supported**: this
+is corroboration, not a correction. What is new is (a) the argument moves from *recency* to
+**downstream ratification** — an independently-written artifact on a third branch already implements
+one side and cites it — and (b) the **failure mode of choosing the other side is silent**, which §5
+did not say, because §5 was reasoning about the conflict and not about the clean merges around it.
+`--ours` is the tempting default here precisely because it is the lineage with all the recent work.
+
+**Milestone 7 — a false finding, drafted and killed by looking.** The first version of Milestone 6's
+consistency check grepped **the whole** `Monetization-Decision.md` for `Basic` and reported *both*
+resolutions inconsistent — the `p1-runbook` side hits **3** times. Those three are §3's prose
+recording that the name was considered and dropped; a document that decides against a word must be
+allowed to print it. Scoped to the **price-table row** the check separates the two cleanly (`--ours`
+**YES**, `--theirs` **no**). Recorded so the next reader does not re-derive the same wrong alarm, and
+because the coarse grep is the obvious way to write this check.
+
+**Milestone 8 — environment, measured not inherited (C-ENV-1).** `pwsh` **ABSENT**, `dotnet`
+**ABSENT**, `sdkmanager` **ABSENT**, `adb` **ABSENT**, `ANDROID_HOME` **unset**; `git`, `java`, `node`
+(v22.22.2) present. **No `Verify-Alpha.ps1` result and no android gate result is claimed in this
+entry, and none was produced.** The Kotlin and the store copy cited above were **read, not built**;
+the fused tree of Milestone 4 was **never compiled**, which is exactly §6's standing point.
+
+**Milestone 9 — coordination.** Terra's `autonomy/codex-state:STATE.md` still reads **COMPLETE**,
+*"the ladder is exhausted"*, **files claimed: none** — **no collision**; nothing of Terra's was
+written. `autonomy/claude-state` updated with this run's heartbeat and claimed files.
+
+**No rung status changed and no rung advanced.** S0 DONE; S1 DONE (successor stack costed, not
+landed); S2/S3/S4/S5/S6/S7 PARTIAL; S8 PARTIAL/BLOCKED on **B-5**. This run is maintenance on the
+handoff Brandon reads tomorrow, not progress on the ladder. **B-18 stands at its seventeenth
+firing** — the banner made this session reach "already built" from its first document read, which is
+what the banner is for, but only Brandon can retire the routine, and mission §7's *"clear the goal"*
+has been due since run 45.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased or
+taken out of draft in either repo**; the 17 fleet PRs and the 6 android drafts are exactly as found,
+and **#53's fate remains Brandon's, un-nudged**. The eight merges of Milestones 4 and 6 happened
+**only inside a throwaway clone under `/tmp`**, were never pushed, and **no branch in either repo
+advanced by them**; `docs/Monetization-Decision.md` was **read in three blobs and never written** —
+this run does not resolve §5's conflict, it measures it. **No vector byte was written in either
+repo** — `docs/sync-vectors/` was archived and diffed, never edited; `VECTORS.lock` was read, not
+changed; the pin stays `7328a0b`. **No engine file was modified**: the engine checkout was read-only
+apart from this run's heartbeat on the docs-only `autonomy/claude-state` branch, and the `s5-check`
+branch created there is local-only and was never pushed. No `$ExpectedOfflineTotal` edit, so this run
+adds **no** pin-toucher and **no** stop to the landing plan (**B-17**). No `docs/Sync-Protocol.md`
+edit. No Kotlin and no C# was written — the S5 appliers still need a compiler this host does not
+have. No force-push, no history rewrite, no branch deleted. **No deploy of any kind** — Cloudflare,
+Workers, relay or site. **The production relay was not contacted at all, not even `GET /v1/health`.**
+No Play, Google or OAuth console; no accounts, no purchases, no Play Billing code, no keystore, no
+emulator, no Gmail. **No secret was read, printed or echoed** — none was opened. No `.appdata`
+original touched. Terra's territory was read, never written.

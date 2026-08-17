@@ -2125,7 +2125,11 @@ single pinned total as the thing that makes a dropped assertion a hard failure. 
 **Symptom.** The scheduled prompt that starts each cloud iteration assigns S5's spec half — amend
 `docs/Sync-Protocol.md` §4.3 with the `entitlement_ack` body, add the vector via `generate.mjs`,
 close PQ-A2-1/-2/-3. **That work has existed since 2026-08-09** (`8575539`, `22b028e`, `7328a0b`,
-**C-STOP-1**). This is the **thirteenth** consecutive run to be assigned it. `RETURN-DAY.md` §7.5
+**C-STOP-1**). This is the **thirteenth** consecutive run to be assigned it. **UPDATED 2026-08-17
+(fifty-second run): the count is now SEVENTEEN.** Runs 49, 50, 51 and 52 were each assigned it again
+and each declined it again, re-verifying rather than rebuilding. Attempt 3's banner is working as
+designed — run 52 reached "already built" from its **first document read** — but a cheap wrong
+assignment is still a wrong assignment, and the banner cannot retire the schedule. `RETURN-DAY.md` §7.5
 already names the loop as the defect that cost this window the most iterations; run 47 could describe
 it but could not stop it, and neither can this run.
 
