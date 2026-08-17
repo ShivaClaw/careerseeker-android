@@ -10845,7 +10845,10 @@ original touched. Terra's territory was read, never written.
 any count. The android checkout arrived **detached at `ebfaf81`** — docs-only `main`, the trap
 **C-FETCH-1** records — and `git rev-list --left-right --count origin/main...origin/claude/android-a0-probe`
 measured **`10  209`**: the arriving checkout was **209 commits behind** the work branch, and
-`RETURN-DAY.md`, `BLOCKED.md` B-18 and run 48's banner **do not exist at that ref**. Checked out
+`RETURN-DAY.md`, `BLOCKED.md` B-18 and run 48's banner **do not exist at that ref**. **`209` is the
+session-start value; re-running the same command after this run reports `10  212`**, because this
+run's own three records commits are on the right-hand side — the number is a moving one, and a
+reader who re-derives it and gets 212 has not found drift. Checked out
 `claude/android-a0-probe` at `ddc1cd9`. Engine `origin/main` is still **`aac05f3`**, unmoved since
 2026-08-12; android `origin/main` is still **`ebfaf81`**.
 
