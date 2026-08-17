@@ -10202,3 +10202,87 @@ as if it were.** No file records it; delivery is attested only by the tool's own
 (`Mobile push requested.`). An auditor should treat "a notification was sent" as **unverified from
 the repo** and, if it matters, confirm with Brandon directly. What *is* verifiable from the repo is
 everything the notification asserted — each item above has its command in this file.
+
+## Fifty-fourth run — 2026-08-17 (Linux sandbox): the lock file's own claim, re-measured against main
+
+This run took no rung. It re-ran the four eve-of-return checks (all unchanged, below), then narrowed
+one measurably false sentence in the file the vendored-vector guarantee rests on. **C-LOCK-1 is the
+only new claim.**
+
+### C-LOCK-1 — the vendored corpus is NOT byte-identical to main, in either direction
+
+The claim the header made until this run. Run after `git fetch --all --prune` in both trees.
+
+```bash
+cd <engine> && git ls-tree --name-only origin/main docs/sync-vectors/v1/ \
+  | xargs -n1 basename | sort > /tmp/main.names
+ls <android>/core/src/test/resources/sync-vectors/v1 | sort > /tmp/vend.names
+echo "main=$(wc -l < /tmp/main.names) vendored=$(wc -l < /tmp/vend.names)"
+echo "-- vendored-only --"; comm -13 /tmp/main.names /tmp/vend.names
+echo "-- main-only --";     comm -23 /tmp/main.names /tmp/vend.names
+for f in $(comm -12 /tmp/main.names /tmp/vend.names); do
+  a=$(git cat-file blob origin/main:docs/sync-vectors/v1/$f | sha256sum | cut -d' ' -f1)
+  b=$(sha256sum <android>/core/src/test/resources/sync-vectors/v1/$f | cut -d' ' -f1)
+  [ "$a" = "$b" ] || echo "DIFFERS: $f"
+done
+```
+
+*Expected, and **observed** against `origin/main` = `aac05f3`:* **`main=26 vendored=29`**;
+vendored-only = **`entitlement-ack.json`**, **`entitlement-ack-no-order-id.json`**,
+**`invalid-unknown-field.json`**; main-only = **none**; and exactly one shared file differs —
+**`DIFFERS: index.json`**.
+
+**What this does and does not mean.** It is **not** drift: the three files are the S5 vectors, they
+live only on the unmerged draft stack the pin sits on, `index.json` differs because it is the manifest
+that lists them, and the corpus remains byte-identical to its pin (**C-STOP-3**). It **is** a
+refutation of the header sentence *"They must stay byte-identical to the main repo"* — for these
+three files the phone is **ahead** of main, and the guarantee both repos actually check is
+**phone == pin**. The reverse direction (**phone behind main**) is what opens at `RETURN-DAY.md` §3
+step 4 (**B-16 status 2026-08-17**, **H7**).
+
+**Attack this first if you doubt the run:** the edit is a comment-only change to a `.lock` file, so
+the risk is not the prose — it is whether it broke the consumer. Two guards, both run:
+
+```bash
+cd <android>
+PIN=$(grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1); echo "$PIN"
+grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | wc -l
+git diff --name-only HEAD~1 | grep -c 'sync-vectors/v1/'
+```
+
+*Expected, and **observed**:* `PIN` = **`7328a0bc043335491cd96a67d634e8eea2a13af9`**, the file
+contains **exactly one** 40-hex string (so `head -1` cannot pick up a SHA added by this run —
+appended prose deliberately uses short SHAs only), and **`0`** files under `v1/` were touched by the
+commit. `ci.yml:75` is the line that would have broken; it does not.
+
+### C-STOP-1, C-PIN-1, C-STOP-3, C-RET-1 — re-run at run 54, all unchanged
+
+- **C-STOP-1** — `8575539` (2026-08-09) touches `docs/Sync-Protocol.md` only, **+114/−3**;
+  `22b028e` adds both ack vectors, `index.json` and `generate.mjs`; `7328a0b` adds
+  `invalid-unknown-field.json`. On `origin/claude/s5-entitlement-ack-emitter`,
+  `node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the generator.`**,
+  `exit=0` (node v22.22.2). The four gates were read **in the file** at `7328a0b`, not inferred:
+  `acknowledged_at` at `Sync-Protocol.md:319` (**PQ-A6-1**), the cap on decoded ciphertext at
+  `:112`/`:132` (**PQ-A2-1**), structural rejection as `decrypt_failed` at `:103`/`:601`
+  (**PQ-A2-2**), `invalid-unknown-field.json` present (**PQ-A2-3**). `origin/main` carries **26**
+  vector files and `7328a0b` is **NOT on main** — unmerged, not unwritten. **Fourteenth consecutive
+  assignment; declined again.**
+- **C-PIN-1** — vendored pin reads **`7328a0bc043335491cd96a67d634e8eea2a13af9`**. The recurring
+  prompt's `679a317` is stale by three vectors, as it has been since 2026-08-12.
+- **C-STOP-3** — `git archive 7328a0b` unpacked and `diff -r`'d against the vendored tree: **no
+  output, `exit=0`, 29 files** — re-run **after** this run's commit, so it also proves the edit
+  touched no payload.
+- **C-RET-1** — all **18** open PRs in `ShivaClaw/careerseeker` read from the API: **17 `claude/*`
+  (#32–#53) plus Terra's #26**, every one still **open and still draft**. The seven landing branches
+  match run 53's recorded SHAs exactly — `c93e88d`, `2be00fc`, `b0b6c77`, `edee32b`, `94fd979`,
+  `f5e0c0a`, `8177353`, **0 mismatches**. `origin/main` is still `aac05f3`; android `origin/main` is
+  still `ebfaf81`. **Nothing has been landed, closed or undrafted since run 53. `RETURN-DAY.md` §3 is
+  still safe to execute exactly as printed.**
+
+### C-ENV-1 — unchanged, and no gate is claimed at run 54
+
+`pwsh`, `dotnet`, `sdkmanager`, `adb` **ABSENT**; `ANDROID_HOME`/`ANDROID_SDK_ROOT` **unset**;
+`git`, `java`, `node` v22.22.2, `gradle` present. **Neither `Verify-Alpha.ps1` nor the android gate
+was run at run 54, and no result for either is claimed anywhere in this entry.** The one thing this
+run's change would be gated by is `ci.yml`'s drift step, which runs on a real runner; the two guards
+in **C-LOCK-1** are the parts of it that are runnable here, and they were run.

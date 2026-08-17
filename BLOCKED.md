@@ -2269,3 +2269,62 @@ this is run 53. Brandon returns **2026-08-18**. Either turn the routine off, or 
 "YOUR SLICE THIS ITERATION" section with *read `RETURN-DAY.md` §5 and pick from the human queue what
 a Linux sandbox can actually advance*. **Do not leave it pointed at S5's spec half**; that
 instruction has now been wrong for nine days.
+
+### B-18 status 2026-08-17 (fifty-fourth run) — run 53 named the test; this run is its result, and it failed
+
+Run 53's entry closed with a falsifiable prediction: *"If run 54 fires on the same slice, attempt 4
+did not land either, and the next session should say so plainly rather than re-recording the request a
+seventh time."*
+
+**Run 54 fired on the same slice.** The prompt again assigned §4.3's `entitlement_ack` body, the
+`generate.mjs` vector, and PQ-A2-1/-2/-3 — the **nineteenth firing** and the **fourteenth consecutive
+assignment of work built on 2026-08-09**. It again described the vendored pin as `679a317` (stale
+since 2026-08-12) and S5 as "NOT STARTED" (its spec half and emitter are both built). So, plainly, as
+instructed: **attempt 4 did not change the schedule.** Whether the notification was delivered and not
+acted on, or never surfaced, is not decidable from here — that is exactly the limit **C-B18-4**
+records.
+
+**Attempt 5 — executed this run, deliberately different in content.** Re-sending attempt 4's message
+would be the seventh recording of the same request, which run 53 ruled out. So this notification does
+not re-argue that the slice is built; it reports the **state that changed**: the routine is now firing
+on the **eve of return** with **no ladder work left that this environment can advance**, every
+remaining item being in `RETURN-DAY.md` §5 and needing Brandon. The ask is one action, unchanged in
+substance since run 48: **retire the schedule, or repoint it.**
+
+**What attempt 5 is not.** Not a fix. Not repo-verifiable (**C-B18-4** applies unchanged). It does not
+close B-18, and **B-18 cannot be closed by any agent** — the obstacle is scheduler configuration that
+no file in either checkout can reach, which has been the finding since run 48 and is now confirmed by
+five failed attempts rather than argued.
+
+**Cost accounting, so the next reader can weigh it.** Nineteen firings have produced **zero** duplicate
+S5 commits — every session correctly derived the state and declined — so the loop is **wasteful, not
+destructive**. That is worth stating precisely: the guard that keeps holding is the mission's
+"derive state before acting" rule plus run 48's banner, and it has held **six** times running. A
+session that skipped rule one would be the failure mode, and **C-FETCH-1** measures why: the arriving
+checkout is detached at docs-only `main`, where `RETURN-DAY.md` and this entry **do not exist**.
+
+**Smallest human unblock — unchanged, and now due today.** Mission §7's terminal instruction is
+*"clear the goal"*. The stop condition was crossed at run 45 and executed at run 47; this is run 54;
+Brandon returns **2026-08-18**. Either turn the routine off, or replace its "YOUR SLICE THIS ITERATION"
+section with *read `RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox can actually
+advance*. **Do not leave it pointed at S5's spec half** — that instruction has been wrong for nine
+days.
+
+### B-16 status 2026-08-17 (fifty-fourth run) — the wording half is closed; the decision half is untouched
+
+B-16's entry ended by noting that **`VECTORS.lock`'s own wording is close to implying** the phone
+matches the engine, when the guarantee is only that it matches the pin. **Measured this run
+(C-LOCK-1), the wording was not merely close to implying it — it asserted it, and it was false in both
+directions**: `main` carries 26 vector files, the phone 29, the three extra being the S5 vectors that
+live only on the unmerged stack the pin sits on, with `index.json` differing because it is the manifest
+that lists them.
+
+Commit `89068d8` narrows the header to **"the phone matches the pin, never the phone matches the
+engine"** and records the measurement in the file, with the coming reverse-direction gap
+(`pairing-high-bit-confirm.json` at `RETURN-DAY.md` §3 step 4, **H7**) named in place.
+
+**This closes only the documentation half, and it is not option 3.** B-16's three options — advisory
+job / compare against `main` once the stack lands / accept and document — are a decision about the two
+repos' release coupling. **H3 remains open and Brandon's**, and the note in `VECTORS.lock` says so
+explicitly. The CI step at `.github/workflows/ci.yml:127-133` was **not** modified: making it fire
+requires naming an upstream ref, which is the decision itself. **B-16 stays open.**

@@ -10978,3 +10978,119 @@ independently of the runner. **Whoever reads this next: check the run's outcome 
 Note also what android CI's vendored step actually proves — it lists upstream at `?ref=$PIN`
 (`ci.yml:100-101`), so a pass means *the phone matches the pin*, not *the phone matches upstream*.
 That is **B-16**, and it is exactly the gap **H7** closes.
+
+## Fifty-fourth run — 2026-08-17 (Linux sandbox): the fourteenth assignment of a built slice, declined again; the lock file's own guarantee was the one thing left that this host could honestly fix
+
+**Milestone 1 — rule one, in both trees, before any count.** `git fetch --all --prune` in
+`careerseeker` and `careerseeker-android`. The android checkout again arrived **detached at
+`ebfaf81`** — docs-only `main`, the **C-FETCH-1** trap — and was checked out to
+`claude/android-a0-probe` at **`975fd308`**. `git rev-list --left-right --count
+origin/main...origin/claude/android-a0-probe` measured **`10  215`** at session start; run 53 recorded
+`10  209` and predicted the right-hand number would keep moving as records commits land. **It moved as
+predicted; 215 is not drift.** Engine `origin/main` is still **`aac05f3`**, unmoved since 2026-08-12.
+
+**Milestone 2 — the assigned slice, verified built for the fourteenth time, and declined.** The
+recurring prompt assigned S5's spec half again: amend §4.3 with the `entitlement_ack` body, add the
+vector via `generate.mjs`, close PQ-A2-1/-2/-3. **All four have been closed since 2026-08-09.**
+**C-STOP-1** reproduces exactly: `8575539` touches **`docs/Sync-Protocol.md` only, +114/−3**;
+`22b028e` adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`, `index.json` **and
+`generate.mjs`** — generator output, not hand-written; `7328a0b` adds `invalid-unknown-field.json`.
+The prompt's own named verification, `node docs/sync-vectors/generate.mjs --check`, **was run** on
+`origin/claude/s5-entitlement-ack-emitter`: **`OK: 29 vector files match the generator.`**, `exit=0`,
+node v22.22.2. The four gates were then read **in the file** at `7328a0b` rather than inferred from
+commit subjects — `acknowledged_at` at `Sync-Protocol.md:319`, the cap measured on the **decoded
+ciphertext** at `:112`, structural rejection reported as **`decrypt_failed`** at `:601`, and the
+unknown-field vector present. `origin/main` carries **26** vector files; the emitter branch **29**;
+the three S5 vectors are exactly that delta, and **`7328a0b` is NOT an ancestor of `origin/main`**.
+**The work is unmerged, not unwritten** — building it again would duplicate `8575539` and regenerate
+a corpus the android repo vendors, which the prompt itself classes as a cross-repo drift event.
+Declined, as at runs 48–53.
+
+**Milestone 3 — nothing has moved since run 53, which is the freshness claim the returning reader
+needs (C-RET-1).** All **18** open PRs were read from the API: **17 `claude/*` (#32–#53) plus Terra's
+#26**, every one still **open** and still **draft**. The **seven** branches `RETURN-DAY.md` §3 names
+match run 53's recorded head SHAs **exactly** — `c93e88d`, `2be00fc`, `b0b6c77`, `edee32b`,
+`94fd979`, `f5e0c0a`, `8177353`, **0 mismatches**. Android `origin/main` is still `ebfaf81`.
+**Brandon has not begun landing, nothing was merged or closed, and §3 is safe to execute exactly as
+printed.** Run 53 measured the plan; this run establishes only that the measurement has not gone
+stale overnight, which is a smaller claim and is stated as one.
+
+**Milestone 4 — the slice actually taken, and why this one.** Every rung is DONE or PARTIAL-blocked on
+a human (`RETURN-DAY.md` §5): a Windows gate, an emulator (**B-4**), a relay deploy, the #53 decision,
+Room 2.8.4 under Robolectric (**B-5**). Run 53 already consolidated every number a returning reader
+acts on; re-measuring the same numbers hours later would add nothing. **B-16's fix was considered and
+rejected as out of authority** — the CI step that would catch the coming gap has to name an upstream
+ref, which decides the two repos' release coupling, and B-16 records that as **H3, Brandon's
+decision**. What was left is smaller and unambiguous: **`VECTORS.lock`'s header stated a guarantee
+that is measurably false**, and B-16 had already flagged its wording as "close to implying" more than
+it verifies. That is a house-rule violation (an unverified claim in the file the guarantee rests on),
+not a design decision, so it was fixed.
+
+**Milestone 5 — the measurement that retired the sentence (C-LOCK-1).** The header said the vendored
+vectors *"must stay byte-identical to the main repo"*. Measured file-by-file against a freshly fetched
+`origin/main` (`aac05f3`), by blob hash: **`main=26 vendored=29`**; **vendored-only** =
+`entitlement-ack.json`, `entitlement-ack-no-order-id.json`, `invalid-unknown-field.json`;
+**main-only** = **none**; and of the shared files, exactly one differs — **`index.json`**. So the
+sentence is false, and **for these three vectors the phone is *ahead* of main, not behind**: the pin
+sits on the unmerged S5 stack and `main` has never carried them; the manifest differs because it lists
+them. **None of this is drift** — the corpus is byte-identical to its **pin**, which is the property
+CI checks and the one that makes the corpus reproducible. The claim was narrowed to
+**"the phone matches the pin, never the phone matches the engine"**, with the measurement, its
+re-verification command, and a paragraph naming the direction that *does* bite: when §3's six merges
+land, `main` gains `pairing-high-bit-confirm.json`, the phone goes **behind by one file**, and
+**nothing fires** (**B-16 status 2026-08-17**, **H7**). Commit `89068d8`. The note says in the file
+that **H3 remains open and Brandon's** — correcting a false sentence is not choosing among B-16's
+three options.
+
+**Milestone 6 — the edit's real risk was the consumer, and it was tested.** A comment-only change to a
+`.lock` file cannot break a test, but it can break the thing that parses it: `ci.yml:75` extracts the
+pin with `grep -oE '[0-9a-f]{40}' … | head -1`. **Any 40-hex string added above the pin line would
+silently repoint CI at another commit.** Verified after the edit: the extracted `PIN` is
+**`7328a0bc043335491cd96a67d634e8eea2a13af9`**, and the file contains **exactly one** 40-hex string —
+the appended prose uses short SHAs deliberately. **C-STOP-3 was re-run after the commit**: `diff -r`
+against `git archive 7328a0b` gives **no output, `exit=0`, 29 files**, and
+`git diff --name-only HEAD~1 | grep -c 'sync-vectors/v1/'` returns **`0`**. **No payload byte moved.**
+
+**Milestone 7 — environment, measured not inherited (C-ENV-1).** `pwsh` **ABSENT**, `dotnet`
+**ABSENT**, `sdkmanager` **ABSENT**, `adb` **ABSENT**, `ANDROID_HOME`/`ANDROID_SDK_ROOT` **unset**;
+`git`, `java`, `node` v22.22.2 and `gradle` present — but `gradle` without an SDK cannot run
+`:app:assembleDebug`. **Neither `scripts\Verify-Alpha.ps1` nor
+`./gradlew … :app:assembleDebug :app:lintDebug` was run this run, and no result for either is claimed
+in this entry.** The android gate on this change is `ci.yml`'s drift step, which needs a real runner;
+the two parts of it that are runnable here were run, in Milestone 6.
+
+**Milestone 8 — B-18, attempt 5.** The routine fired a fourteenth assignment of work built eight days
+ago. Attempts 1–3 were in-repo and could not reach scheduler configuration; attempt 4 (run 53) was the
+first notification to Brandon. **This run sent attempt 5**, and its content is deliberately different:
+run 53's message said *"the slice is built, here is the check"*; this one says **the routine is now
+firing on the day before return with no ladder work left it can do**, and asks for the one action only
+he can take — retire or repoint the schedule. **It is not a fix.** Recorded, per **C-B18-4**'s
+standard, as **unverifiable from the repository**: no file attests delivery.
+
+**Milestone 9 — coordination.** Terra's `autonomy/codex-state:STATE.md` still reads **COMPLETE**, *"the
+ladder is exhausted"*, **files claimed: none** — **no collision**, and nothing of Terra's was written.
+`autonomy/claude-state` updated with this run's heartbeat and the one file claimed.
+
+**No rung status changed and no rung advanced.** S0 DONE; S1 DONE (successor stack costed, not
+landed); S2/S3/S4/S5/S6/S7 PARTIAL; S8 PARTIAL/BLOCKED on **B-5**. **S5 is PARTIAL and NOT blocked** —
+its remaining half is host wiring needing a compiler this host does not have, which is a statement
+about this sandbox, not about the work. Everything else remaining is in `RETURN-DAY.md` §5 and needs
+Brandon.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 17 fleet PRs, Terra's #26 and the android drafts are
+exactly as found, and **#53's fate remains Brandon's, un-nudged**. **No vector byte was written in
+either repo** — `docs/sync-vectors/` was archived, generated-checked, hashed and diffed, never
+edited; the pin stays **`7328a0b`**; the only file changed under `core/src/test/resources/` is
+**`VECTORS.lock`**, and only its comments. **No engine file was modified**: the engine checkout was
+read-only apart from this run's heartbeat on the docs-only `autonomy/claude-state` branch, and the
+detached worktree used to run the generator was under the session scratchpad and **never pushed**. No
+`$ExpectedOfflineTotal` edit, so this run adds **no** pin-toucher and **no** stop to the landing plan
+(**B-17**). **No `docs/Sync-Protocol.md` edit**, and **no `.github/workflows/ci.yml` edit** — the
+B-16 fix that would have gone there is **H3** and was deliberately left. **No Kotlin and no C# was
+written**: the S5 appliers still need a compiler this host lacks, and that is the honest reason they
+are absent. No history rewrite, no branch deleted. **No deploy of any kind** — Cloudflare, Workers,
+relay or site. **The production relay was not contacted at all, not even `GET /v1/health`.** No Play,
+Google or OAuth console; no accounts, no purchases, no Play Billing code, no keystore, no emulator, no
+Gmail. **No secret was read, printed or echoed** — none was opened. No `.appdata` original touched.
+Terra's territory was read, never written.
