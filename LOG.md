@@ -10514,3 +10514,109 @@ contacted at all, not even `GET /v1/health`**. No deploy of any kind; no Play, G
 console; no accounts, no purchases, no keystore, no emulator, no Gmail. **No secret read, printed, or
 echoed** — none was opened. No `.appdata` original touched. Terra's territory read, never written;
 Terra's PR #26 was counted and named, never touched.
+
+## Fiftieth run — 2026-08-17 (Linux sandbox): the fifteenth assignment of a built slice, and the last full day before return
+
+**Rule one first.** `git fetch --all --prune` in both trees before anything was read or compared.
+It earned its keep again, and more loudly than usual: this session's android checkout began on a
+**detached HEAD at `ebfaf81`**, which is **200 commits behind** `origin/claude/android-a0-probe`
+(`bd2be94`). Every record this run relies on — `RETURN-DAY.md`, run 48's banner, B-18 — was invisible
+at that starting ref. A session that skipped the fetch would have read a repository in which none of
+the last twelve runs happened, and would have built the assigned slice believing it new. The engine
+checkout was likewise detached; `origin/main` is `aac05f3`, **unmoved since 2026-08-12**.
+
+**Milestone 1 — the assigned slice is built, verified here, for the fifteenth consecutive run.**
+The stored prompt assigns S5's spec half: amend §4.3 with the `entitlement_ack` body, add the vector
+via `generate.mjs`, close PQ-A2-1/-2/-3. **C-STOP-1** run verbatim after the fetch, and all three
+commits resolve with the content the records claim:
+
+- `8575539` (2026-08-09) — `docs/Sync-Protocol.md` **only**, +114/−3
+- `22b028e` (2026-08-09) — `generate.mjs`, `entitlement-ack.json`, `entitlement-ack-no-order-id.json`, `index.json`
+- `7328a0b` (2026-08-12) — `generate.mjs`, `index.json`, `invalid-unknown-field.json`, +60
+
+Read at the diff rather than trusted by subject line: `8575539` adds §4.3.3's
+`{product_id, acknowledged_at, order_id?}` (**PQ-A6-1**), restates the cap on the **decoded
+ciphertext** (**PQ-A2-1**), and adds the `decrypt_failed` row covering *"every structural rejection…
+There is deliberately no separate `malformed` code"* (**PQ-A2-2**). `7328a0b` is **PQ-A2-3**.
+**All four gates named in the prompt are closed.**
+
+**Milestone 2 — the one gate this sandbox can actually run, run.** At the pin commit in a detached
+worktree: `node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the
+generator.`**, **`exit=0`**. This is the verification the prompt asks for, and its answer is that the
+corpus already contains what it was told to add. `main` carries **26**; the three additional vectors
+are the S5 ones, on unmerged drafts.
+
+**Milestone 3 — no cross-repo drift, measured after this run's edits as well as before.**
+`diff -rq` between the pin worktree and `core/src/test/resources/sync-vectors/v1` → **no output,
+`exit=0`, 29 files**. `VECTORS.lock` extracts `7328a0bc043335491cd96a67d634e8eea2a13af9` — **not**
+`679a317`, which the prompt still names; that pin moved on 2026-08-12 (**C-PIN-1**). **No vector byte
+was written by this run in either repo.**
+
+**Milestone 4 — the slice DECLINED, and why declining is the substantive act.** Building it would
+produce a second §4.3 amendment competing with `8575539`, and re-running the generator to "add"
+vectors that exist risks touching the corpus the android repo vendors at `7328a0b` — which the
+prompt itself classes as a **cross-repo drift event**. Run 48 recorded this reasoning; this run
+re-derived it from the evidence rather than inheriting it, and reaches the same answer.
+
+**Milestone 5 — the slice taken instead: re-validate the landing plan on the last day before it is
+used.** Chosen because Brandon returns **tomorrow (2026-08-18)**, `RETURN-DAY.md` §3 is the document
+he acts on in what §1 calls the single highest-value hour, and it is the only board item needing no
+gate, no Windows, no emulator and no .NET. Run 49 validated it earlier the same day; this run
+re-measured rather than citing, because the plan's whole value is that it is fresh.
+
+**C-RD-1 reproduces exactly.** Recommended order with #53 closed → **`conflicted merges (human
+stops): 2`**; the same order with #53 appended → **`3`**. The first four merges are `clean` in both.
+The stopping merges carry the exact file sets §3 prints — `s6-outcome-disposition` on the five-file
+pin family, `s6-composition-root-decision` adding `tests/SyncHarness/Program.cs`, and the #53 leaf
+the only one dragging in `src/Sync/RelayClient.cs`, `src/Sync/SyncPublisher.cs`,
+`src/Engine/Program.cs` and `tests/SyncLiveSmoke/Program.cs`. **§3's central claim — closing #53
+removes a stop and the entire `src/Sync/` conflict class — measures true a second time.**
+
+**C-RD-3 reproduces: 7 of 7 landing branches match their live PR head SHA, 0 mismatches** (#35
+`2be00fc`, #36 `b0b6c77`, #48 `c93e88d`, #49 `f5e0c0a`, #51 `edee32b`, #52 `94fd979`, #53 `8177353`),
+read from the live PR list, not from local refs. **All 18 open PRs are `draft: true`**; the fleet is
+17 (`#32`–`#39`, `#45`–`#53`) and the eighteenth is Terra's **#26**, outside the plan — stated so a
+recount is not misread as drift.
+
+**Milestone 6 — the cheapest possible check, added as C-STOP-4.** Every prior demonstration that the
+slice is built has gone through `git`: resolve three SHAs, or check out a branch and run the
+generator. There is a shorter path that needs no clone at all — **the assigned slice is an open draft
+pull request, and its title says so**: **#32, "S5 (first half): the `entitlement_ack` body, PQ-A2-1/-2,
+and the relay cap §3.1 turned out to require"**, with **#37** carrying *"closes B-6 / PQ-A2-3"*. One
+PR-list call answers the prompt's question. This is not a new fact — PR #32 is named ~28 times in
+`AUDIT-REQUEST.md` — and it is recorded as a **cheaper route to a known fact**, not a finding.
+
+**Milestone 7 — environment measured, not inherited (C-ENV-1).** `pwsh` **ABSENT**, `dotnet`
+**ABSENT**, `sdkmanager` **ABSENT**, `adb` **ABSENT**, `ANDROID_HOME` **unset**; only `gradle`,
+`java` and `node` are present. **Therefore no `Verify-Alpha.ps1` result and no android gate result is
+claimed anywhere in this entry**, and none was produced. The `fleet-probe.sh` counts are **textual**
+`merge-tree` results: `clean` means no textual conflict, **not** that the merged tree builds, and the
+stop counts forecast hand-resolutions only.
+
+**Milestone 8 — coordination.** Terra's `autonomy/codex-state:STATE.md` reads **COMPLETE**, *"the
+ladder is exhausted and the goal is complete"*, **files claimed: none** — **no collision**, and
+nothing of Terra's was written. `autonomy/claude-state` updated with this run's heartbeat and the
+files claimed.
+
+**No rung status changed and no rung advanced.** S0 DONE; S1 DONE (successor stack costed, not
+landed); S2/S3/S4/S5/S6/S7 PARTIAL; S8 PARTIAL/BLOCKED on **B-5**. This run is maintenance on the
+handoff, not progress on the ladder, and it is recorded as such. **B-18 stands at its fifteenth
+firing**: run 48's banner makes each firing cheap — this session reached "already built" from its
+first document read — but a cheap wrong assignment is still a wrong assignment, and the only actor
+who can retire the routine is the one who created it. Mission §7's *"clear the goal"* has been due
+since run 45.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased or
+taken out of draft in either repo**; the 17 fleet PRs and the 6 android drafts are exactly as found,
+and **#53's fate remains Brandon's decision, un-nudged**. No engine branch, no engine PR and **no
+engine file** — the engine checkout was read-only (`git` queries, a detached worktree for
+`generate.mjs --check`, `merge-tree` probes), and the worktree was removed. **No vector byte moved in
+either repo**; `VECTORS.lock` was not edited; `docs/Sync-Protocol.md` was never opened for writing.
+No `$ExpectedOfflineTotal` edit, so this run adds **no** pin-toucher and **no** stop to the landing
+plan (**B-17**). No force-push, no history rewrite, no branch deleted. **No deploy of any kind** —
+Cloudflare, Workers, relay or site. The production relay was **not contacted at all, not even
+`GET /v1/health`**. No Play, Google or OAuth console; no accounts, no purchases, no Play Billing
+code, no keystore, no emulator, no Gmail. **No secret was read, printed or echoed** — none was
+opened. No `.appdata` original touched. Terra's territory was read, never written; Terra's PR #26 was
+counted and named, never touched. No Kotlin and no C# was written — the S5 appliers still need a
+compiler this host does not have, and that remains a local session's work.

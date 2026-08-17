@@ -9765,3 +9765,144 @@ against the android repo's vendored corpus reports **no output, `exit=0`, 29 fil
 added at run 48 did its job: this session reached the built-already conclusion from its **first**
 document read rather than by re-deriving it. That is B-18 attempt 3 working as designed — it makes
 the firing cheap, and it still does not stop the firing.
+
+## Fiftieth run — 2026-08-17 (Linux sandbox): re-verification, and the cheapest check yet
+
+Every command below was **executed this run**, after `git fetch --all --prune` in both trees. That
+fetch is load-bearing here rather than ceremonial — see **C-FETCH-1**.
+
+### C-FETCH-1 — how stale an unfetched checkout actually was, measured
+
+```bash
+cd <android> && git rev-list --left-right --count HEAD...origin/claude/android-a0-probe
+```
+
+*Expected, and **observed** at session start:* **`10  200`** — the checkout's detached `HEAD`
+(`ebfaf81`) was **200 commits behind** the work branch (`bd2be94`). `RETURN-DAY.md`, run 48's banner
+and `BLOCKED.md` B-18 **do not exist at that ref**. This is the concrete cost of skipping rule one:
+not a stale number, but a repository in which the last twelve runs are invisible and the assigned
+slice looks genuinely unbuilt. Re-run after checking out the branch and it reads `0  0`.
+
+### C-STOP-1 (re-run at run 50) — unchanged, and read at the diff
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  echo "== $c =="; git log -1 --format='%ad  %s' $c; git show --stat --format='' $c
+done
+# and the gates, read from the diff rather than the subject line:
+git show 8575539 -- docs/Sync-Protocol.md | grep -E "^\+" \
+  | grep -iE "entitlement_ack|product_id|acknowledged_at|order_id|ciphertext|decrypt_failed|MiB"
+```
+
+*Expected, and **observed**:* `8575539` (Sun Aug 9 2026) touches **`docs/Sync-Protocol.md` only**,
+**+114/−3**; `22b028e` adds both ack vectors, `index.json` **and** `generate.mjs`; `7328a0b` adds
+`invalid-unknown-field.json` **+60**. The grep prints §4.3.3's
+`{product_id, acknowledged_at, order_id?}` (**PQ-A6-1**), *"The **decoded ciphertext** … MUST NOT
+exceed **1 MiB**"* (**PQ-A2-1**), and the `decrypt_failed` row reading *"**Also every structural
+rejection**… There is deliberately no separate `malformed` code"* (**PQ-A2-2**). **All four prompt
+gates closed.**
+
+### C-STOP-3 (re-run at run 50) — the generator, and zero cross-repo drift
+
+```bash
+cd <engine> && git worktree add -f --detach /tmp/pin 7328a0bc043335491cd96a67d634e8eea2a13af9
+(cd /tmp/pin && node docs/sync-vectors/generate.mjs --check); echo "exit=$?"
+diff -rq /tmp/pin/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1; echo "drift-exit=$?"
+ls <android>/core/src/test/resources/sync-vectors/v1 | wc -l
+cd <engine> && git worktree remove --force /tmp/pin
+```
+
+*Expected, and **observed**:* **`OK: 29 vector files match the generator.`**, **`exit=0`**; the
+`diff -rq` prints **nothing**, **`drift-exit=0`**, **29** files. Re-run after this run's commits —
+the android diff touches no path under `core/src/test/resources/`, so the corpus is byte-identical
+to the pin **before and after** this run.
+
+### C-STOP-4 — the cheapest check: the slice is an open draft PR, and its title says so
+
+**New this run, and it is a shorter route to a known fact, not a new fact.** Every prior
+demonstration ran `git` against three SHAs or checked out a branch. This one needs no clone:
+
+```
+list_pull_requests(ShivaClaw/careerseeker, state=open, fields=[number,title,draft])
+```
+
+*Expected, and **observed**:* **#32 — "S5 (first half): the `entitlement_ack` body, PQ-A2-1/-2, and
+the relay cap §3.1 turned out to require"**, `draft: true`; **#37 — "S5: the engine's strict §3 wire
+parser, and the vector it makes enforceable (closes B-6 / PQ-A2-3)"**, `draft: true`. A session asked
+to build the `entitlement_ack` body can read the answer off the PR list in one call. **This is not a
+discovery** — PR #32 is referenced ~28 times in this file already; it is recorded because B-18's
+mitigation is about *cost per firing*, and this is the lowest-cost form of the check found so far.
+
+### C-RD-1 (re-run at run 50) — the landing plan's stop counts, on the last day before it is used
+
+```bash
+cd <android>
+scripts/fleet-probe.sh land <engine> \
+  claude/s8-harness-linux-reach claude/s2-seq-bound claude/s2-transport-vocabulary \
+  claude/s3-pairing-confirm-consumer claude/s6-outcome-disposition \
+  claude/s6-composition-root-decision                                   # expect 2
+scripts/fleet-probe.sh land <engine> \
+  claude/s8-harness-linux-reach claude/s2-seq-bound claude/s2-transport-vocabulary \
+  claude/s3-pairing-confirm-consumer claude/s6-outcome-disposition \
+  claude/s6-composition-root-decision claude/s6-resume-reconciliation   # expect 3
+cd <engine> && git rev-parse --short origin/main                        # expect aac05f3
+```
+
+*Expected, and **observed**:* **`conflicted merges (human stops): 2`** and **`: 3`**; first four
+merges `clean` in both; `origin/main` **`aac05f3`**, unmoved since 2026-08-12, so this is the same
+base §3 was written against. The stopping merges print the exact file sets §3 names, and the #53 leaf
+is the only one carrying `src/Sync/RelayClient.cs`, `src/Sync/SyncPublisher.cs`,
+`src/Engine/Program.cs` and `tests/SyncLiveSmoke/Program.cs`.
+
+**Caveat, stated because the number invites over-reading:** `fleet-probe.sh` reports **textual**
+`merge-tree` conflicts. **`clean` is not evidence that a merged tree compiles**, and the counts
+forecast hand-resolutions only. No gate ran — see **C-ENV-1**.
+
+### C-RD-3 (re-run at run 50) — branch heads against the live PRs
+
+```bash
+cd <engine>
+for pair in 35:claude/s2-seq-bound 36:claude/s2-transport-vocabulary 48:claude/s8-harness-linux-reach \
+  49:claude/s6-composition-root-decision 51:claude/s3-pairing-confirm-consumer \
+  52:claude/s6-outcome-disposition 53:claude/s6-resume-reconciliation; do
+  n=${pair%%:*}; br=${pair#*:}; echo "PR #$n  $br  $(git rev-parse origin/$br)"
+done
+# compare against list_pull_requests(ShivaClaw/careerseeker, state=open, fields=[number,head,draft])
+```
+
+*Expected, and **observed**:* **7 of 7 match, 0 mismatches** — `#35 2be00fc`, `#36 b0b6c77`,
+`#48 c93e88d`, `#49 f5e0c0a`, `#51 edee32b`, `#52 94fd979`, `#53 8177353`. **All 18 open PRs are
+`draft: true`**; none merged, closed or undrafted since run 47 wrote the plan. The fleet is **17**
+(`#32`–`#39`, `#45`–`#53`); the eighteenth is Terra's **#26**, outside the plan — an auditor
+recounting from the PR list gets 18 and **should not read that as drift**.
+
+### C-ENV-1 (re-run at run 50) — neither gate can run here, measured not inherited
+
+```bash
+for t in pwsh dotnet sdkmanager adb gradle java node; do
+  printf "%-12s %s\n" "$t" "$(command -v $t || echo ABSENT)"
+done; echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
+```
+
+*Expected, and **observed**:* `pwsh` **ABSENT**, `dotnet` **ABSENT**, `sdkmanager` **ABSENT**,
+`adb` **ABSENT**, `ANDROID_HOME` **unset**; `gradle`, `java` and `node` present. **So
+`scripts\Verify-Alpha.ps1` cannot run and neither can
+`./gradlew … :app:assembleDebug :app:lintDebug`** — no Android SDK exists for the latter to target.
+**No gate result is claimed anywhere in this run's records.** Grep this run's LOG entry for any
+sentence that blurs that line and report it; run 47's auditor list ranks exactly this attack third.
+
+### C-PIN-1 (re-run at run 50) — the pin the prompt still gets wrong
+
+```bash
+cd <android> && grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1
+cd <engine>  && git merge-base --is-ancestor 7328a0bc043335491cd96a67d634e8eea2a13af9 origin/main \
+                 && echo "on main" || echo "NOT on main"
+cd <engine>  && git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l
+```
+
+*Expected, and **observed**:* pin is **`7328a0bc043335491cd96a67d634e8eea2a13af9`**, the recurring
+prompt's `679a317` is **stale by five days** (moved 2026-08-12); the pin is **NOT on main**; `main`
+carries **26** vectors, the branches **29**. **Run the ancestry check in the *engine* checkout** — run
+in the android checkout it fails with `fatal: Not a valid commit name`, which a careless reader could
+mistake for a meaningful "NOT on main".
