@@ -10950,3 +10950,20 @@ relay or site. **The production relay was not contacted at all, not even `GET /v
 Google or OAuth console; no accounts, no purchases, no Play Billing code, no keystore, no emulator,
 no Gmail. **No secret was read, printed or echoed** — none was opened. No `.appdata` original
 touched. Terra's territory was read, never written.
+
+### Fifty-third run — CI state at handoff, recorded so nothing here implies a pass
+
+The android gate is the one check this sandbox cannot run but a real runner can, so this run pushed
+and waited on it. **At the time this entry was closed, job `95443895818` on workflow run
+`32049083463` (head `d357ab5`) was still `in_progress`** — started 17:09:57Z, ~35 minutes elapsed,
+and in-progress logs return HTTP 404, so nothing could be read from it either. An earlier run
+(`32048819412`, head `4f98a9e`) was superseded when the precision-note commit landed.
+
+**No CI result is claimed by this run, green or red.** The four commits are markdown only — `LOG.md`,
+`STATE.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, **247 insertions, 3 deletions, zero source files, zero
+vector bytes** — and the vendored corpus was re-diffed against pin `7328a0b` locally *after* they
+were committed (byte-identical, 29 files, `exit=0`), so the cross-repo invariant is verified
+independently of the runner. **Whoever reads this next: check the run's outcome before citing it.**
+Note also what android CI's vendored step actually proves — it lists upstream at `?ref=$PIN`
+(`ci.yml:100-101`), so a pass means *the phone matches the pin*, not *the phone matches upstream*.
+That is **B-16**, and it is exactly the gap **H7** closes.
