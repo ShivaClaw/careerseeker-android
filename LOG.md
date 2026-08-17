@@ -10620,3 +10620,99 @@ code, no keystore, no emulator, no Gmail. **No secret was read, printed or echoe
 opened. No `.appdata` original touched. Terra's territory was read, never written; Terra's PR #26 was
 counted and named, never touched. No Kotlin and no C# was written — the S5 appliers still need a
 compiler this host does not have, and that remains a local session's work.
+
+## Fifty-first run — 2026-08-17 (Linux sandbox): the landing plan was measured for conflicts, never for what it does to the phone's vector pin
+
+**Milestone 1 — rule one, then the banner.** `git fetch --all --prune` in both trees before any
+count. Both checkouts arrived **detached**: the android tree at `ebfaf81` (local `main`, docs-only
+lineage) and the engine at `aac05f3`. Checked out `claude/android-a0-probe` at `2949645` after the
+fetch — this is the same trap **C-FETCH-1** recorded at run 50, and the fetch is what defuses it.
+`origin/main` in the engine is still **`aac05f3`**, unmoved since 2026-08-12.
+
+**Milestone 2 — the assigned slice, verified built for the sixteenth time, and declined.**
+`C-STOP-1` reproduces exactly: `8575539` (2026-08-09) touches **`docs/Sync-Protocol.md` only**,
+**+114/−3**; `22b028e` adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`, `index.json`
+and `generate.mjs`; `7328a0b` adds `invalid-unknown-field.json`. On
+`origin/claude/s5-entitlement-ack-emitter`, `node docs/sync-vectors/generate.mjs --check` →
+**`OK: 29 vector files match the generator.`**, `exit=0`. `C-STOP-3` reproduces: the vendored corpus
+is **byte-identical to pin `7328a0b`**, `diff -r` **exit 0**, **29 files**. All four gates named in
+the recurring prompt (**PQ-A6-1**, **PQ-A2-1/-2/-3**) are closed on open draft PRs **#32** and
+**#37**. Building it again would duplicate `8575539` and regenerate a corpus the android repo
+vendors — the prompt's own **cross-repo drift event**. Declined, as at runs 48–50.
+
+**Milestone 3 — the slice taken instead, and why it is not another revalidation.** Run 50 already
+re-measured `RETURN-DAY.md` §3 today; repeating it would buy nothing. The unasked question is one
+step further on: **§3 is executed tomorrow — what does executing it do to the corpus the phone
+vendors?** Every vector check in this window, in both repos and in CI, compares the phone against
+**the pin**. **Nothing has ever measured the post-landing state.** That is a real gap, it needs no
+Windows, no emulator and no .NET, and its answer lands in the document Brandon acts on in the hour
+§1 calls the highest-value one.
+
+**Milestone 4 — the six merges, run as real merges (C-POST-1).** From `aac05f3`, in a throwaway
+clone: merges 1–4 **clean**; **#52 stops on the five-file pin family**; **#49 stops on those five
+plus `tests/SyncHarness/Program.cs`**. **Two stops, file sets exactly as §3 prints them.** §3's
+counts came from `merge-tree` *textual* probes; these are `git merge`. The counts corroborate. The
+second stop's file list is measured downstream of a resolution I chose, so it is **corroborated, not
+independent** — RETURN-DAY §7 item 2's warning stands and is repeated in the audit entry rather than
+quietly retired.
+
+**Milestone 5 — the result that does not depend on Brandon's choices (C-POST-2).** At every stop,
+**`vector files conflicted: 0`** — nothing under `docs/sync-vectors/` conflicts in any of the six
+merges. Re-running the whole sequence resolving every conflict with `--ours` instead of `--theirs`
+produces a **byte-identical** vector corpus: identical file set, **zero byte differences**,
+`generate.mjs --check` → **`OK: 30 vector files match the generator.`**, `exit=0`. **The post-landing
+corpus is determined by the merge set, not by the hand-resolutions.**
+
+**Milestone 6 — the finding (C-POST-3).** After §3 lands, `main` carries **29 payloads +
+`index.json`**; the phone vendors **28 + `index.json`**. The single delta is
+**`pairing-high-bit-confirm.json`**, introduced by **`b95e83d`** and arriving with **step 4 (#51) —
+the merge §3 calls clean**. `.github/workflows/ci.yml:127-133` holds a check written for exactly this
+case (*"upstream has vector(s) that were never vendored"*), but it queries `?ref=$PIN`; while the pin
+is `7328a0b` — which also lacks the vector — **it passes and cannot fire.** Android CI stays green
+straight through the event it was written to catch.
+
+**What is new here, stated narrowly.** That the phone lacks this vector is **B-14**, filed
+2026-08-15. That drift checks look at the pin and not upstream is **B-16**. Neither is my finding.
+**Mine is the measurement on the far side of the landing plan** — the exact post-state, proven
+resolution-independent, with the date it opens (**tomorrow, at step 4**) and the numbers to check
+against. B-14's unblock and `VECTORS.lock`'s *"ACTION WHEN PR #38's STACK MERGES"* both say *re-pin
+afterwards*; neither says the re-pin belongs in the **same sitting** as the merges, and neither gives
+a number to verify it against. Now both exist, in §3 where the merges happen.
+
+**Milestone 7 — a false finding, drafted and killed by looking.** The merged `index.json` lists
+**29** entries beside a **30**-file corpus, which reads as a stale manifest merged without conflict.
+It is not: **`generate.mjs` counts `index.json` among its "vector files"**, so 30 files = 29 payloads
++ the manifest, and `pairing-high-bit-confirm` **is** listed. Recorded in **C-POST-3** so the next
+reader does not re-derive the same wrong alarm.
+
+**Milestone 8 — environment, measured not inherited (C-ENV-1).** `pwsh` **ABSENT**, `dotnet`
+**ABSENT**, `sdkmanager` **ABSENT**, `adb` **ABSENT**, `ANDROID_HOME` **unset**; `gradle`, `java`,
+`node` present. **No `Verify-Alpha.ps1` result and no android gate result is claimed in this entry,
+and none was produced.** The Kotlin cited in Milestone 6 was **read, not run**.
+
+**Milestone 9 — coordination.** Terra's `autonomy/codex-state:STATE.md` still reads **COMPLETE**,
+*"the ladder is exhausted"*, **files claimed: none** — **no collision**; nothing of Terra's was
+written, and PR #26 was neither counted into the fleet nor touched. `autonomy/claude-state` updated
+with this run's heartbeat.
+
+**No rung status changed.** S0 DONE; S1 DONE (successor stack costed, not landed); S2/S3/S4/S5/S6/S7
+PARTIAL; S8 PARTIAL/BLOCKED on **B-5**. This is handoff maintenance, not ladder progress. **B-18
+stands at its sixteenth firing** — the banner made this session reach "already built" from its first
+document read, but only Brandon can retire the routine, and mission §7's *"clear the goal"* has been
+due since run 45.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased or
+taken out of draft in either repo**; the 17 fleet PRs and 6 android drafts are exactly as found, and
+**#53's fate remains Brandon's, un-nudged**. The six merges of Milestone 4 happened **only inside two
+throwaway clones under `/tmp`**, were never pushed, and no branch in either repo advanced by them.
+**No vector byte was written in either repo** — `docs/sync-vectors/` was read, archived and diffed,
+never edited; `VECTORS.lock` was read, not changed; the pin stays `7328a0b`. **No engine file was
+modified**: the engine checkout was read-only apart from this run's heartbeat on the docs-only
+`autonomy/claude-state` branch. No `$ExpectedOfflineTotal` edit, so this run adds **no** pin-toucher
+and **no** stop to the landing plan (**B-17**). No `docs/Sync-Protocol.md` edit. No Kotlin and no C#
+was written — the S5 appliers still need a compiler this host does not have. No force-push, no
+history rewrite, no branch deleted. **No deploy of any kind** — Cloudflare, Workers, relay or site.
+**The production relay was not contacted at all, not even `GET /v1/health`.** No Play, Google or
+OAuth console; no accounts, no purchases, no Play Billing code, no keystore, no emulator, no Gmail.
+**No secret was read, printed or echoed** — none was opened. No `.appdata` original touched. Terra's
+territory was read, never written.
