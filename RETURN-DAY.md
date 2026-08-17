@@ -47,6 +47,13 @@ handoff; it wrote no engine code and no Kotlin.
 Full derivation and the commands: [`docs/Merge-Topology.md` §12](docs/Merge-Topology.md).
 **Decide step 0 before doing any of it.**
 
+> **REVALIDATED 2026-08-17 (run 49), the day before this plan is acted on.** Every number in this
+> section was re-measured against a `main` fetched that morning — `origin/main` is still
+> `aac05f3`, unmoved since 2026-08-12 — and against the **live PR heads**, not just local refs: all
+> seven landing branches match their PR's head SHA exactly, 0 mismatches (**C-RD-3**). All 17 PRs
+> are still open and still draft; nothing was merged or closed. **The four stop counts below (3 / 2
+> / 4 / 3) all reproduce** (**C-RD-1**, **C-RD-2**). One row was missing and is added below.
+
 ### Step 0 — decide PR #53 (`claude/s6-resume-reconciliation`)
 
 #53 and the #45/#46 stack **implement the same defect fix twice, incompatibly** — a typed push
@@ -75,6 +82,21 @@ not a merge conflict, and it is yours.
 
 **Order is load-bearing.** Landing #49 first costs **4** stops instead of 3: it forked at pin `598`,
 `main` is now `611`, so it conflicts even as the first merge and forfeits the free slot.
+
+**The row that was missing, added at run 49 (C-RD-2).** The `4 instead of 3` above is measured on
+the **all-7-leaves** configuration — but this section *recommends closing #53*, and nobody had
+measured order-dependence in the configuration it recommends. Both are now measured:
+
+| configuration | recommended order | #49 first | penalty |
+| --- | --- | --- | --- |
+| all 7 leaves | **3** stops | **4** stops | **+1** |
+| **#53 closed** (what §3 recommends) | **2** stops | **3** stops | **+1** |
+
+**This is a clarification, not a correction — the `4 instead of 3` figure is right as written.** The
+point is that a reader who takes step 0's advice, closes #53, and then sanity-checks the order claim
+will measure **3 vs 2** and see neither printed number. The penalty is what transfers between
+configurations; the absolute counts are not. **Order is load-bearing in both**, which is the claim
+that actually matters, and it now has evidence in the configuration you will be standing in.
 
 ### At each STOP
 
