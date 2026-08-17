@@ -2236,3 +2236,36 @@ running past that, the prompt's "YOUR SLICE THIS ITERATION" section should be re
 the honest answer today is **very little**, because everything left needs a Windows gate (**H2**), an
 emulator (**B-4**/**H4**), a relay deploy (**H5**), or a decision only Brandon can make (**H1**,
 **H3**). That is the state, not a failure.
+
+### B-18 status 2026-08-17 (fifty-third run) — the eighteenth firing, and the first attempt that leaves the repository
+
+**Unchanged as a blocker.** The scheduled prompt assigned S5's spec half again. It has been built
+since 2026-08-09 (`8575539`, `22b028e`, `7328a0b`); verified again this run in one command
+(**C-STOP-1**: `OK: 29 vector files match the generator.`, `exit=0`) and declined again. **Eighteen
+consecutive assignments across nine days.**
+
+**Attempt 4 — notify the human out of band. Executed this run.** Attempts 1–3 all lived inside the
+repository: do the slice anyway (refused, correct), edit the prompt (impossible — it is scheduler
+configuration no file in either checkout can reach), and move the pointer to where the reader looks
+(run 48's banner, which worked: sessions now reach "already built" on their first read). **All three
+share one defect, and it is the reason five recorded requests never produced a fix: the actor who can
+retire the routine does not read this file.** B-18's smallest human unblock has been correct since
+run 48 and undelivered since run 48.
+
+This run had a notification channel earlier runs did not, and used it: a push to Brandon carrying the
+eighteen firings, the three commits, the one-command check, the two measurably stale prompt facts
+(pin `679a317` → `7328a0b`; S5 described as "NOT STARTED" when its spec half and emitter are both
+built), and `RETURN-DAY.md` §5 as the queue of what actually remains.
+
+**What attempt 4 is not.** It is not a fix, and it does not close B-18. It cannot turn the routine
+off; only Brandon can. It is also **the one claim in this run's records that the repository cannot
+verify** (**C-B18-4**) — no file attests it, and an auditor should treat delivery as unconfirmed
+until Brandon says otherwise. If run 54 fires on the same slice, attempt 4 did not land either, and
+the next session should say so plainly rather than re-recording the request a seventh time.
+
+**Smallest human unblock — unchanged, and now due today rather than tomorrow.** Mission §7's terminal
+instruction is *"clear the goal"*. The stop condition was crossed at run 45, executed at run 47, and
+this is run 53. Brandon returns **2026-08-18**. Either turn the routine off, or replace its
+"YOUR SLICE THIS ITERATION" section with *read `RETURN-DAY.md` §5 and pick from the human queue what
+a Linux sandbox can actually advance*. **Do not leave it pointed at S5's spec half**; that
+instruction has now been wrong for nine days.
