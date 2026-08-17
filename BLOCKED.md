@@ -1853,6 +1853,16 @@ offline total 617/0).
 Re-verify: **C-CC-8**, and `git -C . log -1 --format=%H -- core/src/test/resources/sync-vectors/`
 against `679a317`.
 
+**Status 2026-08-17 (fifty-first run) — the unblock is now scheduled, and it needs one more word.**
+B-14's unblock says *merge #50, then re-pin*. `RETURN-DAY.md` §3 **step 4 does exactly that**: #51
+lands #50, and `pairing-high-bit-confirm.json` reaches `main` (`b95e83d`) in a merge §3 calls clean.
+Measured post-landing corpus: `main` **29 payloads + `index.json`**, phone **28 + `index.json`**
+(**C-POST-3**). So B-14 is unblocked by tomorrow's merges **only if the re-pin happens with them** —
+otherwise the vector exists upstream, the phone still cannot assert it, and **no check in either repo
+reports the gap** (see **B-16 status 2026-08-17**: the CI step written for this queries `?ref=$PIN`
+and stays green). **The missing word is "same sitting".** Expected after re-pin:
+`OK: 30 vector files match the generator.` and **30** vendored files.
+
 ---
 
 ### B-7 status 2026-08-15 (fortieth run) — unchanged, and it bounded exactly one claim
@@ -2030,6 +2040,41 @@ case was covered, and it is not.
 
 Until one is chosen, **the guarantee is exactly "the phone matches the pin", never "the phone matches
 the engine"** — and `VECTORS.lock`'s own wording is close to implying the latter.
+
+### B-16 status 2026-08-17 (fifty-first run) — the abstract gap now has a filename and a date
+
+This blocker was filed with a *past* instance (the three `entitlement-ack` vectors, closed by a human
+noticing). It now has a **future** one, measured rather than predicted: **executing `RETURN-DAY.md`
+§3 opens it again, at step 4.**
+
+Measured post-landing (**C-POST-1/-2/-3**), from base `aac05f3`: after §3's six merges, `main` carries
+**29 payloads + `index.json`**; the phone vendors **28 + `index.json`**. The delta is
+**`pairing-high-bit-confirm.json`** (`b95e83d`), arriving with **#51 — the merge §3 calls clean**.
+**No file under `docs/sync-vectors/` conflicts in any of the six merges**, and the resulting corpus is
+**byte-identical** whether every hand-resolution is taken `--ours` or `--theirs`, so this is
+**determined by the merge set, not by how Brandon resolves the two stops.**
+
+**And the check that exists for this cannot fire.** `.github/workflows/ci.yml:127-133` already
+implements *"upstream has vector(s) that were never vendored"* — written for exactly this case — but
+it queries `?ref=$PIN` (lines 86, 101). While the pin is `7328a0b`, which **also** lacks the vector,
+the comparison is phone-against-a-commit-that-agrees-with-it: **green, across the very event it was
+written to catch.** This is not a defect in that step; it is B-16's design gap deciding its behaviour.
+
+**This sharpens option 2 into the cheap one.** After §3 lands, the sync track *is* on `main`, so
+"compare against `main` and fail" stops being gated on the restack — and it would fire immediately,
+correctly, on this vector. **The decision (H3) is unchanged and still Brandon's**; what changed is
+that option 2's precondition is satisfied by the very merges he is about to run.
+
+**Smallest human unblock, unchanged in substance, now with a number:** re-pin `VECTORS.lock` to the
+post-landing merge commit and re-vendor **in the same sitting as the merges**. Verify with
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 30 vector files match the generator.`** on
+`main`, and `ls core/src/test/resources/sync-vectors/v1 | wc -l` → **30** on the phone. Both
+`VECTORS.lock`'s *"ACTION WHEN PR #38's STACK MERGES"* note and **B-14**'s unblock already say
+*re-pin afterwards*; **neither says same-sitting, and neither gave a number to check it against.**
+
+**Not claimed:** that anything breaks at runtime. `ProtocolVectorsTest` enumerates from the phone's
+own `index.json`, so an un-vendored vector is a **silently untested case**, not a failure. No gate ran
+for any of this (**C-ENV-1**); the Kotlin and the workflow YAML were **read, not executed**.
 
 ---
 
