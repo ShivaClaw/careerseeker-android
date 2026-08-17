@@ -98,6 +98,42 @@ will measure **3 vs 2** and see neither printed number. The penalty is what tran
 configurations; the absolute counts are not. **Order is load-bearing in both**, which is the claim
 that actually matters, and it now has evidence in the configuration you will be standing in.
 
+### Do this in the same sitting: re-pin the phone's vectors (added run 51, 2026-08-17)
+
+**Step 4 (#51) changes the shared vector corpus, and the phone will not follow on its own.**
+Measured against a `main` fetched this morning, by running all six merges for real (**C-POST-1**):
+
+| | payload vectors | `index.json` | total files |
+| --- | --- | --- | --- |
+| phone today, pin `7328a0b` | 28 | 1 | **29** |
+| `main` after §3's six merges | **29** | 1 | **30** |
+
+The extra one is **`pairing-high-bit-confirm.json`** (`b95e83d`), and it arrives with **#51 — a merge
+this plan calls *clean*, because it is.** **No file under `docs/sync-vectors/` conflicts in any of the
+six merges**, and the post-landing corpus is **byte-identical whether you resolve the two stops
+`--ours` or `--theirs`** (**C-POST-2**) — so this outcome is fixed by the merge set and none of your
+choices at the stops can change it.
+
+**Nothing will tell you.** `.github/workflows/ci.yml:127-133` has a check written for exactly this
+case — *"upstream has vector(s) that were never vendored"* — but it queries `?ref=$PIN`, and the pin
+also lacks the vector, so **android CI stays green straight through it** (**B-16 status 2026-08-17**).
+Nothing breaks at runtime either: `ProtocolVectorsTest` enumerates from the phone's own `index.json`,
+so the vector is simply **never asserted** — which is what **B-14** has been blocked on since 08-15.
+
+**So, right after the last merge:**
+
+```bash
+cd <engine>  && node docs/sync-vectors/generate.mjs --check   # expect: OK: 30 vector files match the generator.
+cd <android> && # re-vendor docs/sync-vectors/v1 -> core/src/test/resources/sync-vectors/v1
+                # bump the SHA in core/src/test/resources/sync-vectors/VECTORS.lock to the merge commit
+ls core/src/test/resources/sync-vectors/v1 | wc -l             # expect: 30
+```
+
+**This closes B-14.** `VECTORS.lock`'s *"ACTION WHEN PR #38's STACK MERGES"* note and B-14's unblock
+both already say *re-pin afterwards* — **neither says to do it in the same sitting, and neither gave a
+number to check it against.** Both now do. Deferring it is safe for the build and costs you the one
+thing the re-pin buys: the phone testing what the engine ships.
+
 ### At each STOP
 
 The conflict is always the same five files — `README.md`, `docs/CareerSeeker-Project-Summary.md`,
@@ -138,7 +174,8 @@ policy is yours.
 | --- | --- | --- |
 | **H1** | **Decide PR #53** | design choice between two push-result shapes (§3 step 0) |
 | **H2** | **Run the gate and land §3's six merges** | `Verify-Alpha.ps1 -IncludePublish -IncludePackage` needs Windows + .NET; no cloud session can run it |
-| **H3** | **Decide B-16** — should anything watch the vendored pin for staleness? | naming a draft branch in CI couples the android build to a ref someone may rebase; three options are written out in `BLOCKED.md` B-16 |
+| **H3** | **Decide B-16** — should anything watch the vendored pin for staleness? | naming a draft branch in CI couples the android build to a ref someone may rebase; three options are written out in `BLOCKED.md` B-16. **Landing §3 satisfies option 2's precondition** — the sync track reaches `main`, so "compare against `main` and fail" stops being gated on the restack, and would fire correctly on H7's vector |
+| **H7** | **Re-pin the phone's vectors, in the same sitting as H2** | §3's step 4 puts `pairing-high-bit-confirm.json` on `main`; the phone stays at 28 payloads and **no check in either repo reports it** (**C-POST-3**, **B-14**, **B-16**). Mechanical, ~5 min, expected `OK: 30` / `30` files — but only you can decide the pin moves |
 | **H4** | **Install `sdkmanager`/`avdmanager`** (B-4) | unblocks S3, S4, S6 — the emulator lane is the single biggest unblock on the board |
 | **H5** | **`npx wrangler deploy --config relay/wrangler.jsonc`**, then re-run SyncLiveSmoke live | the production relay still self-reports `phase: p1`; it predates P2/P4. Deploys are embargoed for agents |
 | **H6** | **Room 2.8.4 / Robolectric** (B-5) | blocks S8's migration coverage |
@@ -180,6 +217,14 @@ Ranked by how much would be wrong if the claim is wrong.
 5. **The eleven-times-restated slice.** Twelve runs were assigned S5's spec half; it has been built
    since 2026-08-09 (`8575539`, `22b028e`, `7328a0b`) on draft branches. If the records made that hard
    to see, that is a defect in the records, and it is the one that cost the most iterations.
+6. **"§3 leaves the phone one vector behind"** (added run 51, §3's re-pin box). Two ways in: the
+   **28 vs 29 payload** counts are easy to misread, because `generate.mjs --check` counts
+   `index.json` among its "vector files" and so reports **29/30** where the payload counts are
+   **28/29** — a reader comparing the generator's number against `index.vectors[]` will think the
+   manifest is stale, and it is not (**C-POST-3** records that false alarm and why it is false). The
+   harder attack is the **resolution-independence** claim: re-run **C-POST-1** with `--ours` instead
+   of `--theirs` and byte-compare the corpora. If any vector byte differs, the re-pin box's numbers
+   are a forecast rather than a determination, and it should be re-read as one.
 
 ---
 
