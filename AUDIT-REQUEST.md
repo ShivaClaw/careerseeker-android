@@ -10004,3 +10004,112 @@ and a date on it.
 own `index.json` (`core/src/test/kotlin/app/careerseeker/core/ProtocolVectorsTest.kt:35`), so an
 un-vendored vector is a **silently untested case**, not a failure. **No gate was run for this claim
 and none could be** (**C-ENV-1**); the Kotlin side is read, not executed.
+
+## Fifty-second run — 2026-08-17 (Linux sandbox): revalidating the *android* landing plan, which had never been re-measured
+
+`RETURN-DAY.md` §3 (engine) was revalidated at run 49 and extended at run 51. **§4 (android) had not
+been touched since `docs/Merge-Topology.md` §§4–7 was measured on 2026-08-09**, while one side of its
+central hazard grew by 156 commits. These three checks re-measure it. All are `git`-only: **no
+Windows, no .NET, no Android SDK, no emulator** is needed to reproduce any of them, and none of them
+claims a build.
+
+### C-AND-1 — §4's integration table still holds, as real merges
+
+Run after `git fetch --all --prune` in the android tree, or the SHAs are stale — that is rule one.
+
+```bash
+cd <android>
+git rev-parse --short origin/main origin/claude/p5-store origin/claude/p1-runbook \
+                      origin/claude/p0-scaffold origin/claude/android-a0-probe
+echo "a0-probe past fork: $(git rev-list --count d9f95fd..origin/claude/android-a0-probe)"
+echo "  of those, since 2026-08-09: $(git rev-list --count --since=2026-08-09 origin/claude/android-a0-probe)"
+
+rm -rf /tmp/andmerge && git clone -q <android> /tmp/andmerge && cd /tmp/andmerge
+git fetch -q <android> 'refs/remotes/origin/*:refs/rem/*'
+git checkout -q -B integ rem/main
+for b in p0-scaffold p1-pairing p2-replica p5-store android-a0-probe p2-runbook todos-pq1-pricing p1-runbook; do
+  if git merge --no-edit -q rem/claude/$b >/dev/null 2>&1; then echo "  <- $b : CLEAN"
+  else echo "  <- $b : CONFLICT"; git diff --name-only --diff-filter=U | sed 's/^/       /'; fi
+done
+```
+
+*Expected, and **observed** this run:* `main` **`ebfaf81`**, `p5-store` **`bb7f4d0`**, `p1-runbook`
+**`ec0f73e`**, `p0-scaffold` **`59051a4`**, `a0-probe` **`980689b`**; a0-probe **183** past the fork,
+**156** of them on/after 2026-08-09. Then **seven CLEAN merges** and **`p1-runbook` → CONFLICT on
+`docs/Monetization-Decision.md`, exactly one file.** This is `docs/Merge-Topology.md` §4's table
+reproduced row for row. **§4 used `merge-tree --write-tree`; this uses real `git merge`** — the two
+agree by different means, which is the point of re-running it rather than re-reading it.
+
+**Why this is a revalidation and not a new plan:** every other android branch is byte-unmoved since
+08-09. **Only `a0-probe` moved, and only by this window's own records commits** — so the honest
+result is *"the plan holds"*, and the finding is that nobody knew that until it was run.
+
+### C-AND-2 — the §6 sibling overlap is still exactly three files
+
+```bash
+cd <android>
+git diff --name-only d9f95fd origin/claude/p5-store        | sort > /tmp/p5.txt
+git diff --name-only d9f95fd origin/claude/android-a0-probe | sort > /tmp/a0.txt
+wc -l < /tmp/p5.txt; wc -l < /tmp/a0.txt
+comm -12 /tmp/p5.txt /tmp/a0.txt
+```
+
+*Expected, and **observed**:* `p5-store` touches **21** files, `a0-probe` **73**, and the
+intersection is **3** — `app/src/main/kotlin/app/careerseeker/dashboard/ui/ApplicationsScreen.kt`,
+`.../ui/HomeScreen.kt`, `app/src/test/kotlin/app/careerseeker/dashboard/ui/ScreensFromFixtureTest.kt`.
+Identical to the 08-09 set. **The 156 records commits added no new file that `p5-store` also touches.**
+
+**Not claimed:** that the fused result is correct. All three **auto-fuse with no conflict**, and
+§6's standing warning — *"a clean merge is not a passing gate"*, **no gate has ever run on the fused
+tree** — is unchanged. **This run ran no gate and could not** (**C-ENV-1**): no Android SDK, no
+`sdkmanager`, `ANDROID_HOME` unset.
+
+### C-AND-3 — §5's conflict is already ratified downstream, and the merge that reveals it is clean
+
+```bash
+cd /tmp/andmerge
+# the rule, and the authority it cites -- on p5-store, a THIRD branch
+git show rem/claude/p5-store:docs/store/Play-Listing.md | sed -n '6,8p'
+# the section that rule cites, on each side of the conflict
+git show 973a1dc | sed -n '5p;63p'     # a0-probe / p0-scaffold side
+git show 2322ce8 | sed -n '5p;63p'     # p1-runbook side
+# build both resolutions and scope the test to the PRICE-TABLE ROW
+for res in ours theirs; do
+  git checkout -q -B t-$res rem/main
+  for b in p0-scaffold p1-pairing p2-replica p5-store android-a0-probe p2-runbook todos-pq1-pricing; do
+    git merge --no-edit -q rem/claude/$b >/dev/null 2>&1; done
+  git merge --no-edit -q rem/claude/p1-runbook >/dev/null 2>&1
+  git checkout -q --$res -- docs/Monetization-Decision.md; git add -A >/dev/null; git commit -q --no-edit >/dev/null
+  echo -n "--$res price row prints 'Basic'? "
+  sed -n '5p' docs/Monetization-Decision.md | grep -q Basic && echo YES || echo no
+done
+```
+
+*Expected, and **observed**:* `Play-Listing.md:6-8` reads **"Naming canon (enforced): the Windows app
+is 'CareerSeeker' … never 'Basic'. … Do not let 'Basic' appear in any user-facing string
+(Monetization-Decision §3)."** Blob `973a1dc` §3 = *"Naming note (worth a decision, not urgent)"*
+with price row *"**CareerSeeker Basic** (.exe)"*; blob `2322ce8` §3 = *"Naming — **decided**
+2026-07-23"* with price row *"**CareerSeeker** (.exe) — the product, not a tier"*. Then **`--ours`
+→ YES**, **`--theirs` → no**.
+
+**Read the check carefully — scope it to line 5.** A grep of the **whole file** reports *both*
+resolutions inconsistent, because the `p1-runbook` side mentions `Basic` **3** times in §3's prose
+*recording that the name was dropped* (*"was briefly on the table and dropped"*). A document that
+decides against a word must be allowed to print it. **This run drafted that false finding and killed
+it by looking**; it is written down because the coarse grep is the obvious way to write this check.
+
+**What this establishes, narrowly.** §5 already recommends the `p1-runbook` side, arguing from
+recency. **This does not change the recommendation — it corroborates it from an independent
+direction** and adds the part §5 did not state: `docs/store/Play-Listing.md` lives on **`p5-store`,
+neither side of the conflict**, already **enforces** one side, and **cites the disputed section as
+its authority**. So resolving `--ours` leaves `main` carrying a price table that prints the exact
+string its own store listing forbids, with the listing pointing at that table as the rule's source.
+
+**And nothing raises a hand.** `p5-store` merges **clean**, `a0-probe` merges **clean**; the only
+conflict git reports is on `Monetization-Decision.md` itself (**C-AND-1**). **The contradiction is
+never a merge conflict** — it would surface, if at all, in copy pasted into the Play Console.
+`--ours` is the tempting default precisely because it is the lineage carrying all 183 commits.
+
+**Not claimed:** that anything builds, or that the store copy is otherwise submission-ready. **`Basic`
+appears in the whole `docs/store/` dossier exactly twice, both on `Play-Listing.md:6-7`, and both are
+the guard clause itself** — the other 13 dossier files contain the string zero times.
