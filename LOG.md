@@ -10954,10 +10954,21 @@ touched. Terra's territory was read, never written.
 ### Fifty-third run — CI state at handoff, recorded so nothing here implies a pass
 
 The android gate is the one check this sandbox cannot run but a real runner can, so this run pushed
-and waited on it. **At the time this entry was closed, job `95443895818` on workflow run
-`32049083463` (head `d357ab5`) was still `in_progress`** — started 17:09:57Z, ~35 minutes elapsed,
-and in-progress logs return HTTP 404, so nothing could be read from it either. An earlier run
-(`32048819412`, head `4f98a9e`) was superseded when the precision-note commit landed.
+and waited on it. **It never resolved inside the run.** Three jobs were started and each was
+superseded by the next push:
+
+| head | run / job | state when observed |
+| --- | --- | --- |
+| `4f98a9e` | `32048819412` / `95442940706` | superseded |
+| `d357ab5` | `32049083463` / `95443895818` | superseded, ~35 min `in_progress` |
+| `18266d8` | `32049277565` / `95444503942` | **still `in_progress`, ~30 min** |
+
+In-progress logs return HTTP 404, so nothing could be read from any of them.
+
+**Do not chase the job ids above — chase the branch tip.** Each commit here retriggers CI, so the
+newest id in this table is stale the moment another commit lands, *including the commit that records
+this table*. The durable instruction is: **read the check run for whatever `claude/android-a0-probe`
+points at when you open it**, and treat every id above as history.
 
 **No CI result is claimed by this run, green or red.** The four commits are markdown only — `LOG.md`,
 `STATE.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, **247 insertions, 3 deletions, zero source files, zero
