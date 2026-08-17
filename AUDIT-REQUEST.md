@@ -10113,3 +10113,92 @@ never a merge conflict** — it would surface, if at all, in copy pasted into th
 **Not claimed:** that anything builds, or that the store copy is otherwise submission-ready. **`Basic`
 appears in the whole `docs/store/` dossier exactly twice, both on `Play-Listing.md:6-7`, and both are
 the guard clause itself** — the other 13 dossier files contain the string zero times.
+
+## Fifty-third run — 2026-08-17 (Linux sandbox): eve-of-return revalidation
+
+Every command below was **executed this run**, after `git fetch --all --prune` in both trees. This
+run added **one** new check (**C-RET-1**); the rest are prior checks re-executed verbatim, which is
+the point of the run — the numbers Brandon acts on tomorrow were last measured across three separate
+earlier runs, and this pass re-stamps all of them together.
+
+### C-RET-1 — on the eve of the landing, every PR is still open+draft and every landing branch still matches its live PR head
+
+The freshness check that makes §3 safe to execute against the refs it names. `C-RD-3` (run 49)
+checked the seven heads; this adds the open+draft sweep over **all** open PRs, so a PR merged or
+undrafted by someone else would be caught too.
+
+```bash
+# live state — GitHub API (any client); expected: 18 open, all draft
+#   17 claude/* (#32..#53) + Terra's #26
+cd <engine>
+declare -A PR=( [s8-harness-linux-reach]=c93e88dcd459f52e6982f1cee5149658ba0165f5 \
+  [s2-seq-bound]=2be00fc07793b4da6ba2fcfdd626f70924613a8d \
+  [s2-transport-vocabulary]=b0b6c7730d95f92f5bce75a0eabfebe04fd082eb \
+  [s3-pairing-confirm-consumer]=edee32b7eda68ac7e420b59cc69642a1d4effedf \
+  [s6-outcome-disposition]=94fd9794309c474fee631e98d5562f5795a451cb \
+  [s6-composition-root-decision]=f5e0c0a4feeb56b2b617bb7d8702fa17c56fcd8c \
+  [s6-resume-reconciliation]=8177353c2147d24500a9edf2b866abfc62645230 )
+for b in "${!PR[@]}"; do L=$(git rev-parse origin/claude/$b)
+  [ "$L" = "${PR[$b]}" ] && echo "MATCH $b" || echo "MISMATCH $b $L ${PR[$b]}"; done
+git rev-parse origin/main
+```
+
+*Expected, and **observed**:* **7 MATCH, 0 MISMATCH**; `origin/main` = **`aac05f3`**, unmoved since
+2026-08-12. All 18 open PRs still `open` and still `draft`; **nothing merged, closed or undrafted**
+since run 49. **If any line reports MISMATCH, §3's plan is stale and must be re-costed before it is
+executed** — that is the whole purpose of this check.
+
+### C-STOP-1, C-STOP-3, C-POST-1, C-POST-3 — re-run at run 53, all unchanged
+
+All four re-executed verbatim after this run's fetch. Every number reproduces:
+
+- **C-STOP-1** — `8575539` touches `docs/Sync-Protocol.md` only, **+114/−3**; `22b028e` adds the two
+  ack vectors, `index.json` and `generate.mjs`; `7328a0b` adds `invalid-unknown-field.json`. On
+  `origin/claude/s5-entitlement-ack-emitter`: **`OK: 29 vector files match the generator.`**,
+  `exit=0`. `git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l` → **26**; the same on
+  the emitter branch → **29**. **Eighteenth consecutive assignment, eighteenth verification.**
+- **C-STOP-1 (content half, new phrasing this run)** — the four gates read **in the file**, not
+  inferred from commit subjects:
+  ```bash
+  cd <engine> && git checkout -B s5-check origin/claude/s5-entitlement-ack-emitter
+  grep -n "product_id\|acknowledged_at\|order_id" docs/Sync-Protocol.md | head -3   # PQ-A6-1 -> :318-320
+  grep -n -i "decoded ciphertext" docs/Sync-Protocol.md                             # PQ-A2-1 -> :111
+  grep -n "Also every structural rejection" docs/Sync-Protocol.md                    # PQ-A2-2 -> :601
+  ls docs/sync-vectors/v1/invalid-unknown-field.json                                 # PQ-A2-3
+  ```
+- **C-STOP-3** — `git archive 7328a0b docs/sync-vectors/v1` → **29 files**; `diff -r` against
+  `core/src/test/resources/sync-vectors/v1` → **no output, `exit=0`**. Byte-identical to pin.
+- **C-POST-1** — six merges from `aac05f3` as real merges: **1–4 CLEAN**, **#52 stops on the
+  five-file pin family**, **#49 on those five plus `tests/SyncHarness/Program.cs`**,
+  **`vector files conflicted: 0` at both stops**, corpus 26 → 28 → 28 → 29 → 29 → **30**.
+- **C-POST-3** — phone **29 files / 28 payloads / `index.vectors[]` 28**; landed `main` **30 / 29 /
+  29**; single delta **`pairing-high-bit-confirm.json`**; generator on the landed tree →
+  **`OK: 30 vector files match the generator.`**, `exit=0`.
+
+### C-ENV-1 — re-measured; neither gate is runnable here, and `gradle` being present does not change that
+
+```bash
+for t in pwsh dotnet sdkmanager adb gradle java node git; do
+  printf '%-12s %s\n' "$t" "$(command -v $t 2>/dev/null || echo ABSENT)"; done
+echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
+```
+
+*Expected, and **observed**:* `pwsh` **ABSENT**, `dotnet` **ABSENT**, `sdkmanager` **ABSENT**, `adb`
+**ABSENT**, `ANDROID_HOME`/`ANDROID_SDK_ROOT` **unset**; `git`, `java`, `node` v22.22.2 and
+**`gradle` present**. **The `gradle` line is the one worth reading carefully**: a reader who greps
+this file for "gradle: present" could conclude the android gate ran. It cannot —
+`:app:assembleDebug` requires the Android SDK, which is absent. **No gate result of either kind is
+claimed at run 53**, and RETURN-DAY §7 item 3 stands: grep these records for any sentence that blurs
+that line and report it.
+
+### C-B18-4 — the notification, and its limits as evidence
+
+B-18 attempt 4 was a push notification to Brandon (routine notification channel), sent this run,
+carrying: the eighteen firings, the three commits, `generate.mjs --check` → `OK: 29 … exit=0`, the
+two stale prompt facts (pin `679a317` → `7328a0b`; S5 "NOT STARTED" → built), and `RETURN-DAY.md` §5.
+
+**This claim is not independently re-verifiable from either repository, and it should not be written
+as if it were.** No file records it; delivery is attested only by the tool's own result
+(`Mobile push requested.`). An auditor should treat "a notification was sent" as **unverified from
+the repo** and, if it matters, confirm with Brandon directly. What *is* verifiable from the repo is
+everything the notification asserted — each item above has its command in this file.
