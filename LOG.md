@@ -10375,3 +10375,142 @@ no history rewritten, no force-push. The production relay was **not contacted at
 `GET /v1/health`**. No deploy of any kind; no Play, Google or OAuth console; no accounts, no
 purchases, no keystore, no emulator, no Gmail. **No secret read, printed, or echoed** — none was
 opened. No `.appdata` original touched. Terra's territory read, never written.
+
+## Forty-ninth run — 2026-08-17 (Linux sandbox): the plan Brandon uses tomorrow had never been checked against the pull requests it names
+
+**Rule one, first, both trees.** `git fetch --all --prune` in `/home/user/careerseeker` and
+`/home/user/careerseeker-android`. Both checkouts arrived **detached and stale** again — the android
+tree at `ebfaf81`, a docs-only commit with four files at root — so `git checkout -B
+claude/android-a0-probe origin/claude/android-a0-probe` came before any derivation, and every count
+below was taken after both. **Terra read first, as the bus requires:** `autonomy/codex-state`
+heartbeat `2026-08-12T20:28:36`, *"COMPLETE… the ladder is exhausted"*, **files claimed: none**. No
+collision, nothing to rebase around. Read, never written.
+
+`origin/main` in the engine is `aac05f3`, **unmoved since 2026-08-12** — which matters later, because
+it means this run and run 47 measured the landing plan against the same base.
+
+### Milestone 1 — the banner worked, and that is a finding rather than a formality
+
+The prompt assigned S5's spec half for the **fourteenth** consecutive run. Run 48 built a mitigation
+for exactly this — a pointer banner at the top of `docs/CLAUDE-ANDROID-MISSION.md` and `STATE.md`,
+the first two files on the prompt's own reading list — and **this is the first run to arrive after
+it.** It worked as designed: the truth was in the **first document read**, not the fifth derivation.
+
+Verified rather than inherited, both commands re-run verbatim (**C-STOP-1**, **C-STOP-3**):
+
+```
+$ node docs/sync-vectors/generate.mjs --check       # on origin/claude/s5-entitlement-ack-emitter
+OK: 29 vector files match the generator.
+exit=0
+
+$ git archive 7328a0b docs/sync-vectors/v1 | tar -x -C <tmp>
+$ diff -r <tmp>/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1
+$ echo $?
+0                                                   # no output, 29 files
+```
+
+`git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l` still returns **26**. Built,
+unmerged, pin intact. **Declined again, for run 48's reasons, which have not changed.**
+
+**What is new is the cost, not the conclusion.** Run 48 spent its run establishing the conclusion;
+this run spent two commands re-confirming it and had the rest of the iteration for something else.
+That is the mitigation paying out — and it is also the whole of what the mitigation can do, because
+the prompt is stored scheduler configuration and nothing here can edit it (**B-18**, restated today
+with the observation that a *cheap* wrong assignment is still a wrong assignment).
+
+### Milestone 2 — picking the slice: what is left that a sandbox can actually verify
+
+Brandon returns **tomorrow**. `RETURN-DAY.md` §1 names the highest-value hour on return day as
+*"decide PR #53, then land six merges in the order in §3"*. That plan was measured at run 47 and has
+been sitting unexercised for two runs. **A stale landing plan is worse than no landing plan, because
+it reads as measured** — and unlike every other item on the board, revalidating it needs **no gate,
+no Windows, no emulator, no .NET**. It is pure `git`. That is the slice.
+
+### Milestone 3 — every number in §3 reproduces (C-RD-1)
+
+The recommended order, #53 closed:
+
+```
+  s8-harness-linux-reach                   clean
+  s2-seq-bound                             clean
+  s2-transport-vocabulary                  clean
+  s3-pairing-confirm-consumer              clean
+  s6-outcome-disposition                   STOP  README.md ... scripts/Verify-Alpha.ps1 src/Engine/README.md
+  s6-composition-root-decision             STOP  (the same five) + tests/SyncHarness/Program.cs
+conflicted merges (human stops): 2
+```
+
+and with #53 appended, **3** — the third stop being the only merge that drags in
+`src/Sync/RelayClient.cs`, `src/Sync/SyncPublisher.cs`, `src/Engine/Program.cs` and
+`tests/SyncLiveSmoke/Program.cs`. **§3's central claim — closing #53 removes a stop and the entire
+`src/Sync/` conflict class — is now measured directly rather than inferred**, and the file sets match
+what §3 prints, file for file.
+
+### Milestone 4 — the row §3 never measured, and the stronger claim I did not make (C-RD-2)
+
+§3 says *"landing #49 first costs **4** stops instead of 3"*. That is an **all-7-leaves** figure. But
+§3's step 0 *recommends closing #53* — and nobody had measured order-dependence in the configuration
+the document recommends. Measured now, both ways: **all-7: 3 → 4**, **#53-closed: 2 → 3**. The
+penalty for putting #49 first is **+1 in both**.
+
+**I nearly filed this as "§3 is wrong for the configuration it recommends". It is not wrong.** The
+printed `4 instead of 3` reproduces exactly when you measure what it measured. The real finding is
+smaller and more useful: a reader who takes step 0's advice and then sanity-checks the order claim
+will measure **3 vs 2** and see neither printed number, and may conclude the plan drifted when it did
+not. **The penalty transfers between configurations; the absolute counts do not.** §3 now carries
+both rows.
+
+This is run 48's milestone-6 failure mode — reaching for a stronger version of one's own finding —
+declining to recur, and the thing that prevented it was cheap: **measure the case the document
+claims before saying anything about the number it prints.** One extra probe run, and the difference
+between a correction and a clarification.
+
+### Milestone 5 — the check nobody had run: does the plan name the PRs it thinks it names? (C-RD-3)
+
+Every prior costing simulated **branch names**. A human on return day clicks merge on **pull
+requests**. Nothing had checked the correspondence. Resolved each of the seven landing branches
+against its live PR head from the GitHub API: **7 of 7 match, 0 mismatches** — `#35 2be00fc`,
+`#36 b0b6c77`, `#48 c93e88d`, `#49 f5e0c0a`, `#51 edee32b`, `#52 94fd979`, `#53 8177353` — and all
+17 fleet PRs are still `state: open`, `draft: true`. **Nothing merged, closed, or undrafted since
+run 47.** The plan simulates the PRs it names.
+
+**One precise count, because it is a trap:** the repo shows **18** open PRs. The eighteenth is
+**#26 (`codex/r6-dependency-sbom`)**, which is **Terra's** and belongs to no landing step. §1's
+"seventeen" counts the `claude/*` fleet (#32–#39, #45–#53) and is right as written. An auditor
+recounting from the PR list gets 18 and should not read it as drift — so it is written down.
+
+### Milestone 6 — what this run does not establish
+
+**No gate ran, measured rather than assumed:** `pwsh` and `dotnet` are both absent, there is no
+Android SDK, no emulator, no Windows. **No `Verify-Alpha.ps1` result and no android gate result is
+claimed anywhere in this entry**, and no number above depends on one. The `merge-tree` probe reports
+**textual** conflicts — a `clean` row is **not** proof two branches are semantically compatible, and
+`fleet-probe.sh`'s own header says so. **The four stop counts are a forecast of hand-resolutions, not
+a promise that the merged tree builds.** Only the gate on Brandon's machine decides that.
+
+**No rung status changed and no rung advanced.** This run wrote no C#, no Kotlin, and no vector. S5's
+appliers remain unwritten because neither compiles here; the ladder table in `STATE.md` is unchanged
+from run 47's close. **Revalidating a plan is not progress on the ladder** — it is maintenance on the
+handoff, and it is worth exactly what it says it is worth: the plan Brandon opens tomorrow has been
+checked against today's refs and today's pull requests.
+
+### What this run did NOT touch
+
+**No engine file of any kind.** The engine checkout was read-only — `git` queries, `git archive`, a
+detached `git worktree add` used to run `generate.mjs --check` against an existing remote branch, and
+`merge-tree` probes that write nothing. **No commit and no push to any engine branch except
+`autonomy/claude-state`**, which is the docs-only coordination bus and is never merged. **No vector
+byte in either repo** — `docs/sync-vectors/` and `core/src/test/resources/sync-vectors/` untouched,
+`VECTORS.lock` not edited, corpus still byte-identical to pin `7328a0b` (**C-STOP-3**).
+**`docs/Sync-Protocol.md` read, never opened for edit** — the assigned S5 spec work is built, and
+duplicating it was refused on the record for the second consecutive run. **No `scripts/Verify-Alpha.ps1`
+edit and no offline pin edit** — nothing here is counted by `$ExpectedOfflineTotal`, so this run adds
+**no** new pin-toucher and does **not** increase B-17's landing cost. **No C# applier, no Kotlin
+applier, no Gradle invocation.** **Nothing merged, closed, or taken out of draft in either repo** —
+the android repo is never-self-merge and the main-repo condition is a gate this sandbox does not
+have; **#53 stays open and draft**, and its fate remains Brandon's decision, unchanged and
+un-nudged. No branch deleted, no history rewritten, no force-push. The production relay was **not
+contacted at all, not even `GET /v1/health`**. No deploy of any kind; no Play, Google or OAuth
+console; no accounts, no purchases, no keystore, no emulator, no Gmail. **No secret read, printed, or
+echoed** — none was opened. No `.appdata` original touched. Terra's territory read, never written;
+Terra's PR #26 was counted and named, never touched.

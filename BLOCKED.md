@@ -2119,3 +2119,33 @@ Windows gate, an emulator (**B-4**), a relay deploy, or a decision only Brandon 
 ITERATION" section should be replaced with: *read `RETURN-DAY.md` §5 and pick from the human queue
 what a Linux sandbox can actually advance* — which today is very little, and that is the honest state,
 not a failure.
+
+### B-18 status 2026-08-17 (forty-ninth run) — the banner worked; the loop fired anyway, for the fourteenth time
+
+**Unchanged as a blocker, and now with one run of evidence about the mitigation.**
+
+Attempt 3 of B-18 (put the pointer where the reader actually looks) was landed at run 48 as a banner
+on `docs/CLAUDE-ANDROID-MISSION.md` and `STATE.md`. **It did what it was built to do.** This session
+was assigned the same S5 spec half — the **fourteenth** consecutive assignment — and reached "it is
+already built" from its **first** document read, not its fifth derivation. It then spent one command
+verifying rather than re-deriving (**C-STOP-1**: `OK: 29 vector files match the generator.`,
+`exit=0`) and moved on to work that was actually available.
+
+**The blocker itself has not moved, and the distinction matters.** The banner reduces the *cost* of
+each firing; it cannot reduce the *count*, because the prompt is stored scheduler configuration that
+no file in either repo can edit. Run 48 said this explicitly and it is worth restating rather than
+quietly re-discovering: **a cheap wrong assignment is still a wrong assignment.** The evidence that
+it is cheap is that this run had time to do something else; the evidence that it is still wrong is
+that the something else had to be chosen by the session rather than by the prompt.
+
+**Smallest human unblock — unchanged, and now due today.** Mission §7's terminal instruction is
+*"clear the goal"*. The stop condition was crossed at run 45, executed at run 47, and this is run
+49. Brandon returns **2026-08-18**, tomorrow. Either turn the routine off, or replace its "YOUR SLICE
+THIS ITERATION" section with *read `RETURN-DAY.md` §5 and pick from the human queue what a Linux
+sandbox can actually advance*. **Do not leave it pointed at S5's spec half**; that instruction has
+now been wrong for eight days.
+
+**A note for whoever reads this next.** Nothing in this entry is a complaint about the schedule. The
+routine is doing exactly what it was configured to do, and the configuration was correct when it was
+written. It has simply been overtaken by the work, and the only actor who can retire it is the one
+who created it.
