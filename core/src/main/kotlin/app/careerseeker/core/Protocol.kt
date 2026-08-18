@@ -63,30 +63,50 @@ enum class Direction(val wire: String) {
 }
 
 /**
+ * Which way a [PayloadKind] travels. Sync-Protocol.md section 4.3's two tables.
+ *
+ * This was a `// engine -> phone` comment until the fifty-ninth run. A comment cannot be
+ * read by [PayloadKind.ENGINE_TO_PHONE_KINDS], so the set that decides what the phone must
+ * be prepared to receive had to be written out a second time — and two lists of the same
+ * thing, in one file, is the drift this program keeps finding in other files.
+ */
+enum class KindFlow { ENGINE_TO_PHONE, PHONE_TO_ENGINE, BOTH }
+
+/**
  * Payload kinds shipping in v1.
  *
  * [Reserved] kinds are claimed so a future L2 cannot collide with v1 traffic, and a v1
  * receiver must reject them. That rejection is the guard that stops the phone acquiring
  * engine control before the signing and audit story has been externally audited.
+ *
+ * ## Every constant declares its [flow], and every engine→phone constant is classified
+ *
+ * A new kind cannot be added here without stating which way it travels, and — if it travels
+ * to the phone — without landing in exactly one of the three sets below. `PayloadKindCoverageTest`
+ * fails until it does. That is deliberate, and it is B-19's neighbourhood: `entitlement_ack`
+ * spent nine days in this enum with a documented applier and no production caller, because
+ * nothing anywhere required the question *"and who receives it?"* to be answered when a kind
+ * was added. The partition does not answer it — see the warning on [ROUTED_OUTSIDE_REPLICA] —
+ * but it does force it to be asked.
  */
-enum class PayloadKind(val wire: String) {
+enum class PayloadKind(val wire: String, val flow: KindFlow) {
     // engine -> phone
-    SNAPSHOT("snapshot"),
-    DELTA("delta"),
-    DOC("doc"),
-    EVIDENCE("evidence"),
-    HEARTBEAT("heartbeat"),
-    CONFLICT("conflict"),
-    ENTITLEMENT_ACK("entitlement_ack"),
+    SNAPSHOT("snapshot", KindFlow.ENGINE_TO_PHONE),
+    DELTA("delta", KindFlow.ENGINE_TO_PHONE),
+    DOC("doc", KindFlow.ENGINE_TO_PHONE),
+    EVIDENCE("evidence", KindFlow.ENGINE_TO_PHONE),
+    HEARTBEAT("heartbeat", KindFlow.ENGINE_TO_PHONE),
+    CONFLICT("conflict", KindFlow.ENGINE_TO_PHONE),
+    ENTITLEMENT_ACK("entitlement_ack", KindFlow.ENGINE_TO_PHONE),
 
     // phone -> engine
-    DOC_EDIT("doc_edit"),
-    OUTCOME("outcome"),
-    ENTITLEMENT("entitlement"),
-    PULL_REQUEST("pull_request"),
+    DOC_EDIT("doc_edit", KindFlow.PHONE_TO_ENGINE),
+    OUTCOME("outcome", KindFlow.PHONE_TO_ENGINE),
+    ENTITLEMENT("entitlement", KindFlow.PHONE_TO_ENGINE),
+    PULL_REQUEST("pull_request", KindFlow.PHONE_TO_ENGINE),
 
     // both
-    ERROR("error"),
+    ERROR("error", KindFlow.BOTH),
     ;
 
     companion object {
@@ -101,6 +121,43 @@ enum class PayloadKind(val wire: String) {
             "state_change", "gate_request", "gate_resolve", "kill",
             "config_change", "lesson_proposal", "metric",
         )
+
+        /** Derived from [flow], never listed a second time. */
+        val ENGINE_TO_PHONE_KINDS: Set<PayloadKind> =
+            entries.filter { it.flow == KindFlow.ENGINE_TO_PHONE }.toSet()
+
+        /**
+         * Kinds the `:app` [ReplicaApplier] projects into the Room replica.
+         *
+         * This mirrors the `when` in `:app`'s `EnvelopeApplier`, and mirroring is the honest
+         * word: `:core` is Android-free, so nothing here can read that `when`. What this set
+         * buys is that the mirror has one location instead of three KDoc paragraphs, and that
+         * a kind added to the enum has to be placed against it.
+         */
+        val PROJECTED_BY_REPLICA: Set<PayloadKind> = setOf(SNAPSHOT, DELTA, HEARTBEAT, EVIDENCE)
+
+        /**
+         * Engine→phone kinds that a correct build acts on **somewhere other than the replica**.
+         *
+         * **This set is not a guarantee that anything constructs that route.** `entitlement_ack`
+         * was in exactly this position for nine days: [EntitlementAckApplier] existed, was
+         * documented as the phone's only unlock path, and had no production caller in either
+         * module. [EntitlementRoutingApplier] is the route now; **the composition root that
+         * builds it is `:app` and does not exist yet (B-19)**. Membership here means "the
+         * replica's `else` branch is the wrong destination for this kind" — a statement about
+         * where it must not go, which is what was missing, not a claim about where it does go.
+         */
+        val ROUTED_OUTSIDE_REPLICA: Set<PayloadKind> = setOf(ENTITLEMENT_ACK)
+
+        /**
+         * Engine→phone kinds v1 accepts and deliberately drops.
+         *
+         * `doc` is not emitted in v1 at all (§4.3's table says so), and `conflict` rejects a
+         * `doc_edit` the phone cannot send until the P3 editing surface exists. Both reaching
+         * the replica's `else` branch is correct, and saying so here is what stops the next
+         * reader from "fixing" it.
+         */
+        val NOT_PROJECTED_IN_V1: Set<PayloadKind> = setOf(DOC, CONFLICT)
     }
 }
 
