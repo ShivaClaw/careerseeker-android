@@ -2505,3 +2505,91 @@ easier** (**B-17**).
 
 **No new blocker arose this run.** The one thing that could have become one — run 56's unresolved CI
 — resolved **green** instead (**C-CI-57**), and is recorded as evidence rather than as a blocker.
+
+---
+
+## B-19 — S5's phone route exists and nothing in `:app` constructs it (fifty-eighth run, 2026-08-18)
+
+**Symptom.** `EntitlementRoutingApplier` and `ProStateStore` landed this run in `:core`, test-green
+at **299 / 0** (**C-S5-2**), with a negative control pinning the pre-fix behaviour (**C-S5-3**).
+**None of it runs on a phone yet**, and it cannot until three `:app`-side pieces exist:
+
+1. a `ProStateStore` implementation — Room table or DataStore, and **which one is a decision, not a
+   detail**: Pro state must survive a replica wipe, and the replica is wiped wholesale by the first
+   real snapshot (`EnvelopeApplier`'s fixture-clearing path). Storing it in the replica DB is
+   therefore the *wrong* choice unless it is explicitly excluded from that wipe;
+2. the configured `knownProductIds` set — `pro_unlock` per `docs/Monetization-Decision.md`, but the
+   **production ids exist only once the Play app is created**, which is a Console step (S7, human);
+3. the composition root itself, which is **S4's** and does not exist: nothing in `:app` constructs
+   `SyncPump`, `RelayClient` or any `:core` type today (**C-S5-1**, second grep).
+
+**Why this is BLOCKED here rather than merely unfinished.** All three are `:app`, `:app` needs the
+Android SDK and AGP from `dl.google.com`, and this sandbox's egress policy denies it (**B-7**).
+`scripts/core-probe.sh` reaches `:core` *only*. Writing the wiring blind would be the exact thing
+this program's standing rule forbids: source that no one has compiled, claimed as done.
+
+**Attempts.** None beyond confirming the boundary — the boundary is the finding. Item 1 was
+scoped rather than decided, deliberately: it is a persistence decision with a user-visible failure
+mode (an unlock that a later snapshot silently revokes), and it is Brandon's.
+
+**Smallest human unblock.** On the Windows box, with the SDK present: implement `ProStateStore`
+against DataStore (the recommendation — it is outside the replica DB and therefore outside the
+snapshot wipe, which resolves item 1 by construction), wire
+
+```kotlin
+applier = EntitlementRoutingApplier(roomApplier, EntitlementAckApplier(setOf("pro_unlock")), proStateStore)
+```
+
+into whatever constructs `SyncPump`, and run the full gate
+`./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:test :app:assembleDebug :app:lintDebug --rerun-tasks`.
+`SyncPump`'s KDoc now carries that snippet at the point where the wiring is chosen (`03e3e8f`), so
+the composition root does not have to find this file to get it right.
+
+**What is NOT blocked, and should not be re-derived.** The route's own behaviour — routing,
+idempotence, the `IGNORED` disposition and its consequence, §4.3.3's ignore-rather-than-unlock, and
+PQ-A2-4's boundary — is settled and test-pinned here (**C-S5-3** … **C-S5-5**). This blocker is
+about **construction**, not about semantics.
+
+---
+
+### B-18 status 2026-08-18 (fifty-eighth run) — the twenty-third firing, and its premise is now measurably false too
+
+**Unchanged as a blocker.** The scheduled prompt again assigned S5's spec half. That work has
+existed since **2026-08-09** as draft PR **#32**; re-verified rather than assumed (**C-STOP-6**).
+The prompt's pin `679a317` is still stale (**`7328a0b`**), and its "S5 is NOT STARTED" is still
+wrong. **Nothing has been merged, closed or undrafted in either repo** — engine `main` still
+`aac05f3`, android `main` still `ebfaf81`, unmoved since 2026-08-12, 18 and 6 PRs still open and
+still draft (**C-RET-5**). Return day was 2026-08-18; it has now passed twice over.
+
+**What is new, and it is a correction to this entry's own five previous statuses.** Every prior
+status treated the prompt as *stale about state* — right about the world, wrong about the date. It
+is also **wrong about this environment**, and that error was costing real work. The prompt says:
+
+> *Do NOT write the C# applier or the Kotlin applier unless you can compile them — you cannot.*
+
+**Half of that is false, and has been since run 56 (C-JDK-1).** `:core` is Android-free by
+construction and `scripts/core-probe.sh` runs `:core:test` on this host. Twenty-two runs took the
+prohibition at face value and produced records; **run 58 checked it, and found a silent product
+defect behind it** — `EntitlementAckApplier`, the phone's only unlock path, with no caller anywhere
+(**C-S5-1**). Pro could not have unlocked on any phone built from this branch, and no test, counter
+or error anywhere would have said so.
+
+**So the lesson generalises past this prompt.** *Verify the summary* was already house law and is
+why the ladder table is re-derived every run. **Verify the constraints too** — a stale
+"you cannot do X" is more expensive than a stale "X is not started", because the second gets
+checked on arrival and the first is never tested at all.
+
+**Attempts — 1 through 5 unchanged; 6 is this run.**
+
+6. **NEW — stop treating the prompt's prohibitions as boundaries and re-derive them, then do the
+   work the prohibition was hiding.** This is the first firing that produced product code rather
+   than records, and it did so *because* it disbelieved the prompt in a second place. It **does not
+   close B-18**: the routine will fire again with the same text, and the next slice found this way
+   is not guaranteed to exist. The escalation still went out by push notification, since attempts
+   1–4 all terminated inside files the scheduler cannot read.
+
+**Smallest human unblock — unchanged, and now with one line added.** Turn the routine off, **or**
+replace its "YOUR SLICE THIS ITERATION" section with: *read `RETURN-DAY.md` §5, and re-derive what
+this environment can run before assuming what it cannot — `:core` compiles and tests here
+(`scripts/core-probe.sh`); `:app`, .NET and the emulator do not.* The real bottleneck is unchanged
+and is a merge decision (**#53**) plus a Windows gate, not authoring capacity.

@@ -10797,3 +10797,165 @@ draft PR #32 since 2026-08-09.**
 with no `entitlement-ack*` and no `invalid-unknown-field`. **That ambiguity is the single best
 explanation for why the slice keeps being re-assigned**, and it is the reason the honest status is
 *built and unlanded*, not *done* and not *not started*.
+
+---
+
+## Fifty-eighth run (2026-08-18) — re-verification commands
+
+Every claim below was produced on Linux with JDK 17 installed into the container. `<engine>` is a
+checkout of `ShivaClaw/careerseeker`; `<android>` is this repo on `claude/android-a0-probe`.
+
+### C-S5-1 — `EntitlementAckApplier` had no production caller in either module
+
+```bash
+cd <android>
+git grep -n "EntitlementAckApplier\|ProState" -- core/src/main app/src/main
+git grep -n "app.careerseeker.core" -- app/src/main            # the :app production sources
+git grep -n "entitlement" -- app/src/main/kotlin/app/careerseeker/dashboard/replica/EnvelopeApplier.kt
+```
+
+*Expected, at commit `0c4ca8f` (this run's parent):* the first command prints **only** the
+definitions in `core/.../ProState.kt`, `EntitlementAck.kt`, `OutcomeMarking.kt` and `Protocol.kt` —
+**no call site**. The second prints **nothing**: `:app`'s production code does not reference `:core`
+at all. The third prints **nothing**: the replica applier's `when` covers
+`snapshot`/`delta`/`heartbeat`/`evidence` and sends everything else to `else -> Ignored(kind)`.
+
+**Attack this first.** The claim is *"an accepted `entitlement_ack` reaches nothing"*, and the three
+greps establish it only together. If a future session adds a second dispatch path, this evidence
+goes stale silently — the standing check is **C-S5-3**, which asserts the behaviour rather than the
+absence.
+
+### C-S5-2 — `:core:test` before and after, on this host
+
+```bash
+cd <android>
+apt-get update && apt-get install -y openjdk-17-jdk-headless   # see C-JDK-2
+git stash && scripts/core-probe.sh --rerun ; git stash pop     # baseline
+scripts/core-probe.sh --rerun                                  # with this run's change
+```
+
+*Expected, and **observed**:*
+
+```
+baseline (0c4ca8f):  core-probe: 288 tests, 0 failed, 0 skipped, across 19 classes   exit=0
+after   (03e3e8f):   core-probe: 299 tests, 0 failed, 0 skipped, across 20 classes   exit=0
+```
+
+Zero compiler warnings in both. **This is one of the android gate's five tasks, not the gate.**
+`checkCoreIsAndroidFree`, `:app:test`, `:app:assembleDebug` and `:app:lintDebug` did **not** run
+here and no result is claimed for them (**B-7**). `core-probe.sh` builds a throwaway Gradle build
+with `google()` absent from the resolver, so a green run additionally proves `:core` resolves with
+the Android repository unreachable.
+
+### C-S5-3 — the negative control: without the route, an accepted ack is dropped
+
+```bash
+cd <android>
+scripts/core-probe.sh --rerun 2>&1 | grep "without the route"
+```
+
+*Expected, and **observed**:*
+`EntitlementRoutingApplierTest > without the route an accepted ack is dropped and the phone stays Free() PASSED`
+
+**Read what that test does, because the pass is the finding.** It drives a real sealed
+`entitlement_ack` through a real `SyncPump` and a real `EnvelopeReceiver` into the `:app`-shaped
+replica applier, with **no** `EntitlementRoutingApplier`, and asserts `pulled == 1`,
+`rejections == []`, that the replica **did** see the kind, and that the phone is **still
+`ProState.Free`**. It is the pre-fix behaviour pinned as an assertion, so the gap cannot reopen
+without a red test.
+
+### C-S5-4 / C-S5-5 — the new tests were made to fail before being believed
+
+```bash
+cd <android>
+F=core/src/main/kotlin/app/careerseeker/core/EntitlementRoute.kt
+cp $F /tmp/route.orig
+
+sed -i 's/if (kind != PayloadKind.ENTITLEMENT_ACK.wire) {/if (true) {/' $F   # C-S5-4
+scripts/core-probe.sh --rerun; echo "exit=$?"
+cp /tmp/route.orig $F
+
+sed -i '0,/return ApplyDisposition.IGNORED$/! s/return ApplyDisposition.IGNORED/return ApplyDisposition.APPLIED/' $F   # C-S5-5
+scripts/core-probe.sh --rerun; echo "exit=$?"
+cp /tmp/route.orig $F
+scripts/core-probe.sh --rerun; echo "exit=$?"
+```
+
+*Expected, and **observed**:*
+
+| mutation | failures | exit |
+| --- | --- | --- |
+| **C-S5-4** ack branch removed (the pre-fix behaviour) | `an accepted ack unlocks Pro end to end through the pump`, `a re-delivered ack does not write again`, `a local ACCEPTED verdict still unlocks nothing`, `an honoured ack sends no pull_request` — **4** | **1** |
+| **C-S5-5** honoured ack reported as `APPLIED` | `an honoured ack sends no pull_request`, `an unknown product id writes nothing and leaves the state alone`, `a non-ack body delivered under the ack kind unlocks nothing` — **3** | **1** |
+| restored | none — **299 / 0** | **0** |
+
+**C-S5-5 is the one to read.** It fails the **end-to-end** test, not an assertion on an enum name: a
+real ack at seq `900` over a replica marked at `40`, asserting the relay received **no push**. Under
+`APPLIED`, `PullPolicy` measures an 860-wide gap and pushes a `pull_request` — a gap the ack can
+never close, because an ack never advances `highestAppliedSeq`. That is why the disposition is
+`IGNORED` even on success, and it is pinned by consequence.
+
+### C-S5-6 — no vector byte was written, verified after the commits
+
+```bash
+cd <android>
+rm -rf /tmp/pinvec && mkdir -p /tmp/pinvec
+git -C <engine> archive 7328a0bc043335491cd96a67d634e8eea2a13af9 docs/sync-vectors/v1 | tar -x -C /tmp/pinvec
+find /tmp/pinvec/docs/sync-vectors/v1 -type f | wc -l
+find core/src/test/resources/sync-vectors/v1 -type f | wc -l
+diff -r /tmp/pinvec/docs/sync-vectors/v1 core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+git status --porcelain
+```
+
+*Expected, and **observed**:* **29** upstream, **29** vendored, `diff -r` prints **nothing**,
+**`exit=0`**. `git status` showed exactly three paths — `SyncPump.kt` modified,
+`EntitlementRoute.kt` and `EntitlementRoutingApplierTest.kt` untracked — **and no path under
+`sync-vectors/`**. `VECTORS.lock` untouched; the pin did not move (**H7**).
+
+### C-JDK-2 — a correction to C-JDK-1's recorded command
+
+```bash
+apt-get install -y openjdk-17-jdk-headless          # C-JDK-1 as written at run 56
+apt-get update && apt-get install -y openjdk-17-jdk-headless   # what works today
+```
+
+*Expected, and **observed**:* the first now **fails**, `exit=100`, with
+`404 Not Found` on `openjdk-17-{jre,jdk}-headless_17.0.18+8-1~24.04.1_amd64.deb` — the indexed
+version was superseded and the container's package index is stale from image build. With
+`apt-get update` first, **`17.0.19+10-1~24.04.2` installs, `exit=0`**. **C-JDK-1's conclusion stands
+in full** — this host can run `:core:test` — only its command line needs the update.
+
+### C-RET-5 — freshness, re-measured after `git fetch --all --prune` in both trees
+
+```bash
+git -C <engine> fetch --all --prune && git -C <engine> rev-parse --short origin/main
+git -C <android> fetch --all --prune && git -C <android> rev-parse --short origin/main
+# live, not local refs:
+#   list_pull_requests(ShivaClaw/careerseeker, state=open)  -> count, and draft per row
+#   list_pull_requests(ShivaClaw/careerseeker-android, state=open)
+```
+
+*Expected, and **observed**:* engine `origin/main` = **`aac05f3`**, android `origin/main` =
+**`ebfaf81`**, both unmoved since 2026-08-12. **18 open / 18 draft** in `careerseeker` (17 `claude/*`
++ `codex/r6-dependency-sbom` #26), **6 open / 6 draft** here. **Nothing merged, closed or undrafted
+by anyone, including this session.** **`RETURN-DAY.md` §3 is still safe to execute exactly as
+printed.**
+
+### C-STOP-6 — the assigned spec half is still built; twenty-third consecutive assignment
+
+```bash
+git -C <engine> show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md | grep -n "4.3.3" | head
+git -C <engine> ls-tree --name-only origin/claude/s5-entitlement-ack-emitter docs/sync-vectors/v1/ | grep -c json
+```
+
+*Expected:* §4.3.3 defines `{product_id, acknowledged_at, order_id?}` under an explicit
+*"Decided 2026-08-07 (gate PQ-A6-1, default-proceed)"* marker; §3.1 measures the 1 MiB cap on the
+ciphertext; §7.2 reports structural rejection as `decrypt_failed`; `invalid-unknown-field.json`
+exists. Commits `8575539`, `22b028e`, `7328a0b`; draft PR **#32**, open since **2026-08-09**. The
+prompt's stated pin `679a317` is stale — it is **`7328a0b`**. **Declined again**, for the reason in
+LOG Milestone 2: re-authoring is the cross-repo drift event the prompt itself names.
+
+**What is new at run 58 and supersedes part of C-STOP-1..5's framing:** the prompt's instruction
+*"do NOT write the phone applier, you cannot compile it"* is **false for `:core`** and has been
+since **C-JDK-1**. Acting on that discovery is what produced C-S5-1 through C-S5-6. **The prompt's
+premise, not only its ladder summary, is stale.**
