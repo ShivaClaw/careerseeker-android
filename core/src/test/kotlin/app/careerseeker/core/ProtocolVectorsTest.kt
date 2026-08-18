@@ -5,6 +5,7 @@ import app.careerseeker.core.crypto.SyncCrypto
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -56,6 +57,24 @@ class ProtocolVectorsTest {
             .filter { it.str("type") == "envelope" }
             .map { load(it.str("name")) }
 
+    /**
+     * Every VALID pairing vector the manifest lists, by name.
+     *
+     * Enumerated rather than named, deliberately. Until 2026-08-18 the derivation test below
+     * loaded `pairing-basic` by hand while calling itself "every vector value", so a pairing
+     * vector added upstream was vendored, listed here, and asserted by nothing — measured with
+     * a negative control: corrupting `pairing-high-bit-confirm`'s expected confirm code left
+     * :core:test green at 288/0. Enumerating from the manifest is what makes a re-pin actually
+     * deliver the phone testing what the engine ships (B-14/H7).
+     *
+     * `valid: false` vectors are excluded: they pin a REJECTION and have their own tests
+     * (e.g. `pairing-mitm-keyswap`), so running the happy-path assertions over them is wrong.
+     */
+    private fun validPairingVectors(): List<Pair<String, JsonObject>> =
+        index()["vectors"]!!.jsonArray.map { it.jsonObject }
+            .filter { it.str("type") == "pairing" && it["valid"]!!.jsonPrimitive.boolean }
+            .map { it.str("name") to load(it.str("name")) }
+
     private fun keyFor(dir: String): ByteArray = hex(
         if (dir == "e2p") "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
         else "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
@@ -76,36 +95,48 @@ class ProtocolVectorsTest {
 
     @Test
     fun `pairing derivation reproduces every vector value`() {
-        val v = load("pairing-basic")
-        val expected = v["expected"]!!.jsonObject
-        val secret = b64u(v.str("secret_b64u"))
+        val vectors = validPairingVectors()
+        assertTrue(vectors.isNotEmpty(), "the manifest lists no valid pairing vectors")
 
-        val enginePub = b64u(v["engine"]!!.jsonObject.str("pub_b64u"))
-        val phonePub = b64u(v["phone"]!!.jsonObject.str("pub_b64u"))
-        val engineD = hex(v["engine"]!!.jsonObject.str("d_hex"))
-        val phoneD = hex(v["phone"]!!.jsonObject.str("d_hex"))
+        for ((name, v) in vectors) {
+            val expected = v["expected"]!!.jsonObject
+            val secret = b64u(v.str("secret_b64u"))
 
-        val ssEngine = SyncCrypto.ecdhSharedSecret(engineD, phonePub)
-        val ssPhone = SyncCrypto.ecdhSharedSecret(phoneD, enginePub)
-        assertEquals(expected.str("ss_hex").lowercase(), ssEngine.toHex(), "ECDH shared secret")
-        assertTrue(ssEngine.contentEquals(ssPhone), "ECDH is symmetric")
+            val enginePub = b64u(v["engine"]!!.jsonObject.str("pub_b64u"))
+            val phonePub = b64u(v["phone"]!!.jsonObject.str("pub_b64u"))
+            val engineD = hex(v["engine"]!!.jsonObject.str("d_hex"))
+            val phoneD = hex(v["phone"]!!.jsonObject.str("d_hex"))
 
-        val keys = PairingDerivation.derive(listOf(ssEngine), secret)
-        assertEquals(expected.str("k_e2p_hex").lowercase(), keys.keyEngineToPhone.toHex(), "k_e2p")
-        assertEquals(expected.str("k_p2e_hex").lowercase(), keys.keyPhoneToEngine.toHex(), "k_p2e")
-        assertEquals(expected.str("relay_token_b64u"), keys.relayToken, "relay token")
-        assertEquals(expected.str("confirm"), keys.confirmCode, "6-digit confirm code")
-        assertEquals(expected.str("provisional_token_b64u"), PairingDerivation.provisionalRelayToken(secret), "provisional token")
+            val ssEngine = SyncCrypto.ecdhSharedSecret(engineD, phonePub)
+            val ssPhone = SyncCrypto.ecdhSharedSecret(phoneD, enginePub)
+            assertEquals(expected.str("ss_hex").lowercase(), ssEngine.toHex(), "ECDH shared secret ($name)")
+            assertTrue(ssEngine.contentEquals(ssPhone), "ECDH is symmetric ($name)")
 
-        // The completion opens under the derived k_p2e, and the device key is inside it.
-        val completion = v["completion"]!!.jsonObject
-        assertEquals(
-            PairingDerivation.completionAad(index().str("pairing_id"), v.str("suite"), v["phone"]!!.jsonObject.str("pub_b64u")),
-            completion.str("aad"),
-        )
-        val payload = SyncCrypto.open(keys.keyPhoneToEngine, b64u(completion.str("nonce_b64u")),
-            completion.str("aad"), b64u(completion.str("ciphertext_b64u")))
-        assertTrue(payload.toString(Charsets.UTF_8).contains(v["device_sig"]!!.jsonObject.str("pub_b64u")))
+            val keys = PairingDerivation.derive(listOf(ssEngine), secret)
+            assertEquals(expected.str("k_e2p_hex").lowercase(), keys.keyEngineToPhone.toHex(), "k_e2p ($name)")
+            assertEquals(expected.str("k_p2e_hex").lowercase(), keys.keyPhoneToEngine.toHex(), "k_p2e ($name)")
+            assertEquals(expected.str("relay_token_b64u"), keys.relayToken, "relay token ($name)")
+            assertEquals(expected.str("confirm"), keys.confirmCode, "6-digit confirm code ($name)")
+            assertEquals(
+                expected.str("provisional_token_b64u"),
+                PairingDerivation.provisionalRelayToken(secret),
+                "provisional token ($name)",
+            )
+
+            // The completion opens under the derived k_p2e, and the device key is inside it.
+            val completion = v["completion"]!!.jsonObject
+            assertEquals(
+                PairingDerivation.completionAad(index().str("pairing_id"), v.str("suite"), v["phone"]!!.jsonObject.str("pub_b64u")),
+                completion.str("aad"),
+                "completion aad ($name)",
+            )
+            val payload = SyncCrypto.open(keys.keyPhoneToEngine, b64u(completion.str("nonce_b64u")),
+                completion.str("aad"), b64u(completion.str("ciphertext_b64u")))
+            assertTrue(
+                payload.toString(Charsets.UTF_8).contains(v["device_sig"]!!.jsonObject.str("pub_b64u")),
+                "device signing key inside the completion ($name)",
+            )
+        }
     }
 
     @Test
