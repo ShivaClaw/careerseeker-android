@@ -10655,3 +10655,26 @@ was already self-extending, so a vector added upstream to any of them lands asse
 would land inert — and `pairing-high-bit-confirm` is precisely a `pairing` vector arriving upstream.
 **Attack this by re-running the grep**: if a fifth type appears in the manifest with no matching
 filter, the same hole is open again for that family.
+
+### C-CI-56 — the runner's verdict on `4ddad07` was still pending when this run closed
+
+```bash
+# check run 95604409205 on PR #6, head 467d7b1
+# (workflow run 32102074876)
+```
+
+*Observed at close of slice:* **`status: in_progress`**, started `2026-08-18T05:13:53Z`, polled five
+times over roughly **28 minutes** and never reached a conclusion inside this session. **No CI result
+is claimed for this run's commits — not green, not red.**
+
+This matters because the house rule is that android **gate** results are read out of runner logs and
+never produced locally, and this run produced only `:core:test` locally (**C-JDK-1**, 1 of the gate's
+5 tasks). So the status of `checkCoreIsAndroidFree`, `:app:test`, `:app:assembleDebug` and
+`:app:lintDebug` against `4ddad07` is **unknown as of this writing**.
+
+**What to do with that.** The change is confined to a **test** file and adds no production code, and
+the same file's suite was run locally at the current pin (**288 / 0**, **C-ENUM-3**), so the expected
+runner outcome is green. **Expected is not observed** — read the run before treating it as evidence:
+`https://github.com/ShivaClaw/careerseeker-android/actions/runs/32102074876`. If it is red, the
+finding in **C-ENUM-2** is unaffected (it was measured locally, with a negative control) but the
+**fix** in `4ddad07` is not, and should be re-read first.
