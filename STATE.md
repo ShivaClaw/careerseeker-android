@@ -35,6 +35,12 @@
 > for the first time, that **this phone's confirm reduction is the conforming one** (**C-ENUM-4**).
 > **The test count is 288 in all four runs, so this is invisible to anyone auditing by count.**
 >
+> **CI was still `in_progress` when this run closed**, polled five times over ~28 minutes, and each
+> records push starts a fresh run that supersedes the last — so **no CI result is claimed for any of
+> this run's commits, not green and not red** (**C-CI-56**). Read the **latest** run on PR #6 rather
+> than a run ID recorded here, which is stale by construction. The change is test-only and its suite
+> ran locally at the current pin (288/0), so green is *expected*; **expected is not observed.**
+>
 > **Files claimed this run:** `core/src/test/kotlin/app/careerseeker/core/ProtocolVectorsTest.kt`
 > (+ house records). **No pin moved, no vector byte written** in either repo (**C-ENUM-5**) — the
 > re-pin is still **H7** and still Brandon's. `ci.yml` untouched (**H3** open). **No android gate and

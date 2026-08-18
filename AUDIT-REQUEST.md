@@ -10667,6 +10667,11 @@ filter, the same hole is open again for that family.
 times over roughly **28 minutes** and never reached a conclusion inside this session. **No CI result
 is claimed for this run's commits — not green, not red.**
 
+**Do not chase the run ID above.** Each records push starts a fresh run that supersedes the previous
+one — the final commit of this run had already replaced `32102074876` with `32102294199` before the
+session closed. **Read the latest run on PR #6**; any run ID written into a records file is stale by
+construction, which is why the re-verification below names the PR and not a run.
+
 This matters because the house rule is that android **gate** results are read out of runner logs and
 never produced locally, and this run produced only `:core:test` locally (**C-JDK-1**, 1 of the gate's
 5 tasks). So the status of `checkCoreIsAndroidFree`, `:app:test`, `:app:assembleDebug` and
