@@ -10683,3 +10683,117 @@ runner outcome is green. **Expected is not observed** — read the run before tr
 `https://github.com/ShivaClaw/careerseeker-android/actions/runs/32102074876`. If it is red, the
 finding in **C-ENUM-2** is unaffected (it was measured locally, with a negative control) but the
 **fix** in `4ddad07` is not, and should be re-read first.
+
+---
+
+## Fifty-seventh run (2026-08-18) — re-verification commands
+
+Every claim this run makes is below with the exact command that re-derives it. **All of them must be
+run after `git fetch --all --prune` in both checkouts**; a stale ref silently invalidates every
+count here, which is the failure this program's rule one exists to prevent.
+
+### C-CI-57 — the gate is GREEN on PR #6's head, closing C-CI-56
+
+```bash
+# The PR, never a run ID -- each records push supersedes the previous run,
+# so any run ID written into a records file is stale by construction (C-CI-56).
+gh pr view 6 --repo ShivaClaw/careerseeker-android --json headRefOid
+gh api repos/ShivaClaw/careerseeker-android/commits/878a203/check-runs \
+  --jq '.check_runs[] | {name, status, conclusion, started_at, completed_at}'
+```
+
+*Expected, and **observed** at this run:* head `878a20368072223d450c5a16c216953b11603dd9`; one check
+run, `Build and test`, **`status: completed`**, **`conclusion: success`**, `2026-08-18T05:17:53Z →
+2026-08-18T05:26:15Z`, job `95605131416`. **This supersedes C-CI-56's explicit non-claim**, which
+recorded `in_progress` after five polls over ~28 minutes and claimed no result in either direction.
+
+**Why this is the whole gate and not one suite** — verify rather than take it on trust:
+
+```bash
+grep -n "gradlew\|name:" .github/workflows/ci.yml | head -40
+```
+
+*Observed:* the single `Build and test` job runs `checkCoreIsAndroidFree` (:47), the vendored-vector
+drift step (:69), `:core:test` (:154), `:app:test` (:162), `:app:assembleDebug` (:165),
+`:app:lintDebug` (:168) and the analytics assertion (:176). **So run 56's `ProtocolVectorsTest`
+enumerator fix (C-ENUM-3) is runner-green across all five gate tasks**, where run 56 could only run
+`:core:test` locally (C-JDK-1, 1 of 5).
+
+**Attack this first.** It is a **read of someone else's runner**, not a gate this session executed —
+**B-7 is not lifted** and no local gate result is claimed anywhere in this run. And it is a
+**pass-path** observation only, so **B-15 stays NARROWED**: a green drift step proves the check does
+not false-alarm at 29/29; it does **not** prove the check still fires on a deleted or hand-edited
+vector. Those paths remain stub-only. If you want C-CI-57 to mean more than it does, the thing to
+break is a vector on a scratch branch and watch the step go red.
+
+### C-RET-4 — freshness: nothing landed, and §3 is still executable as printed
+
+```bash
+cd <engine> && git fetch --all --prune
+cd <android> && git fetch --all --prune
+gh pr list --repo ShivaClaw/careerseeker        --state open --json number,draft | jq 'length, (map(select(.draft)) | length)'
+gh pr list --repo ShivaClaw/careerseeker-android --state open --json number,draft | jq 'length, (map(select(.draft)) | length)'
+git -C <engine>  rev-parse origin/main
+git -C <android> rev-parse origin/main
+# the load-bearing half: LIVE PR head vs fetched ref, per landing branch
+gh pr list --repo ShivaClaw/careerseeker --state open --json number,headRefName,headRefOid \
+  --jq '.[] | "\(.number) \(.headRefName) \(.headRefOid)"' | while read -r n ref sha; do
+    [ "$(git -C <engine> rev-parse "origin/$ref" 2>/dev/null)" = "$sha" ] \
+      && echo "PR#$n $ref MATCH" || echo "PR#$n $ref *** MISMATCH ***"
+  done
+```
+
+*Expected, and **observed**:* engine `origin/main` = **`aac05f3`** and android `origin/main` =
+**`ebfaf81`**, both unmoved since 2026-08-12. **18 open / 18 draft** in `careerseeker`, **6 open /
+6 draft** here — **nothing merged, closed or undrafted by anyone, including this session**. All
+**17** engine PR branches: **MATCH, 0 mismatches**. Android `a0-probe` local ref equals its live PR
+head. **Therefore `RETURN-DAY.md` §3 is still safe to execute exactly as printed.**
+
+**Attack this by re-running it, and note the direction of decay:** this claim is true only until
+someone lands something. If any row prints MISMATCH, **stop and re-derive §3's stop counts** before
+merging — the plan's 4-CLEAN/2-STOP shape was measured against these exact SHAs.
+
+### C-PIN-3 — the vendored corpus is still byte-identical to pin `7328a0b`
+
+```bash
+rm -rf /tmp/pinvec && mkdir -p /tmp/pinvec
+git -C <engine> archive 7328a0bc043335491cd96a67d634e8eea2a13af9 docs/sync-vectors/v1 \
+  | tar -x -C /tmp/pinvec
+ls /tmp/pinvec/docs/sync-vectors/v1 | wc -l
+ls core/src/test/resources/sync-vectors/v1 | wc -l
+diff -r /tmp/pinvec/docs/sync-vectors/v1 core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **29** upstream, **29** vendored, `diff -r` prints **nothing**,
+**`exit=0`**. This was run **after** this run's commits, so it also proves the prohibition
+paragraph's "no vector byte written" rather than merely asserting it.
+
+**Read the guarantee precisely** — this is the wording B-16 and `VECTORS.lock` were narrowed to at
+run 54: it says **the phone matches the pin**, *never* the phone matches the engine. `main` holds
+**26** vector files and the phone **29**; the extra three are the S5 vectors that live only on the
+unmerged stack the pin sits on. That gap is **H7** and is not drift.
+
+### C-STOP-5 — the assigned slice is built, and the generator agrees
+
+```bash
+git -C <engine> log --oneline origin/main..origin/claude/s5-entitlement-ack-spec
+git -C <engine> worktree add -f --detach /tmp/s5wt origin/claude/s5-entitlement-ack-emitter
+cd /tmp/s5wt && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+grep -n "entitlement_ack\|ciphertext\|decrypt_failed" docs/Sync-Protocol.md | head -20
+ls docs/sync-vectors/v1/ | grep -E "entitle|unknown"
+```
+
+*Expected, and **observed**:* the four commits `8575539`, `a564c0c`, `22b028e`, `9c05ef7`;
+**`OK: 29 vector files match the generator.`**, **`exit=0`**; §4.3.3 at line 307 defining the body as
+`{product_id, acknowledged_at, order_id?}` under the explicit **"Decided 2026-08-07 (gate PQ-A6-1,
+default-proceed)"** marker; §3.1 line 111 measuring the cap on the **decoded ciphertext**; §7.2 line
+601 reporting structural rejection as **`decrypt_failed`** with no `malformed` code; and
+`entitlement-ack.json`, `entitlement-ack-no-order-id.json`, `invalid-unknown-field.json` present.
+**That is PQ-A6-1, PQ-A2-1, PQ-A2-2 and PQ-A2-3 — all four assigned gates — closed, and open as
+draft PR #32 since 2026-08-09.**
+
+**Attack this by checking where those commits live.** They are on **unmerged draft branches, not on
+`origin/main`** — `git -C <engine> ls-tree origin/main docs/sync-vectors/v1/ | wc -l` returns **26**,
+with no `entitlement-ack*` and no `invalid-unknown-field`. **That ambiguity is the single best
+explanation for why the slice keeps being re-assigned**, and it is the reason the honest status is
+*built and unlanded*, not *done* and not *not started*.
