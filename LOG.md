@@ -11094,3 +11094,139 @@ relay or site. **The production relay was not contacted at all, not even `GET /v
 Google or OAuth console; no accounts, no purchases, no Play Billing code, no keystore, no emulator, no
 Gmail. **No secret was read, printed or echoed** — none was opened. No `.appdata` original touched.
 Terra's territory was read, never written.
+
+## Fifty-fifth run — 2026-08-18 (Linux sandbox): return day, and the one step in the landing plan that had no command now has one
+
+**Milestone 1 — rule one, in both trees, before any count.** `git fetch --all --prune` in
+`careerseeker` and `careerseeker-android`. The android checkout again arrived **detached at
+`ebfaf81`** — the docs-only `main`, the **C-FETCH-1** trap that has caught every cloud session — and
+was checked out to `claude/android-a0-probe` at **`b8f7466`**. Engine `origin/main` is still
+**`aac05f3`**, unmoved since 2026-08-12. Every number below was taken after that fetch.
+
+**Milestone 2 — return-day freshness, which is the claim today's reader actually needs (C-RET-2).**
+It is 2026-08-18. `RETURN-DAY.md` was written at run 47 for this morning, and the only thing that
+could have invalidated it is someone starting to land. **Nobody has.** Read from the API, not from
+local refs: **18 open PRs** in `ShivaClaw/careerseeker` — 17 `claude/*` (#32–#53) plus Terra's #26 —
+and **6** in `careerseeker-android` (#1–#6), **every one still open and still draft, none merged,
+none closed, none undrafted**. The seven branches `RETURN-DAY.md` §3 names match run 53/54's recorded
+heads exactly: `c93e88d`, `2be00fc`, `b0b6c77`, `edee32b`, `94fd979`, `f5e0c0a`, `8177353` —
+**0 mismatches**. **§3 is safe to execute exactly as printed.**
+
+**Milestone 3 — the assigned slice, verified built for the fifteenth time, and declined (C-STOP-1).**
+The routine again assigned S5's spec half: amend §4.3 with the `entitlement_ack` body, add the vector
+via `generate.mjs`, close PQ-A2-1/-2/-3. All four have been closed since **2026-08-09**. Reproduced
+this morning: `8575539` touches **`docs/Sync-Protocol.md` only, +114/−3**; `22b028e` adds both ack
+vectors, `index.json` **and `generate.mjs`**; `7328a0b` adds `invalid-unknown-field.json`. The
+prompt's own named verification was **run**, on `origin/claude/s5-entitlement-ack-emitter`:
+**`OK: 29 vector files match the generator.`**, `exit=0`, node v22.22.2. `origin/main` carries **26**
+vector files and `7328a0b` is not an ancestor of it. **The work is unmerged, not unwritten.** The
+prompt's other two facts are stale in the same direction they have been for six days: the vendored
+pin moved `679a317` → `7328a0b` on 2026-08-12, and S5 is **PARTIAL**, not "NOT STARTED".
+
+**Milestone 4 — the slice actually taken, and why this one.** Every remaining rung needs a human or a
+machine this sandbox does not have (`RETURN-DAY.md` §5). Runs 49–54 each re-measured the landing plan;
+re-measuring it a seventh time and stopping would add nothing on the morning it is executed. So this
+run looked for the part of today's sitting that is **mechanical, unverified, and unbuilt** — and
+there was exactly one. `RETURN-DAY.md` §3's last step, *"re-pin the phone's vectors in the same
+sitting"*, read:
+
+```
+cd <android> && # re-vendor docs/sync-vectors/v1 -> core/src/test/resources/sync-vectors/v1
+                # bump the SHA in ... VECTORS.lock to the merge commit
+```
+
+**That is a description standing where the plan puts a command**, for the one step in the plan that
+**nothing catches if it is skipped**: android CI's drift step fetches upstream at `?ref=$PIN`
+(`ci.yml:100-101`), so a stale pin is invisible to it by construction, and `ProtocolVectorsTest`
+enumerates from the phone's own `index.json`, so a vector the phone has never seen is a vector it
+never asserts. That is **B-16/H7** and **B-14**. Writing the tool is mechanical; it decides nothing.
+
+**Milestone 5 — `scripts/repin-vectors.sh`, and what it refuses to do.** Commit `423cade`. It takes a
+rev the caller names and makes the vendored bytes match it, and it will not write until it has proved:
+the rev resolves to a commit that **exists**; that commit **carries** `docs/sync-vectors/v1`; the
+corpus there **satisfies its own generator** (`node generate.mjs --check` — the property
+`VECTORS.lock`'s guarantee actually rests on, that the bytes are generator output and not something
+hand-edited); and `VECTORS.lock` holds **exactly one** 40-hex string, checked **before** the write and
+again after. That last one is `ci.yml:75`'s contract and it is the sharp edge run 54 measured on this
+file: `grep -oE '[0-9a-f]{40}' | head -1` means a second full SHA anywhere above the pin line silently
+repoints CI at another commit. It replaces the corpus **wholesale**, so an upstream **deletion** is
+honoured and not just an addition. **It decides nothing**: which upstream ref the two repos should
+track is **H3** and stays Brandon's; the pin is an argument.
+
+**Milestone 6 — proved against a replay of the actual six merges, not against a hypothetical
+(C-REPIN-1).** A tool for a situation that does not exist yet can only be trusted if the situation is
+built. `RETURN-DAY.md` §3's six merges were replayed for real in a throwaway clone under the session
+scratchpad: **#48, #35, #36, #51 CLEAN; #52 and #49 STOP** — 5 and 6 conflicted files, **0 of them
+under `docs/sync-vectors/`**, the conflict set being the `$ExpectedOfflineTotal` pin family plus
+`tests/SyncHarness/Program.cs` at #49. Post-landing corpus: **30 files**. **This independently
+reproduces C-POST-1 and C-POST-2 on the morning §3 is executed** — it is a replay, not a citation of
+run 51's number. Then the script against that replayed head: `OK: 30 vector files match the
+generator.` (the merge set does not corrupt the corpus), `vendored: 29 files    at pin: 30 files`,
+**`+ pairing-high-bit-confirm.json`**, **`~ index.json`**, `exit=1`. **The gap nothing else reports,
+printed by name.** The write path was then exercised in a **copy** of the android tree: `git status`
+showed **exactly three** paths and nothing else, the lock read back as the new pin with one 40-hex
+string, and an immediate re-`--check` returned the clean no-op — **idempotent**. At the *current* pin
+the script is a proven no-op, `exit=0`.
+
+**Milestone 7 — the mistake it is most likely to be handed, measured (C-REPIN-2).** The obvious wrong
+target is #51's branch — the one that *adds* the vector. Pointed there, the script reports
+**`+1 / −3 / ~1`**: `pairing-high-bit-confirm.json` arrives, but **the three S5 vectors disappear**,
+because that branch has never carried them. Re-pinning there would silently delete them from the
+phone. The removals print **above** the verdict, before any write, and this is precisely why the
+corpus is replaced wholesale rather than copied over: an additive-only re-vendor would hide it. The
+warning is now in `RETURN-DAY.md` §3 (`d89e833`) with the measured numbers.
+
+**Milestone 8 — the four refusals, each measured rather than asserted (C-REPIN-3).** Unresolvable rev
+→ names the `git fetch --all --prune` fix. Root commit `a96cb34` → *"carries no
+`docs/sync-vectors/v1`"*. One byte appended to a vendored vector with the **pin unchanged** → *"this
+is a LOCAL EDIT to vendored bytes — that is a cross-repo drift event. Do not 'fix' it by re-vendoring
+until you know why"*, which is **the offline half of CI's drift step, runnable with no network**. And
+a second 40-hex string injected into `VECTORS.lock` → refused, with `git status` proving **nothing
+under `v1/` was written**. That last case is the one worth attacking: an abort-after-write would
+leave a corpus matching one commit and a lock naming another, which is the exact state this file
+exists to make impossible — so the guard runs before the write, and again after it as a net.
+
+**Milestone 9 — the limit of what was proved, stated rather than left to inference (C-ENV-1).**
+`pwsh`, `dotnet`, `sdkmanager`, `adb` **ABSENT**; `ANDROID_HOME`/`ANDROID_SDK_ROOT` **unset**. And a
+narrower one this run had to measure: `/usr/lib/jvm` holds **only JDK 21**, so `core-probe.sh` exits
+at its own `jvmToolchain(17)` precondition. **`repin-vectors.sh` was therefore never validated against
+`:core:test`** — only against its own preconditions and its own output. It is proved correct **about
+bytes**, not proved test-green. That is §3 step 2 and it needs the Windows box. **Neither
+`Verify-Alpha.ps1` nor the android gate was run this run, and no result for either is claimed
+anywhere in this entry.**
+
+**Milestone 10 — B-18, attempt 6.** The routine fired a fifteenth assignment of work built nine days
+ago, on the morning its stop condition has been met for ten runs. Attempts 1–3 were in-repo and cannot
+reach scheduler configuration; 4 and 5 were notifications. **Attempt 6 was sent this morning** and its
+content is again different: it leads with the return-day freshness stamp Brandon acts on, then asks
+for the one action only he can take — retire or repoint the schedule. **It is still not a fix**, and
+per **C-B18-4**'s standard it is recorded as **unverifiable from the repository**: no file attests
+delivery.
+
+**Milestone 11 — coordination.** Terra's `autonomy/codex-state:STATE.md` still reads **COMPLETE**,
+*"the ladder is exhausted"*, **files claimed: none** — **no collision**, and nothing of Terra's was
+written. `autonomy/claude-state` updated with this run's heartbeat and the files claimed.
+
+**No rung status changed.** S0 DONE; S1 DONE (successor stack costed, not landed); S2/S3/S4/S5/S6/S7
+PARTIAL; S8 PARTIAL/BLOCKED on **B-5**. **S5 is PARTIAL and NOT blocked** — its remaining half needs a
+compiler this host does not have, which is a fact about this sandbox, not about the work. This run
+advanced no rung; it removed the last piece of hand-work from the plan Brandon executes today.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 17 fleet PRs, Terra's #26 and the 6 android drafts are
+exactly as found, and **#53's fate remains Brandon's, un-nudged**. **No vector byte was written in
+either repo** — every write path of the new script was exercised in `/tmp` copies, never in the
+repository; the vendored corpus was re-diffed against pin `7328a0b` **after** this run's commits
+(**no output, `exit=0`, 29 files**) and the pin is unchanged. **`VECTORS.lock` was not edited this
+run.** **No engine file was modified**: the engine checkout was read-only apart from this run's
+heartbeat on the docs-only `autonomy/claude-state` branch; the detached worktree and the throwaway
+merge clone both lived under the session scratchpad and **neither was ever pushed**, so no branch in
+`careerseeker` advanced by them. No `$ExpectedOfflineTotal` edit, so this run adds **no** pin-toucher
+and **no** stop to the landing plan (**B-17**). **No `docs/Sync-Protocol.md` edit**, and **no
+`.github/workflows/ci.yml` edit** — the B-16 fix that would go there is **H3** and was deliberately
+left; a script that performs a re-pin the plan already calls for is not a choice among H3's three
+options. **No Kotlin and no C# was written.** No history rewrite, no branch deleted. **No deploy of
+any kind** — Cloudflare, Workers, relay or site. **The production relay was not contacted at all, not
+even `GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no Play Billing
+code, no keystore, no emulator, no Gmail. **No secret was read, printed or echoed** — none was opened.
+No `.appdata` original touched. Terra's territory was read, never written.

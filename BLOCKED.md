@@ -2328,3 +2328,69 @@ job / compare against `main` once the stack lands / accept and document — are 
 repos' release coupling. **H3 remains open and Brandon's**, and the note in `VECTORS.lock` says so
 explicitly. The CI step at `.github/workflows/ci.yml:127-133` was **not** modified: making it fire
 requires naming an upstream ref, which is the decision itself. **B-16 stays open.**
+
+### B-14 / B-16 status 2026-08-18 (fifty-fifth run) — the re-pin now has a command; the *detection* still does not
+
+**Symptom, restated so the two halves stay separate.** When `RETURN-DAY.md` §3's six merges land,
+`main` gains `pairing-high-bit-confirm.json`, the phone is behind by one vector, and **no check in
+either repo reports it** — CI fetches upstream at `?ref=$PIN` (`ci.yml:100-101`) so a stale pin is
+invisible by construction, and `ProtocolVectorsTest` enumerates from the phone's own `index.json` so
+the missing vector is never asserted (**B-14**). Two things were missing: something that **does** the
+re-pin, and something that **notices** it is needed.
+
+**What this run closed — the doing half.** `scripts/repin-vectors.sh` (`423cade`), wired into
+`RETURN-DAY.md` §3 (`d89e833`). Verified against a replay of the actual six merges: at the current pin
+it is a proven no-op (`exit=0`), at the replayed post-landing head it reports
+**`+ pairing-high-bit-confirm.json`** and **`~ index.json`** and refuses to call it clean (`exit=1`),
+and its write path produces exactly three changed paths and is idempotent (**C-REPIN-1**). Pointed at
+#51's branch instead of the merged `main` it reports **`+1 / −3 / ~1`** — that branch never carried the
+three S5 vectors, so re-pinning there would delete them — and it prints the removals before writing
+(**C-REPIN-2**). Four refusal paths measured (**C-REPIN-3**). **`--check` with no rev is the offline
+half of CI's drift step and needs no network.**
+
+**What is still blocked — the noticing half, and it is not a tooling gap.** Nothing invokes the script
+on its own. Making CI fire on a stale pin requires naming an **upstream ref** to compare against, and
+that names the two repos' release coupling. That is **H3**, it is Brandon's, and B-16's three options
+(advisory job / compare against `main` once the stack lands / accept and document) are untouched.
+**`.github/workflows/ci.yml` was deliberately not edited this run.** Writing a tool that performs a
+re-pin the plan already calls for is not a choice among those three.
+
+**Attempts, so the next session does not repeat them.** Two ways to close the noticing half were
+considered and both were rejected as out of authority, not as too hard: (a) add a second CI step
+comparing against `origin/main` — that *is* option 2 of H3; (b) make the existing step compare against
+a ref read from a new field in `VECTORS.lock` — same decision, wearing a config file.
+
+**Smallest human unblock.** Answer **H3** — one line — and the noticing half is a ten-minute CI edit
+on top of a script that already does the work. Until then the honest state is: the re-pin is one
+command, and remembering to run it is still a human's job.
+
+**Not verified here, and this bounds the claim above.** `/usr/lib/jvm` on this host holds **only JDK
+21**, so `core-probe.sh` exits at its own `jvmToolchain(17)` precondition and **`repin-vectors.sh` was
+never run against `:core:test`** (**C-ENV-1**). It is proved correct **about bytes** — that the
+vendored tree matches the pin it names — not proved to leave the phone's tests green. That is
+`RETURN-DAY.md` §3 step 2 and it needs the Windows box. **B-14 stays open until a re-pin has actually
+been run and `:core:test` has passed after it. B-16 stays open on H3.**
+
+### B-18 status 2026-08-18 (fifty-fifth run) — sixteenth firing, on the morning the window closes
+
+**Symptom, unchanged.** The routine fired again and again assigned S5's spec half — built
+2026-08-09, re-verified this morning for the fifteenth time (**C-STOP-1**). Its two other stated facts
+remain stale in the same direction: the pin is `7328a0b`, not `679a317`, since 2026-08-12; and S5 is
+**PARTIAL**, not "NOT STARTED".
+
+**What is new, and it is the reason this entry exists rather than a pointer to the last one.** This is
+the first firing **on or after Brandon's stated return date**. Mission §7's stop condition was crossed
+at run 45, executed at run 47, and has now been re-confirmed at every run since. The routine is no
+longer running *during* an unattended window; it is running *past* one. **The guard that keeps holding
+is still only rule one plus run 48's banner** — a session that skipped the fetch would arrive detached
+at docs-only `main`, where neither `RETURN-DAY.md` nor this file exists (**C-FETCH-1**).
+
+**Attempt 6 — a notification, sent this morning**, leading with the return-day freshness stamp rather
+than with the stale-slice complaint, because that is what is actionable today. **Recorded as
+unverifiable from the repository, per C-B18-4's standard: no file attests delivery.** In-repo attempts
+1–3 cannot reach scheduler configuration and that has not changed.
+
+**Smallest human unblock — unchanged, and now overdue rather than due.** Turn the routine off, or
+replace its "YOUR SLICE THIS ITERATION" section with *read `RETURN-DAY.md` §5 and pick from the human
+queue what a Linux sandbox can actually advance*. **Do not leave it pointed at S5's spec half.** Ten
+days now.

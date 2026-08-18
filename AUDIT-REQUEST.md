@@ -10286,3 +10286,184 @@ commit. `ci.yml:75` is the line that would have broken; it does not.
 was run at run 54, and no result for either is claimed anywhere in this entry.** The one thing this
 run's change would be gated by is `ci.yml`'s drift step, which runs on a real runner; the two guards
 in **C-LOCK-1** are the parts of it that are runnable here, and they were run.
+
+## Fifty-fifth run — 2026-08-18 (Linux sandbox): the re-pin step gets a command
+
+This run's one new artifact is `scripts/repin-vectors.sh`. Everything below either exercises it or
+re-runs a prior check on the morning the landing plan is executed. **No `.ps1` and no Gradle task ran
+this run; no gate result is claimed anywhere in this entry** (**C-ENV-1**, re-measured below).
+
+### C-REPIN-1 — the script is a proven no-op at the current pin, and does the right thing at the post-landing one
+
+The whole point of a re-pin tool is that it must be **inert** when there is nothing to do and
+**exact** when there is. Both halves, run this morning:
+
+```bash
+cd <android>
+scripts/repin-vectors.sh --check --engine <engine>              # current pin, expect a clean no-op
+```
+
+*Expected, and **observed**:* `current pin` and `target pin` both
+`7328a0bc043335491cd96a67d634e8eea2a13af9`; `pin position : NOT an ancestor of origin/main`;
+`OK: 29 vector files match the generator.`; `vendored: 29 files    at pin: 29 files`; then
+**`OK: the vendored corpus is byte-identical to pin 7328a0b…, and the pin is unchanged.`**, `exit=0`.
+Note the generator check inside it — the script does not merely diff bytes, it re-proves the pinned
+corpus is generator output before it will vendor it.
+
+The post-landing half needs a post-landing `main`, which does not exist yet, so it was **built** by
+replaying `RETURN-DAY.md` §3's six merges for real in a throwaway clone under the session scratchpad:
+
+```bash
+git clone --no-checkout <engine> /tmp/postmerge
+cd /tmp/postmerge && git fetch <engine> 'refs/remotes/origin/*:refs/remotes/eng/*'
+git checkout -B landing eng/main
+for br in s8-harness-linux-reach s2-seq-bound s2-transport-vocabulary \
+          s3-pairing-confirm-consumer s6-outcome-disposition s6-composition-root-decision; do
+  git merge --no-edit "eng/claude/$br" || { git diff --name-only --diff-filter=U; }   # resolve, continue
+done
+ls docs/sync-vectors/v1 | wc -l
+```
+
+*Expected, and **observed**:* **#48, #35, #36, #51 CLEAN; #52 and #49 STOP** — 5 and 6 conflicted
+files respectively, **0 of them under `docs/sync-vectors/`**, the conflict set being the
+`$ExpectedOfflineTotal` pin family (`README.md`, `docs/CareerSeeker-Project-Summary.md`,
+`docs/External-Audit-Handoff.md`, `scripts/Verify-Alpha.ps1`, `src/Engine/README.md`) plus
+`tests/SyncHarness/Program.cs` at #49. Post-landing corpus: **30 files**. **This independently
+reproduces C-POST-1 and C-POST-2 on the morning §3 is executed** — 4 clean / 2 stops / no vector
+conflict / 29 payloads + `index.json` — and it is a *replay*, not a citation of run 51's number.
+
+Then the script against that replayed head:
+
+```bash
+cd <android> && scripts/repin-vectors.sh --check --engine /tmp/postmerge <replayed-head>
+```
+
+*Expected, and **observed**:* `OK: 30 vector files match the generator.` — the merge set does not
+corrupt the corpus — then `vendored: 29 files    at pin: 30 files`, **`+ pairing-high-bit-confirm.json`**,
+**`~ index.json`**, `DRIFT: 2 file(s)`, `exit=1`. **This is the gap no check in either repo reports**
+(**B-16**, **H7**), printed by name.
+
+The write path was exercised in a **throwaway copy** of the android tree, never in the repo:
+
+```bash
+cp -R <android> /tmp/andr-copy && cd /tmp/andr-copy
+scripts/repin-vectors.sh --engine /tmp/postmerge <replayed-head>
+git status --porcelain; grep -coE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock
+scripts/repin-vectors.sh --check --engine /tmp/postmerge        # idempotence
+```
+
+*Expected, and **observed**:* `OK: re-pinned 7328a0b… -> <replayed-head>`, `30 vector files vendored`;
+`git status` shows **exactly three** paths — `M VECTORS.lock`, `M v1/index.json`,
+`?? v1/pairing-high-bit-confirm.json` — nothing else; the lock holds **1** 40-hex string and it reads
+back as the new pin; and the immediate re-`--check` returns the clean no-op, `exit=0`. **Idempotent.**
+
+### C-REPIN-2 — #51's branch is the wrong re-pin target, and the script says so before writing
+
+The obvious mistake is to pin at the branch that *adds* the vector rather than at the merged `main`.
+
+```bash
+cd <android>
+scripts/repin-vectors.sh --check --engine <engine> origin/claude/s3-pairing-confirm-consumer
+```
+
+*Expected, and **observed**:* `at pin: 27 files` against `vendored: 29`, reporting
+**`+ pairing-high-bit-confirm.json`**, **`- entitlement-ack-no-order-id.json`**,
+**`- entitlement-ack.json`**, **`- invalid-unknown-field.json`**, **`~ index.json`** — `DRIFT: 5`,
+`exit=1`. That branch has **never carried the three S5 vectors**, so re-pinning there would *delete*
+them from the phone. The removals are printed above the verdict, before any write. This is why the
+script replaces the corpus **wholesale**: an additive-only re-vendor would hide exactly this.
+
+### C-REPIN-3 — the four refusals, each measured
+
+```bash
+cd <android>
+scripts/repin-vectors.sh --check --engine <engine> deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+scripts/repin-vectors.sh --check --engine <engine> $(git -C <engine> rev-list --max-parents=0 origin/main | head -1)
+cp -R <android> /tmp/neg && cd /tmp/neg
+printf '\n' >> core/src/test/resources/sync-vectors/v1/pairing-basic.json
+scripts/repin-vectors.sh --check --engine <engine>
+sed -i '3i # aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' core/src/test/resources/sync-vectors/VECTORS.lock
+scripts/repin-vectors.sh --engine <engine> origin/main
+```
+
+*Expected, and **observed**, all `exit=1`:*
+
+1. unresolvable rev → *"does not resolve to a commit in …"* and the `git fetch --all --prune` fix;
+2. root commit `a96cb34` → *"carries no `docs/sync-vectors/v1`"*;
+3. one byte appended to a vendored vector, **pin unchanged** → `~ pairing-basic.json`, then
+   *"The pin did not move, so this is a **LOCAL EDIT** to vendored bytes — that is a cross-repo drift
+   event. Do not 'fix' it by re-vendoring until you know why."* **This is the offline half of CI's
+   drift step, runnable with no network**;
+4. a second 40-hex string injected into `VECTORS.lock` → *"contains 2 40-hex strings; ci.yml:75 takes
+   the FIRST one, so the pin is ambiguous"* — and `git status` confirms **nothing under `v1/` was
+   written**. The guard runs **before** the write for exactly that reason; a second, identical
+   assertion runs after it as a net.
+
+**Attack this first if you doubt the run:** the script's own claim is that it is *safe when it
+refuses*. Case 4 is where that is testable and where it would most plausibly be false — an
+abort-after-write leaves a corpus that matches one commit and a lock that names another, which is the
+precise state this file exists to make impossible. Re-run case 4 and check `git status`.
+
+### C-REPIN-4 — the repository's own vectors were not touched by any of it
+
+```bash
+cd <android>
+git diff --name-only 89068d8..HEAD | grep -c 'sync-vectors/v1/'
+git status --porcelain
+git archive --remote=. 2>/dev/null; cd <engine> && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pin-check
+diff -r /tmp/pin-check/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`0`** vector files changed across this run's commits; a clean
+`git status`; and **C-STOP-3** re-run after the commits — **no output, `exit=0`, 29 files**. Every
+write path was exercised in `/tmp` copies. **The pin is still `7328a0b` and the corpus still matches
+it byte for byte.**
+
+### C-RET-2 — return-day freshness: nothing has been landed, and §3 is still safe to execute as printed
+
+Taken **after** `git fetch --all --prune` in both trees on 2026-08-18.
+
+```bash
+cd <engine>  && git rev-parse origin/main
+cd <android> && git rev-parse origin/main
+# and the live PR heads, from the API rather than local refs
+```
+
+*Expected, and **observed**:* engine `origin/main` **`aac05f3`**, unmoved since 2026-08-12; android
+`origin/main` **`ebfaf81`**. **18 open PRs** in `ShivaClaw/careerseeker` (17 `claude/*` #32–#53 plus
+Terra's #26) and **6** in `careerseeker-android` (#1–#6), **every one still open and still draft;
+none merged**. The seven landing branches match run 53/54's recorded heads exactly —
+`c93e88d` (#48), `2be00fc` (#35), `b0b6c77` (#36), `edee32b` (#51), `94fd979` (#52), `f5e0c0a` (#49),
+`8177353` (#53) — **0 mismatches**. **Brandon had not begun landing when this run measured.**
+
+### C-STOP-1 — re-run at run 55; fifteenth consecutive assignment, declined again
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do git log -1 --format='%ad  %s' $c; git show --stat --format='' $c; done
+git worktree add --detach /tmp/wt-s5 origin/claude/s5-entitlement-ack-emitter
+cd /tmp/wt-s5 && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l
+```
+
+*Expected, and **observed**:* `8575539` (2026-08-09) touches **`docs/Sync-Protocol.md` only,
++114/−3**; `22b028e` adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`, `index.json`
+**and `generate.mjs`**; `7328a0b` adds `invalid-unknown-field.json`. The generator check reports
+**`OK: 29 vector files match the generator.`**, `exit=0`, node v22.22.2. `origin/main` carries **26**.
+**Unmerged, not unwritten** — building it again would duplicate `8575539` and regenerate a corpus the
+android repo vendors, which the prompt itself classes as a cross-repo drift event.
+
+### C-ENV-1 — re-measured at run 55, unchanged
+
+`pwsh` **ABSENT**, `dotnet` **ABSENT**, `sdkmanager` **ABSENT**, `adb` **ABSENT**;
+`ANDROID_HOME`/`ANDROID_SDK_ROOT` **unset**; `git` 2.43.0, `java` **openjdk 21.0.10**,
+`node` **v22.22.2**, `gradle` present. **Neither `scripts\Verify-Alpha.ps1` nor
+`./gradlew … :app:assembleDebug :app:lintDebug` was run, and no result for either is claimed.**
+Note the JDK, because it narrows what this run could prove. `:core` pins `jvmToolchain(17)` and
+`core-probe.sh` gates on `ls -d /usr/lib/jvm/*17*`; measured here, that directory holds
+**`java-1.21.0-openjdk-amd64`, `java-21-openjdk-amd64`, `openjdk-21` and no 17**, so `core-probe.sh`
+would exit 1 at its own precondition. **`scripts/repin-vectors.sh` was therefore never validated
+against `:core:test`** — only against its own preconditions and its own output. Whether a re-pinned
+corpus still passes the phone's codec is `RETURN-DAY.md` §3's step 2, and it needs a machine with a
+JDK 17. **Do not read C-REPIN-1 as saying the re-pin is test-green; it says the re-pin is correct
+about bytes.**
