@@ -11585,3 +11585,97 @@ not contacted at all, not even `GET /v1/health`.** No Play, Google or OAuth cons
 purchases, no Play Billing code, no keystore, no emulator, no Gmail. **No secret was read, printed
 or echoed** — none was opened. No `.appdata` original touched. Terra's territory was read, never
 written. The JDK 17 install was made **inside this disposable container only**.
+
+## Fifty-ninth cloud iteration — 2026-08-18 (Linux sandbox): the twenty-fourth assignment of a built slice, and the first run to re-execute run 58's fix on a clean container instead of restating it
+
+**Firing context.** Twenty-fourth consecutive firing assigned S5's spec half. The mission banner,
+`RETURN-DAY.md`, `STATE.md`'s RUN 58 banner and eleven `C-STOP-*` audit entries all already say the
+same thing: the spec half is built (`8575539`, `22b028e`, `7328a0b`, draft PR #32, since
+2026-08-09), the prompt's pin `679a317` is stale (it is `7328a0b`), and everything genuinely left on
+the ladder needs a human (B-18). This run added no code and opened no PR beyond refreshing the
+existing draft with records. What it did that no prior run had is re-run the suite run 58 introduced,
+on a fresh container, and report the number it actually saw.
+
+### Milestone 1 — RULE ONE, both trees (C-RET-6)
+
+`git fetch --all --prune` in `careerseeker-android` and `careerseeker` before any read. After it:
+engine `origin/main` = **`aac05f3`**, android `origin/main` = **`ebfaf81`** — both unmoved since
+2026-08-12. This branch tip before this run's commits: **`87a91fc`**. Nothing in either tree had
+moved since run 58.
+
+### Milestone 2 — the assigned slice is still built, and `--is-ancestor` proves it is still off `main` (C-STOP-7)
+
+The three S5 spec commits resolve on this fetch (`git log --oneline -1` on each). `git merge-base
+--is-ancestor 7328a0b origin/main` **exits non-zero** — the spec is on the `claude/s5-*` and several
+`s2`/`s6` draft branches, **not on `main`**. That is the whole shape of the standing situation: built,
+reviewable, unmerged, because the merge condition is a Windows `Verify-Alpha.ps1` no cloud session can
+run. **Declined for the twenty-fourth consecutive run.** Re-authoring the §4.3 amendment and re-running
+`generate.mjs` over the vendored corpus is the cross-repo drift event the prompt itself forbids.
+
+### Milestone 3 — the one thing this run did that was not a restatement: re-execute run 58's fix (C-CORE-59)
+
+Run 58 fixed a real defect (`entitlement_ack` had no production caller; `EntitlementRoutingApplier`
+closed it) and reported `:core:test` 288 → 299. **No subsequent run had re-executed that suite** — it
+was true-when-written but nine days stale as *evidence*. This run reproduced it from clean:
+
+```
+# JDK 17 per C-JDK-2's corrected recipe (apt-get update FIRST, or the index 404s):
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+#   -> openjdk 17.0.19+10 installed from the ubuntu archive.
+#   (the deadsnakes/ondrej PPA InRelease 403s in the log are pre-existing proxy denials,
+#    unrelated to openjdk, which comes from the main archive — the install exit was clean.)
+
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 scripts/core-probe.sh --rerun
+#   -> BUILD SUCCESSFUL in 1m 51s, 5 actionable tasks: 5 executed (--rerun-tasks, cache bypassed)
+#   -> core-probe: 299 tests, 0 failed, 0 skipped, across 20 classes
+```
+
+So run 58's `EntitlementRoutingApplier`, its negative control, and the whole `:core` suite are
+**green on a fresh checkout with the up-to-date checks disabled** — not read out of a cache, not read
+out of a runner log, executed here. **This is one of the android gate's five tasks and nothing more.**
+`checkCoreIsAndroidFree`, `:app:test`, `:app:assembleDebug` and `:app:lintDebug` still need the
+Android SDK this host does not have (**B-7**), and `Verify-Alpha.ps1` still needs Windows + .NET.
+No result for the gate is claimed.
+
+### Milestone 4 — no drift from this run: vendored corpus re-diffed against the pin (C-CORE-59b)
+
+`diff -r` of the android vendored corpus (`core/src/test/resources/sync-vectors/v1`, 29 files)
+against `git archive 7328a0b docs/sync-vectors/v1` from the engine checkout: **silent, `exit=0`,
+29/29 byte-identical.** This run touches only records files, so the corpus could not have moved — the
+diff is the proof, taken anyway, per the house no-drift habit. `VECTORS.lock` unedited; the pin did
+not move (moving it is **H7**, Brandon's).
+
+### Milestone 5 — coordination
+
+Terra's `autonomy/codex-state:STATE.md` read before any write: heartbeat **2026-08-12T20:28:36**,
+**COMPLETE**, **files claimed: none**. **No collision** — this run claims only android records files
+and the docs-only engine bus. `autonomy/claude-state` updated with this run's one-line heartbeat.
+
+### Milestone 6 — status, honestly
+
+**No rung's status changed.** S0 DONE; S1 DONE (successor stack costed, not landed); S2/S3/S4/S6/S7
+PARTIAL; **S5 PARTIAL** (spec + emitter + phone `:core` route landed and re-confirmed test-green this
+run; `:app` composition root outstanding, **B-19**); S8 PARTIAL/BLOCKED on **B-5**. This is a
+come-up-empty, all-healthy run: the terminal state runs 47–58 recorded is unchanged, and the
+codebase is green. No push notification was sent — run 57 already escalated the "loop firing on a
+built slice, everything human-blocked" finding to Brandon by push (B-18 attempt 5), and re-sending
+the same banner every firing is the notification fatigue the routine is meant to avoid.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 18 `careerseeker` PRs and the 6 android drafts are
+exactly as found, and **#53's fate stays Brandon's**. **No vector byte was written in either repo** —
+the vendored corpus is 29/29 byte-identical to pin `7328a0b`, `diff -r` silent, `exit=0`; **the pin
+did not move (H7)** and `VECTORS.lock` was not edited. **No source file of any kind was written** —
+no Kotlin, no C#, no TypeScript, no `:core` and no `:app`; the only files this run wrote are `LOG.md`,
+`STATE.md`, `AUDIT-REQUEST.md` (android) and `STATE.md` on the docs-only `autonomy/claude-state`
+branch (engine). **No `docs/Sync-Protocol.md`, `generate.mjs`, `ci.yml` or `$ExpectedOfflineTotal`
+edit**, so this run adds no pin-toucher and no new stop to the landing plan, and opens no nineteenth
+engine PR. **The android gate was not run and no result for it is claimed** (`:app:assembleDebug`,
+`:app:lintDebug`, `checkCoreIsAndroidFree`, `:app:test` all need the Android SDK — B-7); the only
+thing executed here is `:core:test` via `scripts/core-probe.sh`, one of the gate's five tasks.
+**`Verify-Alpha.ps1` was not run** — this is Linux, no .NET, no Windows box. No history rewrite, no
+branch deleted, no deploy of any kind. **The production relay was not contacted at all, not even
+`GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no Play Billing code,
+no keystore, no emulator, no Gmail. **No secret was read, printed or echoed** — none was opened. No
+`.appdata` original touched. Terra's territory was read, never written. The JDK 17 install was made
+**inside this disposable container only**.

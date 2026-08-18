@@ -10959,3 +10959,60 @@ LOG Milestone 2: re-authoring is the cross-repo drift event the prompt itself na
 *"do NOT write the phone applier, you cannot compile it"* is **false for `:core`** and has been
 since **C-JDK-1**. Acting on that discovery is what produced C-S5-1 through C-S5-6. **The prompt's
 premise, not only its ladder summary, is stale.**
+
+## Fifty-ninth run — 2026-08-18 (Linux sandbox): re-verification commands
+
+Every claim run 59 makes, with the exact command that re-verifies it. This run wrote no source and
+opened no PR; its one non-restatement claim is C-CORE-59, a fresh execution of the suite run 58
+introduced.
+
+### C-RET-6 — freshness after `git fetch --all --prune` in both trees
+
+```bash
+git -C <android> fetch --all --prune && git -C <android> rev-parse --short origin/main   # expect ebfaf81
+git -C <engine>  fetch --all --prune && git -C <engine>  rev-parse --short origin/main   # expect aac05f3
+# live PR state (any GitHub client):
+#   list_pull_requests(ShivaClaw/careerseeker,        state=open)  -> 18, all draft
+#   list_pull_requests(ShivaClaw/careerseeker-android, state=open) ->  6, all draft
+```
+
+*Observed:* engine `aac05f3`, android `ebfaf81`, both unmoved since 2026-08-12. Nothing merged,
+closed or undrafted by anyone. `RETURN-DAY.md` §3 still safe to execute exactly as printed.
+
+### C-STOP-7 — the assigned spec half is built and still off `main`; twenty-fourth assignment
+
+```bash
+for c in 8575539 22b028e 7328a0b; do git -C <engine> log --oneline -1 "$c"; done
+git -C <engine> merge-base --is-ancestor 7328a0b origin/main; echo "is-ancestor exit=$?"   # expect NON-zero (not on main)
+git -C <engine> branch -r --contains 7328a0b | grep s5   # the s5 draft branches carry it
+```
+
+*Expected:* the three commits resolve; `--is-ancestor` exits non-zero (spec is on draft branches,
+not on `main`); draft PR #32 open since 2026-08-09. Prompt's pin `679a317` is stale — it is
+`7328a0b`. Declined again: re-authoring is the cross-repo drift event the prompt forbids.
+
+### C-CORE-59 — run 58's `:core` fix re-executed green on a clean container (the one non-restatement claim)
+
+```bash
+# JDK 17 is required (:core pins jvmToolchain(17)); apt-get update FIRST or the index 404s (C-JDK-2):
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 scripts/core-probe.sh --rerun
+```
+
+*Expected, and observed 2026-08-18:* `BUILD SUCCESSFUL`, `5 actionable tasks: 5 executed`, and
+`core-probe: 299 tests, 0 failed, 0 skipped, across 20 classes`. This is `:core:test` — **one** of
+the android gate's five tasks — with the up-to-date checks disabled (`--rerun-tasks`), executed on
+this host, not read from a cache or a runner log. The other four tasks need the Android SDK (B-7);
+`Verify-Alpha.ps1` needs Windows + .NET. No gate result is claimed.
+
+### C-CORE-59b — no drift: vendored corpus byte-identical to the pin, re-checked this run
+
+```bash
+PIN=7328a0bc043335491cd96a67d634e8eea2a13af9
+TMP=$(mktemp -d); git -C <engine> archive "$PIN" docs/sync-vectors/v1 | tar -x -C "$TMP"
+diff -r "$TMP/docs/sync-vectors/v1" <android>/core/src/test/resources/sync-vectors/v1; echo "diff exit=$?"
+```
+
+*Expected, and observed:* 29 files upstream, 29 vendored, `diff -r` silent, `exit=0`. This run wrote
+only records files, so the corpus could not have moved; the diff is taken anyway. The pin did not
+move (moving it is H7).
