@@ -2440,3 +2440,68 @@ openjdk-17-jdk-headless` — the fix `core-probe.sh`'s own error message prints 
 `:app:assembleDebug` / `:app:lintDebug` still cannot run here. **B-7 is narrowed, not closed**, and the
 android gate is still Windows/SDK work. **The install was inside a disposable container**; a future
 session on a fresh image must repeat it, which is why the command is in **C-JDK-1** rather than in prose.
+
+---
+
+### B-18 status 2026-08-18 (fifty-seventh run) — return day arrived and passed; attempt 5 leaves the repository
+
+**Unchanged as a blocker. The count is now TWENTY-TWO consecutive firings.**
+
+**Symptom, restated with the one detail that is new.** The scheduled prompt again assigned S5's spec
+half — §4.3's `entitlement_ack` body, the ack vector via `generate.mjs`, PQ-A2-1/-2/-3. That work has
+existed since **2026-08-09** and is open as draft PR **#32**. Re-verified this run rather than
+assumed (**C-STOP-5**): all four assigned gates are closed in `docs/Sync-Protocol.md`, the three
+vectors exist, and `node docs/sync-vectors/generate.mjs --check` on
+`claude/s5-entitlement-ack-emitter` returns **`OK: 29 vector files match the generator.`**, `exit=0`.
+The prompt's stated pin `679a317` is still stale (it is `7328a0b`), and its "S5 is NOT STARTED" is
+still wrong.
+
+**What is new: the deadline the earlier statuses were written against has passed.** Runs 49–53 each
+framed the unblock as *"Brandon returns 2026-08-18"*. That date **is today**, it has passed, and the
+schedule fired again with the same completed slice attached. **Nothing has been merged, closed or
+undrafted in either repo** (**C-RET-4**) — engine `main` still `aac05f3` and android `main` still
+`ebfaf81`, both unmoved since 2026-08-12, with 18 and 6 PRs still open and still draft. So the loop
+is not merely re-issuing finished work; it is doing so **while the queue it feeds has not moved in
+six days**, which is the part that makes each additional firing net-negative rather than merely
+wasteful.
+
+**A note on the count, because two records disagree and the discrepancy should not be silently
+smoothed over.** B-18's own history anchors run 52 at the **seventeenth** assignment, which makes
+this run the **twenty-second**; `autonomy/claude-state`'s run-56 heartbeat says **"sixteenth"**. The
+B-18 anchor is used here because it is the document being updated and its per-run increments are
+traceable. **The exact integer is not load-bearing; that it is far past one is.**
+
+**Attempts — 1 through 4 unchanged, and why attempt 5 is shaped differently.**
+
+1. **Do the assigned slice anyway.** Refused again, on the same reasoning and it has strengthened
+   with each copy that exists: it would author a **fourth** divergent §4.3 amendment competing with
+   `8575539`, and re-running the generator to "add" vectors that exist risks the corpus the android
+   repo vendors at `7328a0b`. The prompt itself classes that as a **cross-repo drift event**.
+2. **Fix the prompt.** Still not possible from here. It is stored scheduler configuration, not a
+   file in either checkout; the sandbox has no access to the schedule.
+3. **Banner on `docs/CLAUDE-ANDROID-MISSION.md` and `STATE.md`.** Landed at run 48, working as
+   designed — this run reached "already built" from its first document read. **It reduces the cost
+   of each firing and cannot reduce the count.**
+4. **A notification-shaped request recorded in-repo** (run 53). No effect, and in hindsight the
+   reason is structural: **it was written into a file, and the loop does not read files to decide
+   whether to fire.**
+5. **NEW THIS RUN — escalate out of the repository, to the one channel that reaches a human.** The
+   finding was sent to Brandon **by push notification**: that the routine is re-issuing nine-day-old
+   completed work, that the real bottleneck is a merge decision, and that the queue has not moved in
+   six days. Attempts 1–4 all terminated inside the repository, which is exactly where a scheduler
+   cannot see them. **This is the first attempt whose delivery mechanism does not depend on someone
+   opening a file.**
+
+**Smallest human unblock — unchanged, and now overdue rather than pending.** Mission §7's terminal
+instruction is *"clear the goal"*; the stop condition was crossed at run 45 and executed at run 47,
+and this is run 57. **Either turn the routine off, or replace its "YOUR SLICE THIS ITERATION"
+section with:** *read `RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox can
+actually advance.* Today that is very little — everything left needs a Windows gate
+(`Verify-Alpha.ps1`), an emulator (**B-4**), a relay deploy, the `/pair` page (**B-2**), or a
+decision only Brandon can make (**#53**, `RETURN-DAY.md` §5). **That is the honest state, not a
+failure, and it is why more authoring is the wrong thing to ask for:** 18 draft PRs are already
+queued behind a merge step that costs 3 stops, and **adding a 19th makes return day harder, not
+easier** (**B-17**).
+
+**No new blocker arose this run.** The one thing that could have become one — run 56's unresolved CI
+— resolved **green** instead (**C-CI-57**), and is recorded as evidence rather than as a blocker.

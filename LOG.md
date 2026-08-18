@@ -11334,3 +11334,111 @@ Cloudflare, Workers, relay or site. **The production relay was not contacted at 
 `GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no Play Billing code,
 no keystore, no emulator, no Gmail. **No secret was read, printed or echoed** — none was opened. No
 `.appdata` original touched. Terra's territory was read, never written.
+
+---
+
+## Fifty-seventh cloud iteration — 2026-08-18 (Linux sandbox)
+
+**One-line summary.** The assigned slice was built nine days ago and was declined for the
+twenty-second consecutive run; the run's actual deliverable is the runner verdict that run 56 was
+honest enough to leave unclaimed, plus the freshness stamp the landing plan's safety depends on.
+
+**Milestone 1 — rule one, before anything else.** `git fetch --all --prune` in **both** checkouts,
+and every number below was taken **after** it. Engine `origin/main` = `aac05f3f93f0ca06cbc9dfa7884f74a126f078dc`,
+android `main` = `ebfaf8108e635551c3beac851424a4407c5a8fdd`. Neither has moved since 2026-08-12.
+
+**Milestone 2 — the reading, and what it changed.** The prompt's "LADDER STATE" section says S5 is
+**NOT STARTED**. It is not. `docs/Sync-Protocol.md` §4.3.3 defines the `entitlement_ack` body as
+`{product_id, acknowledged_at, order_id?}` under an explicit **"Decided 2026-08-07 (gate PQ-A6-1,
+default-proceed)"** marker; §3.1 states the 1 MiB cap is measured on the **decoded ciphertext**;
+§7.2 line 601 states structural rejection reports **`decrypt_failed`** with no `malformed` code
+added; and `invalid-unknown-field.json` exists. **That is PQ-A6-1, PQ-A2-1, PQ-A2-2 and PQ-A2-3 —
+all four gates the prompt assigned — already closed** (**C-STOP-5**). The commits are `8575539`,
+`22b028e` and `7328a0b`, open as draft PR **#32** since **2026-08-09** and carried onward by **#37**
+and **#38**. The prompt's stated vendored pin, `679a317`, is also stale: the real pin is `7328a0b`
+and has been since 2026-08-12.
+
+**Milestone 3 — the assigned verification, run rather than assumed.** The prompt names one command
+that is genuinely runnable on Linux, so it was run, against the branch that carries the work:
+
+```
+node docs/sync-vectors/generate.mjs --check     # on claude/s5-entitlement-ack-emitter
+OK: 29 vector files match the generator.        # exit=0
+```
+
+**Milestone 4 — why rebuilding it was refused, stated as a risk and not a preference.** Authoring
+the §4.3 amendment again would produce a **fourth** divergent copy of a normative section competing
+with `8575539`, and "adding" the ack vectors means re-running the generator over the corpus the
+android repo vendors. The prompt itself classes any change to an existing vector's content as a
+**cross-repo drift event**. The correct response to *"build the thing that is built"* is to prove it
+is built and stop — which is what the prompt's own rule, *"verify it; do not trust this summary"*,
+exists to produce.
+
+**Milestone 5 — THE NEW FACT, and it closes a thread the last run deliberately left open
+(C-CI-57).** Run 56 polled CI five times over ~28 minutes, never got a conclusion, and recorded
+**"no CI result is claimed for any of this run's commits, not green and not red"** (**C-CI-56**).
+It also warned that any run ID written into a records file is stale by construction and that the
+**PR**, not the run, is the thing to read. Read that way: the check run on PR #6's current head
+**`878a203`** is **`completed`**, conclusion **`success`**, job `95605131416`, started
+`2026-08-18T05:17:53Z`, completed `05:26:15Z`. Read from `.github/workflows/ci.yml` rather than
+assumed, that single `Build and test` job **is** the whole gate — `checkCoreIsAndroidFree` (:47),
+the vendored-vector drift step (:69), `:core:test` (:154), `:app:test` (:162),
+`:app:assembleDebug` (:165), `:app:lintDebug` (:168) and the analytics assertion (:176).
+**So run 56's `ProtocolVectorsTest` enumerator fix is runner-green across all five gate tasks, not
+just the one suite it could run locally.**
+
+**Milestone 6 — the two limits on that, both of which matter more than the green.** First: this was
+**read out of a runner log, not produced here**. Observing a gate is not running one; **B-7 is not
+lifted** and this session claims no gate result of its own. Second: **B-15 stays NARROWED, not
+closed.** A green drift step is another **pass-path** observation — it proves the check does not
+false-alarm at 29/29, not that it still fires when a vector is missing or edited. Those failure
+paths remain stub-only evidence and a green run cannot upgrade them.
+
+**Milestone 7 — the freshness stamp, and it is the load-bearing one (C-RET-4).** `RETURN-DAY.md` §3
+is safe only while the refs it names still exist unmoved, so all of it was re-measured against the
+**live** API rather than local refs: **18** open PRs in `careerseeker`, **6** here, **every one still
+open and still draft — nothing merged, closed or undrafted by anyone, including me**. All **17**
+`careerseeker` PR branches were compared to their live PR head SHAs: **17/17 MATCH, 0 mismatches**.
+The android `a0-probe` head matches its PR head exactly. **§3 is still safe to execute as printed.**
+Separately, the vendored corpus was diffed against pin `7328a0b` extracted with `git archive`:
+**29 files upstream, 29 on the phone, `diff -r` silent, `exit=0`** (**C-PIN-3**).
+
+**Milestone 8 — coordination.** Terra's `autonomy/codex-state:STATE.md` was read first, before any
+write: heartbeat **2026-08-12T20:28:36**, **"COMPLETE… the ladder is exhausted"**, **files claimed:
+none**. **No collision.** Terra retains right-of-way; nothing of Terra's was read-modified or
+written. `autonomy/claude-state` updated with this run's heartbeat and the files claimed.
+
+**Milestone 9 — B-18, attempt 5, and the one thing that is new about it.** Return day was
+**2026-08-18**. It has now arrived, and the schedule fired again with the same completed slice
+attached. Attempts 1–4 were a refusal, a banner on the mission doc, a banner on `STATE.md`, and a
+notification-shaped request — and all but the last were **written into files that the loop itself
+never reads**, which is precisely why they could not stop it. This run's escalation therefore left
+the repository again: the finding went to Brandon **by push notification**, naming the merge
+decision as the bottleneck rather than any authoring work. **The blocker is unchanged and cannot be
+fixed from here** — the prompt is stored scheduler configuration, not a file in either checkout.
+
+**No rung status changed.** S0 DONE; S1 DONE (successor stack costed, not landed); S2/S3/S4/S5/S6/S7
+PARTIAL; S8 PARTIAL/BLOCKED on **B-5**. **This run advanced no rung, and says so rather than
+dressing a records update as progress.** What it did was close one unverified claim and re-prove
+that the landing plan is still executable.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 18 `careerseeker` PRs and the 6 android drafts are
+exactly as found, and **#53's fate remains Brandon's, un-nudged**. **No vector byte was written in
+either repo** and **`VECTORS.lock` was not edited** — the pin comparison was a read-only `git archive`
+into `/tmp`, and **the pin did not move: that is H7 and it is Brandon's.** **No source file of any
+kind was modified** — no Kotlin, no C#, no TypeScript; this run's entire diff is house records.
+**No `docs/Sync-Protocol.md` edit** and **no `docs/sync-vectors/generate.mjs` edit**, deliberately,
+per Milestone 4. **No `.github/workflows/ci.yml` edit** — the B-16 fix that would go there is **H3**
+and stays Brandon's. **No `$ExpectedOfflineTotal` edit**, so this run adds **no** pin-toucher and
+**no** new stop to the landing plan (**B-17**). **No engine file was modified**: the engine checkout
+was read-only apart from the heartbeat on the docs-only `autonomy/claude-state` branch, and the
+worktree used to run the generator lived under the session scratchpad and was never pushed, so no
+branch in `careerseeker` advanced. **The android gate was not run here and no result for it is
+claimed as this session's own** — the green in Milestone 5 is a runner log, read. **`Verify-Alpha.ps1`
+was not run and no result for it is claimed**; this is Linux and there is no .NET, no PowerShell
+gate, no Windows box. No history rewrite, no branch deleted. **No deploy of any kind** — Cloudflare,
+Workers, relay or site. **The production relay was not contacted at all, not even `GET /v1/health`.**
+No Play, Google or OAuth console; no accounts, no purchases, no Play Billing code, no keystore, no
+emulator, no Gmail. **No secret was read, printed or echoed** — none was opened. Terra's territory
+was read, never written.
