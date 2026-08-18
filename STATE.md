@@ -2,9 +2,10 @@
 
 > **READ [`RETURN-DAY.md`](RETURN-DAY.md) FIRST — it is the window's closing handoff, and the
 > mission's stop condition is already met.** Written at run 47; re-verified green at runs 48, 49,
-> **50, 51, 52, 53, 54, 55, 56 and 57**. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
+> **50, 51, 52, 53, 54, 55, 56, 57 and 58**. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts — and **twenty-two** runs have now been assigned it.
+> `claude/s5-*` drafts — and **twenty-three** runs have now been assigned it. **Run 58 found the half
+> that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
 >
 > ## ▶ RUN 58 — 2026-08-18. The prompt's PROHIBITION was stale too, and a real defect was hiding behind it.
 >
