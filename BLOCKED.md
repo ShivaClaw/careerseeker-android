@@ -2394,3 +2394,49 @@ unverifiable from the repository, per C-B18-4's standard: no file attests delive
 replace its "YOUR SLICE THIS ITERATION" section with *read `RETURN-DAY.md` §5 and pick from the human
 queue what a Linux sandbox can actually advance*. **Do not leave it pointed at S5's spec half.** Ten
 days now.
+
+### B-14 status 2026-08-18 (fifty-sixth run) — the unblock was necessary and **not sufficient**, and that is now fixed
+
+**B-14's unblock reads *merge #50, then re-pin*. Both steps could have completed and B-14 would still
+have been open** — measured, not argued (**C-ENUM-2**).
+
+**Symptom.** With §3's six merges replayed and a **copy** of this tree re-pinned at the result,
+`pairing-high-bit-confirm.json` is vendored and listed in `index.json` — and corrupting its expected
+confirm code to `999999` left `:core:test` **green at 288 / 0, `exit=0`**.
+
+**Cause, read in the file.** `ProtocolVectorsTest.pairing derivation reproduces every vector value`
+hardcoded `load("pairing-basic")` despite its name. The only enumerator, `envelopeVectors()`, filters
+`type == "envelope"`; the new vector is `type: "pairing"`. **Vendored, manifested, read by nothing.**
+
+**Why it mattered here specifically.** The vector exists to separate a signed-int32 reduction
+(`-936782`) and a dropped zero-pad (`30514`) from the conforming `030514`. `pairing-basic` cannot
+catch either — its digest has the high bit clear and six significant digits. The inert vector was the
+only one that could.
+
+**Fixed this run.** `4ddad07` enumerates valid `type: pairing` vectors from the manifest. The same
+mutation now fails: `6-digit confirm code (pairing-high-bit-confirm) ==> expected: <999999> but was:
+<030514>`, `exit=1`. **Test count is 288 before and after — coverage changed, the number did not**, so
+this is invisible to anyone auditing by test count.
+
+**Still open, and still Brandon's:** the **re-pin itself** (**H7**). This run moved no pin and wrote no
+vector byte; the corpus still matches `7328a0b` (**C-ENUM-5**). B-14 closes when H7 happens — and the
+assertion that makes H7 mean something is now in place, which it was not this morning.
+
+**Not a B-16 fix.** B-16 is about *detection* of a stale pin, and **H3** — which upstream ref CI should
+compare against — is untouched. This changes what happens **after** a re-pin, not whether anything
+notices one is needed.
+
+Re-verify: **C-ENUM-2**, **C-ENUM-3**, **C-ENUM-4**.
+
+### B-7 status 2026-08-18 (fifty-sixth run) — narrowed, materially
+
+**`:core:test` runs in this sandbox.** `apt-get install -y --no-install-recommends
+openjdk-17-jdk-headless` — the fix `core-probe.sh`'s own error message prints — satisfied its
+`jvmToolchain(17)` precondition, and the probe returned **288 tests, 0 failed, across 19 classes**,
+`exit=0` (**C-JDK-1**). Every prior run recorded this as unrunnable; the blocker was the JDK, and
+`core-probe.sh` had said so since 2026-08-11.
+
+**Unchanged:** `dl.google.com` is still denied, `sdkmanager`/`adb` are still absent, and
+`:app:assembleDebug` / `:app:lintDebug` still cannot run here. **B-7 is narrowed, not closed**, and the
+android gate is still Windows/SDK work. **The install was inside a disposable container**; a future
+session on a fresh image must repeat it, which is why the command is in **C-JDK-1** rather than in prose.

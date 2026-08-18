@@ -6,6 +6,40 @@
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
 > `claude/s5-*` drafts — and **twenty** runs have now been assigned it.
 >
+> ## ▶ RUN 56 — 2026-08-18. Read this before you run the re-pin in §3.
+>
+> **Freshness (C-RET-3), measured against the live API:** engine `origin/main` still **`aac05f3`**,
+> android `main` still **`ebfaf81`**, **18** open PRs in `careerseeker` and **6** here, **all still
+> open and still draft — nothing merged, closed or undrafted**, all **7** landing branches still
+> matching their live PR heads, **0 mismatches**. **`RETURN-DAY.md` §3 is safe to execute as printed.**
+>
+> **§3 step 2 is no longer unverified.** Run 55 could only prove the re-pin correct *about bytes*
+> because `core-probe.sh` needs JDK 17 and this image ships 21. **It needed a JDK, not the Windows
+> box.** `apt-get install openjdk-17-jdk-headless` (the fix the script's own error prints), then:
+> the six merges replayed for real (**#48/#35/#36/#51 CLEAN, #52 and #49 STOP**, 0 files under
+> `docs/sync-vectors/`), a **copy** of this tree re-pinned at the result, and `:core:test` on it —
+> **288 tests, 0 failed**, `exit=0` (**C-JDK-1**, **C-ENUM-1**). **The re-pin is test-green.**
+>
+> **And that green run proved less than it looks like — this is the finding.** The count was **288
+> before the re-pin and 288 after**, with a vector added. A negative control separated the two
+> readings: corrupting `pairing-high-bit-confirm`'s expected confirm code to `999999` left the suite
+> **green at 288/0** (**C-ENUM-2**). `ProtocolVectorsTest`'s *"…every vector value"* **hardcoded
+> `pairing-basic`**; the only enumerator filters `type == "envelope"` and the new vector is
+> `type: "pairing"`. **So H7's re-pin would have vendored it, listed it, and asserted nothing —
+> B-14 would have read closed while still open.** Worst possible vector for it: it is the only one
+> that separates a signed-int32 reduction (`-936782`) and a dropped zero-pad (`30514`) from the
+> conforming `030514`.
+>
+> **Fixed:** `4ddad07` enumerates valid `type: pairing` vectors from the manifest. Same mutation now
+> **fails** — `expected: <999999> but was: <030514>`, `exit=1` (**C-ENUM-3**) — which also establishes,
+> for the first time, that **this phone's confirm reduction is the conforming one** (**C-ENUM-4**).
+> **The test count is 288 in all four runs, so this is invisible to anyone auditing by count.**
+>
+> **Files claimed this run:** `core/src/test/kotlin/app/careerseeker/core/ProtocolVectorsTest.kt`
+> (+ house records). **No pin moved, no vector byte written** in either repo (**C-ENUM-5**) — the
+> re-pin is still **H7** and still Brandon's. `ci.yml` untouched (**H3** open). **No android gate and
+> no `Verify-Alpha.ps1` result is claimed.**
+>
 > ## ▶ RUN 55 — 2026-08-18, THE MORNING §3 IS EXECUTED. Read this line first.
 >
 > Measured after a fresh fetch of both trees **today**: engine `origin/main` still **`aac05f3`**,

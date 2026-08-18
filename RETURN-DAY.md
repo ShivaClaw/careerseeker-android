@@ -155,6 +155,27 @@ both already say *re-pin afterwards* — **neither says to do it in the same sit
 number to check it against.** Both now do. Deferring it is safe for the build and costs you the one
 thing the re-pin buys: the phone testing what the engine ships.
 
+> **CORRECTED run 56, 2026-08-18 — "this closes B-14" was false until this morning, and the re-pin
+> is what would have looked like closing it.** Step 2 above (*run `:core:test`*) had never been
+> executed by any cloud run, because `core-probe.sh` needs JDK 17 and the image ships 21. It needed a
+> JDK, not the Windows box. Installed, the six merges replayed, a **copy** of the phone tree re-pinned
+> at the result: `:core:test` **288 tests, 0 failed** (**C-ENUM-1**) — so **the re-pin is test-green**.
+>
+> **But the count was 288 before the re-pin and 288 after, with a vector added.** Corrupting
+> `pairing-high-bit-confirm`'s expected confirm code to `999999` left the suite **green** (**C-ENUM-2**):
+> `ProtocolVectorsTest`'s *"…every vector value"* **hardcoded `pairing-basic`**, and its only
+> enumerator filters `type == "envelope"` while the new vector is `type: "pairing"`. **The re-pin would
+> have vendored the vector, listed it in `index.json`, and asserted nothing about it** — and the vector
+> is the only one that separates a signed-int32 reduction (`-936782`) and a dropped zero-pad (`30514`)
+> from the conforming `030514`, which `pairing-basic` cannot do.
+>
+> **`4ddad07` fixes it** by enumerating valid `type: pairing` vectors from the manifest; the same
+> mutation now fails (`expected: <999999> but was: <030514>`, **C-ENUM-3**), which incidentally proves
+> this phone's reduction is the conforming one (**C-ENUM-4**). **Do the re-pin as written — it now buys
+> what this box says it buys.** Nothing about the merge order, the counts, or `--check`'s expected
+> output changes. **No pin was moved and no vector byte written by that run** (**C-ENUM-5**); H7 is
+> still yours.
+
 ### At each STOP
 
 The conflict is always the same five files — `README.md`, `docs/CareerSeeker-Project-Summary.md`,
@@ -235,7 +256,7 @@ that guard clause.**
 | **H1** | **Decide PR #53** | design choice between two push-result shapes (§3 step 0) |
 | **H2** | **Run the gate and land §3's six merges** | `Verify-Alpha.ps1 -IncludePublish -IncludePackage` needs Windows + .NET; no cloud session can run it |
 | **H3** | **Decide B-16** — should anything watch the vendored pin for staleness? | naming a draft branch in CI couples the android build to a ref someone may rebase; three options are written out in `BLOCKED.md` B-16. **Landing §3 satisfies option 2's precondition** — the sync track reaches `main`, so "compare against `main` and fail" stops being gated on the restack, and would fire correctly on H7's vector |
-| **H7** | **Re-pin the phone's vectors, in the same sitting as H2** | §3's step 4 puts `pairing-high-bit-confirm.json` on `main`; the phone stays at 28 payloads and **no check in either repo reports it** (**C-POST-3**, **B-14**, **B-16**). Mechanical, ~5 min, expected `OK: 30` / `30` files — but only you can decide the pin moves |
+| **H7** | **Re-pin the phone's vectors, in the same sitting as H2** | §3's step 4 puts `pairing-high-bit-confirm.json` on `main`; the phone stays at 28 payloads and **no check in either repo reports it** (**C-POST-3**, **B-14**, **B-16**). Mechanical, ~5 min, expected `OK: 30` / `30` files — but only you can decide the pin moves. **Run 56:** the re-pin is now proved **test-green** (`:core:test` 288/0 on a re-pinned copy, **C-ENUM-1**), and `4ddad07` fixes the reason it would otherwise have vendored that vector **inert** (**C-ENUM-2/-3**) |
 | **H8** | **Resolve §5's naming conflict toward `p1-runbook`** — take *"CareerSeeker"*, never *"Basic"* | it is a product-naming decision, so it is yours; but it is no longer 50/50. `docs/store/Play-Listing.md`, on a **third** branch, already enforces that side and cites the disputed section as its authority (**C-AND-3**). The other resolution puts a self-contradicting tree on `main` **through clean merges that raise no conflict**. §4's second box has the detail |
 | **H4** | **Install `sdkmanager`/`avdmanager`** (B-4) | unblocks S3, S4, S6 — the emulator lane is the single biggest unblock on the board |
 | **H5** | **`npx wrangler deploy --config relay/wrangler.jsonc`**, then re-run SyncLiveSmoke live | the production relay still self-reports `phase: p1`; it predates P2/P4. Deploys are embargoed for agents |
@@ -271,7 +292,21 @@ Ranked by how much would be wrong if the claim is wrong.
 3. **Every gate claim in this window.** No cloud run ever executed `Verify-Alpha.ps1` or the android
    gate — no `pwsh`, no `dotnet`, no Android SDK (**C-LAND-7**, **C-ENV-1**). Android gate results in
    these records are *read out of CI runner logs*, never produced locally. Grep for any sentence that
-   blurs that and report it.
+   blurs that and report it. **Run 56 narrows this and is the place to press:** `:core:test` **was**
+   executed locally (**C-JDK-1**, 288/0) after installing JDK 17. That is **one** of the gate's five
+   tasks. Attack any sentence that lets it stand in for the other four — `:app:assembleDebug` and
+   `:app:lintDebug` still have no SDK here, and **the fused android tree has still never been built**.
+8. **Run 56's own finding, by the method that produced it** (added run 56). It rests on a negative
+   control, not on reading code: green with a corrupted vector, red after the fix, same mutation. **The
+   test count is 288 in every run**, so a reviewer checking coverage by count will conclude nothing
+   changed. Re-run **C-ENUM-2** *before* applying `4ddad07` and confirm the green — if it is red, the
+   finding is wrong and the fix is unnecessary. **A first draft of this line claimed the `entitlement`
+   and `entitlement_ack` families had the same hole; they do not** — `EntitlementVectorsTest` filters
+   `type == "entitlement"` and `ProtocolVectorsTest` filters `type == "entitlement_ack"`, both
+   enumerated from the manifest. The claim was withdrawn before push, by grepping instead of assuming.
+   The corrected finding is **narrower and worse**: all four vector families enumerate, and **`pairing`
+   was the single hardcoded exception** — the one family where a vector could be added upstream and
+   land inert.
 4. **B-16.** Every drift check in both repos compares the phone against **the pin**, never upstream.
    The guarantee is "the phone matches the pin", not "the phone matches the engine" — and
    `VECTORS.lock`'s wording is close to implying the latter.

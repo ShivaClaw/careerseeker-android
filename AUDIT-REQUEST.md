@@ -10467,3 +10467,191 @@ against `:core:test`** — only against its own preconditions and its own output
 corpus still passes the phone's codec is `RETURN-DAY.md` §3's step 2, and it needs a machine with a
 JDK 17. **Do not read C-REPIN-1 as saying the re-pin is test-green; it says the re-pin is correct
 about bytes.**
+
+## Fifty-sixth run — 2026-08-18 (Linux sandbox): the re-pin was proved about bytes; this run ran it against the phone's codec
+
+### C-JDK-1 — this host CAN run `:core:test`, and that changes what a cloud run may claim
+
+Every prior run recorded `:core:test` as unrunnable here. **C-ENV-1** narrowed the reason correctly
+to the JDK: `core-probe.sh` gates on `ls -d /usr/lib/jvm/*17*` and this image ships only JDK 21. The
+script's own error message names the fix, and it works.
+
+```bash
+ls -d /usr/lib/jvm/*17* 2>&1                     # before: no match
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+ls -d /usr/lib/jvm/*17*
+cd <android> && scripts/core-probe.sh; echo "exit=$?"
+```
+
+*Expected, and **observed**:* no JDK 17 before; after the install
+`/usr/lib/jvm/java-1.17.0-openjdk-amd64` and `/usr/lib/jvm/java-17-openjdk-amd64`; then
+`BUILD SUCCESSFUL` and **`core-probe: 288 tests, 0 failed, 0 skipped, across 19 classes`**,
+`exit=0`. Maven Central and the Gradle services resolved; `google()` is absent from the probe's
+resolver by construction, so this also re-proves `:core` needs nothing from the Android repository.
+
+**This is a machine change to an ephemeral cloud container, not to Brandon's machine**, and it is
+recorded as one. **It is still not the android gate** — `:app:assembleDebug` and `:app:lintDebug`
+need the Android SDK, which is still absent (**B-7**, **C-ENV-1**), and no result for them is claimed
+anywhere in this entry. What it retires is the narrower sentence *"no Kotlin can be executed here"*.
+
+### C-ENUM-1 — the re-pinned corpus passes the phone's codec (RETURN-DAY §3 step 2, never before run)
+
+Replay §3's six merges, re-pin a **copy** of the phone tree at the replayed head, then test it.
+
+```bash
+git clone -q <engine> /tmp/eng-replay && cd /tmp/eng-replay
+git checkout -B replay origin/main
+for br in s8-harness-linux-reach s2-seq-bound s2-transport-vocabulary \
+          s3-pairing-confirm-consumer s6-outcome-disposition s6-composition-root-decision; do
+  git merge --no-edit -q origin/claude/$br || {
+    for f in $(git diff --name-only --diff-filter=U); do git checkout --theirs -- "$f"; git add "$f"; done
+    git commit -q --no-edit; }
+done
+node docs/sync-vectors/generate.mjs --check
+cp -R <android> /tmp/and-repin && cd /tmp/and-repin
+scripts/repin-vectors.sh --engine /tmp/eng-replay $(git -C /tmp/eng-replay rev-parse HEAD)
+scripts/core-probe.sh --rerun; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **#48, #35, #36, #51 CLEAN; #52 STOP (5 files); #49 STOP (6 files)** —
+independently reproducing **C-POST-1** / **C-REPIN-1** on the morning §3 is executed, the conflict set
+being the `$ExpectedOfflineTotal` pin family plus `tests/SyncHarness/Program.cs`, **0 files under
+`docs/sync-vectors/`**. Post-merge corpus **30 files**, `OK: 30 vector files match the generator.`
+The re-pin reports **`+ pairing-high-bit-confirm.json`**, **`~ index.json`**, writes exactly three
+paths, `exit=0`. Then `:core:test`: **288 tests, 0 failed**, `exit=0`.
+
+**So the re-pin is test-green, not merely byte-correct.** That is the sentence **C-ENV-1** said this
+host could not write, and the only thing that was missing was a JDK.
+
+### C-ENUM-2 — but the newly vendored vector was asserted by NOTHING, and a negative control is what showed it
+
+The green run above is **not** evidence that the new vector is covered. Corrupt it and re-run:
+
+```bash
+cp -R /tmp/and-repin /tmp/and-neg && cd /tmp/and-neg
+python3 -c "import json;p='core/src/test/resources/sync-vectors/v1/pairing-high-bit-confirm.json';\
+d=json.load(open(p));d['expected']['confirm']='999999';json.dump(d,open(p,'w'),indent=2)"
+scripts/core-probe.sh --rerun; echo "exit=$?"
+```
+
+*Expected before this run's fix, and **observed**:* **`288 tests, 0 failed`**, `exit=0`. **A vector
+whose expected confirm code is wrong left the suite green.**
+
+The cause, read in the file rather than guessed:
+`ProtocolVectorsTest.pairing derivation reproduces every vector value` **hardcoded
+`load("pairing-basic")`** despite its name. Only `envelopeVectors()` enumerated the manifest, and it
+filters `type == "envelope"` — `pairing-high-bit-confirm` is `type: "pairing"`, so it was vendored,
+listed in `index.json` (29 payloads), and **read by no test**.
+
+**Why this one matters more than an average uncovered vector:** its own `notes` say it exists to
+separate three implementations `pairing-basic` cannot tell apart — a signed-int32 reduction renders
+`-936782`, a dropped zero-pad renders `30514`, and only the conforming unsigned zero-padded reduction
+renders `030514`. `pairing-basic`'s digest has its high bit clear and six significant digits, so it
+**cannot** catch either bug. The vector that catches them was the inert one.
+
+### C-ENUM-3 — the fix, and the same negative control failing as it should
+
+`4ddad07` replaces the hardcoded load with enumeration of valid `type: pairing` vectors from the
+manifest (`valid: false` stays excluded — those pin a rejection and have their own tests).
+
+```bash
+cd <android> && scripts/core-probe.sh --rerun; echo "exit=$?"     # current pin, 29 files
+# then with the fixed test over the re-pinned 30-file corpus:
+cp <android>/core/src/test/kotlin/app/careerseeker/core/ProtocolVectorsTest.kt /tmp/and-repin/core/src/test/kotlin/app/careerseeker/core/
+cd /tmp/and-repin && scripts/core-probe.sh --rerun; echo "exit=$?"
+# and the negative control again, now over the fixed test:
+cp -R /tmp/and-repin /tmp/and-neg2 && cd /tmp/and-neg2
+python3 -c "import json;p='core/src/test/resources/sync-vectors/v1/pairing-high-bit-confirm.json';\
+d=json.load(open(p));d['expected']['confirm']='999999';json.dump(d,open(p,'w'),indent=2)"
+scripts/core-probe.sh --rerun; echo "exit=$?"
+```
+
+*Expected, and **observed**:* at the **current** pin **288 tests, 0 failed**, `exit=0` — the fix
+changes no result on the corpus the phone ships today. Over the **re-pinned** corpus, **288 / 0**,
+`exit=0`. With the vector corrupted, **`288 tests completed, 1 failed`**, `exit=1`, and the message is
+the whole point:
+
+```
+org.opentest4j.AssertionFailedError: 6-digit confirm code (pairing-high-bit-confirm)
+  ==> expected: <999999> but was: <030514>
+```
+
+**Green → red on the same mutation is the proof the assertion now exists.** Note the test *count* is
+288 in every one of these runs: the vectors are looped **inside** one test method, so a coverage
+change does not move the number. **Anyone auditing this by watching the test count will see nothing.**
+
+### C-ENUM-4 — and the phone's confirm reduction is correct, which nothing previously established
+
+The failure message above reports the actual value: **`030514`**. That is the conforming unsigned,
+zero-padded reduction — not `-936782` (signed int32) and not `30514` (dropped zero-pad). Read in the
+source, `PairingDerivation.derive` masks each byte with `0xFF` into a `Long` and calls
+`padStart(6, '0')`, which agrees.
+
+**This is a new fact, not a restatement.** Before this run the phone's high-bit behaviour was
+**unasserted by construction** — the vector was not vendored, and after a re-pin it would still not
+have been read. The engine half was CI-green already; the phone half is now green too, and by the
+same vector.
+
+### C-ENUM-5 — no vector byte was written in either repo
+
+```bash
+cd <android> && git status --porcelain && git diff --name-only HEAD~1 | grep -c 'sync-vectors/' 
+cd <engine> && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pin-check
+diff -r /tmp/pin-check/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+```
+
+*Expected, and **observed**:* this run's commit touches **`0`** paths under `sync-vectors/`; the
+vendored corpus still matches pin **`7328a0b`** — **no output, `exit=0`, 29 files** (**C-STOP-3**
+re-run after the commit). **Every re-pin and every mutation happened in `/tmp` copies.** The pin did
+not move: moving it is **H7**, and it is Brandon's.
+
+### C-STOP-1 — re-run at run 56; sixteenth consecutive assignment, declined again
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do git log -1 --format='%ad  %s' $c; git show --stat --format='' $c; done
+git checkout -B s5-check origin/claude/s5-entitlement-ack-emitter
+node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l
+```
+
+*Expected, and **observed**:* `8575539` (2026-08-09) touches **`docs/Sync-Protocol.md` only, +114/−3**;
+`22b028e` adds both ack vectors, `index.json` and `generate.mjs`; `7328a0b` adds
+`invalid-unknown-field.json`. Generator check **`OK: 29 vector files match the generator.`**, `exit=0`,
+node v22.22.2. `origin/main` carries **26**. **Unmerged, not unwritten.** Rebuilding it would duplicate
+`8575539` and regenerate a corpus the android repo vendors — which the prompt itself classes as a
+cross-repo drift event.
+
+### C-RET-3 — return-day freshness, re-measured at run 56 against the live API
+
+*Expected, and **observed**, after `git fetch --all --prune` in both trees:* engine `origin/main`
+**`aac05f3`**; android `origin/main` **`ebfaf81`**. **18 open PRs** in `ShivaClaw/careerseeker`
+(17 `claude/*` plus Terra's #26) and **6** in `careerseeker-android`, **every one still open and still
+draft; none merged or closed**. The seven landing branches match their live PR heads exactly —
+`c93e88d` (#48), `2be00fc` (#35), `b0b6c77` (#36), `edee32b` (#51), `94fd979` (#52), `f5e0c0a` (#49),
+`8177353` (#53) — **0 mismatches**. **Brandon had not begun landing when this run measured.**
+
+### C-ENUM-6 — how wide is the hole? Exactly one family, verified rather than assumed
+
+A first draft of this run's auditor note claimed the `entitlement` and `entitlement_ack` families had
+the same defect. **They do not.** Checked before push:
+
+```bash
+cd <android>
+grep -rn 'str("type") ==' core/src/test/kotlin/
+python3 -c "import json,collections;d=json.load(open('core/src/test/resources/sync-vectors/v1/index.json'));\
+print(collections.Counter(v['type'] for v in d['vectors']))"
+```
+
+*Expected, and **observed**:* the manifest holds four types — **envelope 19, entitlement 5, pairing 3
+(post-re-pin), entitlement_ack 2** — and three of the four were already enumerated from it:
+`ProtocolVectorsTest.envelopeVectors()` (`type == "envelope"`),
+`EntitlementVectorsTest.entitlementVectors()` (`type == "entitlement"`), and `ProtocolVectorsTest`
+again at `type == "entitlement_ack"`. **`pairing` was the only hardcoded family**, and `4ddad07` makes
+it the fourth enumerator.
+
+**The withdrawn claim made the finding sound broader; the true one makes it worse.** Every other family
+was already self-extending, so a vector added upstream to any of them lands asserted. Only `pairing`
+would land inert — and `pairing-high-bit-confirm` is precisely a `pairing` vector arriving upstream.
+**Attack this by re-running the grep**: if a fifth type appears in the manifest with no matching
+filter, the same hole is open again for that family.

@@ -11230,3 +11230,107 @@ any kind** — Cloudflare, Workers, relay or site. **The production relay was no
 even `GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no Play Billing
 code, no keystore, no emulator, no Gmail. **No secret was read, printed or echoed** — none was opened.
 No `.appdata` original touched. Terra's territory was read, never written.
+
+## Fifty-sixth run — 2026-08-18 (Linux sandbox): the re-pin was proved correct about bytes; running it against the phone's codec found the vector it would have vendored inert
+
+**Milestone 0 — rule one, and the assignment declined a sixteenth time.** `git fetch --all --prune` in
+both trees before anything was read. The prompt again assigned S5's spec half (§4.3 `entitlement_ack`,
+the vector via `generate.mjs`, PQ-A2-1/-2/-3) and again described the vendored pin as `679a317`. Both
+were re-derived rather than trusted, and both are stale: the work has existed since 2026-08-09 —
+`8575539` (**+114/−3**, `docs/Sync-Protocol.md` only), `22b028e` (both ack vectors), `7328a0b`
+(`invalid-unknown-field`) — with `node docs/sync-vectors/generate.mjs --check` reporting
+**`OK: 29 vector files match the generator.`**, `exit=0` on the branch that carries them, against
+**26** on `origin/main`; and the pin has been **`7328a0b`** since 2026-08-12 (**C-STOP-1**, **C-PIN-1**).
+Building it again would duplicate `8575539` and regenerate a corpus this repo vendors — the
+cross-repo drift event the prompt itself forbids. **Declined, for the reason, in writing.**
+
+**Milestone 1 — return-day freshness (C-RET-3).** Measured against the live API, not local refs:
+engine `origin/main` **`aac05f3`**, android `main` **`ebfaf81`**, **18** open PRs in `careerseeker`
+and **6** here, **every one still open and still draft**, and all **7** landing branches still matching
+their live PR heads — **0 mismatches**. **Nothing had been landed when this run measured, so
+`RETURN-DAY.md` §3 is still safe to execute as printed.**
+
+**Milestone 2 — the slice, and why this one.** §3's re-pin step got a command at run 55
+(`repin-vectors.sh`), and run 55 recorded its own limit precisely: *"proved correct **about bytes**,
+not proved test-green"*, because `core-probe.sh` needs JDK 17 and this image ships only JDK 21
+(**C-ENV-1**). That is `RETURN-DAY.md` §3 **step 2**, it was the last unverified step in the plan
+Brandon executes today, and the record said it needed the Windows box. **It did not. It needed a JDK.**
+
+**Milestone 3 — `:core:test` runs here (C-JDK-1).** `apt-get install -y --no-install-recommends
+openjdk-17-jdk-headless` — the fix `core-probe.sh`'s own error message names — put
+`/usr/lib/jvm/java-17-openjdk-amd64` in place, and `scripts/core-probe.sh` returned **`BUILD
+SUCCESSFUL`**, **`288 tests, 0 failed, 0 skipped, across 19 classes`**, `exit=0`. **A machine change
+to an ephemeral cloud container, logged as one; Brandon's machine was not touched.** This retires the
+sentence *"no Kotlin can be executed here"* and **nothing wider**: `sdkmanager` and `adb` are still
+absent, `:app:assembleDebug` and `:app:lintDebug` still need the Android SDK (**B-7**), and **no
+result for the android gate or for `Verify-Alpha.ps1` is claimed anywhere in this entry.**
+
+**Milestone 4 — §3 step 2, executed (C-ENUM-1).** The six merges were replayed for real in a throwaway
+clone: **#48, #35, #36, #51 CLEAN; #52 STOP (5 files); #49 STOP (6 files)** — the `$ExpectedOfflineTotal`
+pin family plus `tests/SyncHarness/Program.cs`, **0 files under `docs/sync-vectors/`** — independently
+reproducing **C-POST-1** and **C-REPIN-1**. Post-merge corpus **30 files**, `OK: 30 vector files match
+the generator.` A **copy** of this tree was then re-pinned at the replayed head: `+
+pairing-high-bit-confirm.json`, `~ index.json`, exactly three paths written, `exit=0`. Then
+`:core:test` on the re-pinned copy: **288 tests, 0 failed**, `exit=0`. **The re-pin is test-green.**
+
+**Milestone 5 — and the green run proved less than it looked like (C-ENUM-2).** The count was
+**identical** to the baseline: 288 before the re-pin and 288 after, with a vector added. That is
+consistent with the loop being inside one test method — and equally consistent with the new vector
+being read by nothing. **The two were separated with a negative control instead of an argument.**
+Corrupting `pairing-high-bit-confirm`'s expected confirm code to `999999` and re-running gave
+**`288 tests, 0 failed`**, `exit=0`. **A vector with a wrong expected value left the suite green.**
+
+Read in the file rather than inferred: `ProtocolVectorsTest.pairing derivation reproduces every vector
+value` **hardcoded `load("pairing-basic")`** despite its name. `envelopeVectors()` is the only
+enumerator and it filters `type == "envelope"`; the new vector is `type: "pairing"`. So the re-pin
+that **H7** calls for would have vendored it, listed it in `index.json`, and asserted **nothing** —
+and **B-14 would have read as closed while still being open.** Its unblock says *merge #50, then
+re-pin*; those two steps were **necessary and not sufficient**, and no document said so.
+
+**The vector this happened to is the worst one for it to happen to.** Its own `notes` say it exists to
+separate three implementations `pairing-basic` cannot distinguish: a signed-int32 reduction renders
+`-936782`, a dropped zero-pad renders `30514`, only the conforming reduction renders `030514`.
+`pairing-basic`'s digest has the high bit clear and six significant digits, so it catches neither bug.
+
+**Milestone 6 — the fix, and the same control failing (C-ENUM-3).** Commit `4ddad07` enumerates valid
+`type: pairing` vectors from the manifest; `valid: false` stays excluded, because those pin a
+**rejection** and have their own tests. At the **current** pin: **288 / 0**, `exit=0` — the fix changes
+no result on the corpus the phone ships today. Over the **re-pinned** corpus: **288 / 0**, `exit=0`.
+With the vector corrupted: **`288 tests completed, 1 failed`**, `exit=1`,
+`6-digit confirm code (pairing-high-bit-confirm) ==> expected: <999999> but was: <030514>`.
+**Green→red on the same mutation is the evidence; the test count is 288 in all four runs, so an
+auditor watching the count would see nothing.**
+
+**Milestone 7 — a fact that did not exist before (C-ENUM-4).** That failure message reports the phone's
+actual output: **`030514`**. The conforming unsigned, zero-padded reduction. The engine half was
+CI-green already; **the phone half is now green too, by the same vector**, and it was unassertable by
+construction until this run — first because the vector was not vendored, then because nothing read it.
+
+**Milestone 8 — coordination.** Terra's `autonomy/codex-state:STATE.md` still reads **COMPLETE**, *"the
+ladder is exhausted"*, **files claimed: none** — **no collision**, and nothing of Terra's was written.
+`autonomy/claude-state` updated with this run's heartbeat and the one file claimed.
+
+**No rung status changed.** S0 DONE; S1 DONE (successor stack costed, not landed); S2/S3/S4/S5/S6/S7
+PARTIAL; S8 PARTIAL/BLOCKED on **B-5**. This run advanced no rung. It closed the last unverified step
+of the plan Brandon executes today, and found that the step after it did not do what its own records
+promised.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 18 `careerseeker` PRs and the 6 android drafts are
+exactly as found, and **#53's fate remains Brandon's, un-nudged**. **No vector byte was written in
+either repo** (**C-ENUM-5**): every re-pin and every mutation was performed in `/tmp` copies, the
+vendored corpus was re-diffed against pin `7328a0b` **after** this run's commit — **no output,
+`exit=0`, 29 files** — and **`VECTORS.lock` was not edited.** **The pin did not move: that is H7 and it
+is Brandon's.** **No engine file was modified**; the engine checkout was read-only apart from the
+heartbeat on the docs-only `autonomy/claude-state` branch, and the replay clone lived under the
+session scratchpad and was never pushed, so no branch in `careerseeker` advanced. No
+`$ExpectedOfflineTotal` edit, so this run adds **no** pin-toucher and **no** stop to the landing plan
+(**B-17**). **No `docs/Sync-Protocol.md` edit** and **no `.github/workflows/ci.yml` edit** — the B-16
+fix that would go there is **H3** and was deliberately left. **No production Kotlin or C# was written**:
+the only source change is a **test**. **The android gate was not run and no result for it is claimed**;
+`Verify-Alpha.ps1` was not run and no result for it is claimed. The JDK 17 install was made **inside
+this disposable container only**. No history rewrite, no branch deleted. **No deploy of any kind** —
+Cloudflare, Workers, relay or site. **The production relay was not contacted at all, not even
+`GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no Play Billing code,
+no keystore, no emulator, no Gmail. **No secret was read, printed or echoed** — none was opened. No
+`.appdata` original touched. Terra's territory was read, never written.
