@@ -123,11 +123,32 @@ so the vector is simply **never asserted** — which is what **B-14** has been b
 **So, right after the last merge:**
 
 ```bash
-cd <engine>  && node docs/sync-vectors/generate.mjs --check   # expect: OK: 30 vector files match the generator.
-cd <android> && # re-vendor docs/sync-vectors/v1 -> core/src/test/resources/sync-vectors/v1
-                # bump the SHA in core/src/test/resources/sync-vectors/VECTORS.lock to the merge commit
-ls core/src/test/resources/sync-vectors/v1 | wc -l             # expect: 30
+cd <android>
+scripts/repin-vectors.sh --check --engine <engine> origin/main   # what would change, writes nothing
+scripts/repin-vectors.sh --engine <engine> origin/main           # do it
 ```
+
+*Expect from `--check`:* `OK: 30 vector files match the generator.`, then
+`vendored: 29 files    at pin: 30 files` with **`+ pairing-high-bit-confirm.json`** and
+**`~ index.json`** — and `exit=1`, because `--check` reports drift as a failure. The write run ends
+`OK: re-pinned 7328a0b… -> <merge commit>` and `30 vector files vendored`. Then run
+`scripts/core-probe.sh`, and commit the corpus and `VECTORS.lock` **together**.
+
+> **Added run 55, 2026-08-18 — this step used to be prose.** Until this morning the block above
+> said *"# re-vendor docs/sync-vectors/v1 → core/src/test/resources/…"* and *"# bump the SHA"*, which
+> is a description, not a command, for the one step in this plan that nothing checks. `scripts/repin-vectors.sh`
+> is that command. It refuses to write unless the rev resolves, the commit carries
+> `docs/sync-vectors/v1`, the corpus there passes its own generator, and `VECTORS.lock` holds exactly
+> one 40-hex string — `ci.yml:75` reads the pin with `grep -oE '[0-9a-f]{40}' | head -1`, so a second
+> one silently repoints CI. It replaces the corpus wholesale, so an upstream **deletion** is honoured
+> too. It **decides nothing**: which upstream ref the repos should track is **H3**, still yours.
+> Verified against a replay of these exact six merges — **C-REPIN-1**.
+>
+> **Point it at the post-merge `main`, not at #51's branch.** Measured (**C-REPIN-2**):
+> `--check … origin/claude/s3-pairing-confirm-consumer` reports **+1 / −3 / ~1** — that branch
+> gains `pairing-high-bit-confirm.json` but has never carried the three S5 vectors, so re-pinning
+> there would *delete* them from the phone. The script shows you the removals before it writes;
+> read them.
 
 **This closes B-14.** `VECTORS.lock`'s *"ACTION WHEN PR #38's STACK MERGES"* note and B-14's unblock
 both already say *re-pin afterwards* — **neither says to do it in the same sitting, and neither gave a
