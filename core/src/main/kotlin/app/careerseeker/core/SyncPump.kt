@@ -85,6 +85,25 @@ data class PumpReport(
  * latch. Map a snapshot to plain [ApplyDisposition.APPLIED] and the phone still renders the
  * dashboard correctly while the latch stays stuck forever — every later gap goes unasked, in
  * silence. That is why the narrowing is an interface here and not a comment in `:app`.
+ *
+ * ## This interface does not see every accepted payload, and must not be wired as if it does
+ *
+ * The `when` above is a projection of engine data into the replica, so its `else` branch is
+ * correct for `doc` and `conflict` — kinds the dashboard does not render yet. It is **not**
+ * correct for `entitlement_ack`, which carries no rows to project and is the phone's only path to
+ * [ProState.Unlocked]. An `:app` applier handed one matches no branch, reports
+ * [ApplyDisposition.IGNORED] exactly as it does for `doc`, and Pro silently never unlocks —
+ * a failure with no error, no rejection and no wrong counter anywhere.
+ *
+ * So the composition root wires **[EntitlementRoutingApplier] around** the `:app` applier and
+ * passes that to [SyncPump], rather than passing the `:app` applier directly:
+ *
+ * ```
+ * applier = EntitlementRoutingApplier(roomApplier, EntitlementAckApplier(productIds), proStateStore)
+ * ```
+ *
+ * `EntitlementRoutingApplierTest` holds this shut from the other side: its first test drives the
+ * un-decorated arrangement and asserts the phone stays [ProState.Free].
  */
 fun interface ReplicaApplier {
     suspend fun apply(seq: Long, envelopeTs: String, kind: String, plaintext: ByteArray): ApplyDisposition
@@ -110,7 +129,7 @@ fun interface ReplicaPositionSource {
  * ```
  * relay.pull(e2p, cursor) → for each envelope:
  *     EnvelopeReceiver.receiveWire  (every trust decision, §3–§5.4)
- *     → ReplicaApplier.apply        (the projection, :app)
+ *     → ReplicaApplier.apply        (the projection, :app — behind EntitlementRoutingApplier)
  *     → PullPolicy.onEnvelope       (the ask decision, §4.3/§6.2)
  * → at most one pull_request pushed back
  * ```
