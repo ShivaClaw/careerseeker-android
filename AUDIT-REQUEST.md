@@ -11016,3 +11016,122 @@ diff -r "$TMP/docs/sync-vectors/v1" <android>/core/src/test/resources/sync-vecto
 *Expected, and observed:* 29 files upstream, 29 vendored, `diff -r` silent, `exit=0`. This run wrote
 only records files, so the corpus could not have moved; the diff is taken anyway. The pin did not
 move (moving it is H7).
+
+---
+
+## Sixtieth run — 2026-08-18 (Linux sandbox)
+
+**Auditor setup for this run's claims** (Linux, no Android SDK needed — `:core` is Android-free):
+
+```bash
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+#   the update is NOT optional: `apt-get install` alone 404s against a stale index.
+#   Measured this run: without it, both openjdk-17 debs failed 404; with it, clean install
+#   of 17.0.19+10. This is C-JDK-2's recipe and it reproduced exactly.
+cd <android>
+git fetch --all --prune && git checkout claude/android-a0-probe
+```
+
+### C-KIND-1 — the engine→phone kind partition is asserted, and `:core` is green at 304 / 21
+
+> **Claim.** `PayloadKind` now carries a `flow` property; `ENGINE_TO_PHONE_KINDS` is derived from
+> it; three destination sets partition that derived set; `PayloadKindCoverageTest` asserts it.
+> `:core:test` goes **299 tests / 20 classes → 304 tests / 21 classes, 0 failed, 0 skipped**.
+
+```bash
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 scripts/core-probe.sh --rerun
+```
+
+*Expected:* `BUILD SUCCESSFUL`, `5 actionable tasks: 5 executed`, and the final line
+`core-probe: 304 tests, 0 failed, 0 skipped, across 21 classes`.
+
+For the 299 baseline, run the same command at `HEAD~1` (`git stash` is not needed — the change is
+one commit):
+
+```bash
+git checkout HEAD~1 -- core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+rm core/src/test/kotlin/app/careerseeker/core/PayloadKindCoverageTest.kt
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 scripts/core-probe.sh --rerun   # -> 299 / 20 classes
+git checkout HEAD -- core/ && git status --short                             # restore; expect empty
+```
+
+**This is ONE of the android gate's five tasks.** `checkCoreIsAndroidFree`, `:app:test`,
+`:app:assembleDebug` and `:app:lintDebug` need the Android SDK (**B-7**) and **were not run; no
+result is claimed for them.** `Verify-Alpha.ps1` was not run either — this is Linux.
+
+### C-KIND-2 — the new assertions are capable of failing (three mutations)
+
+> **Claim.** Mutation 1 (`entitlement_ack` unclassified — the pre-B-19 state) → **1 failed**;
+> mutation 2 (one kind in two destination sets) → **1 failed**; mutation 3 (`conflict` flipped to
+> `PHONE_TO_ENGINE`) → **2 failed**.
+
+```bash
+P=core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+cp "$P" /tmp/Protocol.bak
+
+sed -i 's|ROUTED_OUTSIDE_REPLICA: Set<PayloadKind> = setOf(ENTITLEMENT_ACK)|ROUTED_OUTSIDE_REPLICA: Set<PayloadKind> = emptySet()|' "$P"
+scripts/core-probe.sh --rerun 2>&1 | grep -E "FAILED|BUILD "   # -> 1 FAILED: classified exactly once
+cp /tmp/Protocol.bak "$P"
+
+sed -i 's|NOT_PROJECTED_IN_V1: Set<PayloadKind> = setOf(DOC, CONFLICT)|NOT_PROJECTED_IN_V1: Set<PayloadKind> = setOf(DOC, CONFLICT, SNAPSHOT)|' "$P"
+scripts/core-probe.sh --rerun 2>&1 | grep -E "FAILED|BUILD "   # -> 1 FAILED: classified exactly once
+cp /tmp/Protocol.bak "$P"
+
+sed -i 's|CONFLICT("conflict", KindFlow.ENGINE_TO_PHONE)|CONFLICT("conflict", KindFlow.PHONE_TO_ENGINE)|' "$P"
+scripts/core-probe.sh --rerun 2>&1 | grep -E "FAILED|BUILD "   # -> 2 FAILED: flow matches 4-3; no p2e kind
+cp /tmp/Protocol.bak "$P"; git diff --stat                     # expect only the intended change
+```
+
+**What C-KIND-1/-2 do NOT establish, and the auditor should not read into them:** neither proves a
+**production caller** exists for anything in `ROUTED_OUTSIDE_REPLICA`. That set would have held
+`entitlement_ack` on 2026-08-09, when nothing called it, and these tests would have passed. **B-19
+is unchanged.** The guard for that case is `EntitlementRoutingApplierTest`'s negative control
+(**C-S5-3**, run 58).
+
+### C-STOP-8 — the assigned S5 spec half is still built, still off `main`, twenty-five runs on
+
+> **Claim.** All three commits exist and predate this run; the spec amendments and the vector are
+> present at the pin; the generator agrees; and none of it is an ancestor of `origin/main`.
+
+```bash
+cd <engine> && git fetch --all --prune
+git merge-base --is-ancestor 7328a0b origin/main; echo "exit=$?"    # -> exit=1 (still off main)
+for c in 8575539 22b028e 7328a0b; do git log -1 --format='%h %ad %s' --date=short $c; done
+
+git worktree add --detach /tmp/pin 7328a0b
+cd /tmp/pin
+node docs/sync-vectors/generate.mjs --check                        # -> OK: 29 vector files match the generator.  exit=0
+grep -n "product_id\|acknowledged_at\|order_id" docs/Sync-Protocol.md | head   # -> 318-320,324,328,334 (PQ-A6-1)
+grep -n -i ciphertext docs/Sync-Protocol.md | grep -i "MiB\|cap"              # -> 118, 656 (PQ-A2-1)
+grep -n decrypt_failed docs/Sync-Protocol.md | head                          # -> 103, 601, 657 (PQ-A2-2)
+ls docs/sync-vectors/v1/invalid-unknown-field.json                           # -> present (PQ-A2-3)
+```
+
+*Expected:* commits dated **2026-08-09**, **2026-08-09**, **2026-08-12** — all predating this run.
+**The prompt's pin `679a317` is stale; the pin is `7328a0b`** (**C-PIN-1**).
+
+### C-RET-7 — freshness: nothing has landed, on return day
+
+```bash
+cd <engine> && git fetch --all --prune && git rev-parse --short origin/main    # -> aac05f3
+cd <android> && git fetch --all --prune && git rev-parse --short origin/main   # -> ebfaf81
+gh pr list -R ShivaClaw/careerseeker         --state open --json number,isDraft | jq length  # -> 18, all draft
+gh pr list -R ShivaClaw/careerseeker-android --state open --json number,isDraft | jq length  # -> 6,  all draft
+```
+
+*Expected:* both `main`s unmoved since 2026-08-12; **18 + 6 PRs open, every one still draft; nothing
+merged, closed or undrafted.** `RETURN-DAY.md` §3 still safe to execute as printed.
+
+**Note on the fetch:** this run's checkouts arrived **detached and stale — the android tree was 231
+commits behind `origin/claude/android-a0-probe`.** Every number above was taken *after* the fetch.
+
+### C-PIN-4 — no vector drift from this run
+
+```bash
+cd <engine> && git worktree add --detach /tmp/pin 7328a0b
+diff -r /tmp/pin/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+ls <android>/core/src/test/resources/sync-vectors/v1/*.json | wc -l
+```
+
+*Expected:* `diff -r` **silent**, `exit=0`, **29** files. Taken **after** this run's commit.
+`VECTORS.lock` unedited and the pin unmoved (**H7**).

@@ -2593,3 +2593,54 @@ replace its "YOUR SLICE THIS ITERATION" section with: *read `RETURN-DAY.md` §5,
 this environment can run before assuming what it cannot — `:core` compiles and tests here
 (`scripts/core-probe.sh`); `:app`, .NET and the emulator do not.* The real bottleneck is unchanged
 and is a merge decision (**#53**) plus a Windows gate, not authoring capacity.
+
+---
+
+## No new blocker arose 2026-08-18 (S5 defect-class guard, sixtieth cloud iteration)
+
+This run wrote `:core` Kotlin and hit nothing it could not finish. Recorded here anyway, because
+a run that files nothing should say so explicitly rather than leave the reader wondering whether
+it forgot.
+
+### B-19 status 2026-08-18 (sixtieth run) — **unchanged, and deliberately not narrowed**
+
+**Still open, still exactly as run 58 scoped it.** The three `:app` pieces — a `ProStateStore`
+implementation, the configured `knownProductIds` set, and the composition root that constructs
+`EntitlementRoutingApplier` — are untouched. **No `:app` file was written this run.**
+
+**Read the new test's bounds before treating it as progress on this blocker.**
+`PayloadKindCoverageTest` (**C-KIND-1**) asserts that every engine→phone `PayloadKind` is
+classified into exactly one destination. It **does not** assert that anything constructs that
+destination. `PayloadKind.ROUTED_OUTSIDE_REPLICA` would have contained `entitlement_ack` on
+2026-08-09 — the day the applier landed with no caller — and the test would have **passed**. The
+set's own KDoc says this in the source, and the test's KDoc says it again, because a set named
+"routed" is exactly the kind of name a later reader trusts too far.
+
+So: the guard added this run catches a kind **nobody classified at all**; the guard that catches a
+kind **classified but unbuilt** is `EntitlementRoutingApplierTest`'s negative control (**C-S5-3**,
+run 58); and the thing that catches a **composition root that does not exist** is the android gate,
+which needs the Android SDK (**B-7**) and did not run. B-19 is the third of those and is unmoved.
+
+**Smallest human unblock — unchanged from run 58, repeated so it is not chased across files.** On
+the Windows box with the SDK present: implement `ProStateStore` against DataStore (outside the
+replica DB, therefore outside the snapshot wipe), wire
+
+```kotlin
+applier = EntitlementRoutingApplier(roomApplier, EntitlementAckApplier(setOf("pro_unlock")), proStateStore)
+```
+
+into whatever constructs `SyncPump`, and run the full gate.
+
+### B-7 status 2026-08-18 (sixtieth run) — unchanged, and it bounded exactly one claim
+
+`:app` still cannot be built here. It bounded the `:app` half of this run's work to nothing: the
+classification sets are `:core`, and the `when` they mirror is `:app` and was **read, not compiled**.
+That mirroring is labelled as mirroring in both the source and the test rather than presented as a
+check. **Four of the android gate's five tasks did not run and no result is claimed for them.**
+
+### B-2, B-4, B-5, B-9, B-12, B-13, B-14, B-16, B-18 — untouched this run
+
+None was worked, none moved, and none is re-derived here. **B-18** in particular: the prompt
+assigned the built S5 spec half for the **twenty-fifth** time (**C-STOP-8**). Its premise is stale
+in the same three ways runs 48–59 measured, and this run escalated the one item that had **never**
+reached Brandon — B-19's product consequence — rather than re-sending the standing banner.

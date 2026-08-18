@@ -11679,3 +11679,155 @@ branch deleted, no deploy of any kind. **The production relay was not contacted 
 no keystore, no emulator, no Gmail. **No secret was read, printed or echoed** — none was opened. No
 `.appdata` original touched. Terra's territory was read, never written. The JDK 17 install was made
 **inside this disposable container only**.
+
+---
+
+## Sixtieth cloud iteration — 2026-08-18 (Linux sandbox): the twenty-fifth assignment of a built slice, and the enum that let B-19 happen now refuses to let the next one
+
+**Assigned:** S5's spec half — amend §4.3 with the `entitlement_ack` body, add the vector via
+`generate.mjs`, close PQ-A2-1/-2/-3. **Declined, for the twenty-fifth consecutive run, and verified
+instead rather than asserted from the records.**
+
+### Milestone 1 — rule one, and the freshness the whole run rests on (C-RET-7)
+
+`git fetch --all --prune` in both trees, before anything was read. It earned its keep again: **both
+checkouts came up detached and stale — the android tree was 231 commits behind
+`origin/claude/android-a0-probe`.** Nothing was compared, branched or reported until after the fetch.
+
+| measured after fetch | value |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`** — unmoved since 2026-08-12 |
+| android `main` | **`ebfaf81`** — unmoved since 2026-08-12 |
+| open PRs, `careerseeker` | **18**, every one still **draft** |
+| open PRs, `careerseeker-android` | **6**, every one still **draft** |
+| merged / closed / undrafted by anyone | **none** |
+
+**Return day is today and it has passed with nothing landed.** `RETURN-DAY.md` §3 is still safe to
+execute exactly as printed.
+
+### Milestone 2 — the assigned slice, re-verified from the repository rather than from the banner (C-STOP-8)
+
+Every item of the assignment already exists, and this run measured each one rather than citing the
+previous twenty-four runs that said so:
+
+```
+git merge-base --is-ancestor 7328a0b origin/main   -> exit=1   (still off main)
+8575539 2026-08-09  S5: define the entitlement_ack body, and say what the size cap actually measures
+22b028e 2026-08-09  S5: pin section 4.3.3 with two entitlement_ack vectors, generated not hand-written
+7328a0b 2026-08-12  S5: add the invalid-unknown-field vector, closing PQ-A2-3 and B-6
+```
+
+Read out of `docs/Sync-Protocol.md` at the pin, not out of a commit message: §4.3.3's body at
+**lines 318-320** (`product_id`, `acknowledged_at`, `order_id` OPTIONAL) closes **PQ-A6-1**; the
+ciphertext cap at **118** and **656** closes **PQ-A2-1**; `decrypt_failed` for structural rejection
+at **103**, **601** and **657** closes **PQ-A2-2**; `invalid-unknown-field.json` is present, closing
+**PQ-A2-3**.
+
+**The one command the prompt asked for was run, and it passes** — on work that already exists:
+
+```
+node docs/sync-vectors/generate.mjs --check      # at pin 7328a0b
+#   -> OK: 29 vector files match the generator.   exit=0
+```
+
+**The prompt's pin `679a317` is still stale** — it is **`7328a0b`**, and has been since 2026-08-12.
+Re-authoring any of this would rewrite bytes a second repository is pinned to: the cross-repo drift
+event the prompt itself forbids.
+
+### Milestone 3 — the slice this run actually did: B-19's defect class, closed at the enum (C-KIND-1)
+
+Run 58 found that `entitlement_ack` had no production caller and fixed the instance. **This run went
+after the reason the instance was possible.** The defect was never a wrong route — it was that
+**nothing ever asked where a received kind lands.** A kind could be added to `PayloadKind`, spec'd,
+vector-covered and given an applier without anyone stating its destination, and `entitlement_ack`
+sat in exactly that state for nine days: accepted, counted, and dropped into the replica applier's
+`else` branch with no layer reporting a failure.
+
+Two things were prose that code could not read:
+
+- **direction** was a `// engine -> phone` comment, so the engine→phone set had to be written out a
+  second time wherever it was needed. It is now a `flow` property on every constant, and
+  `ENGINE_TO_PHONE_KINDS` is **derived** from it rather than restated;
+- **the four kinds the replica projects** appeared as prose in **three** separate KDoc blocks
+  (`SyncPump`, `PullPolicy`, `EntitlementRoute`). Now one declaration those blocks can point at.
+
+The three destination sets — `PROJECTED_BY_REPLICA`, `ROUTED_OUTSIDE_REPLICA`,
+`NOT_PROJECTED_IN_V1` — **partition** the derived engine→phone set, and `PayloadKindCoverageTest`
+fails until a new engine→phone kind is placed in exactly one of them.
+
+```
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 scripts/core-probe.sh --rerun
+#   before: BUILD SUCCESSFUL, 5 executed -> 299 tests, 0 failed, 0 skipped, across 20 classes
+#   after:  BUILD SUCCESSFUL, 5 executed -> 304 tests, 0 failed, 0 skipped, across 21 classes
+```
+
+**Bounds, stated here and in the test file rather than left to a reader to discover.** This does
+**NOT** prove a production caller exists. `ROUTED_OUTSIDE_REPLICA` would have contained
+`entitlement_ack` on 2026-08-09 and this test would have passed. The guard for *that* case is
+`EntitlementRoutingApplierTest`'s negative control (run 58); **this is the wider, weaker net**, and
+it catches the kind nobody classified at all — which is the state `entitlement_ack` was in before
+anyone looked. **B-19 is not closed by this and its status is unchanged.**
+
+### Milestone 4 — the assertions were proved capable of failing (C-KIND-2)
+
+A test that cannot go red is not evidence. Three mutations, each reverted immediately:
+
+| mutation | result |
+| --- | --- |
+| `ROUTED_OUTSIDE_REPLICA = emptySet()` — the pre-B-19 state, `entitlement_ack` unclassified | **1 failed** (`every engine to phone kind is classified exactly once`) |
+| `SNAPSHOT` added to `NOT_PROJECTED_IN_V1` — one kind, two destinations | **1 failed** (same test, disjointness branch) |
+| `CONFLICT` flipped to `PHONE_TO_ENGINE` — the comment-drift the `flow` property replaces | **2 failed** (`flow matches section 4-3's direction tables`, `no phone to engine kind is classified as something the phone receives`) |
+
+`git diff --stat` after restore showed the intended change and nothing else.
+
+**Two Kotlin warnings are reported by this build** — `PairingSessionTest.kt:53:30` and
+`RelayClientTest.kt:334:28`, both *"No cast needed"*. **They are pre-existing and neither file was
+touched this run** (`git status` shows only `Protocol.kt` modified and the new test added), so they
+cannot come from this change. Recorded rather than quietly left, because the house baseline elsewhere
+is stated as zero warnings.
+
+### Milestone 5 — no drift from this run (C-PIN-4)
+
+`diff -r` of the vendored corpus against the pinned tree at `7328a0b`, taken **after** this run's
+commit: **silent, `exit=0`, 29/29 byte-identical.** `VECTORS.lock` unedited; **the pin did not move**
+(moving it is **H7**, Brandon's). No file under `docs/sync-vectors/` was written in either repo.
+
+### Milestone 6 — coordination
+
+Terra's `autonomy/codex-state:STATE.md` read before any write: heartbeat **2026-08-12T20:28:36**,
+**COMPLETE**, **files claimed: none**. **No collision** — this run's only source edits are android
+`:core` Kotlin, which is not Terra's territory under any reading. `autonomy/claude-state` updated
+with this run's heartbeat and claims.
+
+### Milestone 7 — status, honestly
+
+**No rung's status changed.** S0 DONE; S1 DONE (successor stack costed, not landed); S2/S3/S4/S6/S7
+PARTIAL; **S5 PARTIAL** (spec + emitter + phone `:core` route landed; `:app` composition root
+outstanding, **B-19**); S8 PARTIAL/BLOCKED on **B-5**. This run added a guard, not a rung.
+
+**A push notification WAS sent this run, and the reason it is not fatigue.** Run 57 escalated the
+standing state (loop firing on a built slice, everything human-blocked) and runs 58–59 correctly
+declined to re-send it. **B-19 was found at run 58 — after that escalation — and has never reached
+Brandon.** It is the one item in the queue with a user-visible product consequence: **Pro cannot
+unlock on any phone built from this branch until the `:app` composition root exists.** Return day is
+today. Sending the standing banner again would be fatigue; sending a defect discovered after the last
+message is the routine doing its job.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 18 `careerseeker` PRs and the 6 android drafts are
+exactly as found, and **#53's fate stays Brandon's**. **No vector byte was written in either repo** —
+corpus 29/29 byte-identical to pin `7328a0b`, `diff -r` silent, `exit=0`; **the pin did not move
+(H7)** and `VECTORS.lock` was not edited. **No `:app` file was written** — not one; the `:app`
+composition root is **B-19** and writing it blind is what this program forbids. **Nothing was written
+in the engine repo at all** except `STATE.md` on the docs-only `autonomy/claude-state` branch: no
+C#, no `docs/Sync-Protocol.md`, no `generate.mjs`, no `ci.yml`, **no `$ExpectedOfflineTotal`** — so
+this run adds no pin-toucher, no new stop to the landing plan, and opens no nineteenth engine PR.
+**The android gate was not run and no result for it is claimed** — `checkCoreIsAndroidFree`,
+`:app:test`, `:app:assembleDebug` and `:app:lintDebug` all need the Android SDK this host cannot
+reach (**B-7**); the only gate task executed here is `:core:test` via `scripts/core-probe.sh`.
+**`Verify-Alpha.ps1` was not run** — this is Linux, no .NET, no Windows box. No history rewrite, no
+branch deleted, no deploy of any kind. **The production relay was not contacted at all, not even
+`GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no Play Billing
+code, no keystore, no emulator, no Gmail. **No secret was read, printed or echoed** — none was
+opened. No `.appdata` original touched. Terra's territory was read, never written. The JDK 17
+install was made **inside this disposable container only**.
