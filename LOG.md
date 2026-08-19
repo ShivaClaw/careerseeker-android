@@ -11974,3 +11974,123 @@ production relay was not contacted at all, not even `GET /v1/health`.** No Play,
 console; no accounts, no purchases, no Play Billing code, no keystore, no emulator, no Gmail. **No
 secret was read, printed or echoed** — none was opened. Terra's territory was read, never written.
 The JDK 17 install was made **inside this disposable container only**.
+
+---
+
+## Run 62 — 2026-08-19. The twenty-seventh assignment of a built slice; the run that opened the two STOPs nobody had looked inside.
+
+**Fetch first, and it earned its keep again: both checkouts arrived detached at a stale `main`** —
+the android tree **235** commits behind `origin/claude/android-a0-probe`. Every number below was
+taken after `git fetch --all --prune` in both trees.
+
+### Milestone 1 — the assignment, declined for the twenty-seventh time and verified instead (C-STOP-10)
+
+The prompt assigned S5's spec half: amend §4.3, add the vector, close PQ-A2-1/-2/-3. **It has been
+built since 2026-08-09** — `8575539`, `22b028e`, `7328a0b`, on the `claude/s5-*` drafts. Verified
+here, not taken from the banner: `git merge-base --is-ancestor 7328a0b origin/main` **exits 1**, so
+the work is real and **not on `main`**; `main` carries **26** vectors, the pin **29**. The prompt's
+one requested command **was run**, at the pin: **`OK: 29 vector files match the generator.`,
+`exit=0`**. The prompt's pin `679a317` is still stale — it is **`7328a0b`** — and its "S5 is NOT
+STARTED" remains wrong.
+
+### Milestone 2 — freshness: return day came and went (C-RET-9)
+
+Return day was **2026-08-18**. It is now **2026-08-19**. `careerseeker` `main` is **`aac05f3`**,
+android `main` **`ebfaf81`**, both unmoved since **2026-08-12**. **18** open engine PRs and **6**
+android drafts, **all still draft — none merged, closed or undrafted**. **No item in RETURN-DAY §5's
+human queue (H1–H8) has been acted on.** Terra's `autonomy/codex-state` heartbeat is unchanged at
+**2026-08-12T20:28:36**, **"COMPLETE… the ladder is exhausted"**, **files claimed: none**.
+
+### Milestone 3 — the landing plan has not decayed (C-LAND-8)
+
+§3 was last revalidated at runs 49/51/52. Re-measured against **live PR heads** fetched this
+morning: all **7** landing branches match their PR's head SHA exactly, **0 mismatches**. All three
+stop-count configurations reproduce: **#53 closed = 2**, **all 7 leaves = 3**, **#53 closed with #49
+first = 3** — the **+1** order penalty intact. The plan is still exactly executable.
+
+### Milestone 4 — the slice: both STOPs, opened for the first time (C-RES-1, C-RES-2)
+
+Re-validating a plan a fourth time is not a slice. **What had never been done is opening the
+conflicts.** §3 describes the two STOPs as a five-file list and a rule; nobody had run them. Both
+were replayed as **real merges** onto this morning's `main`, in §3's recommended order, #53 closed.
+
+| | files | hunks | in dispute |
+| --- | --- | --- | --- |
+| **STOP 1** (#52) | 5 | **11** | one number-pair, eleven times. `SyncHarness/Program.cs` **auto-fuses** |
+| **STOP 2** (#49) | 6 | **7** | the same pair — **plus one `using` line**: `System.Buffers.Binary` vs `System.Net` |
+
+**That single `using` directive is the entire source-code conflict in the six-merge landing.**
+In all 18 hunks each side's text is identical but for the digits, so *"keep both sides' prose"* has
+real work only in `Verify-Alpha.ps1`'s pin comment, where the two sides wrote **different
+provenance paragraphs**. Both kept, each scoped to *"on its own branch"*, one line added for the
+merged arithmetic.
+
+### Milestone 5 — the number is derivable, and disjointness was measured rather than assumed (C-RES-3, C-RES-4)
+
+§3 says **do not pre-fill the pin**, because §10.3's `806` and the fleet's `832` were wrong. Those
+failed by *assuming* disjointness. Here it was **measured, three ways**:
+
+- **Line-set superset.** Every line each side adds to `SyncHarness/Program.cs` survives the fuse —
+  **#51 +51, #52 +38, #49 +1292 — 0 missing in all three.**
+- **Call counts.** `Check(` at STOP 1: base **97**, +5, +4, fused **106** — exactly additive.
+- **Provenance.** #49 forked at `00b3705` (**598**, SyncHarness **130**) and is **793** (**325**),
+  so its **entire** +195 is SyncHarness; `main`'s +13 (`598 → 611`, R6/R7 scorer assertions) is
+  therefore disjoint from it by construction. That is precisely the overlap §11.3 caught with #53.
+
+`611 + 6 + 4 + 195 = **816**`; `130 + 6 + 4 + 195 = **335**`.
+
+**`816` is a PREDICTION and is labelled one everywhere it appears.** `Verify-Alpha.ps1` was **not**
+run and cannot be — Linux, no .NET, no `pwsh`. The drift trap is what makes the value safe to
+carry: a wrong derivation throws loudly on the number. **If the gate reports something else, the
+gate is right.**
+
+### Milestone 6 — the landed tree is coherent short of the gate (C-RES-5)
+
+After both resolutions: **zero conflict markers** anywhere in the tree, and **every**
+`Assert-Contains` string naming the totals resolves to a doc that contains it — the drift trap
+satisfied **statically**, which is the half of it that does not need Windows. Landed corpus **30**
+files, **`OK: 30 vector files match the generator.`, `exit=0`**, and the single file it gains over
+the phone's pin is **`pairing-high-bit-confirm.json`** — §3's re-pin box and **H7**, confirmed by
+replay rather than forecast.
+
+### Milestone 7 — no drift (C-VEC-5)
+
+Vendored corpus re-diffed against pin `7328a0b`: **29/29, `diff -r` clean, `exit=0`**,
+`git status --porcelain core/src/test/resources/` **empty**. `VECTORS.lock` unedited; **the pin did
+not move (H7).**
+
+### Milestone 8 — status, honestly
+
+**No rung's status changed.** S0 DONE; S1 DONE (successor stack costed, not landed);
+S2/S3/S4/S5/S6/S7 PARTIAL; S8 PARTIAL/BLOCKED on **B-5**. **B-19 is unmoved** — nothing in `:app`
+was written. **This run advanced no rung and closed no blocker.** What it did was make the most
+error-prone hour of **H2** mechanical: the human now knows, before starting, that there is one
+`using` line and one number in the whole landing, and has a check-value the gate will confirm or
+reject loudly.
+
+**No push notification was sent this run.** Run 57 escalated exactly this standing state — loop
+firing on a built slice, everything human-blocked (**B-18** attempt 5) — and run 59 escalated
+**B-19**. Nothing has changed since: no rung moved, no blocker opened or closed, nothing merged,
+and this run's finding is a convenience for work already queued as H2, not a new demand on Brandon.
+Re-sending the same banner on every firing is the notification fatigue the routine exists to avoid.
+**This is a come-up-empty, all-healthy run, and it says so.**
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 18 `careerseeker` PRs and the 6 android drafts are
+exactly as found, and **#53's fate stays Brandon's**. **The six merges were replayed in a
+disposable scratch clone under `/tmp` only** — **no engine branch was pushed, no PR opened, no
+engine ref updated**, and the resolutions exist as measurement and as a written recipe, nowhere
+else. **No vector byte was written in either repo** — corpus 29/29 byte-identical to pin `7328a0b`,
+`git status` on the resource tree empty; **the pin did not move** and `VECTORS.lock` was not
+edited. **No `:app` file was written** — not one; **B-19** stays open. **Nothing was written in the
+engine repo at all** except `STATE.md` on the docs-only `autonomy/claude-state` branch: no C#, no
+`docs/Sync-Protocol.md`, no `generate.mjs`, no `ci.yml`, **and `$ExpectedOfflineTotal` was not
+moved on any pushed branch** — so this run adds no pin-toucher, no new stop to the landing plan,
+and opens no nineteenth engine PR. **`Verify-Alpha.ps1` was not run and no result for it is
+claimed** — `816` is derived and labelled a prediction. **The android gate was not run either**;
+`checkCoreIsAndroidFree`, `:core:test`, `:app:test`, `:app:assembleDebug` and `:app:lintDebug` all
+need tooling this host lacks (**B-7**), and **no Kotlin was written this run**, so none was needed.
+No history rewrite, no branch deleted, no deploy of any kind. **The production relay was not
+contacted at all, not even `GET /v1/health`.** No Play, Google or OAuth console; no accounts, no
+purchases, no Play Billing code, no keystore, no emulator, no Gmail. **No secret was read, printed
+or echoed** — none was opened. Terra's territory was read, never written.

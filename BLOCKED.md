@@ -2712,3 +2712,39 @@ still open and still Brandon's**, and nothing here chooses among its three optio
 ### B-1, B-2, B-4, B-5, B-8, B-9, B-12, B-13, B-14, B-17 — untouched this run
 
 None was worked, none moved, and none is re-derived here.
+
+### B-18 status 2026-08-19 (run 62) — attempt 6, and the only new fact is the date
+
+**Symptom, unchanged.** The stored scheduler prompt assigns S5's spec half, which has been built
+since 2026-08-09. Run 62 is the **twenty-seventh** firing. The prompt is scheduler configuration,
+not a file in either checkout, so **no session can fix this from inside the repos**.
+
+**Attempts.** 1–4 were a refusal, a mission-doc banner, a `STATE.md` banner and a
+notification-shaped request; **attempt 5 (run 57) sent the escalation to Brandon by push
+notification**, naming the merge decision as the bottleneck. Attempt 6 is this entry.
+
+**What is new, and it is only this: return day (2026-08-18) has passed** and **no H1–H8 item has
+been acted on** (**C-RET-9**) — `main` unmoved since 2026-08-12 in both repos, 18 + 6 PRs still
+open and draft.
+
+**No notification was sent this run, deliberately.** Run 57 already escalated this exact standing
+state and run 59 escalated **B-19**; nothing has changed since, and re-sending the same banner on
+every firing is the fatigue that would make the next real escalation ignorable. **Silence here is a
+decision, not an omission.**
+
+**Smallest human unblock.** Edit or disable the scheduled prompt. Failing that, act on **H1** and
+**H2** — the queue that every remaining rung is waiting behind.
+
+### The `816` prediction is NOT a new blocker — it is H2, already queued
+
+Recorded here only so nobody opens one for it. Run 62 derived `$ExpectedOfflineTotal = **816**`
+(SyncHarness **335**) for the post-landing tree and **could not measure it**: `Verify-Alpha.ps1`
+needs Windows + .NET and this is Linux (**B-7**'s engine-side twin). That is **not** a blocker —
+it is exactly what **H2** exists to do, and the drift trap makes a wrong prediction a **hard
+failure on the number**, never silent drift. **If the gate reports something other than 816, the
+gate is right**; write what it measured and sweep every count-reporting doc in the same commit.
+
+### B-1, B-2, B-4, B-5, B-6, B-8, B-9, B-12, B-13, B-14, B-16, B-17, B-19 — untouched this run
+
+None was worked, none moved, and none is re-derived here. **B-19 in particular is unmoved: no
+`:app` file was written this run.**
