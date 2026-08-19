@@ -190,6 +190,50 @@ from `CLAUDE.md`'s drift trap is:
 value is whatever `Verify-Alpha.ps1` reports *after* step 0. It throws on a mismatch, so a wrong
 guess is a hard failure, not silent drift — the drift trap is protective here.
 
+> **Added run 62, 2026-08-19 — both STOPs, run for real, and what you actually face at each.**
+> Until this run the two STOPs were a file list and a rule. Nobody had opened the conflicts. Both
+> were replayed as **real merges** onto a `main` fetched this morning, in §3's recommended order,
+> #53 closed (**C-RES-1**, **C-RES-2**) — and they are far more mechanical than the rule implies.
+>
+> | | files | hunks | what is actually in dispute |
+> | --- | --- | --- | --- |
+> | **STOP 1** (#52) | 5 | 11 | **one number-pair, eleven times**: `SyncHarness 136/**617**` (ours) vs `134/**615**` (theirs). `tests/SyncHarness/Program.cs` **auto-fuses — it is not conflicted** |
+> | **STOP 2** (#49) | 6 | 7 | the same number-pair (`140/621` vs `325/793`) — **plus one `using` line** in `SyncHarness/Program.cs`: `System.Buffers.Binary` (ours) vs `System.Net` (theirs). **Keep both.** That single directive is the entire source conflict in the whole landing |
+>
+> **There is no prose to reconcile.** In all 18 hunks each side's text is identical except the
+> digits; "keep both sides' prose" has real work to do only in `Verify-Alpha.ps1`'s pin comment,
+> where the two sides wrote **different provenance paragraphs** for their own deltas. Keep both
+> paragraphs, scope each to *"on its own branch"*, and add one line stating the merged arithmetic.
+>
+> **The number is derivable, and it is `816` — SyncHarness `335`.** This does not contradict the
+> paragraph above: §10.3's `806`/`832` failed because disjointness was *assumed*. Here it was
+> **measured**, three ways (**C-RES-3**, **C-RES-4**):
+>
+> - Every line each side adds to `SyncHarness/Program.cs` is present in the fused file — **51 + 38 +
+>   1292 added lines, 0 missing**. Nothing is dropped or overwritten.
+> - `Check(` counts are exactly additive at STOP 1: base **97**, +5, +4, fused **106**.
+> - #49's **entire** +195 is SyncHarness (`325 − 130`), so `main`'s +13 (`598 → 611`, R6/R7 scorer
+>   assertions) is disjoint from it by construction, which is the trap §11.3 caught.
+>
+> So `611 + 6 + 4 + 195 = **816**`, and `130 + 6 + 4 + 195 = **335**`.
+>
+> **Treat `816` as a check-value, not as the answer.** No cloud session can run
+> `Verify-Alpha.ps1` — this is Linux, no .NET, no `pwsh` (**C-LAND-7**, **C-ENV-1**) — so **`816` is
+> a prediction and is labelled one wherever it appears.** The drift trap is exactly what makes it
+> safe to carry: if the derivation is wrong the run throws, loudly, on the number. If the gate
+> reports something else, **the gate is right** — write what it measured and sweep the docs.
+>
+> **The fully-landed tree was verified coherent, short of the gate** (**C-RES-5**): after both
+> resolutions, **zero conflict markers** anywhere in the tree, and **every** `Assert-Contains`
+> string in `Verify-Alpha.ps1` resolves to a doc that contains it — the drift trap satisfied
+> statically, which is the part of it that does not need Windows. The landed corpus is **30 files**,
+> `OK: 30 vector files match the generator.`, `exit=0`, and the one file it gains over the phone's
+> pin is **`pairing-high-bit-confirm.json`** — §3's re-pin box and **H7**, confirmed by replay
+> rather than forecast.
+>
+> **This changes no decision and lands nothing.** It was measured in a disposable scratch clone;
+> **no engine branch was pushed, no PR opened, nothing merged**, and step 0 (#53) is still yours.
+
 ---
 
 ## 4. Android repo — 6 open drafts, unchanged
