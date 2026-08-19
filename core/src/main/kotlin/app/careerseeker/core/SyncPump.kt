@@ -12,6 +12,13 @@ enum class RelayFailure {
     PAIRING_UNKNOWN,
     UNAUTHORISED,
     TOO_LARGE,
+
+    /**
+     * The relay refused the envelope's shape (400). Distinct from [UNAVAILABLE] on purpose: this
+     * one says the phone built something wrong, and reporting it as an unavailability is what
+     * PQ-PSH-1 was opened about.
+     */
+    REJECTED,
     CONFLICT,
     UNAVAILABLE,
     ;
@@ -23,6 +30,7 @@ enum class RelayFailure {
             RelayResult.PairingUnknown -> PAIRING_UNKNOWN
             RelayResult.Unauthorised -> UNAUTHORISED
             RelayResult.TooLarge -> TOO_LARGE
+            RelayResult.Rejected -> REJECTED
             is RelayResult.Conflict -> CONFLICT
             is RelayResult.Unavailable -> UNAVAILABLE
         }

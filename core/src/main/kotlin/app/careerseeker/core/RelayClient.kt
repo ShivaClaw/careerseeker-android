@@ -33,6 +33,28 @@ sealed interface RelayResult<out T> {
     /** Envelope exceeded the relay's limit (HTTP 413, §3.1). */
     data object TooLarge : RelayResult<Nothing>
 
+    /**
+     * HTTP 400 — the relay could not parse the body, or the envelope failed its header-shape
+     * check (`relay/src/channel.ts:143-159`).
+     *
+     * Unlike every other case here this one indicts **this side**: a conforming phone does not
+     * compose an envelope the relay refuses to shape-check, so it is a defect in the sender and it
+     * is permanent for these bytes. Kept distinct from [TooLarge] because the remedy differs — a
+     * malformed envelope is a bug to fix, an oversized one is a payload to split (§4.4). This is
+     * the engine's `RelayPushResult.Rejected` decision, matched deliberately (mission §1's
+     * engine-compatible interpretation rule).
+     *
+     * A `data object` rather than the engine's `Rejected(string Detail)`, and the difference is
+     * considered rather than accidental: this interface carries a payload only where a *variable*
+     * the caller must act on rides along ([Conflict.latest], [Unavailable.detail], which differs
+     * per transport failure). A 400 carries no such input — the remedy is "fix whatever composed
+     * these bytes" whatever the relay's wording — and the engine's own detail is a constant
+     * string. PQ-PSH-1 warns that the phone's mapping needs its own derivation rather than a
+     * transcription; this is that derivation, and it matches the engine where it counts: 400 is
+     * terminal, and it is not [TooLarge].
+     */
+    data object Rejected : RelayResult<Nothing>
+
     /** Transport or 5xx failure after the configured retries. */
     data class Unavailable(val detail: String) : RelayResult<Nothing>
 
@@ -285,6 +307,15 @@ class RelayClient(
                     HttpStatusCode.Conflict -> return RelayResult.Conflict(conflictLatest(response.bodyAsText()))
                     HttpStatusCode.PayloadTooLarge -> return RelayResult.TooLarge
 
+                    // 400 is "not ever" too, and it used to fall to the `else` below — so a
+                    // sender-side defect was retried the full budget and then reported as
+                    // Unavailable, i.e. presented to the user as being offline while the relay was
+                    // answering promptly and saying exactly what was wrong (PQ-PSH-1). Version
+                    // skew reaches this with no bug at all: a relay that tightens its shape check
+                    // 400s every push from an older phone, which is precisely when "the network is
+                    // down" is the most expensive possible misdiagnosis.
+                    HttpStatusCode.BadRequest -> return RelayResult.Rejected
+
                     // 5xx and 429 are the only retryable answers: they say "not now", whereas
                     // every 4xx above says "not ever", and retrying those just burns battery
                     // and adds load to a relay that already told us the answer.
@@ -327,6 +358,7 @@ private inline fun <T, R> RelayResult<T>.map(transform: (T) -> R): RelayResult<R
     is RelayResult.PairingUnknown -> this
     is RelayResult.Unauthorised -> this
     is RelayResult.TooLarge -> this
+    is RelayResult.Rejected -> this
     is RelayResult.Conflict -> this
     is RelayResult.Unavailable -> this
 }
@@ -344,6 +376,7 @@ private inline fun <T, R> RelayResult<T>.flatMap(transform: (T) -> RelayResult<R
     is RelayResult.PairingUnknown -> this
     is RelayResult.Unauthorised -> this
     is RelayResult.TooLarge -> this
+    is RelayResult.Rejected -> this
     is RelayResult.Conflict -> this
     is RelayResult.Unavailable -> this
 }

@@ -54,6 +54,24 @@ enum class DropReason {
      * mark behind an envelope that can never fit.
      */
     TOO_LARGE,
+
+    /**
+     * The relay answered 400 — it could not parse the body, or the envelope failed its
+     * header-shape check. A conforming phone does not compose such an envelope, so this is a
+     * defect in whatever built it, and it is permanent for these bytes: re-pushing would wedge
+     * every later mark behind an envelope the relay will refuse forever.
+     *
+     * **Dropped rather than kept, and that is the half PQ-PSH-1 left open.** The question was
+     * drop-or-quarantine, on the grounds that dropping silently is its own data-loss question. It
+     * is answered here by [TOO_LARGE]'s precedent rather than by a new mechanism: both are
+     * sender-side defects the relay never stored, so `last` is unmoved and §6.2 makes the
+     * resulting gap legal for the receiver. Keeping the bytes buys nothing — nothing on the phone
+     * can repair an envelope this build composed wrongly — while blocking every later mark behind
+     * it, which is a strictly larger loss than the one drop. Nor is it silent: it leaves as
+     * [PushOutcome.Dropped] carrying this reason, where [PushOutcome.Retry] was the outcome that
+     * said nothing.
+     */
+    REJECTED,
 }
 
 /** What the transport should do next. */
@@ -262,6 +280,15 @@ class OutboundQueue(private val factory: OutboundEnvelopeFactory) {
             RelayResult.TooLarge -> {
                 entries.removeFirst()
                 PushOutcome.Dropped(DropReason.TOO_LARGE)
+            }
+
+            // 400 is the same shape as 413: the relay refused what this build composed, never
+            // stored it, and will refuse it identically forever. Before PQ-PSH-1 this arrived as
+            // Unavailable and became Retry, so a sender-side defect was re-sent indefinitely and
+            // surfaced to the user as "waiting for network" — the one diagnosis that hides it.
+            RelayResult.Rejected -> {
+                entries.removeFirst()
+                PushOutcome.Dropped(DropReason.REJECTED)
             }
 
             RelayResult.Unauthorised -> halted(SendHalt.UNAUTHORISED)

@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -285,7 +286,21 @@ class RelayClientTest {
         assertEquals(RelayResult.Unauthorised, pushWith(HttpStatusCode.Unauthorized))
         assertEquals(RelayResult.Unauthorised, pushWith(HttpStatusCode.Forbidden))
         assertEquals(RelayResult.TooLarge, pushWith(HttpStatusCode.PayloadTooLarge))
+        assertEquals(RelayResult.Rejected, pushWith(HttpStatusCode.BadRequest))
         assertEquals(RelayResult.Conflict(), pushWith(HttpStatusCode.Conflict))
+    }
+
+    @Test
+    fun `a 400 is the sender's defect and is kept distinct from an oversized body`() = runTest {
+        // The relay 400s when the body will not parse or the envelope fails its header-shape
+        // check (channel.ts:143-159). Unlike every other answer this one indicts the phone, and
+        // the remedy differs from 413's: a malformed envelope is a bug to fix, an oversized one
+        // is a payload to split (§4.4). This is the engine's RelayPushResult.Rejected decision,
+        // matched deliberately per the engine-compatible interpretation rule.
+        assertNotEquals(
+            RelayResult.TooLarge,
+            clientOver(MockEngine { respondError(HttpStatusCode.BadRequest) }).push("{}"),
+        )
     }
 
     @Test
@@ -315,12 +330,46 @@ class RelayClientTest {
     @Test
     fun `a 4xx is a decision and is never retried`() = runTest {
         // Retrying "not ever" burns battery and adds load to a relay that already answered.
-        var calls = 0
-        val engine = MockEngine { calls++; respondError(HttpStatusCode.NotFound) }
-        val result = clientOver(engine).push("{}")
+        //
+        // This test asserted a general property about 4xx and witnessed it with 404 alone, which
+        // is how PQ-PSH-1's defect survived it: 400 was NOT in the mapping, fell to the retry
+        // branch, and was retried the full budget before being reported as an unavailability —
+        // while this test stayed green. It now enumerates every status the mapping calls
+        // terminal, so a status dropping out of that list fails here instead of quietly
+        // becoming retryable.
+        val terminal = listOf(
+            HttpStatusCode.NotFound to RelayResult.PairingUnknown,
+            HttpStatusCode.Unauthorized to RelayResult.Unauthorised,
+            HttpStatusCode.Forbidden to RelayResult.Unauthorised,
+            HttpStatusCode.PayloadTooLarge to RelayResult.TooLarge,
+            HttpStatusCode.BadRequest to RelayResult.Rejected,
+        )
 
-        assertEquals(RelayResult.PairingUnknown, result)
-        assertEquals(1, calls)
+        for ((status, expected) in terminal) {
+            var calls = 0
+            val engine = MockEngine { calls++; respondError(status) }
+            val result = clientOver(engine).push("{}")
+
+            assertEquals(expected, result, "status $status")
+            assertEquals(1, calls, "status $status was retried")
+        }
+    }
+
+    @Test
+    fun `405 and 426 are still retried, because the engine leaves them in its default too`() = runTest {
+        // Deliberately NOT widened. PQ-PSH-1 notes these take the same "not ever" path in
+        // principle, but the engine's RelayClient.cs maps only 400 to Rejected and leaves these in
+        // its default, and a phone terminal where the engine retries would be the "more correct
+        // than the engine" field bug the interpretation rule exists to prevent. Pinned so that
+        // widening the phone's terminal set alone has to fail a test that says why.
+        for (status in listOf(HttpStatusCode.MethodNotAllowed, HttpStatusCode.UpgradeRequired)) {
+            var calls = 0
+            val engine = MockEngine { calls++; respondError(status) }
+            val result = clientOver(engine).push("{}")
+
+            assertTrue(result is RelayResult.Unavailable, "status $status")
+            assertEquals(3, calls, "status $status")
+        }
     }
 
     @Test

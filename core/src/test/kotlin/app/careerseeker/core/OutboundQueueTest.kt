@@ -266,6 +266,48 @@ class OutboundQueueTest {
     }
 
     @Test
+    fun `a 400 drops only that envelope and the queue continues`() {
+        // The 413 case's twin: the relay refused what this build composed, so re-pushing wedges
+        // every later mark behind bytes the relay will refuse forever (PQ-PSH-1).
+        val (q, _) = queue()
+        q.enqueueOutcome("a1")
+        q.enqueueOutcome("a2")
+        q.next()
+
+        assertEquals(PushOutcome.Dropped(DropReason.REJECTED), q.onPushed(RelayResult.Rejected))
+
+        assertEquals(1, q.depth())
+        assertNull(q.halted())
+        assertEquals("a2", pushOf(q.next()).id)
+    }
+
+    @Test
+    fun `a rejected envelope is never reported as a retry, which is what hid it`() {
+        // The negative control for PQ-PSH-1's actual symptom. Before the fix a 400 reached this
+        // method as RelayResult.Unavailable — the relay client had already spent its whole retry
+        // budget on it — and Unavailable maps to Retry, "keep the bytes, offline is not a
+        // data-loss event". So the queue re-sent a defective envelope forever and the phone
+        // showed "waiting for network" while the relay was answering promptly and saying exactly
+        // what was wrong. This asserts the two are now distinguishable at this boundary: the same
+        // envelope, one answer per status, and only one of them keeps the bytes.
+        val (q, _) = queue()
+        q.enqueueOutcome("a1")
+        q.next()
+
+        val rejected = q.onPushed(RelayResult.Rejected)
+        assertEquals(PushOutcome.Dropped(DropReason.REJECTED), rejected)
+        assertNotEquals(PushOutcome.Retry, rejected)
+        assertEquals(0, q.depth())
+
+        val (q2, _) = queue()
+        q2.enqueueOutcome("b1")
+        q2.next()
+
+        assertEquals(PushOutcome.Retry, q2.onPushed(RelayResult.Unavailable("offline")))
+        assertEquals(1, q2.depth())
+    }
+
+    @Test
     fun `pairing_unknown is terminal and no clearing call revives it`() {
         val (q, _) = queue()
         q.enqueueOutcome("a1")

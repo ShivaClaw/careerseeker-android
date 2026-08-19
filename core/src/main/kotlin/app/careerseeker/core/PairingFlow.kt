@@ -344,7 +344,12 @@ class PairingFlow(
 
             // A completion the relay called too large is a bug in this build, not a race: the
             // body is a fixed handful of base64url fields and cannot approach any limit. Terminal.
-            RelayResult.TooLarge -> {
+            //
+            // A 400 is the same judgement for the same reason — the relay shape-checked what this
+            // build composed and refused it — so it aborts the same way rather than being retried
+            // as an unavailability (PQ-PSH-1). Both are RELAY_REFUSED because the user's remedy is
+            // identical: this build cannot pair, and pairing again will not change that.
+            RelayResult.TooLarge, RelayResult.Rejected -> {
                 settled = true
                 PairingStep.Aborted(PairingAbort.RELAY_REFUSED)
             }

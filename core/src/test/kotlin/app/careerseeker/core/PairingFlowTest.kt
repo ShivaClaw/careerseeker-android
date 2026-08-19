@@ -320,7 +320,14 @@ class PairingFlowTest {
 
     @Test
     fun `relay answers that foreclose the attempt are terminal, not retryable`() = runTest {
-        for (status in listOf(HttpStatusCode.Unauthorized, HttpStatusCode.NotFound, HttpStatusCode.PayloadTooLarge)) {
+        // BadRequest joins the list with PQ-PSH-1: a completion the relay shape-checked and
+        // refused is this build's defect, so retrying it cannot succeed.
+        for (status in listOf(
+            HttpStatusCode.Unauthorized,
+            HttpStatusCode.NotFound,
+            HttpStatusCode.PayloadTooLarge,
+            HttpStatusCode.BadRequest,
+        )) {
             val flow = flowOver(FakeRelay(status))
             assertEquals(
                 PairingStep.Aborted(PairingAbort.RELAY_REFUSED),
