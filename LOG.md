@@ -12108,3 +12108,142 @@ else**, so green means the tree is still unbroken — it **tests none of this ru
 7 passing is **not** evidence about **B-16**: it compares the phone against **the pin**, which is
 precisely the direction B-16 records as unchecked. **`Verify-Alpha.ps1` still has not run
 anywhere**, so **`816` remains a prediction** (**C-RES-4**), unchanged by this.
+
+---
+
+## Run 63 — 2026-08-19. The twenty-eighth assignment of a built slice; return day + 1, and the schedule located from a new angle.
+
+**Fetch first (rule one).** `git fetch --all --prune` in **both** checkouts before anything was read.
+The android checkout again arrived **detached at a stale `main`** (`ebfaf81`), as it has every run of
+this window; every number below was taken after the fetch, from `origin/claude/android-a0-probe`.
+
+### Milestone 1 — the assigned slice, declined for the twenty-eighth time (C-STOP-11)
+
+The scheduled prompt again assigned S5's spec half: amend §4.3 with the `entitlement_ack` body, add
+the vector via `generate.mjs`, close **PQ-A2-1/-2/-3**. **All four gates have been closed since
+2026-08-09/08-12.** Verified this run, not recalled:
+
+| commit | date | what it did |
+| --- | --- | --- |
+| `8575539` | 2026-08-09 | `docs/Sync-Protocol.md` **only**, +114/−3 — §4.3.3 body, ciphertext cap, `decrypt_failed` |
+| `22b028e` | 2026-08-09 | `entitlement-ack.json`, `entitlement-ack-no-order-id.json`, `index.json`, **and `generate.mjs`** |
+| `7328a0b` | 2026-08-12 | `invalid-unknown-field.json` (**PQ-A2-3**, closes **B-6**) |
+
+The prompt's one requested command **was run**, on the branch that carries the work:
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the generator.`**,
+**`exit=0`**. The spec text was read rather than assumed: §4.3.3 carries
+`{product_id, acknowledged_at, order_id?}` with `order_id` marked OPTIONAL; §3.1 states the cap on
+the **decoded ciphertext** (1 MiB, with the relay's `1,398,102`-char proxy); §7.2 states structural
+rejection reports **`decrypt_failed`** with no `malformed` code added.
+
+**Two prompt details remain stale**, both cheap to check and both flagged since run 48: the vendored
+pin is **`7328a0b`**, not `679a317` (moved 2026-08-12), and S5 is not "NOT STARTED" — spec, emitter
+and the phone-side `:core` route are all built. `git merge-base --is-ancestor 7328a0b origin/main`
+exits **1**: the work is real and **not on `main`**, which is a *landing* problem, not a *building*
+one. The prompt's own rule — *"verify it; do not trust this summary"* — is what caught all three.
+
+### Milestone 2 — return day + 1: nobody has acted (C-RET-10)
+
+Return day was **2026-08-18**; it has now passed by a day.
+
+| | measured this run |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`** — unmoved since **2026-08-12** (7 days) |
+| android `origin/main` | **`ebfaf81`** — unmoved |
+| engine PRs | **18 open, all draft**, none merged or closed |
+| android PRs | **6 open, all draft**, none merged, closed or undrafted |
+| **#53** (H1) | still open — the decision is still Brandon's |
+| Terra (`autonomy/codex-state`) | **COMPLETE**, *files claimed: none* — **no collision** |
+
+**No H1–H8 item has been acted on.** Every remaining rung needs a Windows gate, an emulator
+(**B-4**), a relay deploy, or a decision — see `RETURN-DAY.md` §5.
+
+### Milestone 3 — the landing plan has not decayed (C-LAND-10)
+
+All **7/7** landing branches still match their **live PR heads** — checked against the GitHub API,
+not against local refs alone — **0 mismatches**:
+
+```
+s8-harness-linux-reach c93e88d · s2-seq-bound 2be00fc · s2-transport-vocabulary b0b6c77
+s3-pairing-confirm-consumer edee32b · s6-outcome-disposition 94fd979
+s6-composition-root-decision f5e0c0a · s6-resume-reconciliation 8177353
+```
+
+`RETURN-DAY.md` §3's six merges, the two STOPs opened at run 62, and the `816` / SyncHarness `335`
+prediction all still describe the tree Brandon will land. **Nothing was re-derived that run 62
+already measured hours earlier** — this is a non-decay check, not a re-costing.
+
+### Milestone 4 — no vector drift (C-VEC-6)
+
+Vendored corpus re-diffed blob-for-blob against pin `7328a0b`: **29/29, `diff -r` silent,
+`exit=0`**. `main` still carries **26**. `VECTORS.lock` unedited; **the pin did not move (H7).**
+
+### Milestone 5 — B-7 re-measured, and its shape stated precisely (C-ENV-2)
+
+The egress boundary was re-tested rather than assumed, because a network policy is exactly the kind
+of thing that can change between runs. It has **not**:
+
+```
+dl.google.com/dl/android/maven2/  ->  curl (56) CONNECT tunnel failed, response 403
+repo1.maven.org/maven2/          ->  HTTP 200
+java -version                    ->  openjdk 21.0.10   (the image still ships 21, not 17)
+sdkmanager / adb / ANDROID_HOME  ->  absent
+```
+
+**This is an allowlist denial, not an absent network** — Maven Central answers 200 in the same
+session that Google's Android repo is refused at the proxy. That distinction is already B-7's
+substance (see the 2026-08-11 scope correction) and is **restated, not discovered**, here. Per
+`/root/.ccr/README.md` a 403 is an organization policy denial: **no mirror, no vendored AGP, no
+`ANDROID_HOME` fabrication was attempted.** `:core` remains reachable, `:app` remains not.
+
+### Milestone 6 — B-18: the schedule is not where the records could reach (C-CRON-1)
+
+B-18 attempt 2 records *"fix the prompt — not possible from here; it is stored scheduler
+configuration, not a file in either checkout."* That was an inference. This run had session cron
+tooling available and **checked it**: `CronList` → **`No scheduled jobs.`**
+
+So the recurring prompt is **not** a session-level cron job, and no tool in this session enumerates
+or edits it. It is account/environment-level scheduled-task configuration, reachable only from the
+surface Brandon started it from. **This does not unblock B-18 — it narrows where its unblock lives**,
+which is the difference between "somewhere in the config" and "not in either repo, and not in this
+session's job list." Attempts 3–5 put banners in `docs/CLAUDE-ANDROID-MISSION.md`, `STATE.md`, and a
+push notification; **all a banner can do is make the firing cheap, and this one was cheap** — the
+built-already conclusion was reached from the **first** document read.
+
+### Milestone 7 — status, honestly
+
+**No rung's status changed. No blocker was opened or closed. No rung advanced.** S0 DONE; S1 DONE
+(successor stack costed, not landed); S2/S3/S4/S5/S6/S7 PARTIAL; S8 PARTIAL/**BLOCKED** on **B-5**.
+**B-19 unmoved** — nothing in `:app` was written. This run verified; it did not build, and it does
+not dress a records update as progress.
+
+**No push notification was sent this run, and that is a decision rather than an omission.** Run 57
+escalated the standing state (loop firing on a built slice, everything human-blocked) and run 60
+escalated **B-19**'s product consequence — **both on 2026-08-18**, one day ago. Runs 61 and 62 fired
+today and each correctly declined to re-send. **This run found nothing Brandon has not already been
+told:** the slice is still built, the plan still holds, the corpus still matches, the boundary is
+unchanged, and the one genuinely new measurement (**C-CRON-1**) *narrows* a blocker rather than
+raising a new demand. A third "everything is waiting on you" inside two days is precisely the
+notification fatigue the routine exists to avoid. **This is a come-up-empty, all-healthy run, and it
+says so.** If a future run finds movement — a merge, a moved `main`, a decayed plan, a broken gate —
+that is the signal worth spending his attention on.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 18 `careerseeker` PRs and the 6 android drafts are
+exactly as found, and **#53's fate stays Brandon's**. **No vector byte was written in either repo** —
+corpus **29/29** byte-identical to pin `7328a0b`, `diff -r` silent, `git status` on the resource tree
+empty; **the pin did not move (H7)** and `VECTORS.lock` was not edited. **No `:app` file was
+written** — not one; **B-19** stays open. **No Kotlin, no C#, no `generate.mjs`, no
+`docs/Sync-Protocol.md`, no `ci.yml` was written**, and **`$ExpectedOfflineTotal` was not moved on
+any pushed branch** — this run adds no pin-toucher, no new stop to the landing plan, and opens no
+nineteenth engine PR. **Nothing was written in the engine repo at all** except `STATE.md` on the
+docs-only `autonomy/claude-state` branch. **`Verify-Alpha.ps1` was not run and no result for it is
+claimed** — there is no `pwsh` and no `dotnet` here, and `816` remains run 62's labelled
+**prediction**. **The android gate was not run either** — `checkCoreIsAndroidFree`, `:core:test`,
+`:app:test`, `:app:assembleDebug` and `:app:lintDebug` all need tooling this host lacks (**B-7**,
+re-measured above); **no gate result is claimed anywhere in this entry**. **No cron job was created,
+edited or deleted** — `CronList` was read-only, and the schedule is Brandon's to retire. No history
+rewrite, no branch deleted, no deploy of any kind. **The production relay was not contacted at all,
+not even `GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no Play
+Billing code, no keystore, no emulator, no Gmail. **No secret was read, printed or echoed** — none
+was opened. Terra's territory was **read, never written**.
