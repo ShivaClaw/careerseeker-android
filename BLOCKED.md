@@ -2748,3 +2748,35 @@ gate is right**; write what it measured and sweep every count-reporting doc in t
 
 None was worked, none moved, and none is re-derived here. **B-19 in particular is unmoved: no
 `:app` file was written this run.**
+
+---
+
+### B-18 status 2026-08-19 (run 63) — a new attempt: the schedule located, from the one angle a session has
+
+**The twenty-eighth firing.** Unchanged in substance: the prompt still assigns S5's spec half, still
+names the stale pin `679a317`, still calls S5 "NOT STARTED". All three are false against the repo
+(**C-STOP-11**), and the banner did its job again — the built-already conclusion came from the
+**first** document read, not the fifth derivation.
+
+**What is new.** Attempt 2 recorded *"fix the prompt — not possible from here; it is stored scheduler
+configuration"* as an **inference**. This run had session cron tooling and checked it:
+**`CronList` → `No scheduled jobs.`** (**C-CRON-1**). So the recurring prompt is **not** a
+session-level cron job, and nothing in this session enumerates or edits it. It is account- or
+environment-level scheduled-task configuration, reachable only from the surface Brandon created it
+from — not from either checkout, and not from any tool a firing session holds.
+
+**This does not unblock B-18.** It converts "somewhere in the configuration" into a bounded negative:
+**not in either repo, and not in this session's job list.** The blocker stands exactly as written.
+
+**Smallest human unblock — unchanged, and now precisely located.** Retire or repoint the scheduled
+task from the Claude Code surface it was created on (the web/app scheduled-tasks configuration for
+this account). Mission §7's terminal instruction is *"clear the goal"*; the stop condition was
+crossed at run 45 and executed at run 47 as `RETURN-DAY.md`. **If the routine is meant to keep
+running**, replace its "YOUR SLICE THIS ITERATION" section with: *read `RETURN-DAY.md` §5 and pick
+from the human queue, or verify and stop.* Everything the ladder has left needs a Windows gate, an
+emulator (**B-4**), a relay deploy, or a decision (**H1**, **H3**, **H8**) — none of which a cloud
+session can supply.
+
+**Cost to date.** Twenty-eight firings on a completed slice. The per-run cost is now small by design
+(attempts 3–5's banners), but a cheap wrong assignment is still a wrong assignment, and **only
+Brandon can stop it.**
