@@ -269,6 +269,32 @@ class SyncPumpTest {
         assertTrue(!pump.hasPendingRequest, "a request that never landed is not outstanding")
     }
 
+    /**
+     * The same rule as [PullPolicyTest]'s reopen cases, at the level a caller actually sees.
+     *
+     * `open()` is documented as the app-start, resume and **reconnect** entry point, so this is the
+     * ordinary lifecycle of a phone that backgrounds and comes back — not an exotic path. The ask
+     * that the relay accepted before the disconnect may have expired unanswered in the relay's
+     * TTL window, and nothing on the phone can tell. Asking again costs one snapshot; not asking
+     * costs the dashboard for the life of the process.
+     */
+    @Test
+    fun `reopening after an unanswered pull_request asks again`() = runTest {
+        val relay = FakeRelay(emptyList())
+        val replica = FakeReplica(cold()) { _, _ -> ApplyDisposition.APPLIED }
+        val pump = pumpOver(relay, replica, signer = null)
+
+        assertEquals(PullReason.COLD_START, pump.open().requestSent)
+        // The relay took it (pushStatus defaults to 201), so the latch is NOT released by
+        // onRequestFailed. The engine never answers -- it was off, or it polled after the TTL.
+        assertEquals(
+            PullReason.COLD_START,
+            pump.open().requestSent,
+            "a reconnect must re-ask; the first ask may have expired unanswered",
+        )
+        assertEquals(2, relay.pushes.size, "one pull_request per transport bring-up")
+    }
+
     // ---------------------------------------------------------------- pump(): transport
 
     @Test

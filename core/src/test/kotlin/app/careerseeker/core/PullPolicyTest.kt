@@ -166,6 +166,64 @@ class PullPolicyTest {
         request(policy.onEnvelope(2L, ApplyDisposition.AWAITING_SNAPSHOT, cold))
     }
 
+    // ---- the latch across a transport reopen ----
+
+    /**
+     * The release path [PullPolicy.onRequestFailed] does not cover, and the one that fails
+     * silently.
+     *
+     * A failed push re-arms the policy because the caller can see the push fail. Nobody can see an
+     * ask that the relay accepted and the engine never collected — the phone's evidence is
+     * identical to a healthy sync that is merely slow. Before `onOpen` released the latch, a cold
+     * phone in that state never asked again for the life of the process.
+     */
+    @Test
+    fun `a reopen re-asks when the first request was accepted but never answered`() {
+        val policy = PullPolicy()
+        assertEquals(PullReason.COLD_START, request(policy.onOpen(cold)).reason)
+        assertTrue(policy.hasPendingRequest)
+
+        // No onRequestFailed call: the push landed. The engine simply never answered it, and the
+        // transport has since dropped and come back.
+        assertEquals(
+            PullReason.COLD_START,
+            request(policy.onOpen(cold)).reason,
+            "a reconnected cold phone must ask again; the first ask may have expired unanswered",
+        )
+    }
+
+    /**
+     * The release is unconditional, so it also covers the warm replica whose §6.2 gap ask was
+     * latched when the transport went down. `onOpen` still returns None — a warm replica has
+     * nothing to ask for at open — but the latch must not survive to suppress the next gap.
+     */
+    @Test
+    fun `a reopen releases a gap request latched on a warm replica`() {
+        val policy = PullPolicy(gapThreshold = 32L)
+        request(policy.onEnvelope(100L, ApplyDisposition.APPLIED, warm))
+        assertTrue(policy.hasPendingRequest)
+
+        assertEquals(PullDecision.None, policy.onOpen(warm), "a warm replica asks nothing at open")
+        assertFalse(policy.hasPendingRequest, "the reopen should have released the latch")
+
+        assertEquals(
+            PullReason.SEQUENCE_GAP,
+            request(policy.onEnvelope(200L, ApplyDisposition.APPLIED, warm)).reason,
+        )
+    }
+
+    /**
+     * The other half of the rule: releasing on reopen must not turn one page of refused deltas
+     * into a burst. Within a session the latch still holds — only a reopen clears it.
+     */
+    @Test
+    fun `releasing on reopen does not weaken the one-ask-per-page latch`() {
+        val policy = PullPolicy()
+        request(policy.onOpen(cold))
+        val afterOpen = (1L..10L).map { policy.onEnvelope(it, ApplyDisposition.AWAITING_SNAPSHOT, cold) }
+        assertEquals(0, afterOpen.count { it is PullDecision.Request }, "the open's ask still latches")
+    }
+
     // ---- the wire value ----
 
     /**

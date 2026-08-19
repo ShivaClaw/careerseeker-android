@@ -109,8 +109,14 @@ sealed interface PullDecision {
  * A phone awaiting a snapshot may be handed many deltas in one pull page, and a large gap is
  * usually followed by more envelopes on the far side of it. Emitting one `pull_request` per
  * envelope would answer a stalled sync with a burst of traffic. The policy therefore latches:
- * once it has asked, it returns [PullDecision.None] until an [ApplyDisposition.APPLIED_SNAPSHOT]
- * satisfies the request, or the caller reports the push failed via [onRequestFailed].
+ * once it has asked, it returns [PullDecision.None] until one of three things releases it — an
+ * [ApplyDisposition.APPLIED_SNAPSHOT] satisfies the request, the caller reports the push failed
+ * via [onRequestFailed], or the transport is reopened via [onOpen].
+ *
+ * The third exists because the first two only cover asks whose fate the phone can observe. An ask
+ * the relay accepted and the engine never collected before the TTL expired is indistinguishable,
+ * from here, from one still in flight — so without a release at [onOpen] the latch outlives the
+ * thing it was latching for. See [onOpen]'s doc; it is the case that fails silently.
  *
  * Not thread-safe: drive it from the single coroutine that owns the transport loop.
  *
@@ -137,9 +143,48 @@ class PullPolicy(val gapThreshold: Long = DEFAULT_GAP_THRESHOLD) {
      * A phone that has never applied a snapshot asks for one immediately rather than waiting for
      * a `delta` to be refused. Waiting would mean an idle engine leaves the phone showing demo
      * data indefinitely, since nothing forces a delta to arrive.
+     *
+     * ## A reopen releases the latch, and that is a different case from [onRequestFailed]
+     *
+     * [onRequestFailed] covers the ask that never left the phone. This covers the ask that **did**
+     * leave, was accepted by the relay, and was never answered — and until this line existed, that
+     * case had no release path at all.
+     *
+     * It is not hypothetical. The relay is a blind store-and-forward queue with a TTL (§6.2's
+     * "the relay's TTL purge creates legitimate gaps"), and the engine is a desktop application
+     * that is switched off more often than it is on. So *"the relay accepted my `pull_request`"*
+     * is not *"the engine will answer it"*: an engine that never polls before the TTL expires
+     * leaves the ask nowhere at all. The latch would then suppress every later ask for the life of
+     * the process — [onEnvelope] cannot release it either, because on a replica with no snapshot
+     * every disposition that would ask routes through the same latched [request]. The phone shows
+     * demo data with [hasPendingRequest] true: waiting, and honestly reporting that it is waiting,
+     * on a question that no longer exists anywhere. **§6.2 forbids exactly this outcome** — "a gap
+     * MUST NOT stall the stream".
+     *
+     * The engine's start-up snapshot hides it most of the time, which is what makes it worth
+     * pinning rather than trusting: it bites precisely when the engine was *already* running as
+     * the ask expired, so it never publishes a fresh start-up snapshot and the phone never asks
+     * again.
+     *
+     * Releasing here is safe because the asymmetry runs the same way as everywhere else in this
+     * loop. A duplicate ask costs one extra snapshot, is bounded by the **reconnect** rate rather
+     * than the envelope rate, and is idempotent engine-side — every `ISnapshotRepublisher`
+     * implementation answers `pull_request` by publishing a full snapshot regardless of state. A
+     * suppressed ask costs the dashboard indefinitely, in silence. The recoverable failure takes
+     * the benefit of the doubt.
+     *
+     * This is phone-side policy, not protocol: the engine never *sends* `pull_request`, so there
+     * is no engine behaviour for the mission's interpretation rule to bind to here. The release is
+     * unconditional rather than cold-only on purpose — a warm replica holding a latched
+     * [PullReason.SEQUENCE_GAP] ask across a reconnect has lost it the same way, and gets the same
+     * second chance the moment the next gap appears.
      */
-    fun onOpen(position: ReplicaPosition): PullDecision =
-        if (position.snapshotSeen) PullDecision.None else request(PullReason.COLD_START)
+    fun onOpen(position: ReplicaPosition): PullDecision {
+        // Before the decision, not after: the release must happen even on the warm path that
+        // returns None, or a gap ask latched before the reconnect survives it.
+        pending = false
+        return if (position.snapshotSeen) PullDecision.None else request(PullReason.COLD_START)
+    }
 
     /**
      * Called once per envelope, after the replica has applied it.
