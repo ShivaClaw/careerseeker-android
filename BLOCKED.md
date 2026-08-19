@@ -2780,3 +2780,49 @@ session can supply.
 **Cost to date.** Twenty-eight firings on a completed slice. The per-run cost is now small by design
 (attempts 3–5's banners), but a cheap wrong assignment is still a wrong assignment, and **only
 Brandon can stop it.**
+
+---
+
+### B-18 status 2026-08-19 (run 64) — attempt 7, and the first firing that produced an executed gate
+
+**The twenty-ninth firing.** Substance unchanged: the stored prompt still assigns S5's spec half
+(built since 2026-08-09), still names the stale pin `679a317` (it is **`7328a0b`**), and still calls
+S5 "NOT STARTED" (it is PARTIAL; the emitter landed). All three are false against the repo
+(**C-64-1**), and the `STATE.md` banner did its job for the fourth run running — the built-already
+conclusion came from the **first** document read.
+
+**What is new, and it is genuinely small.** Nothing about the blocker moved. Two facts were added:
+
+1. **The gate that *is* reachable here was executed**, not merely described: `:core:test` via
+   `scripts/core-probe.sh`, **308 / 0 / 0 across 22 classes**, reproducing run 61's recorded
+   expectation on a container built today (**C-64-4**). Twenty-eight prior firings recorded that
+   number; this one re-earned it. That makes a future *red* `:core` detectable by this routine,
+   which is the only standing value the loop still has while H1/H2 wait.
+2. **A recorded command has rotted and is corrected** (**C-64-5**): the documented one-command JDK-17
+   install now 404s, because the image's apt index went stale (17.0.18 → 17.0.19). `apt-get update`
+   first, then install. Without that fix the next container would read `:core` as unreachable and
+   silently lose fact 1.
+
+**Neither narrows the unblock.** B-18 is scheduler configuration; run 63 bounded it further with
+`CronList` → `No scheduled jobs.`, so it is **not** in either repo and **not** in this session's job
+list. Attempts 1–4 were a refusal and three banners; 5 and 6 were push notifications (runs 57, 59/60,
+2026-08-18). **Attempt 7 sends nothing**, deliberately: runs 61–63 declined for the same reason and
+were right. Everything this run measured is green and unchanged, and a fourth escalation inside two
+days is the fatigue that would make a real one ignorable.
+
+**Smallest human unblock — unchanged.** Retire or repoint the scheduled task from the Claude Code
+surface it was created on. **If the routine is meant to keep running**, replace its "YOUR SLICE THIS
+ITERATION" section with: *read `RETURN-DAY.md` §5; then run `scripts/core-probe.sh` and report it,
+and stop.* That is an honest standing job for a cloud session — a real regression check on the one
+module this environment can build — instead of a rebuild order for finished work. **The bottleneck
+remains H1 (decide #53) and H2 (run the Windows gate, land §3's six merges), and neither is authoring
+capacity.**
+
+**Cost to date.** Twenty-nine firings on a completed slice. **Only Brandon can stop it.**
+
+### B-1, B-2, B-4, B-5, B-6, B-7, B-8, B-9, B-12, B-13, B-14, B-16, B-17, B-19 — untouched this run
+
+None was worked, none moved, and none is re-derived here. **B-19 in particular is unmoved: no `:app`
+file was written this run.** **B-7** was not re-measured — run 63 did that hours earlier; this run
+only confirmed `:core` still builds under it, which is B-7's known-reachable side, not a change to
+its scope.
