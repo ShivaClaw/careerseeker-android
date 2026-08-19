@@ -11606,3 +11606,111 @@ not unblock it.** Nothing was created, edited or deleted — the call is read-on
 android gate did not run either — `:core:test` was **not** executed this run (run 61's **308/0** and
 run 56's **C-ENUM-1** stand as the last measurements), and `:app:assembleDebug` / `:app:lintDebug`
 have never run in any cloud session. **No sentence in the run 63 LOG entry claims a gate result.**
+
+---
+
+## Run 64 — 2026-08-19 (twenty-ninth firing)
+
+Every claim in `LOG.md`'s RUN 64 entry, with the command that re-verifies it. `<E>` is a checkout of
+`ShivaClaw/careerseeker`; `<A>` is this repo. **Run `git fetch --all --prune` in both first** — runs
+62, 63 and 64 all arrived detached at a stale `main`, and every number below is post-fetch.
+
+### C-64-1 — The assigned slice is built, and none of it is on `main`
+
+> **Claim.** §4.3.3's `entitlement_ack` body, the two ack vectors, PQ-A2-1, PQ-A2-2 and PQ-A2-3 all
+> exist upstream (`8575539`, `22b028e`, `7328a0b`), and **not one is an ancestor of `origin/main`**.
+> The first four are PR **#32**, open and draft since 2026-08-09.
+
+```bash
+cd <E> && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do
+  git merge-base --is-ancestor $c origin/main && echo "$c ON MAIN" || echo "$c not on main (exit 1)"
+done
+git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md | grep -n "4.3.3\|decoded ciphertext\|decrypt_failed" | head
+git log --oneline -1 7328a0b
+```
+
+*Expected:* all three print `not on main (exit 1)`; the grep shows §4.3.3, the **decoded ciphertext**
+cap sentence and `decrypt_failed`; `7328a0b` is *"S5: add the invalid-unknown-field vector, closing
+PQ-A2-3 and B-6"*. **If any commit reports `ON MAIN`, H2 has been done and this entry is stale — good
+news, not drift.**
+
+### C-64-2 — `generate.mjs --check` passes at the pin's branch
+
+> **Claim.** `OK: 29 vector files match the generator.`, `exit=0`.
+
+```bash
+cd <E> && git worktree add -f --detach /tmp/wt-s5 origin/claude/s5-entitlement-ack-emitter
+cd /tmp/wt-s5 && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected:* `OK: 29 vector files match the generator.` and `exit=0`. Node 22 here; the generator is
+deterministic, so the count is the assertion.
+
+### C-64-3 — The vendored corpus has not drifted from pin `7328a0b`
+
+> **Claim.** 29/29 files byte-identical; `diff -r` silent; `exit=0`; `VECTORS.lock` unedited.
+
+```bash
+mkdir -p /tmp/pin && cd <E> \
+  && git archive 7328a0bc043335491cd96a67d634e8eea2a13af9 docs/sync-vectors/v1 | tar -x -C /tmp/pin
+diff -r /tmp/pin/docs/sync-vectors/v1 <A>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+ls /tmp/pin/docs/sync-vectors/v1 | wc -l; ls <A>/core/src/test/resources/sync-vectors/v1 | wc -l
+```
+
+*Expected:* no output from `diff`, `exit=0`, and `29` twice. **This is the phone-matches-its-pin
+guarantee and nothing wider** — see `VECTORS.lock`'s 2026-08-17 note; the phone is *ahead* of `main`
+by three vectors, which is not drift.
+
+### C-64-4 — `:core:test` is green on a clean container: 308 / 0 / 0 across 22 classes
+
+> **Claim.** `BUILD SUCCESSFUL` and `core-probe: 308 tests, 0 failed, 0 skipped, across 22 classes`.
+> This reproduces run 61's recorded expectation exactly.
+
+```bash
+apt-get update && apt-get install -y --no-install-recommends openjdk-17-jdk-headless   # see C-64-5
+cd <A> && bash scripts/core-probe.sh 2>&1 | tail -5
+```
+
+*Expected:* `BUILD SUCCESSFUL` and `core-probe: 308 tests, 0 failed, 0 skipped, across 22 classes`.
+**Scope:** this is `:core:test` **only**. `checkCoreIsAndroidFree`, `:app:test`,
+`:app:assembleDebug` and `:app:lintDebug` need the Android SDK (**B-7**) and **did not run**; no
+result is claimed for them. Do not cite this as the android gate.
+
+### C-64-5 — The recorded JDK-17 install step needs `apt-get update` first, or it 404s
+
+> **Claim.** `apt-get install -y --no-install-recommends openjdk-17-jdk-headless` **alone** now fails
+> with `404 Not Found` and `exit=100`; with `apt-get update` first it succeeds and installs
+> **17.0.19+10-1~24.04.2**. The image ships JDK **21** only.
+
+```bash
+java -version 2>&1 | head -1          # openjdk 21.x -- and :core pins jvmToolchain(17)
+apt-get install -y --no-install-recommends openjdk-17-jdk-headless; echo "exit=$?"   # expect 404 / 100
+apt-get update && apt-get install -y --no-install-recommends openjdk-17-jdk-headless; echo "exit=$?"
+ls /usr/lib/jvm
+```
+
+*Expected:* the bare install fails fetching `openjdk-17-*_17.0.18+8-1~24.04.1_amd64.deb` with `404`;
+after `apt-get update` it exits `0` and `java-17-openjdk-amd64` appears. **404 is a stale apt index,
+not the egress policy** — a policy denial shows as `403` at the proxy (**B-7**, `/root/.ccr/README.md`).
+This corrects the command block recorded at C-VEC-1; it is **not** a new blocker.
+
+### C-64-6 — The standing state has not moved
+
+> **Claim.** engine `main` **`aac05f3`** (2026-08-12), android `main` **`ebfaf81`** (2026-08-06);
+> **18 + 6 PRs open, all draft**, none merged/closed/undrafted; **#53 open**; landing plan **7/7**
+> against live PR heads, 0 mismatches; Terra **COMPLETE, files claimed: none**.
+
+```bash
+cd <E> && git fetch --all --prune && git log -1 --format='%h %ad' --date=short origin/main
+cd <A> && git fetch --all --prune && git log -1 --format='%h %ad' --date=short origin/main
+# live, not local refs:
+gh pr list -R ShivaClaw/careerseeker         --state open --json number,isDraft,headRefName,headRefOid
+gh pr list -R ShivaClaw/careerseeker-android --state open --json number,isDraft,headRefName,headRefOid
+cd <E> && git show origin/autonomy/codex-state:STATE.md | head -12
+```
+
+*Expected:* `aac05f3 2026-08-12` / `ebfaf81 2026-08-06`; 18 and 6 entries, every `isDraft: true`;
+#53 present; the seven landing heads `c93e88d 2be00fc b0b6c77 edee32b 94fd979 f5e0c0a 8177353`;
+Terra COMPLETE with no files claimed. **Any difference here means a human acted — re-read
+`RETURN-DAY.md` §3 before trusting the older counts.**

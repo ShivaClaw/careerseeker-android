@@ -12247,3 +12247,126 @@ rewrite, no branch deleted, no deploy of any kind. **The production relay was no
 not even `GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no Play
 Billing code, no keystore, no emulator, no Gmail. **No secret was read, printed or echoed** — none
 was opened. Terra's territory was **read, never written**.
+
+---
+
+## RUN 64 — 2026-08-19. The twenty-ninth firing, and the first to actually run `:core`.
+
+**Fetch first (RULE ONE).** `git fetch --all --prune` in both checkouts before any number below.
+Both arrived **detached at a stale `main`**, as at runs 62 and 63. Every count here is post-fetch.
+
+**The assigned slice was, once again, already built.** The prompt asked for §4.3's `entitlement_ack`
+body, the ack vectors, and PQ-A2-1/-2/-3. All five exist and have since **2026-08-09 / 2026-08-12**.
+This run did **not** rebuild them (**C-64-1**). What it did instead is the thing twenty-eight prior
+firings could not: it **executed `:core`'s suite** on a clean container (**C-64-4**).
+
+### Milestone 1 — the slice exists, and it is PR #32 (C-64-1)
+
+| item the prompt assigned | where it already is |
+| --- | --- |
+| §4.3.3 `entitlement_ack` = `{product_id, acknowledged_at, order_id?}` | `8575539` |
+| the two ack vectors, generated not hand-written | `22b028e` |
+| PQ-A2-1 — the 1 MiB cap measures the **decoded ciphertext** | `8575539` (§3.1, l. 111) |
+| PQ-A2-2 — structural rejection reports `decrypt_failed` | `8575539` (§3, l. 103) |
+| PQ-A2-3 — the `invalid-unknown-field` vector | `7328a0b` |
+
+None is an ancestor of `origin/main` (`git merge-base --is-ancestor` → **exit 1**, all three). The
+first four are **PR #32**, open and **draft since 2026-08-09**; PQ-A2-3 is #37. **The work is not
+missing. It is unmerged, and merging it is H2.**
+
+### Milestone 2 — the one command the prompt asked for (C-64-2)
+
+`node docs/sync-vectors/generate.mjs --check` at `origin/claude/s5-entitlement-ack-emitter`:
+
+```
+OK: 29 vector files match the generator.
+exit=0
+```
+
+### Milestone 3 — no vector drift (C-64-3)
+
+Vendored corpus vs pin `7328a0b`, blob-for-blob: **29/29 files, `diff -r` silent, `exit=0`**.
+`VECTORS.lock` unedited; **the pin did not move (H7)**.
+
+### Milestone 4 — `:core:test` actually ran, and it is green (C-64-4)
+
+The first executed Kotlin gate since run 61 recorded its expectation. On a clean container:
+
+```
+BUILD SUCCESSFUL in 1m 59s
+core-probe: 308 tests, 0 failed, 0 skipped, across 22 classes
+```
+
+**This reproduces run 61's recorded `308 / 22` exactly**, which is the point: it converts a written
+expectation into a re-executed one, on a container built from scratch today. **It is `:core:test`
+and nothing else** — `checkCoreIsAndroidFree`, `:app:test`, `:app:assembleDebug` and `:app:lintDebug`
+did **not** run and **no result is claimed for them** (**B-7**).
+
+### Milestone 5 — the documented setup step is now two commands, not one (C-64-5)
+
+Run 61 recorded `apt-get install -y --no-install-recommends openjdk-17-jdk-headless` as the
+one-command fix for the image shipping JDK 21 against `:core`'s `jvmToolchain(17)`. **As written it
+now fails**, and the next container will hit this:
+
+```
+E: Failed to fetch .../openjdk-17-jdk-headless_17.0.18+8-1~24.04.1_amd64.deb  404  Not Found
+exit=100
+```
+
+The image's apt index has gone stale — 17.0.18 was superseded by **17.0.19+10-1~24.04.2**, and 404
+is what a stale index looks like, not a policy denial. **`apt-get update` first, then install**, and
+it succeeds. Small, but it is the difference between `:core` being reachable here and appearing
+blocked. This is a **correction to a recorded command**, not a new blocker.
+
+### Milestone 6 — the standing state has not moved (C-64-6)
+
+| | |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`** — unmoved since **2026-08-12** |
+| android `origin/main` | **`ebfaf81`** — unmoved since **2026-08-06** |
+| engine PRs | **18 open, all draft** — none merged, closed or undrafted |
+| android PRs | **6 open, all draft** |
+| **#53** (H1) | still open — still Brandon's decision |
+| landing plan | **7/7** branches match their **live** PR heads, **0 mismatches** |
+| Terra | **COMPLETE**, *files claimed: none* — **no collision** |
+
+**No H1–H8 item has been acted on.**
+
+### Milestone 7 — status, honestly
+
+**No rung's status changed. No blocker was opened or closed.** S0 DONE; S1 DONE; S2/S3/S4/S5/S6/S7
+PARTIAL; S8 PARTIAL/**BLOCKED** on **B-5**. **B-19 unmoved** — nothing in `:app` was written.
+
+**Why no new product code was written, and it is a judgement rather than a constraint.** The prompt
+says to pick the topmost rung verifiable here. S5's spec half is built; its remaining halves are the
+C# and Kotlin appliers, which the prompt itself excludes and which **B-7** independently prevents.
+Everything else needs a Windows gate, an emulator (**B-4**), a relay deploy, or a decision. Authoring
+capacity is **not** this program's bottleneck: **24 draft PRs are already queued behind one merge
+decision**, and a twenty-fifth would add review cost while moving nothing. **The scarce resource is
+Brandon's hour, not another branch.** So this run spent itself on execution — running the gate that
+*is* reachable — rather than on output.
+
+**No push notification was sent, and that is a decision.** Runs 57, 59 and 60 escalated this exact
+standing state, the last two on **2026-08-18**; runs 61, 62 and 63 each declined to re-send. This run
+found **nothing Brandon has not already been told** — the slice is still built, the plan still holds,
+the corpus still matches, and the suite is **green**. A fourth "everything waits on you" inside two
+days is the fatigue that would make a real signal ignorable. **Green-and-unchanged is a reason for
+silence, not for a banner.** If a future run finds movement — a merge, a moved `main`, a decayed
+plan, or a **red** `:core`, which this run has now made detectable — that is worth his attention.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 18 engine PRs and the 6 android drafts are exactly as
+found, and **#53's fate stays Brandon's**. **No vector byte was written in either repo** — corpus
+**29/29** byte-identical to pin `7328a0b`, `VECTORS.lock` not edited, **the pin did not move (H7)**.
+**No `:app` file was written** — not one; **B-19** stays open. **No Kotlin, no C#, no `generate.mjs`,
+no `docs/Sync-Protocol.md`, no `ci.yml` was written**; **`$ExpectedOfflineTotal` was not moved on any
+pushed branch**, and **no nineteenth engine PR was opened**. **Nothing was written in the engine repo
+at all** except `STATE.md` on the docs-only `autonomy/claude-state` branch. **`Verify-Alpha.ps1` was
+not run and no result for it is claimed** — no `pwsh`, no `dotnet`; `816` remains run 62's labelled
+**prediction**. **The android gate was not run** — only `:core:test` executed, via
+`scripts/core-probe.sh`; the other four tasks are unrun and unclaimed. The only host mutation was
+**`apt-get update` + `openjdk-17-jdk-headless`** inside a disposable container. No history rewrite,
+no branch deleted, no deploy of any kind. **The production relay was not contacted at all, not even
+`GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no keystore, no
+emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory was **read, never
+written**.
