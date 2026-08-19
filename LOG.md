@@ -12094,3 +12094,17 @@ No history rewrite, no branch deleted, no deploy of any kind. **The production r
 contacted at all, not even `GET /v1/health`.** No Play, Google or OAuth console; no accounts, no
 purchases, no Play Billing code, no keystore, no emulator, no Gmail. **No secret was read, printed
 or echoed** — none was opened. Terra's territory was read, never written.
+
+### Run 62, addendum — CI green on the runner (C-CI-62)
+
+Recorded after the push, from the runner rather than from here. Run
+[32218378901](https://github.com/ShivaClaw/careerseeker-android/actions/runs/32218378901),
+`head_sha` **`ba3c7ea`**, **attempt 1**: *Build and test* → **`completed success`**, **all 13 steps
+`success`**, including the five gate tasks this host cannot run (*checkCoreIsAndroidFree*,
+`:core:test`, `:app:test`, *Assemble debug APK*, *Lint*) and the vendored-vector drift step.
+
+**Stated so it is not read as more than it is.** This run changed **five Markdown files and nothing
+else**, so green means the tree is still unbroken — it **tests none of this run's findings**. Step
+7 passing is **not** evidence about **B-16**: it compares the phone against **the pin**, which is
+precisely the direction B-16 records as unchecked. **`Verify-Alpha.ps1` still has not run
+anywhere**, so **`816` remains a prediction** (**C-RES-4**), unchanged by this.

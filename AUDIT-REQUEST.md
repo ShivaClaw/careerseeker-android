@@ -11455,3 +11455,21 @@ git status --porcelain core/src/test/resources/
 ```
 
 *Expected:* no `diff` output, `exit=0`, and empty `git status`.
+
+### C-CI-62 — the android gate ran green on the runner for run 62's push
+
+> **Claim.** Run [32218378901](https://github.com/ShivaClaw/careerseeker-android/actions/runs/32218378901),
+> `head_sha` **`ba3c7ea`**, **attempt 1**: job *Build and test* **`completed success`**, **all 13
+> steps `success`** — including the five android-gate tasks this sandbox cannot run (steps 6, 8, 9,
+> 10, 11) and the vendored-vector drift step (7). **Read out of the runner, produced locally by
+> nothing.** Run 62 changed only five Markdown files, so this proves the tree is unbroken and
+> **tests none of run 62's findings**; `Verify-Alpha.ps1` still has not run anywhere.
+
+```bash
+gh api repos/ShivaClaw/careerseeker-android/actions/runs/32218378901 \
+  --jq '{status,conclusion,head_sha}'
+gh api repos/ShivaClaw/careerseeker-android/actions/runs/32218378901/jobs \
+  --jq '.jobs[] | {name,conclusion,steps:[.steps[]|{number,name,conclusion}]}'
+```
+
+*Expected:* `"conclusion":"success"`, `head_sha` starting `ba3c7ea`, and every step `success`.
