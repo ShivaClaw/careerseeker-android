@@ -11300,3 +11300,158 @@ cd ../careerseeker-android && git fetch --all --prune && git log --oneline -1 or
 
 *Expected:* `aac05f3` and `ebfaf81`. PR counts via the GitHub API, `state=open`: 18 and 6, every
 one with `"draft": true`.
+
+### C-RET-9 — freshness at run 62: return day passed, nothing moved
+
+> **Claim.** Taken after `git fetch --all --prune` in both checkouts. Return day was **2026-08-18**;
+> it is now **2026-08-19**. `careerseeker` `main` is **`aac05f3`** and android `main` is
+> **`ebfaf81`**, both unmoved since **2026-08-12**. **18** open PRs in `careerseeker` and **6** in
+> android, **all still draft; none merged, closed or undrafted.** No item in RETURN-DAY §5's human
+> queue (**H1–H8**) has been acted on.
+
+```bash
+cd ../careerseeker         && git fetch --all --prune && git log --oneline -1 origin/main
+cd ../careerseeker-android && git fetch --all --prune && git log --oneline -1 origin/main
+```
+
+*Expected:* `aac05f3` and `ebfaf81`. PR counts via the GitHub API, `state=open`: 18 and 6, every one
+`"draft": true`.
+
+### C-STOP-10 — the assigned slice is still built, still off `main`, twenty-seven runs on
+
+> **Claim.** The scheduled prompt assigned S5's spec half for the **twenty-seventh** time. The one
+> command it asks for **was run**, at the pin: **`OK: 29 vector files match the generator.`,
+> `exit=0`**. `7328a0b` is **not** an ancestor of `origin/main`. The prompt's pin `679a317` is
+> stale and its "S5 is NOT STARTED" is wrong.
+
+```bash
+cd ../careerseeker && git fetch --all --prune
+git merge-base --is-ancestor 7328a0b origin/main; echo "exit=$?"   # -> 1, i.e. NOT on main
+git checkout --detach 7328a0b && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected:* `exit=1` from the ancestor check; `OK: 29 vector files match the generator.`, `exit=0`
+from the generator.
+
+### C-LAND-8 — the landing plan has not decayed: 7/7 heads still match the live PRs
+
+> **Claim.** All seven branches named in RETURN-DAY §3 (including #53, step 0) match their **live
+> PR head SHA** exactly — **0 mismatches** — and §3's stop counts still reproduce in all three
+> configurations: **#53 closed = 2**, **all 7 leaves = 3**, **#53 closed with #49 first = 3**
+> (the **+1** order penalty).
+
+```bash
+cd ../careerseeker && git fetch --all --prune
+# heads: compare `git rev-parse origin/<branch>` against each PR's head.sha from the API
+cd ../careerseeker-android
+./scripts/fleet-probe.sh land ../careerseeker \
+  claude/s8-harness-linux-reach claude/s2-seq-bound claude/s2-transport-vocabulary \
+  claude/s3-pairing-confirm-consumer claude/s6-outcome-disposition claude/s6-composition-root-decision
+```
+
+*Expected:* four `clean`, then two `STOP`, `conflicted merges (human stops): 2`. Appending
+`claude/s6-resume-reconciliation` gives **3**; moving `claude/s6-composition-root-decision` first
+gives **3**.
+
+### C-RES-1 / C-RES-2 — what each STOP actually contains, from real merges
+
+> **Claim.** **STOP 1** conflicts 5 files / **11** hunks, every one the same number-pair
+> (`SyncHarness 136`/`617` vs `134`/`615`); `tests/SyncHarness/Program.cs` is **not** conflicted.
+> **STOP 2** conflicts 6 files / **7** hunks — the same shape **plus a single `using` directive**
+> in `SyncHarness/Program.cs`: `System.Buffers.Binary` (ours) vs `System.Net` (theirs). **That one
+> directive is the only source-code conflict in the entire six-merge landing.**
+
+```bash
+cd /tmp && rm -rf land && git clone -q --shared --no-checkout <engine> land && cd land
+git fetch -q <engine> 'refs/remotes/origin/*:refs/remotes/origin/*'
+git checkout -q --detach origin/main
+for b in claude/s8-harness-linux-reach claude/s2-seq-bound \
+         claude/s2-transport-vocabulary claude/s3-pairing-confirm-consumer; do
+  git merge --no-edit -q origin/$b; done                      # all clean
+git merge --no-edit origin/claude/s6-outcome-disposition      # STOP 1
+git diff --name-only --diff-filter=U                          # 5 files, no SyncHarness
+grep -c '^<<<<<<<' README.md docs/CareerSeeker-Project-Summary.md \
+        docs/External-Audit-Handoff.md scripts/Verify-Alpha.ps1 src/Engine/README.md
+```
+
+*Expected:* `1 2 1 6 1` = **11** hunks at STOP 1, and `SyncHarness/Program.cs` absent from the
+conflict list. After resolving, `git merge origin/claude/s6-composition-root-decision` conflicts
+**6** files, and the harness hunk is the two `using` lines.
+
+### C-RES-3 — the deltas are additive; nothing is dropped in the fuse
+
+> **Claim.** Every line each side adds to `tests/SyncHarness/Program.cs` survives into the fused
+> file: **#51 +51 lines, #52 +38, #49 +1292 — 0 missing in all three.** `Check(` counts are exactly
+> additive at STOP 1: base **97**, #51 **102** (+5), #52 **101** (+4), fused **106**.
+
+```bash
+# in the merged tree above, with F=tests/SyncHarness/Program.cs
+git show origin/main:$F > /tmp/base.cs
+for side in claude/s3-pairing-confirm-consumer claude/s6-outcome-disposition; do
+  git show origin/$side:$F > /tmp/s.cs
+  diff /tmp/base.cs /tmp/s.cs | grep '^>' | sed 's/^> //' | while read -r l; do
+    [ -z "${l// }" ] || grep -Fqx -- "$l" $F || echo "MISSING: $l"; done
+done
+grep -oE '\bCheck\(' $F | wc -l
+```
+
+*Expected:* no `MISSING:` line from any side (use `git merge-base origin/main
+origin/claude/s6-composition-root-decision` as the base for #49), and **106** at STOP 1.
+
+### C-RES-4 — the pin arithmetic, and why disjointness holds here
+
+> **Claim.** `main` = **611** (SyncHarness **130**). #51 = **617** (**136**), #52 = **615**
+> (**134**) — both +6 / +4 on the same base. #49 forked at **`00b3705`** = **598** (**130**) and is
+> **793** (**325**), so its total delta **195** is **entirely** SyncHarness (`325 − 130`) — meaning
+> `main`'s +13 (`598 → 611`, R6/R7 scorer assertions) is disjoint from it. Hence
+> `611 + 6 + 4 + 195 = **816**` and `130 + 6 + 4 + 195 = **335**`.
+> **This is a PREDICTION.** `Verify-Alpha.ps1` was **not** run and cannot be run here (Linux, no
+> .NET, no `pwsh`). The gate decides; the drift trap throws on a wrong value.
+
+```bash
+cd <engine>
+for r in origin/main 00b3705 origin/claude/s3-pairing-confirm-consumer \
+         origin/claude/s6-outcome-disposition origin/claude/s6-composition-root-decision; do
+  printf '%-46s %s\n' "$r" "$(git show $r:scripts/Verify-Alpha.ps1 | grep -oE 'ExpectedOfflineTotal = [0-9]+' | head -1)"
+  git show $r:src/Engine/README.md | grep -E '\| SyncHarness \|'
+done
+git merge-base origin/main origin/claude/s6-composition-root-decision   # -> 00b3705…
+```
+
+*Expected:* `611, 598, 617, 615, 793` and SyncHarness `130, 130, 136, 134, 325`.
+
+### C-RES-5 — the fully-landed tree is coherent short of the gate
+
+> **Claim.** After both resolutions the tree has **zero conflict markers**, and **every**
+> `Assert-Contains` string in `Verify-Alpha.ps1` naming the totals resolves to a doc that contains
+> it — the drift trap satisfied **statically**, the part of it that does not need Windows. The
+> landed corpus is **30 files**, `OK: 30 vector files match the generator.`, `exit=0`, and the one
+> file it gains over the phone's pin `7328a0b` is **`pairing-high-bit-confirm.json`** (**H7**).
+
+```bash
+# in the fully-merged, fully-resolved tree
+grep -rn '^<<<<<<<\|^>>>>>>>' . | grep -v '^./.git' | wc -l     # -> 0
+for lit in '| SyncHarness | 335 |' '| **Total** | **816** |'; do
+  grep -rFl -- "$lit" README.md src/Engine/README.md \
+       docs/CareerSeeker-Project-Summary.md docs/External-Audit-Handoff.md; done
+ls docs/sync-vectors/v1 | wc -l && node docs/sync-vectors/generate.mjs --check
+comm -13 <(git -C <engine> ls-tree -r --name-only 7328a0b docs/sync-vectors/v1 \
+           | xargs -n1 basename | sort) <(ls docs/sync-vectors/v1 | sort)
+```
+
+*Expected:* `0` markers; each literal found in three docs; `30`, `OK: 30 vector files match the
+generator.`, `exit=0`; and exactly `pairing-high-bit-confirm.json` from the `comm`.
+
+### C-VEC-5 — the vendored corpus is still byte-identical to its pin
+
+> **Claim.** Re-run this iteration: **29 vendored, 29 at pin `7328a0b`, `diff -r` clean, `exit=0`.**
+> No vector byte was written this run in either repo.
+
+```bash
+cd ../careerseeker-android
+git -C ../careerseeker archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pin
+diff -r core/src/test/resources/sync-vectors/v1 /tmp/pin/docs/sync-vectors/v1; echo "exit=$?"
+git status --porcelain core/src/test/resources/
+```
+
+*Expected:* no `diff` output, `exit=0`, and empty `git status`.
