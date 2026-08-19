@@ -11473,3 +11473,136 @@ gh api repos/ShivaClaw/careerseeker-android/actions/runs/32218378901/jobs \
 ```
 
 *Expected:* `"conclusion":"success"`, `head_sha` starting `ba3c7ea`, and every step `success`.
+
+---
+
+## Run 63 — 2026-08-19 (Linux sandbox): re-verification commands
+
+Every command below was **executed this run**, after `git fetch --all --prune` in **both** trees.
+Run that fetch first or the counts are stale — that is rule one, and the android checkout arrives
+detached at a stale `main` on every firing.
+
+### C-STOP-11 — the assigned slice is built, for the twenty-eighth run
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  echo "== $c =="; git log -1 --format='%ad  %s' $c; git show --stat --format='' $c
+done
+git merge-base --is-ancestor 7328a0b origin/main; echo "is-ancestor exit=$?"
+```
+
+*Expected, and **observed**:* `8575539` (2026-08-09) touches **`docs/Sync-Protocol.md` only**,
+**+114/−3**; `22b028e` (2026-08-09) adds both ack vectors, `index.json` **and `generate.mjs`**;
+`7328a0b` (2026-08-12) adds `invalid-unknown-field.json`. `is-ancestor` **exits 1** — built, and
+**not on `main`**. All four gates named in the recurring prompt (**PQ-A6-1**, **PQ-A2-1/-2/-3**) are
+already closed.
+
+The generator half, on the branch that carries it — this is the one command the prompt requests:
+
+```bash
+cd <engine> && git checkout -B s5-check origin/claude/s5-entitlement-ack-emitter
+node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`OK: 29 vector files match the generator.`**, **`exit=0`**.
+
+And the spec text itself, so the closure is read rather than inferred:
+
+```bash
+grep -n "acknowledged_at\|order_id" docs/Sync-Protocol.md | head
+grep -n -i "decoded ciphertext\|1 MiB" docs/Sync-Protocol.md | head
+grep -n "decrypt_failed" docs/Sync-Protocol.md | head
+```
+
+*Expected:* §4.3.3's `{product_id, acknowledged_at, order_id?}` with `order_id` **OPTIONAL**; the cap
+stated on the **decoded ciphertext**; structural rejection reported as **`decrypt_failed`** with no
+`malformed` code added.
+
+### C-RET-10 — return day + 1, and no human action
+
+```bash
+cd <engine>   && git log -1 --format='%H %ad' origin/main
+cd <android>  && git log -1 --format='%H %ad' origin/main
+```
+
+*Expected, and **observed**:* **`aac05f3`**, dated **2026-08-12** (unmoved 7 days), and **`ebfaf81`**.
+
+```bash
+# via the GitHub API, not local refs
+gh pr list --repo ShivaClaw/careerseeker         --state open --json number,isDraft | jq length
+gh pr list --repo ShivaClaw/careerseeker-android --state open --json number,isDraft | jq length
+```
+
+*Expected, and **observed**:* **18** and **6**, **every one still `isDraft: true`**; none merged,
+closed or undrafted. **#53 still open** — H1 undecided. Terra's bus
+(`git show origin/autonomy/codex-state:STATE.md`) still reads **COMPLETE / files claimed: none**.
+
+### C-LAND-10 — the landing plan has not decayed
+
+Compare each of `RETURN-DAY.md` §3's seven landing branches against its **live PR head**, because a
+local ref proves only what was last fetched:
+
+```bash
+cd <engine>
+for b in s8-harness-linux-reach s2-seq-bound s2-transport-vocabulary \
+         s3-pairing-confirm-consumer s6-outcome-disposition \
+         s6-composition-root-decision s6-resume-reconciliation; do
+  printf '%-35s %s\n' "$b" "$(git rev-parse --short=7 origin/claude/$b)"
+done
+```
+
+*Expected, and **observed**, against the API's head SHAs:* `c93e88d`, `2be00fc`, `b0b6c77`,
+`edee32b`, `94fd979`, `f5e0c0a`, `8177353` — **7/7 match, 0 mismatches**. This checks **non-decay
+only**; the stop counts (2 / 3 / 3), the resolutions, and the `816` prediction are run 62's
+measurements (**C-RES-1**…**-5**) and were **not** re-derived here.
+
+### C-VEC-6 — no vector drift
+
+```bash
+cd <engine> && rm -rf /tmp/pinv && mkdir -p /tmp/pinv
+git archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pinv
+diff -r /tmp/pinv/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1
+echo "exit=$?"; ls /tmp/pinv/docs/sync-vectors/v1 | wc -l
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l
+```
+
+*Expected, and **observed**:* **no output**, **`exit=0`**, **29** files vendored; `main` carries
+**26**. `git status --porcelain <android>/core/src/test/resources/` is **empty** — the pin did not
+move (**H7**).
+
+### C-ENV-2 — B-7 re-measured: an allowlist denial, not an absent network
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" --max-time 25 \
+  https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/maven-metadata.xml
+curl -sS -o /dev/null -w "%{http_code}\n" --max-time 25 https://repo1.maven.org/maven2/
+java -version 2>&1 | head -2; which sdkmanager adb; echo "ANDROID_HOME=$ANDROID_HOME"
+```
+
+*Expected, and **observed**:* `dl.google.com` → **`curl: (56) CONNECT tunnel failed, response 403`**
+(code `000`); `repo1.maven.org` → **`200`**; **openjdk 21.0.10** (the image ships 21, not the 17
+`:core` pins); `sdkmanager`/`adb` **absent**, `ANDROID_HOME` **unset**. **Maven Central answers in
+the same session Google's repo is refused**, so B-7 is a policy allowlist denial. Per
+`/root/.ccr/README.md` a 403 is an organization policy denial — **not routed around**. Consequence
+unchanged: `:core` is reachable here, `:app` and the four SDK-bound gate tasks are not.
+
+### C-CRON-1 — the schedule is not a session cron job (B-18, attempt 6)
+
+```
+CronList   ->   "No scheduled jobs."
+```
+
+*Observed.* B-18 attempt 2 **inferred** that the recurring prompt is stored scheduler configuration
+rather than a file in either checkout; this **measures** it from the one angle a session can. No tool
+available here enumerates or edits the schedule, so it is account/environment-level configuration,
+reachable only from the surface it was created on. **This narrows B-18's unblock location; it does
+not unblock it.** Nothing was created, edited or deleted — the call is read-only.
+
+### What this run did NOT verify, stated so no reader infers it
+
+**No gate ran.** `Verify-Alpha.ps1` needs Windows, `pwsh` and `dotnet`, none of which exist here
+(**C-LAND-7**, **C-ENV-1**, re-confirmed by **C-ENV-2**), so **`816` remains a prediction**. The
+android gate did not run either — `:core:test` was **not** executed this run (run 61's **308/0** and
+run 56's **C-ENUM-1** stand as the last measurements), and `:app:assembleDebug` / `:app:lintDebug`
+have never run in any cloud session. **No sentence in the run 63 LOG entry claims a gate result.**
