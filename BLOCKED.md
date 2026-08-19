@@ -2881,3 +2881,71 @@ recorded a green one, job `95605131416`) — or run the command of record locall
 None was worked, none moved, none re-derived. **B-19 in particular is unmoved: no `:app` file was
 written.** **B-7** was not re-measured — run 63 did that; this run only used its known-reachable
 side, which is not a change to its scope.
+
+---
+
+## Run 66 — 2026-08-19. B-18 attempt 9, and a new narrow one (B-21)
+
+### B-18 — the schedule assigned a slice finished on 2026-08-09, for the thirty-first time
+
+**Unchanged as a blocker.** Re-verified rather than assumed (**C-66-1**): all three slice commits
+exist in the **engine** repo and none is on `main` (`exit=1` each). The prompt's pin `679a317` is
+still stale (**`7328a0b`**), and its "S5 is NOT STARTED" is still wrong. **Nothing has been merged,
+closed or undrafted in either repo** — engine `main` still `aac05f3`, android `main` still
+`ebfaf81`; **18 + 6 PRs open and draft** (**C-66-7**).
+
+**Attempt 9, and it is a small correction to this entry's own guidance.** Run 58 established
+*verify the constraints, not just the summary*. This run found a **third** thing the prompt is
+wrong about, and it costs a session real time rather than real work: the prompt says *"add the
+matching vector via `docs/sync-vectors/generate.mjs`"* as though that file were in the android
+tree. **It is not** — the generator, the vector corpus and the three slice commits all live in
+`careerseeker`. Looking for them here does not report "absent", it reports **`exit=128`** from
+`git merge-base`, which reads like a broken command rather than a wrong repository. Recorded in
+**C-66-1** with the distinction spelled out.
+
+**Smallest human unblock — unchanged.** Turn the routine off, **or** replace its "YOUR SLICE THIS
+ITERATION" section with: *read `RETURN-DAY.md` §5; re-derive what this environment can run before
+assuming what it cannot (`:core` compiles and tests here via `scripts/core-probe.sh`; `:app`, .NET
+and the emulator do not); and note that the sync spec, generator and vectors live in the **engine**
+repo.* The real bottleneck is unchanged: a merge decision (**#53**) plus a Windows gate, not
+authoring capacity.
+
+---
+
+### B-21 — Maven Central rate-limits this sandbox, and the first 429 looks like B-7 (NEW, narrow)
+
+**Symptom.** `scripts/core-probe.sh` failed four consecutive times with
+
+```
+Could not GET 'https://repo.maven.apache.org/maven2/...'. Received status code 429 from server: Too Many Requests
+```
+
+naming a **different artifact each time** — `ktor-client-core`, then
+`kotlin-scripting-compiler-impl-embeddable`, then `kotlin-test`, then `junit-platform-commons`.
+
+**Why it is worth a number rather than a shrug.** It is **not B-7**, and mistaking it for B-7 is the
+expensive outcome. B-7 is an egress **policy denial** of `dl.google.com` — permanent within a
+container, and correctly read as "`:app` is unreachable here". A **429 from `repo1.maven.org`** is
+an **allowed** host applying a rate limit: transient, self-clearing, and it says nothing about what
+this environment can build. A session that reads the first one as B-7 will file **`:core` as
+unreachable** and skip the one lane that actually executes here — which is precisely the class of
+error run 58 and run 65 each paid for once.
+
+**Attempts.** Retry with linear backoff, up to six. **Attempt 4 succeeded.** The advancing artifact
+name is the tell: each attempt populates more of `~/.gradle/caches/modules-2` before being cut off,
+so the failures march forward through the dependency graph rather than repeating. Once warm, every
+later run in the same container resolved without incident (baseline, negative control, fixed run
+and four mutations all ran clean afterwards).
+
+**Smallest human unblock.** None needed — it self-clears. **This entry exists to stop the
+misdiagnosis, not to request an action.** If it ever stops clearing, the fix is a Maven mirror or a
+pre-warmed Gradle cache in the container image; neither is worth doing on today's evidence.
+
+**Status:** not blocking. Recorded so the next container does not re-derive it as B-7.
+
+---
+
+### B-1, B-2, B-4, B-5, B-6, B-8, B-9, B-12, B-13, B-14, B-16, B-17, B-19, B-20 — untouched this run
+
+Not re-derived and not re-stated. **B-19 in particular is unmoved: no `:app` file was written**, and
+the fix in this run is `:core`-only, so it changes nothing about whether a production caller exists.

@@ -12545,3 +12545,177 @@ branch deleted, no deploy of any kind. **The production relay was not contacted 
 `GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no keystore, no
 emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory was **read, never
 written**.
+
+---
+
+## RUN 66 — 2026-08-19. The thirty-first firing; a silent stall in the pull loop, closed in `:core`.
+
+**Fetch first, and it mattered again: both checkouts arrived detached at a stale `main`** — the
+android tree **247 commits behind** `origin/claude/android-a0-probe`. Every number below is
+post-fetch.
+
+### Milestone 1 — the assigned slice, verified rather than rebuilt (C-66-1)
+
+The prompt assigned S5's spec half for the **thirty-first** time: amend §4.3 with the
+`entitlement_ack` body, add the vector via `generate.mjs`, close PQ-A2-1/-2/-3. **It has existed
+since 2026-08-09.** Re-derived rather than assumed, in the **engine** repo (the first attempt
+looked in the android checkout and found nothing — the generator and the three slice commits live
+in `careerseeker`, not here; recorded so the next session does not repeat it):
+
+```
+$ cd <engine>
+$ for c in 8575539 22b028e 7328a0b; do git merge-base --is-ancestor $c origin/main; echo "$c exit=$?"; done
+8575539 exit=1     22b028e exit=1     7328a0b exit=1
+```
+
+All three **exist** and **none is on `main`** — a *landing* problem, not a *building* one. The one
+command the prompt asked for **was run**, in the engine repo:
+
+```
+$ node docs/sync-vectors/generate.mjs --check
+OK: 26 vector files match the generator.        exit=0
+```
+
+**26, not 29** — `main` carries 26; the phone's vendored corpus is 29, taken from pin `7328a0b`
+which is not on `main`. The prompt's pin `679a317` is still stale (**C-66-2**).
+
+### Milestone 2 — what this run added: the latch that outlives its ask (C-66-3)
+
+`PullPolicy` latches after asking for a snapshot, and exactly two things released it: an
+`APPLIED_SNAPSHOT`, or `onRequestFailed()` when the push did not land. **Both cover only asks whose
+fate the phone can observe.**
+
+The third case had no release path at all. A `pull_request` the relay **accepted** and the engine
+never collected — it was switched off, or it polled after the TTL purged the queue — leaves
+`pending = true` for the life of the process. `onEnvelope` cannot clear it either: on a replica
+with no snapshot, **every disposition that would ask routes through the same latched `request()`**.
+The phone then sits on demo data with `hasPendingRequest` **true** — waiting, and honestly
+reporting that it is waiting, on a question that no longer exists anywhere. **§6.2 forbids that
+outcome by name**: *"a gap MUST NOT stall the stream."*
+
+**Why it survived twenty-two tests over the same file.** The engine publishes a snapshot on start
+(§4.3), which masks it in the common case. It bites **precisely when the engine was already
+running as the ask expired** — no fresh start-up snapshot is published, and the phone never asks
+again. `SyncPumpTest` already had *"a `pull_request` the relay refused releases the latch instead
+of latching forever"*; nothing tested the ask the relay **accepted**. **`open()` was never called
+twice anywhere in the suite**, though its own KDoc names *reconnect* as a call site.
+
+### Milestone 3 — the fix, and the decision inside it (C-66-4)
+
+`onOpen()` clears the latch **before** deciding. Two choices are load-bearing and each is pinned by
+its own mutation:
+
+- **Before, not after** — the release must happen even on the warm path that returns `None`.
+- **Unconditional, not cold-only** — a warm replica holding a latched `SEQUENCE_GAP` ask across a
+  reconnect lost it the same way, and gets the same second chance at the next gap.
+
+The asymmetry decides the risk, as it does elsewhere in this loop: a duplicate ask costs **one**
+snapshot, is bounded by the **reconnect** rate rather than the envelope rate, and is idempotent
+engine-side (every `ISnapshotRepublisher` answers by publishing a full snapshot regardless of
+state). A suppressed ask costs the dashboard **indefinitely, in silence**.
+
+**Phone-side policy, not protocol.** The engine never *sends* `pull_request`, so the mission's
+engine-parity rule has nothing to bind to here, **no vector moves, and no engine file was touched.**
+
+### Milestone 4 — executed, negative control first (C-66-5, C-66-6)
+
+**Baseline measured on a clean worktree before a line was written**, reproducing run 65's figure on
+a container built today:
+
+```
+$ scripts/core-probe.sh
+BUILD SUCCESSFUL
+core-probe: 312 tests, 0 failed, 0 skipped, across 22 classes
+```
+
+**The negative control was run before the fix**, and it is the evidence the defect was real:
+
+```
+PullPolicyTest > a reopen re-asks when the first request was accepted but never answered() FAILED
+PullPolicyTest > a reopen releases a gap request latched on a warm replica() FAILED
+SyncPumpTest  > reopening after an unanswered pull_request asks again() FAILED
+```
+
+**Exactly three**, and the fourth new test — the one-ask-per-page latch guard — **passed before and
+after**, which is what makes it a guard rather than a second copy of the defect witness.
+
+With the fix:
+
+```
+$ scripts/core-probe.sh --rerun
+BUILD SUCCESSFUL
+core-probe: 316 tests, 0 failed, 0 skipped, across 22 classes
+```
+
+**312 → 316.** Two `No cast needed` warnings appear in `PairingSessionTest` and `RelayClientTest` —
+**pre-existing, in files this run did not touch**; no zero-warning claim is made here.
+
+**Four mutations, each red, and each for its own reason** (**C-66-6**):
+
+| Mutation | Result |
+| --- | --- |
+| **M1** — delete the `pending = false` line (*reinstates the defect*) | **3 failed** — exactly the three negative-control tests; **the guard passes** |
+| **M2** — release *after* the decision instead of before | **4 failed** — the cold reopen, the guard, `a failed push re-arms the policy`, `the snapshot that arrives satisfies the request` |
+| **M3** — release only on the cold path (`if (!snapshotSeen)`) | **exactly 1 failed** — the warm-replica test, **alone** |
+| **M4** — delete the latch check from `request()` | **3 failed** — `many refused deltas produce exactly one request`, the guard, `a failed push re-arms the policy` |
+
+**M3 is the one worth reading twice**: one assertion fires with everything else green, which is what
+makes *unconditional* a constraint rather than a coincidence.
+
+**M2 was predicted to fail one test and failed four — the prediction was wrong and the measurement
+stands.** The four name the reason: releasing *after* the decision means `onOpen` never leaves the
+latch set at all, so every assertion depending on an open having latched goes red. The ordering is
+load-bearing in four places, not one. Recorded rather than quietly corrected, because a mutation
+table that reports predictions instead of measurements is the drift this repo keeps catching.
+
+**M4 answers a question M1 leaves open.** The guard test passes under M1 and fails under M4 — it is
+sensitive to the latch and insensitive to the release, so it is a genuine guard rather than a second
+copy of the defect witness.
+
+### Milestone 5 — freshness, and the standing state is unmoved (C-66-7)
+
+| | measured, post-fetch |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`**, unmoved since **2026-08-12** |
+| android `main` | **`ebfaf81`** |
+| engine PRs | **18 open, all draft** — none merged, closed or undrafted |
+| android PRs | **6 open, all draft** |
+| **#32** (the assigned slice) | still open, still draft |
+| **#53** (H1) | still open — still Brandon's decision |
+| Terra | **COMPLETE**, *files claimed: none* — **no collision** |
+
+**No H1–H8 item has been acted on.** **No drift** (**C-66-8**): vendored corpus **29/29
+byte-identical** to pin `7328a0b`, `diff -r` silent, `exit=0`.
+
+### Milestone 6 — a host fact the next container needs (C-66-9)
+
+`repo1.maven.org` returned **HTTP 429 (Too Many Requests)** on four consecutive resolutions before
+succeeding. This is **not B-7** — B-7 is a policy *denial* of `dl.google.com`, and 429 is a rate
+limit on a host that is allowed. It is **transient and self-clearing**: each attempt populated more
+of the Gradle cache, and attempt 4 resolved everything. **Retry with backoff rather than concluding
+`:core` is unreachable** — a session that reads the first 429 as B-7 will wrongly file `:core` as
+blocked. Filed as **B-21**.
+
+### Milestone 7 — status, honestly
+
+**No rung's status changed, and this run does not claim one did.** The defect closed here is S4
+transport hygiene — the pull loop's ask policy — not a rung. **S4 still needs the E2E rig** and
+**S6 still needs S3's key**, both behind **B-4**. **B-19 is unmoved: no `:app` file was written.**
+The open protocol-question ledger is untouched and still says *do not close them from a sandbox*.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 18 engine PRs and the 6 android drafts are exactly
+as found, and **#53's fate stays Brandon's**. **No vector byte was written in either repo** — corpus
+**29/29** byte-identical to pin `7328a0b`, `VECTORS.lock` not edited, **the pin did not move (H7)**.
+**No `:app` file was written** — not one; **B-19** stays open. **No C# was written, no
+`generate.mjs`, no `docs/Sync-Protocol.md`, no `ci.yml`**; **`$ExpectedOfflineTotal` was not moved**,
+and **no nineteenth engine PR was opened**. **Nothing was written in the engine repo at all** except
+`STATE.md` on the docs-only `autonomy/claude-state` branch. **`Verify-Alpha.ps1` was not run and no
+result for it is claimed** — no `pwsh`, no `dotnet`. **The android gate was not run** — only
+`:core:test` executed, via `scripts/core-probe.sh`; `:app:assembleDebug`, `:app:lintDebug`,
+`:app:test` and `checkCoreIsAndroidFree` are **unrun and unclaimed** (**B-7**). The only host
+mutation was **`apt-get update` + `openjdk-17-jdk-headless`** inside a disposable container. No
+history rewrite, no branch deleted, no deploy of any kind. **The production relay was not contacted
+at all, not even `GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no
+keystore, no emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory was
+**read, never written**.

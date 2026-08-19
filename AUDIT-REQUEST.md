@@ -11867,3 +11867,141 @@ diff -r /tmp/pinchk/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-
 ```
 
 *Expect:* **silent**, **`exit=0`**, **29 files each side** — measured **after** this run's commit.
+
+---
+
+## Run 66 — 2026-08-19. The pull latch that outlived its ask.
+
+Throughout, `<android>` = a checkout of `ShivaClaw/careerseeker-android` on
+`claude/android-a0-probe`, `<engine>` = a checkout of `ShivaClaw/careerseeker`.
+**`git fetch --all --prune` in BOTH before any of it** — both arrived detached at a stale `main`,
+the android tree **247** commits behind its own branch.
+
+### C-66-1 — the assigned slice exists and is not on `main`
+
+Run this in the **engine** repo. The three commits and `generate.mjs` are **not** in the android
+checkout; looking for them there returns `exit 128` (commit absent), which is not the same answer.
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  git merge-base --is-ancestor $c origin/main; echo "$c exit=$?"
+done
+```
+
+*Expect:* **`exit=1`** for all three — they exist, none is on `main`. `exit=128` means you are in
+the wrong repository.
+
+### C-66-2 — the generator is clean, and the count is 26 rather than 29
+
+```bash
+cd <engine> && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expect:* **`OK: 26 vector files match the generator.`**, **`exit=0`**. `main` carries **26**; the
+phone's vendored corpus is **29**, from pin `7328a0b`, which is not on `main`. The prompt's pin
+`679a317` is stale.
+
+### C-66-3 — the defect: `open()` was never called twice anywhere in the suite
+
+```bash
+cd <android> && git show 08e808a^:core/src/test/kotlin/app/careerseeker/core/SyncPumpTest.kt \
+  | grep -c "pump.open()"
+cd <android> && git show 08e808a^:core/src/test/kotlin/app/careerseeker/core/PullPolicyTest.kt \
+  | grep -c "onOpen"
+```
+
+*Expect:* every pre-fix occurrence is a **single** `open()` on a fresh pump/policy — no test drives
+a reopen. That is the hole; the KDoc on `onOpen` named `reconnect` as a call site the whole time.
+
+### C-66-4 — the negative control, which is the proof the defect was real
+
+```bash
+cd <android> && git checkout 08e808a -- core/src/test && git checkout 08e808a^ -- core/src/main
+scripts/core-probe.sh --rerun
+```
+
+*Expect:* **`BUILD FAILED`**, and **exactly these three**:
+
+```
+PullPolicyTest > a reopen re-asks when the first request was accepted but never answered() FAILED
+PullPolicyTest > a reopen releases a gap request latched on a warm replica() FAILED
+SyncPumpTest  > reopening after an unanswered pull_request asks again() FAILED
+```
+
+**`releasing on reopen does not weaken the one-ask-per-page latch` must PASS here.** If it fails,
+it is a second copy of the defect witness rather than a guard. Restore with
+`git checkout 08e808a -- core/`.
+
+### C-66-5 — the baseline and the fixed run
+
+```bash
+cd <android> && git checkout 08e808a^ -- core/ && scripts/core-probe.sh          # baseline
+cd <android> && git checkout 08e808a  -- core/ && scripts/core-probe.sh --rerun  # fixed
+```
+
+*Expect:* **`312 tests, 0 failed, 0 skipped, across 22 classes`** then
+**`316 tests, 0 failed, 0 skipped, across 22 classes`**, both **`BUILD SUCCESSFUL`**.
+Two `No cast needed` warnings appear in `PairingSessionTest` and `RelayClientTest` in **both** runs
+— pre-existing, not this change; **no zero-warning claim is made.**
+**This is `:core:test` only** — four of the android gate's five tasks need the Android SDK and did
+not run (**B-7**). Do not report a gate result on the strength of it.
+
+### C-66-6 — the four mutations, each red, each for its own reason
+
+Apply one at a time to `<android>` `core/src/main/kotlin/app/careerseeker/core/PullPolicy.kt`, run
+`scripts/core-probe.sh --rerun`, then `git checkout -- core/`. **Commit before mutating.**
+
+| | Mutation | Measured |
+| --- | --- | --- |
+| **M1** | delete the `pending = false` line in `onOpen` (*reinstates the defect*) | **3 failed** — exactly the three C-66-4 tests; **the latch guard passes** |
+| **M2** | move `pending = false` to **after** the decision is computed | **4 failed** — the cold reopen test, the guard, `a failed push re-arms the policy`, `the snapshot that arrives satisfies the request` |
+| **M3** | make it conditional: `if (!position.snapshotSeen) pending = false` | **exactly 1 failed** — `a reopen releases a gap request latched on a warm replica`, **alone** |
+| **M4** | delete `if (pending) return PullDecision.None` from `request()` (*remove the latch*) | **3 failed** — `many refused deltas produce exactly one request`, the new guard, `a failed push re-arms the policy` |
+
+**M3 is the one to press**: it fires **one** assertion with everything else green, which is what
+makes *unconditional* a real constraint rather than a coincidence. If it ever fails **nothing**, the
+warm-replica half has become decoration and a later change can silently re-cold-only it.
+
+**M2 was predicted to fail one test and fails four** — worth reading, because the four name the
+reason. Releasing *after* the decision means `onOpen` never leaves the latch set **at all**, so
+every assertion that depends on an open having latched goes red. The ordering is load-bearing in
+four places, not one.
+
+**M4 is what proves the guard test is real.** The guard (`releasing on reopen does not weaken the
+one-ask-per-page latch`) fails here — so it genuinely asserts the latch, and is not a second copy
+of the defect witness. Note it passes under **M1**, which is the complementary half: the guard is
+sensitive to the latch and insensitive to the release, exactly as intended.
+
+### C-66-7 — standing state, unmoved
+
+```bash
+cd <engine>  && git rev-parse --short origin/main    # aac05f3
+cd <android> && git rev-parse --short origin/main    # ebfaf81
+cd <engine>  && git show origin/autonomy/codex-state:STATE.md | head -20
+```
+
+*Expect:* the two SHAs above; **18 engine + 6 android PRs, all open, all draft**, none merged,
+closed or undrafted; **#32 and #53 both still open**; Terra **COMPLETE, files claimed: none**.
+
+### C-66-8 — no vector byte written
+
+```bash
+cd <engine> && tmp=$(mktemp -d) && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C "$tmp"
+diff -r "$tmp/docs/sync-vectors/v1" <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+```
+
+*Expect:* **silent**, **`exit=0`**, **29 files each side** — measured **after** this run's commits.
+
+### C-66-9 — B-21, the 429 that is not B-7
+
+```bash
+cd <android> && scripts/core-probe.sh --rerun
+```
+
+*Expect, on a cold container:* possibly
+**`Received status code 429 from server: Too Many Requests`** against
+**`repo1.maven.org`** — an **allowed** host rate-limiting, **not** B-7's policy denial of
+`dl.google.com`. **Retry with backoff**; each attempt populates more of the Gradle cache and it
+clears (it took **4** attempts here). A session that reads the first 429 as B-7 will wrongly file
+`:core` as unreachable.
