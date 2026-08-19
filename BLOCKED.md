@@ -2826,3 +2826,58 @@ None was worked, none moved, and none is re-derived here. **B-19 in particular i
 file was written this run.** **B-7** was not re-measured — run 63 did that hours earlier; this run
 only confirmed `:core` still builds under it, which is B-7's known-reachable side, not a change to
 its scope.
+
+---
+
+## Run 65 — 2026-08-19. B-18 attempt 8, and a new narrow one (B-20)
+
+### B-18 — the schedule keeps assigning a slice finished on 2026-08-09
+
+**Attempt 8. Status: unchanged, and the cost is now thirty firings.** This run declined the
+assignment for the thirtieth consecutive time (**C-65-1**) and spent itself elsewhere. Nothing about
+the unblock has moved: run 63 bounded it with `CronList` → `No scheduled jobs.`, so it is **not** in
+either repo and **not** in this session's job list — it is account-level scheduled-task
+configuration, which no tool available here can read or edit.
+
+**Attempt 8 DID send a push notification, and the reason is a change in the facts, not in the
+judgement.** Attempts 5 and 6 (runs 57, 59/60) escalated; attempt 7 (runs 61–64) deliberately sent
+nothing, because everything measured was green and unchanged and a fourth "everything waits on you"
+inside two days is the fatigue that makes a real signal ignorable. **That reasoning still stands and
+this run did not re-send the standing banner.** What it sent instead is a **defect discovered this
+run** — a relay 400 retried forever and shown to the user as "waiting for network", reachable by
+version skew with no bug on the phone — which had never reached Brandon in any prior message.
+
+**Smallest human unblock — unchanged, and now with one line more evidence.** Retire or repoint the
+scheduled task. **If the routine is meant to keep running**, replace its "YOUR SLICE THIS ITERATION"
+section with: *read `RETURN-DAY.md` §5; then run `scripts/core-probe.sh` and report it, and stop.*
+Run 65 is the argument for that wording: the one genuinely useful thing a cloud session found this
+week came from **reading the open-question ledger and testing its stated constraints**, not from the
+assignment. **The bottleneck remains H1 (decide #53) and H2 (run the Windows gate, land §3's six
+merges). Authoring capacity has never been the bottleneck.**
+
+### B-20 — PQ-PSH-1's fix is `:core`-verified and gate-unverified (NEW, narrow)
+
+**Symptom.** Run 65's change (`6bddded`) is proven by `:core:test` — **312 tests, 0 failed**, four
+mutations each red — but **`:core:test` is one of the android gate's five tasks**. The change touches
+`RelayClient.kt`, `OutboundQueue.kt`, `SyncPump.kt` and `PairingFlow.kt`, all `:core`; **nothing in
+`:app` was written**. Still, no cloud session can run `:app:assembleDebug`, `:app:lintDebug`,
+`:app:test` or `checkCoreIsAndroidFree` locally.
+
+**Attempts.** None beyond `:core`, and deliberately so — this is **B-7**, measured and unchanged
+(`dl.google.com` → **403 at the proxy**, no `sdkmanager`, no `ANDROID_HOME`). B-20 is filed **not**
+as a new obstacle but so that a reader of PR #6 cannot mistake `312/0` for a gate result.
+
+**Why it is narrow.** `:app` has no reference to `RelayResult` (`grep -rn RelayResult app/src` →
+nothing), so the exhaustive-`when` breakages that a new sealed case causes are **confined to the four
+`:core` files already fixed**. The residual risk is lint, not compilation.
+
+**Smallest human unblock.** Read CI on PR #6 — the runner **does** execute the whole gate (run 57
+recorded a green one, job `95605131416`) — or run the command of record locally:
+`./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:test :app:assembleDebug :app:lintDebug --rerun-tasks`.
+**Closes itself** on the first green CI run for this commit; no decision is owed.
+
+### B-1, B-2, B-4, B-5, B-6, B-8, B-9, B-12, B-13, B-14, B-16, B-17, B-19 — untouched this run
+
+None was worked, none moved, none re-derived. **B-19 in particular is unmoved: no `:app` file was
+written.** **B-7** was not re-measured — run 63 did that; this run only used its known-reachable
+side, which is not a change to its scope.

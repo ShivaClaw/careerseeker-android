@@ -1865,3 +1865,31 @@ quarantine those bytes (dropping silently is its own data-loss question, which i
 question and not a patch), and run the full android gate.
 
 **Re-verification:** `AUDIT-REQUEST.md` **C-PSH-5**.
+
+### PQ-PSH-1 ANSWERED 2026-08-19 (run 65) — and the reason it stayed open for thirty-six runs was wrong
+
+**Closed in `:core`.** `RelayResult.Rejected`, 400 terminal, `Dropped(DropReason.REJECTED)` in
+`OutboundQueue`, `Aborted(RELAY_REFUSED)` in `PairingFlow`, `RelayFailure.REJECTED`. `:core:test`
+**308 → 312, 0 failed** (**C-65-7**), four mutations each red (**C-65-8**).
+
+**The blocking reason was false.** This entry said the fix *"cannot be verified here:
+`:app:assembleDebug`/`:core:test` need the Android SDK (B-7)"*. **`:core:test` needs no Android
+SDK** — `:core` is Android-free by construction and `scripts/core-probe.sh` has run it on a cloud
+host since run 56 — and **both files this question names are `:core` files** (**C-65-3**). The
+question was filed unreachable on the strength of a module neither of them lives in. That is run
+58's lesson a second time: **verify the constraints, not just the summary.**
+
+**The drop-vs-quarantine half is answered by precedent, not by a new mechanism.** `TOO_LARGE`
+already drops a single item for the identical reason — the relay never stored the bytes, so `last`
+is unmoved and §6.2 makes the gap legal for the receiver. Nothing on the phone can repair an
+envelope this build composed wrongly, and keeping it blocks every later mark behind it, which is a
+strictly larger loss than the one drop. It is not silent: `Dropped(REJECTED)` carries its reason
+where `Retry` said nothing.
+
+**405 and 426 are deliberately NOT closed with it.** The engine maps only 400 and leaves these in
+its own default; a phone terminal where the engine retries is the "more correct than the engine"
+field bug the interpretation rule prevents. **Pinned by its own test**, so widening the phone alone
+fails something that says why. If the engine ever widens, the phone follows — not before.
+
+**Still unrun, and unclaimed:** the full android gate. `:app:assembleDebug`, `:app:lintDebug`,
+`:app:test` and `checkCoreIsAndroidFree` need the Android SDK (**B-7**) and did not execute.

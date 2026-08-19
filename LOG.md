@@ -12370,3 +12370,178 @@ no branch deleted, no deploy of any kind. **The production relay was not contact
 `GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no keystore, no
 emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory was **read, never
 written**.
+
+---
+
+## RUN 65 — 2026-08-19. The thirtieth firing, and the first to close a defect PQ-PSH-1 had filed as unreachable.
+
+**Fetch first (RULE ONE).** `git fetch --all --prune` in both checkouts before any number below.
+Both again arrived **detached at a stale `main`**, as at runs 62, 63 and 64. Every count is
+post-fetch.
+
+**The assigned slice was, for the thirtieth time, already built** (**C-65-1**). The prompt asked for
+§4.3's `entitlement_ack` body, the ack vector, and PQ-A2-1/-2/-3. All exist and have since
+**2026-08-09**. It was **not** rebuilt. What this run did instead is close **PQ-PSH-1** — a real,
+user-visible phone defect the ledger had recorded as *needing the android gate*, which was **false in
+the only part that mattered**.
+
+### Milestone 1 — the assigned slice, verified rather than rebuilt (C-65-1)
+
+`git merge-base --is-ancestor` for all three slice commits against a freshly fetched `origin/main`:
+
+```
+8575539 -> exit 1
+22b028e -> exit 1
+7328a0b -> exit 1
+```
+
+All three report **not on main**. The prompt's one requested command **was run**, on the branch that
+carries the work:
+
+```
+$ node docs/sync-vectors/generate.mjs --check
+OK: 29 vector files match the generator.
+exit=0
+```
+
+The four assigned items read **in the file**, not inferred: §4.3.3's body at
+`docs/Sync-Protocol.md:307-320` (PQ-A6-1), the ciphertext cap at `118`/`656` (PQ-A2-1),
+`decrypt_failed` at `103`/`601`/`657` (PQ-A2-2), and `invalid-unknown-field.json` present in the
+corpus (PQ-A2-3). **The prompt's pin `679a317` is still stale — it is `7328a0b`** (**C-65-2**).
+
+### Milestone 2 — the stale constraint, tested instead of inherited (C-65-3)
+
+Run 58's lesson was that **a stale "you cannot do X" costs more than a stale "X is not started"**,
+because the second gets checked on arrival and the first is never tested at all. PQ-PSH-1 closes with
+*"the fix cannot be verified here: `:app:assembleDebug`/`:core:test` need the Android SDK (**B-7**)"*.
+
+**Half of that sentence is false, and has been since run 56.** `:core:test` needs no Android SDK —
+`:core` is Android-free by construction and `scripts/core-probe.sh` runs it on this host. Both files
+PQ-PSH-1 names — `RelayClient.kt` and `OutboundQueue.kt` — are **`:core` files**. The question was
+filed as unreachable on the strength of a module it does not live in.
+
+**Baseline, measured on a clean worktree at HEAD `45d706a` before a line was written** (**C-65-4**):
+`BUILD SUCCESSFUL`, **`core-probe: 308 tests, 0 failed, 0 skipped, across 22 classes`** — independently
+reproducing run 64's figure.
+
+### Milestone 3 — the defect, and how it stayed invisible (C-65-5)
+
+`RelayClient.request` mapped 401/403/404/409/413 to terminal results and let **everything else** fall
+to the retry branch. **400 was in "everything else"** (`grep -c BadRequest` → **0**). So an envelope
+the relay shape-checked and refused was retried the full budget, then reported as
+`RelayResult.Unavailable` — which `OutboundQueue.onPushed` maps to `PushOutcome.Retry`, *"keep the
+bytes, offline is not a data-loss event"*.
+
+**A sender-side defect was therefore re-sent indefinitely and presented to the user as being
+offline** — the one diagnosis that hides it, while the relay was answering promptly and saying
+exactly what was wrong. **Version skew reaches this with no bug at all**: a relay that tightens its
+shape check 400s every push from an older phone, which is precisely when *"the network is down"* is
+the most expensive possible misdiagnosis.
+
+**What kept it green, and it is the run-56 shape again.** The suite already had a test named
+**`a 4xx is a decision and is never retried`** — a claim about the whole class, **witnessed with 404
+alone**, one of the statuses that actually worked. The test's name asserted the property the code
+lacked. It has been generalised to enumerate every status the mapping calls terminal.
+
+### Milestone 4 — the fix, matched to the engine rather than invented (C-65-6)
+
+`RelayResult.Rejected`, added and placed at **all four consumers, each of which failed to compile
+until it was** — the shape this house prefers over a comment:
+
+| Consumer | Placement | Why |
+| --- | --- | --- |
+| `RelayClient` | 400 → `Rejected`, terminal | the engine's `RelayPushResult.Rejected` decision |
+| `OutboundQueue` | `Dropped(DropReason.REJECTED)` | `TOO_LARGE`'s precedent — see below |
+| `PairingFlow` | `Aborted(RELAY_REFUSED)` | a completion this build composed wrongly |
+| `RelayFailure` | `REJECTED` | distinct from `UNAVAILABLE`, which is the whole point |
+
+**Matched to the engine, deliberately.** `src/Sync/RelayClient.cs` maps **only** `BadRequest` to
+`Rejected` and keeps it distinct from `TooLarge` *because the remedies differ* — a malformed envelope
+is a bug to fix, an oversized one is a payload to split (§4.4). **405 and 426 are NOT widened**, even
+though PQ-PSH-1 observes they take the same path in principle: the engine leaves them in its own
+default, and a phone terminal where the engine retries is exactly the *"more correct than the engine"*
+field bug the interpretation rule exists to prevent. **That restraint is pinned by its own test**, so
+widening the phone alone has to fail something that says why.
+
+**The drop-vs-quarantine half, which PQ-PSH-1 left open as a data-loss question, is answered by
+precedent rather than by a new mechanism.** `TOO_LARGE` already drops a single item for the identical
+reason: the relay never stored the bytes, so its `last` is unmoved and §6.2 makes the resulting gap
+legal for the receiver. Nothing on the phone can repair an envelope this build composed wrongly, and
+keeping it blocks **every later mark behind it** — a strictly larger loss than the one drop. **Nor is
+it silent**: it leaves as `Dropped(REJECTED)` carrying its reason, where `Retry` was the outcome that
+said nothing.
+
+### Milestone 5 — executed, and each claim mutation-proven (C-65-7, C-65-8)
+
+```
+$ scripts/core-probe.sh --rerun
+BUILD SUCCESSFUL
+core-probe: 312 tests, 0 failed, 0 skipped, across 22 classes
+```
+
+**308 → 312**, 0 warnings. **Four mutations, each red, and each firing the assertions it should**:
+
+| Mutation | Result |
+| --- | --- |
+| **M1** — remove the 400 branch (*reinstates the original defect*) | **3 failed**: the status mapping, the generalised 4xx test, and `PairingFlowTest`'s terminal list |
+| **M2** — `Rejected` → `PushOutcome.Retry` (*the misreport itself*) | **2 failed**, both new `OutboundQueueTest` cases, and nothing else |
+| **M3** — collapse 400 into `TooLarge` (*terminal, but wrong remedy*) | **3 failed**, including the distinctness test written for exactly this |
+| **M4** — widen the phone past the engine (405 terminal) | **exactly 1 failed** — the engine-parity test, alone |
+
+**M4 is the one worth reading twice**: it fires a single assertion with every other test passing,
+which is what makes the parity pin a real constraint rather than decoration.
+
+### Milestone 6 — freshness, and the standing state is unmoved (C-65-9)
+
+| | measured |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`**, unmoved since **2026-08-12** |
+| android `main` | **`ebfaf81`**, unmoved since **2026-08-06** |
+| engine PRs | **18 open, all draft** — none merged, closed or undrafted |
+| android PRs | **6 open, all draft** |
+| **#53** (H1) | still open — still Brandon's decision |
+| Terra | **COMPLETE**, *files claimed: none* — **no collision** |
+
+**No H1–H8 item has been acted on.** Return day was **2026-08-18**; this is **day + 1**.
+
+**No drift** (**C-65-10**): vendored corpus **29/29 byte-identical** to pin `7328a0b`, `diff -r`
+silent, `exit=0`, measured **after** this run's commit against a worktree checked out at the pin
+itself.
+
+### Milestone 7 — status, honestly
+
+**No rung's status changed**, and this run does not claim one did. The defect closed here is S4/S6
+transport hygiene, not a rung: **S4 still needs the E2E rig** and **S6 still needs S3's key**, both
+behind **B-4**. **B-19 is unmoved — no `:app` file was written.** **PQ-PSH-1 is closed**; PQ-S2-1,
+PQ-S2-2 and the rest of the open ledger are untouched and still say *do not close them from a sandbox*.
+
+**One process error, recorded because the records are the product.** The first mutation pass reverted
+with `git checkout -- core/src/main core/src/test` while the change was **still uncommitted**, which
+restored HEAD and destroyed it. It was rewritten from the session's own record, re-verified to the
+same **312/0**, and **committed before** any further mutation ran. No published artefact was affected
+— nothing had been pushed — but the ordering rule is now explicit: **commit first, mutate second.**
+
+**A push notification WAS sent, and it is not the fatigue runs 61–64 declined.** Those runs found
+everything green and unchanged, and re-sending a standing banner is what makes a real signal
+ignorable. **This run found a defect that had never reached Brandon**: on any phone built from this
+branch, a relay 400 is retried forever and shown as "waiting for network", and version skew triggers
+it with no bug on the phone at all. A defect discovered after the last message is the routine working;
+the standing state was **not** re-sent alongside it.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 18 engine PRs and the 6 android drafts are exactly as
+found, and **#53's fate stays Brandon's**. **No vector byte was written in either repo** — corpus
+**29/29** byte-identical to pin `7328a0b`, `VECTORS.lock` not edited, **the pin did not move (H7)**.
+**No `:app` file was written** — not one; **B-19** stays open. **No C# was written, no
+`generate.mjs`, no `docs/Sync-Protocol.md`, no `ci.yml`**; **`$ExpectedOfflineTotal` was not moved on
+any pushed branch**, and **no nineteenth engine PR was opened**. **Nothing was written in the engine
+repo at all** except `STATE.md` on the docs-only `autonomy/claude-state` branch. **`Verify-Alpha.ps1`
+was not run and no result for it is claimed** — no `pwsh`, no `dotnet`; `816` remains run 62's
+labelled **prediction**. **The android gate was not run** — only `:core:test` executed, via
+`scripts/core-probe.sh`; `:app:assembleDebug`, `:app:lintDebug`, `:app:test` and
+`checkCoreIsAndroidFree` are **unrun and unclaimed** (**B-7**). The only host mutation was
+**`apt-get update` + `openjdk-17-jdk-headless`** inside a disposable container. No history rewrite, no
+branch deleted, no deploy of any kind. **The production relay was not contacted at all, not even
+`GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no keystore, no
+emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory was **read, never
+written**.

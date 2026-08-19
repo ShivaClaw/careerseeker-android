@@ -11714,3 +11714,156 @@ cd <E> && git show origin/autonomy/codex-state:STATE.md | head -12
 #53 present; the seven landing heads `c93e88d 2be00fc b0b6c77 edee32b 94fd979 f5e0c0a 8177353`;
 Terra COMPLETE with no files claimed. **Any difference here means a human acted — re-read
 `RETURN-DAY.md` §3 before trusting the older counts.**
+
+---
+
+## Run 65 — 2026-08-19. PQ-PSH-1 closed in `:core`; re-verification commands
+
+Every claim run 65 makes, with the command that re-runs it. `<android>` is a checkout of
+`claude/android-a0-probe`; `<engine>` is a checkout of `ShivaClaw/careerseeker`. **Fetch both first**
+— every count below is post-`git fetch --all --prune`.
+
+**Toolchain, once, per C-64-5** (the recorded one-command install 404s on a stale apt index):
+
+```bash
+apt-get update && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+```
+
+### C-65-1 — the assigned slice is built, for the thirtieth consecutive run
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  git merge-base --is-ancestor $c origin/main; echo "$c -> exit $?"
+done
+```
+
+*Expect:* **`exit 1` for all three** — the work exists and is **not on `main`**. Then, on the branch
+that carries it:
+
+```bash
+git checkout origin/claude/s5-inbound-pump
+node docs/sync-vectors/generate.mjs --check
+```
+
+*Expect:* **`OK: 29 vector files match the generator.`**, **`exit=0`**.
+
+### C-65-2 — the four assigned items read in the file, not inferred
+
+```bash
+cd <engine> && git checkout origin/claude/s5-inbound-pump
+grep -n "entitlement_ack" docs/Sync-Protocol.md      # §4.3.3 body at 307-320  (PQ-A6-1)
+grep -n -i "ciphertext" docs/Sync-Protocol.md        # cap at 118 / 656        (PQ-A2-1)
+grep -n "decrypt_failed" docs/Sync-Protocol.md       # 103 / 601 / 657         (PQ-A2-2)
+ls docs/sync-vectors/v1/invalid-unknown-field.json   # present                 (PQ-A2-3)
+```
+
+*Expect:* all four present. **The prompt's pin `679a317` is stale; the pin is `7328a0b`** —
+`grep 'Pinned commit' <android>/core/src/test/resources/sync-vectors/VECTORS.lock`.
+
+### C-65-3 — PQ-PSH-1 was filed as needing a gate it does not need
+
+The claim is that both files PQ-PSH-1 names live in `:core`, which needs no Android SDK:
+
+```bash
+cd <android>
+ls core/src/main/kotlin/app/careerseeker/core/RelayClient.kt \
+   core/src/main/kotlin/app/careerseeker/core/OutboundQueue.kt
+```
+
+*Expect:* both exist under `core/`. **This is the whole of the finding** — the question was filed
+unreachable on the strength of `:app`, a module neither file is in.
+
+### C-65-4 — the 308 baseline, measured before a line was written
+
+```bash
+cd <android>
+git worktree add /tmp/cs-baseline 45d706a       # run 64's tip, this run's parent
+cd /tmp/cs-baseline && ./scripts/core-probe.sh
+```
+
+*Expect:* **`BUILD SUCCESSFUL`**, **`core-probe: 308 tests, 0 failed, 0 skipped, across 22 classes`**.
+
+### C-65-5 — the defect, on the parent commit
+
+```bash
+cd /tmp/cs-baseline
+grep -c "BadRequest" core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+```
+
+*Expect:* **`0`** — 400 was in no branch of the mapping, so it fell through to the retry path and was
+reported as `Unavailable`, which `OutboundQueue.onPushed` maps to `PushOutcome.Retry`
+(`grep -n "Unavailable -> PushOutcome.Retry" core/src/main/kotlin/app/careerseeker/core/OutboundQueue.kt`).
+
+**And the test that stayed green over it:**
+
+```bash
+sed -n '/a 4xx is a decision and is never retried/,/^    }/p' \
+  core/src/test/kotlin/app/careerseeker/core/RelayClientTest.kt
+```
+
+*Expect:* on the **parent**, a test claiming a property of all 4xx that witnesses it with
+`HttpStatusCode.NotFound` **only**. On this run's commit it enumerates five statuses.
+
+### C-65-6 — the fix matches the engine, and its restraint is deliberate
+
+```bash
+cd <engine>
+git show origin/claude/s2-relay-pull-result:src/Sync/RelayClient.cs | grep -n -A2 "case HttpStatusCode.BadRequest"
+```
+
+*Expect:* **`return new RelayPushResult.Rejected(...)`** — and **no case for 405 or 426**, which is
+why the phone does not add one either. Phone side:
+
+```bash
+cd <android>
+grep -n "BadRequest\|MethodNotAllowed\|UpgradeRequired" core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+```
+
+*Expect:* **`BadRequest` mapped, 405/426 absent** from the mapping.
+
+### C-65-7 — executed: 312/0
+
+```bash
+cd <android> && ./scripts/core-probe.sh --rerun
+```
+
+*Expect:* **`BUILD SUCCESSFUL`**, **`core-probe: 312 tests, 0 failed, 0 skipped, across 22 classes`**,
+0 warnings. **This is `:core:test` only** — four of the android gate's five tasks need the Android SDK
+and did not run (**B-7**). Do not report a gate result on the strength of it.
+
+### C-65-8 — the four mutations, each red
+
+Apply one at a time to `<android>`, run `./scripts/core-probe.sh --rerun`, then `git checkout -- core/`.
+**Commit before mutating** — see the run-65 log's Milestone 7.
+
+| | Mutation | Expect |
+| --- | --- | --- |
+| **M1** | delete the line `HttpStatusCode.BadRequest -> return RelayResult.Rejected` | **3 failed** — status mapping, the 4xx test, `PairingFlowTest`'s terminal list |
+| **M2** | replace `OutboundQueue`'s `RelayResult.Rejected` block with `PushOutcome.Retry` | **2 failed**, both new `OutboundQueueTest` cases |
+| **M3** | map `BadRequest` to `RelayResult.TooLarge` instead | **3 failed**, incl. `a 400 is the sender's defect and is kept distinct from an oversized body` |
+| **M4** | map `BadRequest, HttpStatusCode.MethodNotAllowed` to `Rejected` | **exactly 1 failed** — `405 and 426 are still retried…` |
+
+**M4 is the one to press**: if it fails *anything else*, the engine-parity pin is entangled with
+another assertion and is weaker than claimed. If it fails **nothing**, the pin is decoration and the
+phone's terminal set can silently drift past the engine's.
+
+### C-65-9 — standing state, unmoved
+
+```bash
+cd <engine>   && git rev-parse --short origin/main    # aac05f3
+cd <android>  && git rev-parse --short origin/main    # ebfaf81
+```
+
+Plus the PR sweep (18 engine + 6 android, **all open, all draft**) and Terra's
+`git show origin/autonomy/codex-state:STATE.md` → **COMPLETE, files claimed: none**.
+
+### C-65-10 — no vector byte written
+
+```bash
+cd <engine> && git worktree add --detach /tmp/pinchk 7328a0bc043335491cd96a67d634e8eea2a13af9
+diff -r /tmp/pinchk/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+```
+
+*Expect:* **silent**, **`exit=0`**, **29 files each side** — measured **after** this run's commit.
