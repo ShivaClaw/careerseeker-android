@@ -11135,3 +11135,168 @@ ls <android>/core/src/test/resources/sync-vectors/v1/*.json | wc -l
 
 *Expected:* `diff -r` **silent**, `exit=0`, **29** files. Taken **after** this run's commit.
 `VECTORS.lock` unedited and the pin unmoved (**H7**).
+
+---
+
+## Sixty-first cloud iteration — 2026-08-19 (Linux sandbox)
+
+### C-VEC-1 — the vector-corpus coverage guard exists and `:core` is green at 308 / 22
+
+> **Claim.** `VectorCorpusCoverageTest` adds four assertions that the vendored corpus is fully
+> consumed and agrees with its manifest. `:core:test` goes **304 tests / 21 classes → 308 tests /
+> 22 classes, 0 failed, 0 skipped**.
+
+```bash
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+scripts/core-probe.sh --rerun
+```
+
+*Expected:* `BUILD SUCCESSFUL` and the final line
+`core-probe: 308 tests, 0 failed, 0 skipped, across 22 classes`.
+
+The JDK line is not decoration: this container ships **JDK 21 only**, `:core` pins
+`jvmToolchain(17)`, and `api.foojay.io` is denied (**B-7**), so the probe fails with its own
+diagnostic until 17 is installed. For the 304 baseline, run the same command at `HEAD~1`.
+
+### C-VEC-2 — the four assertions are capable of failing, and each fires alone
+
+> **Claim.** Four mutations, each firing **exactly one** of the four assertions and leaving the
+> other three passing. No mutation is left on disk.
+
+```bash
+V=core/src/test/resources/sync-vectors/v1
+cp $V/index.json /tmp/index.bak
+
+# 1 -> `every vector type in the manifest has a declared consumer` FAILS
+python3 -c "
+import json; p='$V/index.json'; d=json.load(open(p))
+d['vectors'].append({'name':'outcome-mark-basic','type':'outcome_mark','valid':True,'expect_error':None})
+json.dump(d,open(p,'w'),indent=2)"
+echo '{\"name\":\"outcome-mark-basic\"}' > $V/outcome-mark-basic.json
+scripts/core-probe.sh 2>&1 | grep -E "VectorCorpusCoverageTest.*(PASSED|FAILED)"
+cp /tmp/index.bak $V/index.json; rm -f $V/outcome-mark-basic.json
+
+# 2 -> `every invalid vector outside a whole-type enumerator is covered by a named test` FAILS
+python3 -c "
+import json; p='$V/index.json'; d=json.load(open(p))
+d['vectors'].append({'name':'pairing-replayed-confirm','type':'pairing','valid':False,'expect_error':'decrypt_failed'})
+json.dump(d,open(p,'w'),indent=2)"
+echo '{\"name\":\"pairing-replayed-confirm\"}' > $V/pairing-replayed-confirm.json
+scripts/core-probe.sh 2>&1 | grep -E "VectorCorpusCoverageTest.*(PASSED|FAILED)"
+cp /tmp/index.bak $V/index.json; rm -f $V/pairing-replayed-confirm.json
+
+# 3 -> `the manifest and the vendored directory describe the same payload files` FAILS
+echo '{\"name\":\"stray-vendored\"}' > $V/stray-vendored.json
+scripts/core-probe.sh 2>&1 | grep -E "VectorCorpusCoverageTest.*(PASSED|FAILED)"
+rm -f $V/stray-vendored.json
+
+# 4 -> `every declared consumer still has vectors to consume` FAILS
+python3 -c "
+import json; p='$V/index.json'; d=json.load(open(p))
+d['vectors']=[v for v in d['vectors'] if v.get('type')!='entitlement_ack']
+json.dump(d,open(p,'w'),indent=2)"
+mv $V/entitlement-ack.json $V/entitlement-ack-no-order-id.json /tmp/
+scripts/core-probe.sh 2>&1 | grep -E "VectorCorpusCoverageTest.*(PASSED|FAILED)"
+mv /tmp/entitlement-ack.json /tmp/entitlement-ack-no-order-id.json $V/
+git checkout -- $V/index.json
+git status --porcelain core/src/test/resources/   # -> must print NOTHING
+```
+
+*Expected:* mutation 1 fails `...has a declared consumer`; 2 fails `...covered by a named test`;
+3 fails `...describe the same payload files`; 4 fails `...still has vectors to consume`. In every
+run the other three **PASSED**. The final `git status` line is the safety check — it must be
+**empty**, i.e. no vector byte survived the controls.
+
+### C-VEC-3 — the pre-fix proof: an unconsumed vector type left the suite green at 304 / 0
+
+> **Claim.** This is the defect, measured rather than argued. With a vector of an entirely new
+> `type` **generated, vendored, and listed in `index.json`** — the exact state `entitlement_ack`
+> was in on 2026-08-09 — and `VectorCorpusCoverageTest` removed, `:core:test` is
+> **BUILD SUCCESSFUL, 304 tests, 0 failed, 0 skipped, across 21 classes**. Every test in the
+> suite skipped it and nothing anywhere reported a gap.
+
+```bash
+V=core/src/test/resources/sync-vectors/v1
+mv core/src/test/kotlin/app/careerseeker/core/VectorCorpusCoverageTest.kt /tmp/VCCT.kt
+cp $V/index.json /tmp/index.bak
+python3 -c "
+import json; p='$V/index.json'; d=json.load(open(p))
+d['vectors'].append({'name':'outcome-mark-basic','type':'outcome_mark','valid':True,'expect_error':None})
+json.dump(d,open(p,'w'),indent=2)"
+echo '{\"name\":\"outcome-mark-basic\"}' > $V/outcome-mark-basic.json
+scripts/core-probe.sh 2>&1 | grep -E "BUILD|core-probe: [0-9]+ tests"
+cp /tmp/index.bak $V/index.json; rm -f $V/outcome-mark-basic.json
+mv /tmp/VCCT.kt core/src/test/kotlin/app/careerseeker/core/VectorCorpusCoverageTest.kt
+```
+
+*Expected:* `BUILD SUCCESSFUL` and `core-probe: 304 tests, 0 failed, 0 skipped, across 21 classes`
+— **green, with an unread vector in the corpus.**
+
+### C-PIN-5 — no vector drift from this run, re-checked after the mutation controls
+
+> **Claim.** The vendored corpus is **29/29 byte-identical** to pin `7328a0b`, taken **after** the
+> four negative controls and the pre-fix proof had each mutated and restored it. Nothing under
+> `docs/sync-vectors/` was written in either repo; `VECTORS.lock` was not edited and **the pin did
+> not move** (moving it is **H7**, Brandon's).
+
+```bash
+cd ../careerseeker && git fetch --all --prune
+diff -r <(git show 7328a0b:docs/sync-vectors/v1 >/dev/null 2>&1; git archive 7328a0b docs/sync-vectors/v1 | tar -xO --to-stdout >/dev/null; echo) /dev/null >/dev/null
+# Direct form, which is what was actually run:
+git ls-tree 7328a0b docs/sync-vectors/v1/ --name-only | sed 's|.*/||' | sort > /tmp/up.txt
+ls ../careerseeker-android/core/src/test/resources/sync-vectors/v1/ | sort > /tmp/vd.txt
+comm -3 /tmp/up.txt /tmp/vd.txt          # -> no output
+while read n; do
+  git show 7328a0b:docs/sync-vectors/v1/$n > /tmp/u.json
+  diff -q /tmp/u.json ../careerseeker-android/core/src/test/resources/sync-vectors/v1/$n >/dev/null \
+    || echo "DIFFERS: $n"
+done < /tmp/vd.txt                        # -> no output
+```
+
+*Expected:* both loops silent, `29` on each side. Measured this run: **upstream=29 vendored=29,
+set diff empty, content drift=0**, and `git status --porcelain core/src/test/resources/` empty.
+
+### C-VEC-4 — the prompt's one runnable ask still passes, on work that predates this run
+
+> **Claim.** `node docs/sync-vectors/generate.mjs --check` at the pin reports
+> **`OK: 29 vector files match the generator.`, `exit=0`**. The `entitlement_ack` body (§4.3.3),
+> the ciphertext-cap wording (PQ-A2-1), `decrypt_failed` on structural rejection (PQ-A2-2) and
+> `invalid-unknown-field.json` (PQ-A2-3) are all present **at that commit and not on `main`**.
+
+```bash
+cd ../careerseeker && git fetch --all --prune
+git merge-base --is-ancestor 7328a0b origin/main; echo "exit=$?"   # -> 1, i.e. NOT on main
+git checkout 7328a0b && node docs/sync-vectors/generate.mjs --check
+git show origin/main:docs/sync-vectors/v1 2>/dev/null | tail -n +3 | wc -l   # -> 26 on main
+```
+
+*Expected:* `exit=1` from the ancestor check, `OK: 29 vector files match the generator.` from the
+generator, and **26** vector entries on `main` against the phone's 29.
+
+### C-STOP-9 — the assigned slice is still built, still off `main`, twenty-six runs on
+
+> **Claim.** The scheduled prompt assigned S5's spec half for the **twenty-sixth** time. It has
+> existed since 2026-08-09 as draft PR **#32**; commits `8575539`, `22b028e`, `7328a0b`. The
+> prompt's pin `679a317` is stale — it is **`7328a0b`** — and its "S5 is NOT STARTED" is wrong.
+
+```bash
+cd ../careerseeker && git log --oneline origin/main..origin/claude/s5-entitlement-ack-spec
+grep -n "Pinned commit" ../careerseeker-android/core/src/test/resources/sync-vectors/VECTORS.lock
+```
+
+*Expected:* four commits including `8575539` and `22b028e`; the lock names `7328a0b…`, not
+`679a317`.
+
+### C-RET-8 — freshness: nothing has landed since return day
+
+> **Claim.** Taken after `git fetch --all --prune` in both checkouts. `careerseeker` `main` is
+> **`aac05f3`** and android `main` is **`ebfaf81`**, both unmoved since 2026-08-12. **18** open
+> PRs in `careerseeker` and **6** in android, **all still draft, none merged or closed.**
+
+```bash
+cd ../careerseeker && git fetch --all --prune && git log --oneline -1 origin/main
+cd ../careerseeker-android && git fetch --all --prune && git log --oneline -1 origin/main
+```
+
+*Expected:* `aac05f3` and `ebfaf81`. PR counts via the GitHub API, `state=open`: 18 and 6, every
+one with `"draft": true`.

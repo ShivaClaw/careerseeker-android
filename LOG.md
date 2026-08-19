@@ -11831,3 +11831,146 @@ branch deleted, no deploy of any kind. **The production relay was not contacted 
 code, no keystore, no emulator, no Gmail. **No secret was read, printed or echoed** — none was
 opened. No `.appdata` original touched. Terra's territory was read, never written. The JDK 17
 install was made **inside this disposable container only**.
+
+---
+
+## Sixty-first cloud iteration — 2026-08-19 (Linux sandbox): the twenty-sixth assignment of a built slice, and the corpus that could hold a vector nobody reads
+
+**Rule one first, and it mattered again.** `git fetch --all --prune` in **both** checkouts before
+anything else. Both arrived **detached at a stale `main`**. Every number below was taken after that
+fetch.
+
+### Milestone 1 — the assignment, verified rather than performed (C-STOP-9, C-VEC-4, C-RET-8)
+
+The prompt assigned S5's spec half: §4.3 `entitlement_ack`, the ack vector, PQ-A2-1/-2/-3. **It has
+been built since 2026-08-09** and this is the **twenty-sixth** run assigned it. Verified, not
+inherited from the records: `git merge-base --is-ancestor 7328a0b origin/main` → **exit 1**, so the
+work is real and **not on `main`**; the four commits are on `claude/s5-entitlement-ack-spec` (PR
+**#32**). The prompt's pin `679a317` is **stale** — `VECTORS.lock` names **`7328a0b`**.
+
+The prompt's one runnable ask **was run**, on work that predates this session by ten days:
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the generator.`,
+`exit=0`**. `main` carries **26** vectors; the phone carries **29**.
+
+**Freshness:** `careerseeker` `main` is **`aac05f3`**, android `main` **`ebfaf81`**, both unmoved
+since 2026-08-12. **18** open PRs in the engine repo, **6** in android, **all draft, none merged.**
+
+**So the slice was declined for the twenty-sixth time and a verifiable one was done instead** — and
+the choice of which was driven by run 58's lesson rather than by the prompt's list.
+
+### Milestone 2 — the constraint that was worth re-deriving (and the JDK)
+
+The prompt says *"Do NOT write the C# applier or the Kotlin applier unless you can compile them —
+you cannot."* **Half of that is false**, as run 58 established: `:core` is Android-free by
+construction and `scripts/core-probe.sh` runs `:core:test` on this host. It is re-derived here
+rather than taken from the records, because a stale *"you cannot"* is the expensive kind of stale.
+
+One new fact for the next container: **this image ships JDK 21 only**, and `:core` pins
+`jvmToolchain(17)`. The probe fails with its own diagnostic until
+`apt-get install openjdk-17-jdk-headless` runs. It is in **C-VEC-1** so nobody rediscovers it.
+
+**Baseline before touching anything: `core-probe: 304 tests, 0 failed, 0 skipped, across 21
+classes`.**
+
+### Milestone 3 — the defect, found by asking run 58's question one layer out (C-VEC-3)
+
+Twice the same shape has been found and fixed **one instance at a time**:
+
+| found | instance | how it was closed |
+| --- | --- | --- |
+| run 58 (**B-19**) | `entitlement_ack` — spec'd, vector-covered, **no production caller** | `EntitlementRoutingApplier`, then run 60's `PayloadKindCoverageTest` at the enum |
+| earlier | `pairing-high-bit-confirm` — vendored, listed, **asserted by nothing** | `validPairingVectors()` enumerates the manifest instead of naming one file |
+
+Both are *"present, shipped, and nothing consumes it"*, and both survived because **nothing asked
+the question**. Enumerating from the manifest makes each **existing** type consume its vectors. It
+does **not** make a **new** type consume anything. The suite has exactly four `type` filters —
+`envelope`, `entitlement`, `entitlement_ack`, `pairing` — and **nothing asserted they exhaust the
+manifest**.
+
+**Measured, not argued.** A vector carrying a fifth `type`, generated and vendored and listed in
+`index.json` — precisely the state `entitlement_ack` was in on 2026-08-09 — with the new test
+removed:
+
+```
+BUILD SUCCESSFUL
+core-probe: 304 tests, 0 failed, 0 skipped, across 21 classes
+```
+
+**Green, with an unread vector sitting in the corpus.** CI would have byte-diffed that file against
+the pin and passed it too. The corpus is the phone's only evidence that it agrees with the engine;
+a slice of it that nothing reads is evidence nobody is collecting.
+
+### Milestone 4 — the guard, and four controls that each fire alone (C-VEC-1, C-VEC-2)
+
+`VectorCorpusCoverageTest` (commit `c692422`) asserts four things: every `type` in the manifest has
+a **declared** consumer; every declared consumer still has vectors; every invalid vector of a type
+whose enumerator filters `valid: true` is covered by a **named** test; and the manifest and the
+vendored directory describe the same files.
+
+The consumer map is **declared, not derived**. Reflecting over the test sources would make this
+pass automatically for any type someone filtered on — the tautology it exists to avoid. Adding a
+type to the corpus now fails until a human writes down which test consumes it, the same way adding
+a `PayloadKind` fails until someone places it.
+
+| mutation | result |
+| --- | --- |
+| a vector of a new `type`, vendored + listed | **1 failed** (`…has a declared consumer`) |
+| an invalid `pairing` vector no named test loads | **1 failed** (`…covered by a named test`) |
+| a payload on disk the manifest never lists | **1 failed** (`…describe the same payload files`) |
+| a declared consumer whose type left the corpus | **1 failed** (`…still has vectors to consume`) |
+
+**In every run the other three PASSED** — four assertions, four distinct causes, no overlap.
+
+Final state: **`core-probe: 308 tests, 0 failed, 0 skipped, across 22 classes`**, on `--rerun` so
+no result is inherited from Gradle's up-to-date checks.
+
+**What this guard does not prove, stated here as well as in its KDoc.** It does not prove the
+consumers assert anything *useful* — a consumer that loaded its type and asserted nothing would
+pass. It says nothing about whether the pin is current; that is **B-16**, still open on **H3**, and
+untouched.
+
+### Milestone 5 — no drift, re-checked after the controls (C-PIN-5)
+
+The controls mutated `index.json` and moved payload files five times. After restoring:
+**upstream=29, vendored=29, set diff empty, content drift=0** against pin `7328a0b`, and
+`git status --porcelain core/src/test/resources/` **empty**. **No vector byte survived the
+controls**, in either repo. `VECTORS.lock` unedited; **the pin did not move (H7).**
+
+### Milestone 6 — coordination
+
+Terra's `autonomy/codex-state:STATE.md` read **before** any write: heartbeat
+**2026-08-12T20:28:36**, rung **COMPLETE**, **files claimed: none**. **No collision** — this run's
+only source edit is android `:core` Kotlin, which is not Terra's territory under any reading.
+`autonomy/claude-state` updated with this run's heartbeat and claims.
+
+### Milestone 7 — status, honestly
+
+**No rung's status changed.** S0 DONE; S1 DONE (successor stack costed, not landed); S2/S3/S4/S6/S7
+PARTIAL; **S5 PARTIAL** (spec + emitter + phone `:core` route landed; `:app` composition root
+outstanding, **B-19**); S8 PARTIAL/BLOCKED on **B-5**. **This run added a guard, not a rung** — and
+it closed no blocker. **B-19 is unmoved**: its three pieces are all `:app`, and nothing in `:app`
+was written.
+
+**No push notification was sent this run.** Run 60 escalated B-19's product consequence — the one
+item with a user-visible effect — and nothing has changed since: no rung moved, no blocker opened
+or closed, nothing merged. Re-sending the standing state would be fatigue, which is the failure
+mode the notification rule exists to avoid.
+
+**Prohibition paragraph — what this run did not touch.** **Nothing was merged, closed, rebased,
+undrafted or force-pushed in either repo**; the 18 `careerseeker` PRs and the 6 android drafts are
+exactly as found, and **#53's fate stays Brandon's**. **No vector byte was written in either repo**
+— corpus 29/29 byte-identical to pin `7328a0b` after the controls, `git status` on the resource
+tree empty; **the pin did not move (H7)** and `VECTORS.lock` was not edited. **No `:app` file was
+written** — not one; the `:app` composition root is **B-19** and writing it blind is what this
+program forbids. **Nothing was written in the engine repo at all** except `STATE.md` on the
+docs-only `autonomy/claude-state` branch: no C#, no `docs/Sync-Protocol.md`, no `generate.mjs`, no
+`ci.yml`, **no `$ExpectedOfflineTotal`** — so this run adds no pin-toucher, no new stop to the
+landing plan, and opens no nineteenth engine PR. **The android gate was not run and no result for
+it is claimed** — `checkCoreIsAndroidFree`, `:app:test`, `:app:assembleDebug` and `:app:lintDebug`
+all need the Android SDK this host cannot reach (**B-7**); the only gate task executed here is
+`:core:test` via `scripts/core-probe.sh`. **`Verify-Alpha.ps1` was not run** — this is Linux, no
+.NET, no Windows box. No history rewrite, no branch deleted, no deploy of any kind. **The
+production relay was not contacted at all, not even `GET /v1/health`.** No Play, Google or OAuth
+console; no accounts, no purchases, no Play Billing code, no keystore, no emulator, no Gmail. **No
+secret was read, printed or echoed** — none was opened. Terra's territory was read, never written.
+The JDK 17 install was made **inside this disposable container only**.
