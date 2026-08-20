@@ -80,6 +80,26 @@ class OutboundEnvelopesTest {
         return f to { seq }
     }
 
+    /**
+     * Same factory, but with the two header fields the constructor owns made settable.
+     * [factory] fixes them at the valid values every other test wants; the header tests below
+     * are the only ones that need to vary them, so they get their own builder rather than
+     * widening the one all twenty-odd other tests call.
+     */
+    private fun factoryWith(
+        pairingId: String = pairing,
+        keyIdentifier: String = keyId,
+        signer: DeviceSigner? = null,
+    ): OutboundEnvelopeFactory {
+        var seq = 0L
+        return OutboundEnvelopeFactory(
+            pairingId, keyIdentifier, kP2e,
+            seqSource = { ++seq },
+            signer = signer,
+            nonces = { ByteArray(Protocol.NONCE_BYTES) { i -> (i + seq).toByte() } },
+        )
+    }
+
     // ---------------------------------------------------------------- the signing rule
 
     @Test
@@ -301,6 +321,162 @@ class OutboundEnvelopesTest {
             """{"kind":"outcome","body":{"app_id":"app_01H8XK","outcome":"interview",""" +
                 """"at":"2026-06-11T14:02:11Z"}}""",
             plaintext,
+        )
+    }
+
+    // ---------------------------------------------------------------- envelope header fields
+
+    /**
+     * F-69-1. `build()` interpolated `pairing`, `key_id` and `ts` raw into the header JSON, and
+     * the same three values reach [EnvelopeHeader.aad]. Those are **two** surfaces with two
+     * different failure modes, and they need two different fixes:
+     *
+     *  - **In the JSON**, a `"` malforms the envelope, exactly as F-67-1 did to the body. The fix
+     *    is the same one: route the fields through `jsonString()`.
+     *  - **In the AAD there is no JSON at all** — it is §4.1's `|`-delimited ASCII string that
+     *    both implementations must build byte-identically, so escaping is the wrong tool. A `|`
+     *    inside a field lets two *different* headers produce the *same* AAD, which is the one
+     *    thing the AAD exists to prevent. That collision is **PQ-AAD-1 Half 2**, already filed
+     *    and answered in `docs/protocol-questions.md`; nothing here discovers it. What is added
+     *    is that the collision is now *executable* rather than described, and that the one field
+     *    the phone itself mints can no longer reach it.
+     *
+     * **Only `ts` is refused, and the asymmetry is the point.** `timestamp` is the phone's own
+     * clock, so declining to build an ambiguous one is a sender-side decision with no other party
+     * in it. `key_id` is **engine-sourced**, §5.3 constrains its charset nowhere, and PQ-AAD-1's
+     * answer says the fix is §3 constraining `ts` and `key_id` together — *"a gate for Brandon"*.
+     * Refusing an engine-issued `key_id` here would let the engine's choice brick the phone's
+     * send path, which is the unilateral tightening that question deferred. It stays buildable on
+     * purpose, and the test below says so, so the deferral survives as something that fails when
+     * broken rather than as a paragraph.
+     *
+     * Severity is defense in depth, not a live defect, and these tests do not claim otherwise:
+     * `keyId` comes from the pairing exchange and `timestamp` from the phone's own clock. The
+     * point is that the constructor did not enforce it, and `pairing`'s validator lived one layer
+     * out at `RelayClient:133` rather than here.
+     */
+    @Test
+    fun `a key_id containing a quote does not malform the envelope header`() {
+        val crafted = """k"2026-06-01"""
+        val wire = factoryWith(keyIdentifier = crafted).pullRequest(0, "2026-06-11T14:02:11Z")
+
+        // Unescaped this is not JSON at all, so the strict §3 parser refuses the whole envelope.
+        val parsed = EnvelopeJson.parse(wire)
+        assertTrue(parsed.ok, "envelope rejected before crypto: ${parsed.error?.wire}")
+        assertEquals(crafted, parsed.envelope!!.keyId)
+    }
+
+    @Test
+    fun `a crafted key_id cannot forge a second header field`() {
+        // The load-bearing half, and the mirror of the body's forge test. Unescaped, this key_id
+        // closes its own string and opens a `sig` — a field §3 knows, so unknown-field rejection
+        // does not fire — on an envelope that is deliberately UNSIGNED. `pull_request` changes no
+        // engine state and carries no signature (§5.4); a `sig` appearing on one is a header the
+        // sender never authorised, and the result is still valid JSON, so nothing structural
+        // catches it.
+        val crafted = """k","sig":"forged"""
+        val wire = factoryWith(keyIdentifier = crafted).pullRequest(0, "2026-06-11T14:02:11Z")
+
+        assertEquals(0, Regex("\"sig\":").findAll(wire).count(), "unsigned envelope grew a sig: $wire")
+        val parsed = EnvelopeJson.parse(wire)
+        assertTrue(parsed.ok, "envelope rejected before crypto: ${parsed.error?.wire}")
+        assertNull(parsed.envelope!!.sig, "pull_request must stay unsigned")
+        assertEquals(crafted, parsed.envelope.keyId)
+    }
+
+    @Test
+    fun `a crafted ts cannot restate the sequence number`() {
+        // `seq` is the replay defence (§6.1). Unescaped, this `ts` closes its own string and
+        // writes a SECOND `seq` — still valid JSON, still only fields §3 knows, so neither the
+        // strict parser nor unknown-field rejection fires. Which `seq` wins is duplicate-key
+        // resolution, i.e. parser-dependent, so the phone and the engine need not agree on the
+        // sequence number of an envelope the phone signed.
+        val crafted = """2026-06-11T14:02:11Z","seq":9999,"ts":"2026-06-11T14:02:11Z"""
+        val wire = factoryWith().pullRequest(0, crafted)
+
+        assertEquals(1, Regex("\"seq\":").findAll(wire).count(), "the header carries a second seq: $wire")
+        val parsed = EnvelopeJson.parse(wire)
+        assertTrue(parsed.ok, "envelope rejected before crypto: ${parsed.error?.wire}")
+        assertEquals(crafted, parsed.envelope!!.ts)
+        assertEquals(1, parsed.envelope.seq)
+    }
+
+    @Test
+    fun `a key_id carrying the AAD separator is still accepted, deliberately`() {
+        // This passes before the fix as well, and it is neither a control nor an oversight: it
+        // pins a DECISION. `key_id` is issued by the engine (§5.3), whose charset the spec does
+        // not constrain, and PQ-AAD-1's answer puts the constraint in §3 for BOTH fields as one
+        // coordinated change. A refusal here would let an engine-issued key_id brick the phone's
+        // send path — the phone made stricter than the engine, unilaterally, which is the field
+        // bug the interpretation rule names.
+        //
+        // If §3 ever gains "`ts` and `key_id` MUST be ASCII and delimiter-free", this test is the
+        // one that must be deleted, and deleting it should be a deliberate act.
+        val wire = factoryWith(keyIdentifier = "k|dir=e2p").pullRequest(0, "2026-06-11T14:02:11Z")
+        assertTrue(EnvelopeJson.parse(wire).ok, "the deferral must not have been quietly closed")
+    }
+
+    @Test
+    fun `a ts carrying the AAD separator is refused at build`() {
+        // `timestamp` is a per-call argument, not a constructor one, so its guard cannot live in
+        // `init` — this test is what stops the fix being written in only one of the two places.
+        val f = factoryWith()
+        val failure = assertFailsWith<IllegalArgumentException> {
+            f.pullRequest(0, "2026-06-11T14:02:11Z|key_id=k2")
+        }
+        assertTrue(
+            failure.message!!.contains("ts"),
+            "the message must name the offending field: ${failure.message}",
+        )
+    }
+
+    @Test
+    fun `a malformed pairing id is refused at construction`() {
+        // `isValidPairingId` was enforced on the send path at `RelayClient:133` and on the way in
+        // at `EnvelopeJson:73`, but never by the type that puts the value into the AAD. That is a
+        // protection sitting one layer out from the invariant it protects.
+        assertFailsWith<IllegalArgumentException> { factoryWith(pairingId = "not-a-pairing-id") }
+        assertFailsWith<IllegalArgumentException> { factoryWith(pairingId = "p_short") }
+        // And the valid shape still builds, so the check is not simply refusing everything.
+        factoryWith(pairingId = "p_0123456789abcdef").pullRequest(0, "2026-06-11T14:02:11Z")
+    }
+
+    @Test
+    fun `two distinct headers can collide on one AAD, which is why the separator is refused`() {
+        // This one passes before the fix as well, and it is not a control: it is the REASON the
+        // guard exists. The reason is not new — it is PQ-AAD-1 Half 2, filed on 2026-08-12 with
+        // this exact construction — but until now it lived only in prose, and prose does not fail
+        // when someone reorders `aad()`. `ts` and `key_id` are adjacent and `key_id` is last, so
+        // a `|` moves the boundary between them: two different headers, one AAD, and the AEAD
+        // then authenticates a header tuple that is not the one the sender meant.
+        val a = EnvelopeHeader(1, pairing, Direction.PHONE_TO_ENGINE, 1, "T|key_id=K1", "K2")
+        val b = EnvelopeHeader(1, pairing, Direction.PHONE_TO_ENGINE, 1, "T", "K1|key_id=K2")
+
+        assertTrue(a != b, "the two headers must genuinely differ or this proves nothing")
+        assertEquals(a.aad(), b.aad(), "a `|` in a field makes the AAD ambiguous")
+
+        // And `aad()` itself is deliberately left alone: it is the string the C# engine builds
+        // byte-for-byte, so it is not this repo's to change unilaterally (F-69-1's deferred half).
+        assertEquals(
+            "v=1|pairing=$pairing|dir=p2e|seq=1|ts=T|key_id=K1|key_id=K2",
+            a.aad(),
+        )
+    }
+
+    @Test
+    fun `an ordinary envelope header is byte-for-byte what it always was`() {
+        // A guard against over-fixing, not a control: this passes before the fix too. Escaping
+        // must be a no-op on the values v1 actually carries — every paired device's AAD depends
+        // on these exact bytes, so a "fix" that re-encoded ordinary text would be a wire change
+        // wearing a bug fix's clothes.
+        val wire = factoryWith().pullRequest(0, "2026-06-11T14:02:11Z")
+        assertTrue(
+            wire.startsWith("""{"v":1,"pairing":"$pairing","dir":"p2e","seq":1,"""),
+            "header prefix changed: $wire",
+        )
+        assertTrue(
+            wire.contains(""""ts":"2026-06-11T14:02:11Z","key_id":"$keyId","nonce":""""),
+            "header middle changed: $wire",
         )
     }
 
