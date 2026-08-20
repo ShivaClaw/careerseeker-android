@@ -3220,3 +3220,76 @@ Only `:core:test` ran, via `scripts/core-probe.sh`. **`:app:assembleDebug`, `:ap
 None was acted on, narrowed or re-attempted. **B-18** fired for the **thirty-fourth** time (the
 schedule assigning a slice finished on 2026-08-09) and its premise is unchanged: the work exists,
 the landing needs a Windows gate. **B-19** is unmoved — **no `:app` file was written this run.**
+
+---
+
+## F-69-1 PARTLY RESOLVED — 2026-08-20 (seventieth run), in `:core`, executed
+
+**The JSON half is closed.** `OutboundEnvelopeFactory.build()` routes `pairing`, `ts` and `key_id`
+through the class's own `jsonString()`, and `isValidPairingId` is enforced by the type that puts
+the value into the AAD rather than only by `RelayClient` on the way out. Two live cases were
+measured, both **valid JSON** carrying only fields §3 knows — so neither the strict parser nor its
+unknown-field rejection fires: a crafted `key_id` opens a **`sig` on a deliberately unsigned
+`pull_request`**, and a crafted `ts` writes a **second `seq`**, the replay defence itself. Evidence:
+**C-70-3** through **C-70-6**; `:core:test` **326 → 334, 0 failed**, five red before the fix, seven
+mutations each red.
+
+**The AAD half is NOT closed, and it is not blocked either — it is decided, elsewhere, already.**
+The `|` collision this run tested is **PQ-AAD-1 Half 2**, filed 2026-08-12 with the same two-header
+construction and **answered** the same week. Its answer places the resolution in §3, constraining
+`ts` **and** `key_id` together as one coordinated wire-visible change, and calls that *"a gate for
+Brandon"*. F-69-1's entry above proposed *"validate `keyId` at construction"* as the smallest
+unblock; **that proposal is wrong and is retracted here**, because PQ-AAD-1 had already ruled it
+out in terms:
+
+> Tightening the Kotlin — validating `ts`/`key_id` … would make the phone stricter than an engine
+> whose behaviour is unmeasured, the "more correct than the engine" field bug the mission's
+> interpretation rule names.
+
+**Only `ts` is guarded, and the asymmetry is deliberate.** `timestamp` is minted by the phone at
+call time, so refusing an ambiguous one is a sender-side decision with no second party in it.
+**`key_id` is issued by the engine** and §5.3 constrains its charset nowhere, so a refusal would let
+an engine-issued key id **brick this phone's send path**. It stays buildable, pinned by
+`a key_id carrying the AAD separator is still accepted, deliberately`, and mutation **M7** — which
+adds the forbidden guard — turns exactly that test red. **A deferral that fails when broken.**
+
+**What is left, and who it belongs to.** §3 gaining *"`ts` and `key_id` MUST be ASCII and
+delimiter-free"*, plus one shared vector, applied to both parsers in one change. That is PQ-AAD-1's
+own recommended resolution and it is unchanged by this run. **Nothing is blocked**: no measurement
+is missing, no tool is absent. It is a gate, and gates are Brandon's.
+
+**Also unchanged: `EnvelopeHeader.aad()` itself.** Not touched, not reordered, not re-encoded. No
+receive path was modified either — `EnvelopeJson`, `EnvelopeReceiver` and `SyncCrypto` are
+byte-identical to run 69's tree, so nothing here can make the phone reject an envelope it used to
+accept.
+
+### One process finding, and it is the same shape as run 69's
+
+**A fix can be complete, green, and still wrong, and the tests will not tell you.** The first
+version of this slice guarded all three header fields, passed 334/0 with seven red mutations, and
+was **already ruled out by an answered question in this repository's own
+`docs/protocol-questions.md`**. Nothing in the code, the tests or the gate could have caught it —
+only reading the ledger before writing, rather than after. The commit was reset and the slice
+re-derived. **`BLOCKED.md` and `protocol-questions.md` are inputs to a slice, not just outputs of
+one**, and F-69-1's own "smallest unblock" line is proof that a finding can carry a proposal its
+neighbouring file already refuted.
+
+### B-21 status (seventieth run) — did NOT reproduce, and it stays open
+
+**No 429 at any point.** The clean baseline and all ten subsequent probe runs resolved on the first
+attempt against `repo.maven.apache.org`. **Two quiet runs in a row are not evidence a transient rate
+limit is gone** — that is what one looks like when it is not firing — and closing it would mean the
+next session to hit two 429s files it again as something new.
+
+### B-7 is unchanged and still bounds this run
+
+Only `:core:test` ran, via `scripts/core-probe.sh`. **`:app:assembleDebug`, `:app:lintDebug`,
+`:app:test` and `checkCoreIsAndroidFree` did not run and no result is claimed for them.** The two
+`No cast needed` warnings in `PairingSessionTest.kt:53` and `RelayClientTest.kt:383` are
+**pre-existing, in files this run did not touch**; **no zero-warning claim is made.**
+
+### B-1, B-2, B-4, B-5, B-6, B-8, B-9, B-12–B-20 — untouched this run
+
+None was acted on, narrowed or re-attempted. **B-18** fired for the **thirty-fifth** time and its
+premise is unchanged: the work exists, the landing needs a Windows gate. **B-19** is unmoved — **no
+`:app` file was written this run.**

@@ -12500,3 +12500,169 @@ both implementations classify a garbage body identically". **This is why the mal
 code was not filed as a finding**: the diagnosis is misleading to a human but correct and
 cross-implementation-consistent, and PQ-A2-2's `decrypt_failed` rule is about *structural* envelope
 rejection, not about an undecodable payload body.
+
+---
+
+## RUN 70 — 2026-08-20 (thirty-fifth firing): F-69-1's JSON half closed, its AAD half deferred on purpose
+
+**Auditor setup for every command below.** `<android>` is this checkout,
+`<engine>` is a `ShivaClaw/careerseeker` checkout. **Use absolute paths** — run 69 records a
+drift check that silently ran in the wrong repository and could only have returned a false
+negative. Every command was run in this session and the *observed* output is quoted.
+
+### C-70-1 — the assigned slice exists, and is still not on `main`
+
+```bash
+cd <engine> && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do
+  git merge-base --is-ancestor $c origin/main && echo "$c ON MAIN" || echo "$c not on main (exit $?)"
+done
+```
+
+*Expected, and **observed**:* all three print **`not on main (exit 1)`**. The slice this run's
+prompt assigns has existed since 2026-08-09; this is its **thirty-fifth** assignment.
+
+### C-70-2 — the pin is `7328a0b`, the prompt's `679a317` is stale, and the generator agrees
+
+```bash
+cd <engine> && git worktree add --detach /tmp/eng-pin 7328a0b
+cd /tmp/eng-pin && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+ls docs/sync-vectors/v1/*.json | wc -l
+grep -n 'Pinned commit' <android>/core/src/test/resources/sync-vectors/VECTORS.lock
+```
+
+*Expected, and **observed**:* **`OK: 29 vector files match the generator.`**, **`exit=0`**, **29**
+files; the lock names **`7328a0bc043335491cd96a67d634e8eea2a13af9`**.
+
+### C-70-3 — the defect: three header fields interpolated raw, into JSON and into the AAD
+
+```bash
+cd <android> && git show e696855:core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt \
+  | grep -n '"pairing":"\$pairing"\|"ts":"\$timestamp"\|"key_id":"\$keyId"'
+grep -n 'fun aad()' -A3 core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+```
+
+*Expected, and **observed**:* the pre-fix file interpolates all three raw; `aad()` is
+`"v=$v|pairing=$pairing|dir=${dir.wire}|seq=$seq|ts=$ts|key_id=$keyId"` and **is unchanged by this
+run** — the second command's output is identical before and after.
+
+### C-70-4 — negative control: the tests were written before the fix, and five failed
+
+```bash
+cd <android> && git stash list   # nothing needed; reproduce from the commit instead
+git checkout e696855 -- core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+scripts/core-probe.sh --rerun    # tests from HEAD, production code from before the fix
+git checkout HEAD -- core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+```
+
+*Expected, and **observed**:* `BUILD FAILED`, **`334 tests, 5 failed, 0 skipped, across 22
+classes`**, the five being `a key_id containing a quote does not malform the envelope header`,
+`a crafted key_id cannot forge a second header field`, `a crafted ts cannot restate the sequence
+number`, `a ts carrying the AAD separator is refused at build`, and `a malformed pairing id is
+refused at construction`. **All 326 pre-existing tests green.** The clean-worktree baseline taken
+before any edit was **`326 tests, 0 failed, 0 skipped, across 22 classes`**.
+
+**Three of the eight new tests pass unfixed, deliberately, and are not controls**: the deferral pin
+(`a key_id carrying the AAD separator is still accepted, deliberately`), the reason pin (`two
+distinct headers can collide on one AAD…`) and the over-fix guard (`an ordinary envelope header is
+byte-for-byte what it always was`). That is why the control is **5** and not **8**.
+
+### C-70-5 — with the fix, `:core:test` is green at 334
+
+```bash
+cd <android> && scripts/core-probe.sh --rerun
+```
+
+*Expected, and **observed**:* `BUILD SUCCESSFUL`, **`core-probe: 334 tests, 0 failed, 0 skipped,
+across 22 classes`**. **This is `:core:test` only** — see the bound in C-70-11.
+
+### C-70-6 — seven mutations, each red, every prediction matched
+
+Apply each to `core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt`, run
+`scripts/core-probe.sh --rerun`, then restore from a pre-mutation copy:
+
+| | mutation | **measured failures** |
+| --- | --- | --- |
+| **M1** | `"key_id":${jsonString(keyId)}` → `"key_id":"$keyId"` | **2** |
+| **M2** | `"ts":${jsonString(timestamp)}` → `"ts":"$timestamp"` | **1** |
+| **M3** | `"pairing":${jsonString(pairing)}` → `"pairing":"$pairing"` | **0** |
+| **M4** | delete `requireUnambiguous("ts", timestamp)` | **1** |
+| **M5** | delete `require(isValidPairingId(pairing))` | **1** |
+| **M6** | `jsonString` → `"\"" + raw + "\""` (escapes nothing) | **7** |
+| **M7** | **add** `requireUnambiguous("key_id", keyId)` to `init` | **1** |
+
+*Expected, and **observed**:* every count above, each matching its prediction. **M3's zero is the
+measurement, not a miss** — `isValidPairingId`'s character class excludes `"`, so escaping `pairing`
+is unreachable and no test can fail for it. **M6 takes down four PRE-EXISTING tests** (`the
+entitlement courier forwards original_json byte-for-byte`, `an at timestamp containing a quote
+survives the round trip`, `an app_id containing a quote and a backslash survives the round trip`,
+`a crafted app_id cannot forge the outcome field`) alongside three new ones, which is the proof
+that the header and the body now share one escaper. **M7's single failure is the deferral pin.**
+
+### C-70-7 — the `key_id` guard was written, then removed, because PQ-AAD-1 already decided it
+
+```bash
+cd <android> && sed -n '/## PQ-AAD-1/,/^---$/p' docs/protocol-questions.md | grep -n 'Half 2' -A8
+grep -n 'Tightening the Kotlin' -A4 docs/protocol-questions.md
+grep -n 'a gate for Brandon' -B4 docs/protocol-questions.md
+grep -n 'requireUnambiguous' core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+```
+
+*Expected, and **observed**:* PQ-AAD-1 Half 2 documents the `|` collision with the **same two-header
+construction** this run's test uses — it was filed 2026-08-12 and **this run discovers nothing about
+it**. Its answer places the fix in §3 for `ts` **and** `key_id` together and calls it *"a gate for
+Brandon"*. `requireUnambiguous` therefore appears **twice**: its definition, and **one** call site,
+for `ts`. There is **no** `key_id` call site, and `init` carries the comment saying so.
+
+### C-70-8 — freshness and the standing state
+
+```bash
+cd <engine>  && git rev-parse --short origin/main    # aac05f3
+cd <android> && git rev-parse --short origin/main    # ebfaf81
+cd <android> && git rev-list --count origin/main..HEAD
+cd <engine>  && git show origin/autonomy/codex-state:STATE.md | head -12
+# PR counts — measured via the GitHub API this run, both repos, state=open:
+#   ShivaClaw/careerseeker          -> 18 open, all draft  (#26, #32-#39, #45-#53)
+#   ShivaClaw/careerseeker-android  ->  6 open, all draft  (#1-#6)
+```
+
+*Expected, and **observed**:* the two SHAs above; the branch is **260** commits ahead of a `main`
+the checkout arrives detached at — **run 69 measured 257 against its own tip, and that figure moves
+with every commit; 260 is measured here, not inherited.** **18 engine PRs and 6 android PRs, all
+open, all draft.** Terra: **COMPLETE, files claimed: none.**
+
+### C-70-9 — no vector byte was written
+
+```bash
+cd <engine> && tmp=$(mktemp -d) && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C "$tmp"
+diff -r "$tmp/docs/sync-vectors/v1" <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+cd <android> && git diff e696855..HEAD -- core/src/test/resources/sync-vectors/
+```
+
+*Expected, and **observed**:* the `diff -r` is **silent**, **`exit=0`**, **29 files each side**; the
+second command is **empty**. Both sides addressed by **absolute path**.
+
+### C-70-10 — PQ-AAD-1's "smallest resolution" re-run, and it changes nothing
+
+```bash
+cd <engine> && grep -rn 'ASCII\|UTF8\|GetBytes' src/Sync/*.cs | grep -i 'aad\|EnvelopeCodec\|DeviceSignature'
+```
+
+*Expected, and **observed**:* `EnvelopeCodec.cs:31` and `:45` pass `Encoding.ASCII.GetBytes(aad)`;
+`DeviceSignature.cs:38` uses `Encoding.ASCII.GetBytes(sigInput)`. **This confirms the answer already
+recorded on 2026-08-12 and is not a new finding** — the engine and the phone agree on ASCII, and the
+surrogate-pair divergence that answer measured is untouched by this run. Quoted here only because
+the command was cheap and re-running an answered question beats inheriting it.
+
+### C-70-11 — the bound on all of the above: `:core:test` only
+
+```bash
+cd <android> && sed -n '33,45p' scripts/core-probe.sh
+```
+
+*Expected, and **observed**:* the script's own header states it is **not** the android gate and runs
+**one** of the gate's five tasks. **`:app:assembleDebug`, `:app:lintDebug`, `:app:test` and
+`checkCoreIsAndroidFree` did not run and no result is claimed for them** (**B-7**). **No
+zero-warning claim is made**: `PairingSessionTest.kt:53` and `RelayClientTest.kt:383` emit
+`No cast needed`, pre-existing, in files this run did not touch. **`Verify-Alpha.ps1` did not run
+and could not** — no `pwsh`, no `dotnet`, and it is a Windows gate.

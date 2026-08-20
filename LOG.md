@@ -13275,3 +13275,190 @@ disposable container. No history rewrite, no branch deleted, **no deploy of any 
 production relay was not contacted at all, not even `GET /v1/health`.** No Google, Play or OAuth
 console; no accounts, no purchases, no keystore, no emulator, no Gmail. **No secret was read,
 printed or echoed.** Terra's territory was **read, never written**.
+
+---
+
+## RUN 70 — 2026-08-20. The thirty-fifth firing; the header's two surfaces, and the one that was not mine to change
+
+**Fetch first, rule one.** `git fetch --all --prune` in **both** checkouts before anything was read
+or counted. Both again arrived **detached at a stale `main`**: android at `ebfaf81`, **260** commits
+behind this branch's tip — **measured this run** (`git rev-list --count origin/main..HEAD`), not
+carried forward from run 69's **257**, which was correct for *its* base and is not correct for one
+that now carries this run's commits. Every number below is post-fetch.
+
+### Milestone 1 — the assigned slice, declined for the thirty-fifth time (C-70-1, C-70-2)
+
+The prompt again assigned S5's spec half: amend §4.3 with the `entitlement_ack` body, add the
+vector via `generate.mjs`, close PQ-A2-1/-2/-3. **It has been built since 2026-08-09.** Verified
+this run rather than inherited from the banner — all three commits exist in the **engine** repo and
+all three report `not on main` (exit **1**): `8575539`, `22b028e`, `7328a0b`.
+
+`node docs/sync-vectors/generate.mjs --check` at the pin `7328a0b` → **`OK: 29 vector files match
+the generator.`**, **`exit=0`**, **29** files present. **The prompt's `679a317` pin is still
+stale** (C-70-2) — it moved to `7328a0b` on 2026-08-12. The gap is a *landing* problem, not a
+*building* one, and landing needs a Windows gate no cloud session can run (**B-18**).
+
+### Milestone 2 — the slice taken instead was on the board, filed by the run before (C-70-3)
+
+**F-69-1**, filed by run 69 and deliberately not fixed there (*"the AAD half genuinely is a design
+question and should not be taken unilaterally"*). Run 69 also wrote down the half that **was**
+free: *"Smallest unblock. None needed for the JSON half; no human input required."* This run took
+the free half, and — this is the part worth reading — **found that the other half had already been
+decided, against the fix I had written.**
+
+**The defect.** `OutboundEnvelopeFactory.build()` interpolated three header fields raw:
+
+```kotlin
+append("""{"v":${Protocol.VERSION},"pairing":"$pairing","dir":"p2e","seq":$seq,""")
+append(""""ts":"$timestamp","key_id":"$keyId","nonce":"$nonceB64u",""")
+```
+
+and the same three values reach `EnvelopeHeader.aad()`. **Two surfaces, two failure modes** — which
+is why F-69-1 was filed separately from F-67-1 rather than as its second half.
+
+**The JSON surface, both cases measured rather than reasoned.** Both stay **valid JSON** carrying
+only fields §3 knows, so neither the strict parser nor its unknown-field rejection fires:
+
+1. `key_id = k","sig":"forged` puts a **`sig` on a `pull_request`** — an envelope that is
+   deliberately unsigned, because it changes no engine state (§5.4). A signature the sender never
+   made, on the one kind whose absence of one is the protocol statement.
+2. `ts = 2026-06-11T14:02:11Z","seq":9999,"ts":"…` writes a **second `seq`** — the replay defence
+   itself (§6.1). Which one wins is duplicate-key resolution, i.e. parser-dependent, and PQ-DUP-1
+   already records that .NET takes the last one.
+
+A bare `"` in either field is the milder case: the envelope is not JSON at all and is refused
+before any crypto.
+
+### Milestone 3 — the half I wrote, then took back out (C-70-7)
+
+**The first version of this fix guarded `key_id` too, and that was wrong.** The AAD is §4.1's
+`|`-delimited ASCII string; a `|` inside a field moves the boundary between two of them, so two
+distinct headers produce one AAD. Escaping it would move a normative cross-implementation wire
+input unilaterally — the drift trap — so I refused the value at construction instead, for `ts`,
+`key_id` and `pairing` alike. Sender-side only, no wire byte changed, all tests green.
+
+**Then I read `docs/protocol-questions.md` properly.** The collision is **PQ-AAD-1 Half 2**, filed
+2026-08-12 with *the same two-header example I had just written a test for*, and **answered** the
+same week. Its answer says the resolution is §3 constraining `ts` **and** `key_id` together — *"a
+gate for Brandon"* — and warns in terms against exactly the change I had made:
+
+> Tightening the Kotlin — validating `ts`/`key_id` … would make the phone stricter than an engine
+> whose behaviour is unmeasured, the "more correct than the engine" field bug the mission's
+> interpretation rule names.
+
+**So the commit was reset and the slice re-derived, and the asymmetry is now the interesting part
+of it.** `timestamp` is minted by the phone at call time: declining to build an ambiguous one is a
+sender-side decision with no second party in it, and it is kept. **`key_id` is issued by the
+engine**, §5.3 constrains its charset nowhere, and a refusal here would let an engine-issued key id
+**brick this phone's send path**. That guard is gone, and in its place is a test —
+`a key_id carrying the AAD separator is still accepted, deliberately` — so the deferral is
+something that **fails when broken** rather than a paragraph someone can miss the way I did.
+
+**Nothing here discovers PQ-AAD-1's collision, and the record must not read as though it does.**
+What is new is that the collision is now **executable** instead of described, and that the one
+field the phone itself mints can no longer reach it.
+
+**PQ-AAD-1's own "smallest resolution" was re-run for free** (C-70-10) — the engine checkout is
+here: `grep -rn 'ASCII\|UTF8\|GetBytes' src/Sync/*.cs` → `EnvelopeCodec.cs:31,45` and
+`DeviceSignature.cs:38` use **`Encoding.ASCII`**, matching the phone's `US_ASCII`. That is a
+**re-verification of the answer recorded on 2026-08-12, not a new finding**, and the surrogate-pair
+divergence that answer measured is untouched by anything this run did.
+
+### Milestone 4 — executed, negative control first (C-70-4, C-70-5)
+
+Clean-worktree baseline, before a line was written: **`326 tests, 0 failed, 0 skipped, across 22
+classes`**, `BUILD SUCCESSFUL`, first attempt.
+
+**The eight tests were written before the fix**, and **five** failed:
+
+| test | failure |
+| --- | --- |
+| `a key_id containing a quote does not malform the envelope header` | `envelope rejected before crypto: decrypt_failed` |
+| `a crafted key_id cannot forge a second header field` | `unsigned envelope grew a sig` |
+| `a crafted ts cannot restate the sequence number` | `the header carries a second seq` |
+| `a ts carrying the AAD separator is refused at build` | no exception thrown |
+| `a malformed pairing id is refused at construction` | no exception thrown |
+
+All **326** pre-existing tests stayed green. **Three of the eight pass unfixed, by design, and none
+of them is a control**: the deferral pin (`key_id` still accepted), the reason pin (the AAD
+collision), and the over-fix guard (an ordinary header is byte-for-byte what it always was).
+Counting them would have inflated the control from 5 to 8.
+
+**With the fix:** `BUILD SUCCESSFUL`, **`334 tests, 0 failed, 0 skipped, across 22 classes`** —
+re-confirmed after every mutation was restored.
+
+### Milestone 5 — seven mutations, each red, every prediction matched (C-70-6)
+
+| | mutation | predicted | **measured** |
+| --- | --- | --- | --- |
+| **M1** | `key_id` back to raw interpolation | 2 | **2** |
+| **M2** | `ts` back to raw interpolation | 1 | **1** |
+| **M3** | `pairing` back to raw interpolation | **0** | **0** |
+| **M4** | drop `requireUnambiguous("ts", …)` | 1 | **1** |
+| **M5** | drop `require(isValidPairingId(pairing))` | 1 | **1** |
+| **M6** | `jsonString()` stops escaping anything | 7 | **7** |
+| **M7** | **add** the `key_id` guard the deferral forbids | 1 | **1** |
+
+**M3 fails zero, and it was predicted to.** Escaping `pairing` is unreachable while
+`isValidPairingId` stands — the character class has no `"` — so no test can fail for it. That line
+is redundancy, and saying so is worth more than a test that pretends to cover it.
+
+**M6 is the load-bearing one.** It takes down **four pre-existing tests** — the entitlement courier
+and all three of F-67-1's body fixtures — alongside three new ones. That is what proves the header
+now depends on the **same** escaper as the body rather than on a second copy of it, which is the
+defect class both findings came from.
+
+**M7 mutates in the opposite direction**, adding the guard the deferral forbids, and exactly one
+test goes red: the deferral pin. A deferral nobody can accidentally close is the whole reason that
+test exists.
+
+Each mutation was restored from a pre-mutation copy before the next ran. **No mutation produced a
+compile error**; had one, it would not have been reported as a mutation result.
+
+### Milestone 6 — freshness, and the standing state is unmoved (C-70-8, C-70-9)
+
+| | measured, post-fetch |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`**, unmoved since 2026-08-12 |
+| android `origin/main` | **`ebfaf81`** |
+| engine PRs | **18 open, all draft** — `#26`, `#32`–`#39`, `#45`–`#53` |
+| android PRs | **6 open, all draft** — `#1`–`#6`; **`#6`** carries this branch |
+| **#32** (the assigned slice) and **#53** (H1) | both still open, still draft |
+| Terra (`autonomy/codex-state`) | **COMPLETE**, *files claimed: none* — **no collision** |
+| vendored corpus | **29/29 byte-identical** to pin `7328a0b`, `diff -r` silent, `exit=0` |
+
+**Both PR counts were measured this run via the GitHub API, not carried forward.** The drift check
+was run with **absolute paths on both sides**, per run 69's process finding.
+
+**No rung moved, and none is claimed to have.** This is S6 send-path correctness — the same
+neighbourhood as runs 67–69 — not a rung advance. **B-19 is unmoved: no `:app` file was written.**
+
+**B-21 did not reproduce**: baseline and all **ten** subsequent probe runs resolved on the first
+attempt, no 429 at any point. **It stays open.** Two quiet sessions in a row are what a transient
+rate limit looks like when it is not currently firing, which is the same reasoning runs 67 and 69
+applied to the same observation.
+
+### Milestone 7 — prohibition paragraph: what this run did not touch
+
+**Nothing was merged, closed, rebased, undrafted or force-pushed in either repo**; the **18** engine
+PRs and the **6** android drafts are exactly as found, and **#53's fate stays Brandon's**. **No
+vector byte was written in either repo** — corpus **29/29** byte-identical to pin `7328a0b`,
+`VECTORS.lock` not edited, **the pin did not move (H7)**. **`EnvelopeHeader.aad()` was not
+touched**, nor was any receive path: `EnvelopeJson`, `EnvelopeReceiver` and `SyncCrypto` are
+unmodified, so nothing this run did can make the phone reject an envelope it used to accept. **No
+`:app` file was written** — not one; **B-19** stays open. **No C# was written** — the engine
+checkout was read-only and left detached where it was found, apart from `STATE.md` on the docs-only
+`autonomy/claude-state` branch. **No `generate.mjs`, no `docs/Sync-Protocol.md`, no `ci.yml`**;
+**`$ExpectedOfflineTotal` was not moved**, and **no nineteenth engine PR was opened**.
+**`Verify-Alpha.ps1` was not run and no result for it is claimed** — no `pwsh`, no `dotnet`, and it
+is a Windows gate besides. **The android gate was not run**: only `:core:test` executed, via
+`scripts/core-probe.sh`; **`:app:assembleDebug`, `:app:lintDebug`, `:app:test` and
+`checkCoreIsAndroidFree` are unrun and unclaimed** (**B-7**), and **no zero-warning claim is
+made** — the two `No cast needed` warnings are pre-existing in `PairingSessionTest.kt:53` and
+`RelayClientTest.kt:383`, files this run did not touch. The only host mutation was **`apt-get
+update` + `openjdk-17-jdk-headless`** inside a disposable container. No history rewrite (the one
+`git reset` was of **this run's own uncommitted-to-remote commit**, never of pushed history), no
+branch deleted, **no deploy of any kind**. **The production relay was not contacted at all, not
+even `GET /v1/health`.** No Google, Play or OAuth console; no accounts, no purchases, no keystore,
+no emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory was **read,
+never written**.
