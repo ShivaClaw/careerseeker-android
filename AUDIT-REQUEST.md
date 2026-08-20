@@ -12335,3 +12335,168 @@ is **252** commits behind `claude/android-a0-probe` at run 67's tip.
 when run 66 measured it; the figure moves every time a run commits, and copying it forward turns a
 measurement into a rumour. Corrected to the measured **252** in `LOG.md` and `STATE.md` in the same
 change as this entry.
+
+---
+
+## Sixty-ninth cloud iteration (2026-08-20) — F-67-1 closed in `:core`
+
+Substitute `<engine>` = the `ShivaClaw/careerseeker` checkout, `<android>` = this one. Every command
+below was run in this session and its output is what the "observed" line reports. **`910eb2e` is run
+68's tip, i.e. this run's base** — not `main`, which predates the whole `:core` module and would
+diff sixty-nine runs of work.
+
+### C-69-1 — the assigned slice is built, and is not on `main`
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  git cat-file -e "$c^{commit}" && git merge-base --is-ancestor "$c" origin/main; echo "$c -> $?"
+done
+node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected, and **observed**:* all three commits exist; each `merge-base` returns **1** (`not on
+main`). On `main` the generator reports **`OK: 26 vector files match the generator.`**, **`exit=0`**;
+in a worktree at `7328a0b` it reports **`OK: 29 vector files match the generator.`**, **`exit=0`**.
+
+### C-69-2 — the prompt's vector pin is stale
+
+```bash
+cd <android> && grep -r "7328a0b" VECTORS.lock STATE.md | head -3
+cd <engine>  && git log --oneline -1 7328a0b
+```
+
+*Expected, and **observed**:* the pin of record is **`7328a0b`**, not the prompt's **`679a317`**;
+it moved on **2026-08-12**. **Thirty-four runs have now been assigned the built slice.**
+
+### C-69-3 — the defect, reproduced from the pre-fix source
+
+```bash
+cd <android> && git show 910eb2e:core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt \
+  | grep -A2 'fun outcome('
+```
+
+*Expected, and **observed**:* the pre-fix body is
+`"""{"app_id":"$appId","outcome":"${outcome.wire}","at":"$at"}"""` — raw interpolation, while
+`entitlement()` two methods below routes every field through `jsonString()`.
+
+To see both failure modes rather than read them, check out `910eb2e`, apply only the **test** half
+of `1ed5e94`, and run the probe — the messages are the C-69-5 table.
+
+```bash
+cd <android> && git show 1ed5e94 --stat
+```
+
+*Expected, and **observed**:* exactly **two** files — `OutboundEnvelopes.kt` (+20/−2) and
+`OutboundEnvelopesTest.kt` (+97). **No vector, no `:app` file, no CI file.**
+
+### C-69-4 — the clean-worktree baseline
+
+```bash
+cd <android> && git stash list && git status --porcelain   # must be empty
+scripts/core-probe.sh --rerun
+```
+
+*Expected, and **observed**:* `BUILD SUCCESSFUL` and
+**`core-probe: 322 tests, 0 failed, 0 skipped, across 22 classes`** at `910eb2e`. Requires a JDK 17
+under `/usr/lib/jvm` — `apt-get update -qq && apt-get install -y --no-install-recommends
+openjdk-17-jdk-headless` — or the script exits 1 with that instruction (B-7).
+
+### C-69-5 — the negative control ran BEFORE the fix and failed exactly the three new controls
+
+```bash
+cd <android>
+git checkout 910eb2e -- core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+scripts/core-probe.sh --rerun; echo "exit=$?"
+git checkout HEAD -- core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+```
+
+*Expected, and **observed**:* `BUILD FAILED`, **`326 tests, 3 failed, 0 skipped, across 22
+classes`** — **all 322 pre-existing green**. The three are
+`an app_id containing a quote and a backslash survives the round trip` (**`outcome envelope
+rejected: unknown_kind`**), `an at timestamp containing a quote survives the round trip`
+(**`expected: <2026-06-11T14:02:11Z","injected":"field> but was: <2026-06-11T14:02:11Z>`**), and
+`a crafted app_id cannot forge the outcome field` (**`the body carries a second `outcome` key:
+{"kind":"outcome","body":{"app_id":"x","outcome":"offer","outcome":"sent","at":"..."}}` ==>
+expected: <1> but was: <2>**).
+
+**`an ordinary outcome body is byte-for-byte what it always was` passes here too, by design** — it
+is an over-fix guard, not a control, which is why the negative control is **3** and not 4.
+
+Restored, i.e. with the fix: `BUILD SUCCESSFUL`, **`326 tests, 0 failed, 0 skipped, across 22
+classes`**.
+
+### C-69-6 — three mutations, each red, each predicted before it ran
+
+Apply one at a time to `OutboundEnvelopes.kt`, run `scripts/core-probe.sh --rerun`, restore.
+
+| | mutation | predicted | **observed** |
+| --- | --- | --- | --- |
+| **M1** | `${jsonString(appId)}` → `"$appId"` | 2 | **2**: the app_id round-trip, the forge test |
+| **M2** | `${jsonString(at)}` → `"$at"` | 1 | **1**: the `at` round-trip alone |
+| **M3** | delete the `'\\' -> append("\\\\")` branch of `jsonString` | 2 | **2**: the app_id round-trip **and `the entitlement courier forwards original_json byte-for-byte`** |
+
+*Expected, and **observed**:* every run `BUILD FAILED` with exactly those tests. **M3's second
+failure is a pre-existing test in a path this commit did not modify** — that is the evidence the new
+app_id test is not a duplicate of the line-215 fixture, and that both paths now depend on one
+escaper. **No mutation produced a compile error.**
+
+### C-69-7 — F-69-1 is filed and NOT fixed
+
+```bash
+cd <android> && git diff 910eb2e..HEAD -- core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt \
+  | grep -E '^\+.*(pairing|keyId|timestamp)' | grep -v jsonString
+grep -n 'fun aad()' -A3 core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+```
+
+*Expected, and **observed**:* the first command is **empty** — `build()`'s header interpolation of
+`pairing`, `keyId` and `timestamp` is **untouched**; `aad()` is still
+`"v=$v|pairing=$pairing|dir=…|seq=$seq|ts=$ts|key_id=$keyId"`. **F-69-1 is recorded in `BLOCKED.md`
+with its severity bound; no fix is claimed.**
+
+### C-69-8 — freshness and the standing state
+
+```bash
+cd <engine>  && git rev-parse --short origin/main    # aac05f3
+cd <android> && git rev-parse --short origin/main    # ebfaf81
+cd <android> && git rev-list --count ebfaf81..910eb2e
+cd <engine>  && git show origin/autonomy/codex-state:STATE.md | head -20
+# PR counts — measured via the GitHub API this run, both repos, state=open:
+#   ShivaClaw/careerseeker          -> 18 open, all draft  (#26, #32-#39, #45-#53)
+#   ShivaClaw/careerseeker-android  ->  6 open, all draft  (#1-#6)
+```
+
+*Expected, and **observed**:* the two SHAs above; the checkout arrives at **`ebfaf81`** and is
+**257** commits behind the work branch — **run 68 measured 252 against its own base `f1bdc95`, and
+that figure moves with every commit; 257 is measured here, not inherited.** **18 engine PRs, all
+open, all draft**, **#32** and **#53** among them; **6 android PRs, all open, all draft**. Terra
+**COMPLETE, files claimed: none**.
+
+### C-69-9 — no vector byte written
+
+```bash
+cd <engine> && tmp=$(mktemp -d) && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C "$tmp"
+diff -r "$tmp/docs/sync-vectors/v1" <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+cd <android> && git diff 910eb2e..HEAD -- core/src/test/resources/sync-vectors/
+```
+
+*Expected, and **observed**:* the `diff -r` is **silent**, **`exit=0`**, **29 files each side**; the
+second command is **empty**. Measured **after** this run's commits.
+
+**Use absolute paths.** This check was first run in this session with a `cd` inherited from a
+previous command and executed in the **engine** tree, where it reported `0 files` and a missing
+directory. A drift check pointed at the wrong repository can only return a false negative.
+
+### C-69-10 — `unknown_kind`, not `decrypt_failed`, is deliberate
+
+```bash
+cd <android> && grep -n 'maps that to `unknown_kind`' -B6 -A6 \
+  core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt
+```
+
+*Expected, and **observed**:* `kindOf`'s KDoc states it returns null for malformed JSON and the
+caller maps that to `unknown_kind`, "which matches the engine's `JsonDocument.Parse` behaviour so
+both implementations classify a garbage body identically". **This is why the malformed-body error
+code was not filed as a finding**: the diagnosis is misleading to a human but correct and
+cross-implementation-consistent, and PQ-A2-2's `decrypt_failed` rule is about *structural* envelope
+rejection, not about an undecodable payload body.

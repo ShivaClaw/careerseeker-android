@@ -13088,3 +13088,190 @@ disposable container. No history rewrite, no branch deleted, **no deploy of any 
 production relay was not contacted at all, not even `GET /v1/health`.** No Google, Play or OAuth
 console; no accounts, no purchases, no keystore, no emulator, no Gmail. **No secret was read,
 printed or echoed.** Terra's territory was **read, never written**.
+
+---
+
+## Sixty-ninth cloud iteration · 2026-08-20 · **F-67-1 closed in `:core`** — the escaped sibling and the raw one
+
+**Fetch first, rule one.** `git fetch --all --prune` in **both** checkouts before anything was read
+or counted. Both again arrived **detached at a stale `main`**: android at `ebfaf81`, **257** commits
+behind its own work branch — **measured this run** (`git rev-list --count ebfaf81..910eb2e`), not
+carried forward from run 68's **252**, which was correct for run 67's tip and is not correct for
+this one. Every number below is post-fetch.
+
+### Milestone 1 — the assigned slice, declined for the thirty-fourth time (C-69-1, C-69-2)
+
+The prompt again assigned S5's spec half: amend §4.3 with the `entitlement_ack` body, add the
+vector via `generate.mjs`, close PQ-A2-1/-2/-3. **It has been built since 2026-08-09.** Verified
+this run rather than inherited from the banner — all three commits exist in the **engine** repo and
+all three report `not on main`:
+
+```
+8575539: exists; not on main (exit 1)
+22b028e: exists; not on main (exit 1)
+7328a0b: exists; not on main (exit 1)
+```
+
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the generator.`**,
+**`exit=0`** at the pin `7328a0b`; **`OK: 26 vector files match the generator.`**, **`exit=0`** on
+`main`. **The prompt's `679a317` pin is still stale** (C-69-2) — it moved to `7328a0b` on
+2026-08-12. The gap is a *landing* problem, not a *building* one: the merge condition is a Windows
+gate no cloud session can run.
+
+### Milestone 2 — the slice taken instead was already on the board (C-69-3)
+
+**F-67-1**, filed by run 67, left open by run 68 on purpose (*"a different file and a different
+defect; folding it in would have made this run two changes wearing one commit"*). This is that
+slice, and it is `:core` — the one module this environment compiles and tests.
+
+**The defect.** `OutboundEnvelopeFactory.outcome()` built its body by raw interpolation:
+
+```kotlin
+build("outcome", """{"app_id":"$appId","outcome":"${outcome.wire}","at":"$at"}""", timestamp)
+```
+
+The same class has a `jsonString()` escaper and routes **every** field of `entitlement()` through
+it. `OutboundEnvelopesTest:215` exists *specifically* to catch sloppy escaping on that sibling —
+its fixture carries a quote and a backslash for that reason. The outcome path had **no escaping and
+no equivalent test**.
+
+**Two distinct failures, and the second is the one worth the slice.** Both measured, not reasoned:
+
+1. A `"` or `\` in `app_id` yields a **malformed** plaintext body, and the receiver refuses the
+   whole envelope. **Measured error: `unknown_kind`** — *not* `decrypt_failed`. That was checked
+   rather than filed as a second finding: `EnvelopeReceiver.kindOf`'s KDoc says so deliberately,
+   because it "matches the engine's `JsonDocument.Parse` behaviour so both implementations classify
+   a garbage body identically". **Misleading diagnosis, correct and cross-implementation-consistent
+   behaviour.** A mark the user made, signed, and had silently dropped.
+2. A crafted value that stays **valid** JSON opens a **second `outcome` key**. Measured plaintext:
+   `{"kind":"outcome","body":{"app_id":"x","outcome":"offer","outcome":"sent","at":"..."}}`.
+   Nothing rejects this — the envelope is accepted, signature and all, carrying two outcomes. Which
+   one survives is **parser-dependent**, and kotlinx and the engine's `System.Text.Json` need not
+   agree, so **two implementations can record different outcomes for one signed envelope**.
+   Injected through `at` — the body's *last* field — the forged key lands after the real one, where
+   last-wins makes it decisive. That path was measured too: an `at` of
+   `2026-06-11T14:02:11Z","injected":"field` produced a sibling field on the parsed body.
+
+**Severity is unchanged from F-67-1's bound and is not upgraded here: defense in depth, not a live
+defect.** `app_id` is an engine-internal ULID, inside an AEAD-sealed snapshot, unreachable by the
+blind relay §2 says may be hostile. There is no path from untrusted §8.6 job or recruiter text to
+this field today. It is worth closing because it is three lines, because the twin path already does
+it, and because fact (1) is a **convention rather than an enforced invariant**.
+
+**The fix** (`1ed5e94`): route `appId` and `at` through the existing `jsonString()`. `Outcome.wire`
+is deliberately left unescaped and must not need escaping — it is a closed enum of five ASCII
+literals, and that is exactly what the existing test `the phone can only send the five outcomes it
+is allowed to set` pins. Saying so in the KDoc is the point: the next reader should not have to
+re-derive why one of the three fields is different.
+
+### Milestone 3 — executed, negative control first (C-69-4, C-69-5)
+
+**Clean-worktree baseline, before a line was written:** `BUILD SUCCESSFUL`, **`322 tests, 0 failed,
+0 skipped, across 22 classes`** — first attempt, no 429 (contrast run 68, which needed three).
+
+**The tests were written before the fix and run against the unfixed source.** Negative control:
+**`326 tests, 3 failed, 0 skipped, across 22 classes`** — **all 322 pre-existing green**, and the
+three failures were exactly the three new controls:
+
+| new test | failure message, as measured |
+| --- | --- |
+| `an app_id containing a quote and a backslash survives the round trip` | `outcome envelope rejected: unknown_kind` |
+| `an at timestamp containing a quote survives the round trip` | `expected: <2026-06-11T14:02:11Z","injected":"field> but was: <2026-06-11T14:02:11Z>` |
+| `a crafted app_id cannot forge the outcome field` | `the body carries a second `outcome` key: … ==> expected: <1> but was: <2>` |
+
+**The fourth new test passes unfixed, by design.** `an ordinary outcome body is byte-for-byte what
+it always was` is a guard against **over-fixing**, not a control: it pins that escaping is a no-op
+on the ids v1 actually carries, so a "fix" that re-encoded or double-escaped ordinary text would be
+caught. Counting it as a control would have inflated the negative control from 3 to 4.
+
+**With the fix:** `BUILD SUCCESSFUL`, **`326 tests, 0 failed, 0 skipped, across 22 classes`** —
+re-confirmed after every mutation was restored.
+
+### Milestone 4 — three mutations, each red, each predicted before it ran (C-69-6)
+
+| | mutation | predicted | **measured** |
+| --- | --- | --- | --- |
+| **M1** | `appId` back to raw interpolation, `at` still escaped | 2 | **2** — the app_id round-trip and the forge test |
+| **M2** | `at` back to raw interpolation, `appId` still escaped | 1 | **1** — the `at` round-trip alone |
+| **M3** | `jsonString` stops escaping `\` | 2 | **2** — the app_id round-trip **and the pre-existing entitlement test** |
+
+**All three predictions matched.** Unlike run 68's M2 — predicted 4, failed 7 — there was nothing
+to correct here, and that is reported as the unremarkable outcome it is rather than dressed up.
+
+**M1 and M2 together are the narrowness proof**: the two fields are pinned *separately*, so neither
+new test is carrying the other. **M3 is the more interesting one.** It takes down
+`the entitlement courier forwards original_json byte-for-byte` — a **pre-existing** test in a path
+this run did not modify — which is what proves the new app_id test is **not a duplicate** of the
+line-215 fixture and that both paths now genuinely depend on the same escaper. Before this change
+they did not: one had a guard and the other had nothing.
+
+Each mutation was restored from a pre-mutation copy before the next ran. **No mutation produced a
+compile error**; had one, it would not have been reported as a mutation result.
+
+### Milestone 5 — what this run did NOT fix, recorded rather than carried in someone's head (C-69-7)
+
+**A wider interpolation surface exists in the same file and is deliberately left alone**, filed as
+**F-69-1**. `build()` interpolates `pairing`, `keyId` and `timestamp` raw into both the envelope
+header JSON and `EnvelopeHeader.aad()` — and the AAD is a `|`/`=`-delimited ASCII string, so its
+failure mode is *ambiguity*, not malformed JSON, which is a different argument needing different
+tests. **Not fixed, not claimed to be fixed, and not folded into this commit** — that is the same
+discipline run 68 applied to F-67-1 itself.
+
+**One half of it was narrowed by measurement rather than assumed.** The first draft of this entry
+said `pairing` "has a validator the factory does not call". True of the factory, and **misleading**:
+`grep -rn isValidPairingId core/src/main` shows **`RelayClient:133` enforces it with a `require` on
+the send path**, so a malformed pairing id never reaches the relay whatever the factory does — and
+`EnvelopeJson:73` and `PairingSession:77` enforce it on the way in. **`keyId` and `timestamp` are
+the genuinely unescaped and unvalidated header fields**, and both are locally sourced today.
+Whether the fix is escaping or validation at construction is a real design question, not a
+mechanical edit. `BLOCKED.md` carries the reproduction and the corrected bound.
+
+### Milestone 6 — freshness, and the standing state is unmoved (C-69-8)
+
+| | measured, post-fetch |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`**, unmoved since 2026-08-12 |
+| android `main` | **`ebfaf81`** |
+| engine PRs | **18 open, all draft** — `#26`, `#32`–`#39`, `#45`–`#53` |
+| android PRs | **6 open, all draft** — `#1`–`#6`; **`#6`** carries this branch |
+| **#32** (the assigned slice) and **#53** (H1) | both still open, still draft |
+| Terra (`autonomy/codex-state`) | **COMPLETE**, *files claimed: none* — **no collision** |
+| vendored corpus | **29/29 byte-identical** to pin `7328a0b`, `diff -r` silent |
+
+**Both PR counts were measured this run via the GitHub API, not carried forward.**
+
+**No rung moved, and none is claimed to have.** This is S6 correctness — the outcome envelope is
+S6's send half — not a rung advance. **No H1–H8 item was acted on. B-19 is unmoved: no `:app` file
+was written.**
+
+**B-21 did not reproduce this run**: the baseline and all five later runs resolved on the **first**
+attempt, no 429 at any point. **One clean session does not close a transient rate limit** — B-21
+stays open, exactly as run 67 concluded from the same evidence in the same direction.
+
+**One process note worth more than it looks.** A `cd` into the engine checkout, issued in a parallel
+tool call, **persisted** into the next command, and the vendored-vector drift check silently ran in
+the **wrong repository** — reporting `0 files` and a missing directory rather than a drift. It was
+caught because the number was absurd, not because anything checked. Re-run with absolute paths it
+reports **29/29, `diff -r` silent**. A drift check that runs in the wrong tree can only ever return
+a false negative, and it would have looked like evidence.
+
+### Milestone 7 — prohibition paragraph: what this run did not touch
+
+**Nothing was merged, closed, rebased, undrafted or force-pushed in either repo**; the **18** engine
+PRs and the **6** android drafts are exactly as found, and **#53's fate stays Brandon's**. **No
+vector byte was written in either repo** — corpus **29/29** byte-identical to pin `7328a0b`,
+`VECTORS.lock` not edited, **the pin did not move (H7)**. **No `:app` file was written** — not one;
+**B-19** stays open. **No C# was written, no `generate.mjs`, no `docs/Sync-Protocol.md`, no
+`docs/protocol-questions.md`, no `ci.yml`**; **`$ExpectedOfflineTotal` was not moved**, and **no
+nineteenth engine PR was opened**. **Nothing was written in the engine repo at all** except
+`STATE.md` on the docs-only `autonomy/claude-state` branch; the engine checkout was otherwise
+read-only, and it was left detached where it was found. **`Verify-Alpha.ps1` was not run and no
+result for it is claimed** — no `pwsh`, no `dotnet`, and it is a Windows gate besides. **The android
+gate was not run**: only `:core:test` executed, via `scripts/core-probe.sh`; **`:app:assembleDebug`,
+`:app:lintDebug`, `:app:test` and `checkCoreIsAndroidFree` are unrun and unclaimed** (**B-7**), and
+**no zero-warning claim is made** — two `No cast needed` warnings are pre-existing in files this run
+did not touch. The only host mutation was **`apt-get update` + `openjdk-17-jdk-headless`** inside a
+disposable container. No history rewrite, no branch deleted, **no deploy of any kind**. **The
+production relay was not contacted at all, not even `GET /v1/health`.** No Google, Play or OAuth
+console; no accounts, no purchases, no keystore, no emulator, no Gmail. **No secret was read,
+printed or echoed.** Terra's territory was **read, never written**.

@@ -3119,3 +3119,104 @@ Only `:core:test` ran, via `scripts/core-probe.sh`. **`:app:assembleDebug`, `:ap
 `:app:test` and `checkCoreIsAndroidFree` did not run and no result is claimed for them.** Two
 `No cast needed` warnings persist in `PairingSessionTest.kt:53` and `RelayClientTest.kt:383` —
 **pre-existing, in files this run did not touch**; no zero-warning claim is made.
+
+---
+
+## Sixty-ninth cloud iteration (2026-08-20) — one finding closed, one filed, no new blocker
+
+### F-67-1 RESOLVED — 2026-08-20 (sixty-ninth run), in `:core`, executed
+
+`OutboundEnvelopeFactory.outcome()` now routes `appId` and `at` through the same `jsonString()`
+escaper its `entitlement()` sibling has always used. Commit **`1ed5e94`**.
+
+**The unblock recorded at filing was "none needed; no human input required" and that held** — this
+needed no gate, no emulator, no Windows machine and no decision from Brandon. It was three lines
+and four tests.
+
+**Executed, not reasoned.** Clean-worktree baseline **`322 tests, 0 failed, 0 skipped, across 22
+classes`**; negative control (tests written first, run against unfixed source) **`326 tests, 3
+failed`** — the three new controls, all 322 pre-existing green; with the fix **`326 tests, 0
+failed, 0 skipped, across 22 classes`**. Three mutations, each red, **each matching its prediction**
+(2 / 1 / 2). Re-verification: **C-69-3** through **C-69-6** in `AUDIT-REQUEST.md`.
+
+**Two facts found while closing it that the original entry did not have.** (1) The malformed-body
+case is refused as **`unknown_kind`**, not `decrypt_failed` — deliberate, per `EnvelopeReceiver`'s
+KDoc, and matching the engine's `JsonDocument.Parse` classification, so it is **not** a finding
+(**C-69-10**). (2) A crafted value that stays *valid* JSON opens a **second `outcome` key**, which
+nothing rejects; duplicate-key resolution is parser-dependent, so the phone and the engine can
+record **different outcomes for one signed envelope**. That second mode is worse than the "engine
+refuses to parse" the original entry predicted, and it is the one the forge test pins.
+
+**The severity bound is unchanged and was not upgraded**: defense in depth, not a live defect.
+`app_id` is an engine-internal ULID inside an AEAD-sealed snapshot, unreachable by the blind relay,
+with no path from untrusted §8.6 text today.
+
+### F-69-1 — `build()` interpolates three header fields raw, into JSON *and* into the AAD (NEW, not fixed)
+
+**Symptom.** `OutboundEnvelopeFactory.build()` interpolates `pairing`, `keyId` and `timestamp` raw
+into the envelope header JSON:
+
+```kotlin
+append("""{"v":${Protocol.VERSION},"pairing":"$pairing","dir":"p2e","seq":$seq,""")
+append(""""ts":"$timestamp","key_id":"$keyId","nonce":"$nonceB64u",""")
+```
+
+and the same three values reach `EnvelopeHeader.aad()`, which builds
+`v=$v|pairing=$pairing|dir=$dir|seq=$seq|ts=$ts|key_id=$keyId`. **These are two different failure
+modes and that is why this is its own finding, not a second half of F-67-1.** In the JSON, a `"`
+malforms the envelope. In the AAD there is no JSON at all: the failure mode is **delimiter
+ambiguity** — a `|` or `=` inside a field makes two different header tuples produce the **same**
+AAD string. The AAD's KDoc calls field order normative and warns that changing it "silently breaks
+every paired device"; it does not say what a field containing a delimiter does. **Escaping is
+probably the wrong fix for that half** — the engine builds the identical string in C#, so any
+change is a coordinated cross-implementation change to a normative wire input, which is exactly the
+class of edit `CLAUDE.md`'s drift trap governs.
+
+**Severity, bounded honestly and narrowed by measurement: defense in depth, not a live defect.**
+
+1. **`pairing` is validated** — `isValidPairingId` (`^p_[A-Za-z0-9_-]{16}$`) is enforced at
+   `RelayClient:133` with a `require` on the **send** path, and at `EnvelopeJson:73` and
+   `PairingSession:77` inbound. The character class excludes `"`, `\`, `|` and `=`, so this field
+   cannot carry any of them off-device. **The factory itself does not call the validator** — the
+   protection is real but sits one layer out, which is a fragility, not a hole.
+2. **`keyId` and `timestamp` are neither escaped nor validated** anywhere on the outbound path.
+   Both are locally sourced today: `keyId` from the pairing exchange, `timestamp` from the phone's
+   own clock at call time. Neither is untrusted §8.6 text.
+
+So there is **no reachable exploit today**, exactly as with F-67-1 — and exactly as with F-67-1, the
+protection is a convention plus a validator in another class rather than an invariant this
+constructor enforces.
+
+**Attempts.** None — not attempted, by choice. This is not a failed fix. Run 68 declined to fold
+F-67-1 into an unrelated `:core` commit for the same reason, and that judgement was right.
+
+**Smallest unblock.** None needed for the JSON half; no human input required. Validate `keyId` at
+construction (or escape it, with `pairing`, at use) and give `build()` the quote/backslash fixture
+`OutboundEnvelopesTest` now has for the body. **The AAD half genuinely is a design question and
+should not be taken unilaterally**: it is a normative, cross-implementation wire input, so it wants
+a `docs/protocol-questions.md` entry and an engine-side change in the same window — the S5 pattern,
+not a `:core` slice.
+
+### B-21 status (sixty-ninth run) — did NOT reproduce, and that does not close it
+
+**No 429 at any point this run.** The clean-worktree baseline and all five subsequent probe runs
+(negative control, fix, three mutations) resolved on the **first** attempt, against
+`repo.maven.apache.org`. Run 68 needed **three** attempts for its baseline alone.
+
+**B-21 stays OPEN.** One clean session is not evidence that a transient rate limit is gone — it is
+evidence of what a transient limit looks like when it is not currently firing, which is the same
+conclusion run 67 drew from the same observation before run 68 reproduced it. Closing it on a quiet
+run would mean the next session that hits two 429s files it again as something new.
+
+### B-7 is unchanged and still bounds this run
+
+Only `:core:test` ran, via `scripts/core-probe.sh`. **`:app:assembleDebug`, `:app:lintDebug`,
+`:app:test` and `checkCoreIsAndroidFree` did not run and no result is claimed for them.** The two
+`No cast needed` warnings in `PairingSessionTest.kt:53` and `RelayClientTest.kt:383` are
+**pre-existing, in files this run did not touch**; **no zero-warning claim is made.**
+
+### B-1, B-2, B-4, B-5, B-6, B-8, B-9, B-12, B-13, B-14, B-16, B-17, B-18, B-19, B-20 — untouched this run
+
+None was acted on, narrowed or re-attempted. **B-18** fired for the **thirty-fourth** time (the
+schedule assigning a slice finished on 2026-08-09) and its premise is unchanged: the work exists,
+the landing needs a Windows gate. **B-19** is unmoved — **no `:app` file was written this run.**
