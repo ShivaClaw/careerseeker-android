@@ -2949,3 +2949,96 @@ pre-warmed Gradle cache in the container image; neither is worth doing on today'
 
 Not re-derived and not re-stated. **B-19 in particular is unmoved: no `:app` file was written**, and
 the fix in this run is `:core`-only, so it changes nothing about whether a production caller exists.
+
+---
+
+## Sixty-seventh run (2026-08-20) — no new blocker, and two deliberate non-blockers
+
+Nothing blocked this run's slice. Two real findings were located in `:core` and **deliberately
+left unfixed**: a slice is one coherent change, and neither belongs to the cancellation fix. They
+are recorded here — with reproduction and an honest severity bound — so the next session does not
+have to re-find them, and so nobody mistakes "not fixed" for "not known".
+
+**Neither is a blocker.** Both are fixable in `:core`, which this environment compiles and tests.
+They are queued work, not obstructions.
+
+### F-67-1 — `outcome()` interpolates `app_id` into JSON unescaped, while its sibling escapes
+
+**Symptom.** `OutboundEnvelopeFactory` builds the `outcome` body by raw string interpolation:
+
+```kotlin
+fun outcome(appId: String, outcome: Outcome, at: String, timestamp: String = at): String =
+    build("outcome", """{"app_id":"$appId","outcome":"${outcome.wire}","at":"$at"}""", timestamp)
+```
+
+The same class has a `jsonString()` escaper and uses it for **every** field of `entitlement()`.
+`OutboundEnvelopesTest:215` exists *specifically* to catch sloppy escaping on that sibling — its
+fixture "contains quotes and a backslash precisely to catch sloppy escaping". The `outcome` path
+has **no equivalent test and no escaping**. An `app_id` containing `"` or `\` yields a malformed
+plaintext body, which the engine would refuse to parse — a mark the user made, sent, accepted by
+the relay, and silently never applied.
+
+**Severity, bounded honestly: defense in depth, not a live defect.** Three independent facts hold
+it shut today, and all three were checked rather than assumed:
+1. `app_id` is an engine-internal ULID — `"app_01H8XK"` in every one of the 29 vectors.
+2. The engine's `src/Sync/SyncPayloads.cs` states entity ids are "engine-internal structured
+   identifiers, **not untrusted job text**".
+3. The snapshot carrying the id is **AEAD-sealed by the engine**, so the blind relay — the party
+   §2 says may be hostile — cannot reach or reshape it.
+
+So there is no path from untrusted job/recruiter text (§8.6) to this field today. It is worth
+closing because it is three lines, because the twin path already does it, and because fact (1) is
+a convention rather than an enforced invariant.
+
+**Attempts.** None — not attempted, by choice. This is not a failed fix.
+
+**Smallest unblock.** None needed; no human input required. Route `appId` (and `at`) through the
+existing `jsonString()`, and extend `OutboundEnvelopesTest` with the quote/backslash fixture the
+entitlement test already uses.
+
+### F-67-2 — a §6.2 gap is measured across envelopes the phone deliberately did not project
+
+**Symptom.** `PullPolicy.onEnvelope` decides a large gap with
+
+```kotlin
+envelopeSeq - positionBefore.highestAppliedSeq > gapThreshold
+```
+
+`highestAppliedSeq` advances **only** for `APPLIED` / `APPLIED_SNAPSHOT`. So the measurement
+conflates two different things: envelopes the phone **never received** (a genuine §6.2 gap) and
+envelopes it **received and deliberately did not project** (`doc`, `conflict`, `entitlement_ack`
+→ `IGNORED`). A run of `gapThreshold + 1` consecutive ignored envelopes makes the **next**
+projected envelope report a `SEQUENCE_GAP`, and the phone pushes a `pull_request` asking for a
+full snapshot that nothing was missing from — traffic on a healthy pairing, which is precisely
+what `EntitlementRoutingApplier`'s KDoc says the design is trying to avoid.
+
+That KDoc names this exact hazard **for the ack itself** and closes it by returning `IGNORED`. The
+hazard survives for the envelope **after** it, which nothing addresses.
+
+**Severity, bounded honestly: latent, not live.** `src/Sync/SyncPublisher.cs` exposes exactly four
+publish methods — `snapshot`, `delta`, `heartbeat`, `evidence` — and the `:app` applier projects
+all four. No unprojected kind is published today, so no run of `IGNORED` can occur. It becomes
+reachable the moment a `doc` or `conflict` publisher lands, or if S5's `entitlement_ack` emitter
+ever emits in volume. The cold-replica cases are **not** affected: `!snapshotSeen` fires
+`COLD_START` first, and `AWAITING_SNAPSHOT` has its own branch.
+
+**Existing coverage does not reach it.** `PullPolicyTest`'s *"an unprojected kind asks nothing"*
+asserts a **single** `IGNORED` envelope. Nothing exercises a *run* of them followed by an applied
+one.
+
+**Attempts.** None — not attempted, by choice. The fix is a design decision about what the policy
+should measure (most likely: track the highest seq *handled*, whatever the disposition, and
+measure the gap against `max(highestAppliedSeq, lastHandledSeq)`), and it deserves its own slice
+with its own mutations rather than being smuggled into a transport-hygiene fix.
+
+**Smallest unblock.** None needed; no human input required. It is phone-side policy, not protocol
+— the engine never *sends* `pull_request`, so there is no engine behaviour to match and no vector
+moves.
+
+### B-21 status (sixty-seventh run) — unchanged, and one clean run does not close it
+
+`repo1.maven.org` returned **no 429 this run**: the baseline resolved on the **first** attempt,
+where run 66 needed four. That is consistent with a **transient** rate limit on an **allowed**
+host and does **not** close B-21 — a session that hits it must still retry with backoff rather
+than filing `:core` as unreachable. **B-7 is unchanged and still bounds this run**: four of the
+android gate's five tasks need the Android SDK and did not run.

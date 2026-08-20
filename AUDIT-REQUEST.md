@@ -12005,3 +12005,148 @@ cd <android> && scripts/core-probe.sh --rerun
 `dl.google.com`. **Retry with backoff**; each attempt populates more of the Gradle cache and it
 clears (it took **4** attempts here). A session that reads the first 429 as B-7 will wrongly file
 `:core` as unreachable.
+
+## Sixty-seventh run — 2026-08-20 (Linux sandbox): cancellation swallowed by the relay retry loop
+
+Every command below requires `git fetch --all --prune` in **both** trees first. That is rule one,
+and every count here was taken after it.
+
+### C-67-1 — the assigned slice is built, for the thirty-second consecutive run
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  echo "== $c =="; git log -1 --format='%ad  %s' $c
+  git merge-base --is-ancestor $c origin/main && echo "  ON MAIN" || echo "  NOT on main"
+done
+```
+
+*Expected, and **observed**:* all three commits **exist**; all three report **NOT on main**.
+`8575539` (2026-08-09) touches `docs/Sync-Protocol.md` only (+114/−3); `22b028e` adds both
+`entitlement-ack*` vectors plus the generator arm; `7328a0b` (2026-08-12) adds
+`invalid-unknown-field.json`, closing PQ-A2-3. **Run this in the engine repo** — in the android
+checkout the same command returns `exit=128`, which reads like a broken command rather than a
+wrong repository.
+
+### C-67-2 — the real pin, re-measured
+
+```bash
+cd <android> && grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1
+cd <engine>  && git worktree add -f --detach /tmp/pin 7328a0b && (cd /tmp/pin && node docs/sync-vectors/generate.mjs --check)
+```
+
+*Expected, and **observed**:* the pin is `7328a0bc043335491cd96a67d634e8eea2a13af9`; the generator
+reports **`OK: 29 vector files match the generator.`, `exit=0`**. **The prompt's `679a317` is
+stale** and has been since 2026-08-12.
+
+### C-67-3 — the defect: `CancellationException` is caught by the general clause
+
+```bash
+cd <android> && git show d28b47e^:core/src/main/kotlin/app/careerseeker/core/RelayClient.kt \
+  | grep -n "catch (e: Exception)" -B 2 -A 2
+cd <android> && grep -rn "Cancell\|withTimeout" core/src/test/kotlin/ | grep -iv "pairingflow\|cancels the request"
+```
+
+*Expected, and **observed**:* before this run the retry loop's **only** catch was
+`catch (e: Exception) { "transport failure: …" }`, and **nothing in `:core` tested coroutine
+cancellation** — the second command returns no relevant hit. `CancellationException` is an
+`Exception` on the JVM, so that clause absorbed it and the loop returned
+`RelayResult.Unavailable` from a cancelled coroutine.
+
+### C-67-4 — the negative control, run BEFORE the fix
+
+This is the claim that the defect was real rather than a test written to match already-correct
+code. Reproduce by reverting only the source half of `d28b47e`:
+
+```bash
+cd <android>
+git show d28b47e -- core/src/main/kotlin/app/careerseeker/core/RelayClient.kt | git apply -R
+scripts/core-probe.sh --rerun; git checkout core/src/main/kotlin/app/careerseeker/core/RelayClient.kt
+```
+
+*Expected, and **observed**:*
+
+```
+RelayClientTest > cancellation on the final attempt escapes rather than becoming a value() FAILED
+RelayClientTest > cancellation is not swallowed into an unavailable relay() FAILED
+318 tests completed, 2 failed
+```
+
+**Exactly two failures — the two new tests — with all 316 pre-existing tests green.**
+
+### C-67-5 — the suite, with the fix
+
+```bash
+cd <android> && scripts/core-probe.sh --rerun
+```
+
+*Expected, and **observed**:* **`BUILD SUCCESSFUL`**, **`core-probe: 318 tests, 0 failed, 0
+skipped, across 22 classes`** — against a measured clean-worktree baseline of **316**.
+
+**This is `:core:test` only.** `:app:assembleDebug`, `:app:lintDebug`, `:app:test` and
+`checkCoreIsAndroidFree` need the Android SDK, **did not run**, and **nothing is claimed for
+them** (**B-7**). **No zero-warning claim is made.** JDK 17 is required first:
+`apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless`
+(the `update` is **not** optional — C-64-5).
+
+### C-67-6 — three mutations, each red
+
+Apply each to `RelayClient.request`, run `scripts/core-probe.sh --rerun`, revert.
+
+| | mutation | *expected, and **observed*** |
+| --- | --- | --- |
+| **M1** | delete the `catch (e: CancellationException) { throw e }` clause | **both** new tests fail |
+| **M2** | move that clause **below** `catch (e: Exception)` | **compiles cleanly**, **both** new tests fail |
+| **M3** | make the general clause `throw e` as well | **exactly one** failure: `a thrown transport error is retried, not propagated` |
+
+**M2 is the one that pins the real constraint.** Kotlin does not flag an unreachable catch clause,
+so the mutated file builds and the clause is silently dead — presence alone is not the fix, position
+is. If M2 ever stops failing, the ordering has stopped being tested.
+
+**M3 is what makes the two new tests guards rather than duplicates.** It fails a **pre-existing**
+test while both new tests stay green, proving the fix is **narrow**: an offline phone still receives
+`Unavailable` and does not have an `IOException` propagated into its UI.
+
+*A note on method, because it affects how the table should be read:* a first attempt at M2 spliced
+the file badly and produced a **compile error**. That is not a mutation result and is not reported
+as one. It was redone cleanly; the row above is the redone run, and the restored file was confirmed
+**byte-identical** to the pre-mutation original before the C-67-5 run.
+
+### C-67-7 — two findings recorded but NOT fixed
+
+```bash
+cd <android>
+grep -n "app_id" core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+grep -n "jsonString" core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+grep -rn "PublishSnapshotAsync\|PublishDeltaAsync\|PublishHeartbeatAsync\|PublishEvidenceAsync" <engine>/src/Sync/SyncPublisher.cs
+```
+
+*Expected, and **observed**:* `outcome()` interpolates `app_id` **raw** while `entitlement()` routes
+every field through `jsonString()`; and `SyncPublisher.cs` exposes **exactly four** publish methods
+— `snapshot`, `delta`, `heartbeat`, `evidence`, all of which the `:app` applier **projects**.
+
+Those two observations are what bound the severity of both findings, and the bound is the point:
+finding (1) is **defense in depth** because `app_id` is an engine-internal ULID inside an
+AEAD-sealed snapshot, and finding (2) is **latent** because no unprojected kind is published today.
+Full symptom and reproduction in `BLOCKED.md`. **Neither is claimed as fixed.**
+
+### C-67-8 — standing state, unmoved
+
+```bash
+cd <engine>  && git rev-parse --short origin/main    # aac05f3
+cd <android> && git rev-parse --short origin/main    # ebfaf81
+cd <engine>  && git show origin/autonomy/codex-state:STATE.md | head -20
+```
+
+*Expect:* the two SHAs above; **6 android PRs, all open, all draft**; Terra **COMPLETE, files
+claimed: none**.
+
+### C-67-9 — no vector byte written
+
+```bash
+cd <engine> && tmp=$(mktemp -d) && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C "$tmp"
+diff -r "$tmp/docs/sync-vectors/v1" <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **silent**, **`exit=0`**, **29 files each side** — measured **after**
+this run's commit.

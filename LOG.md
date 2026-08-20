@@ -12719,3 +12719,183 @@ history rewrite, no branch deleted, no deploy of any kind. **The production rela
 at all, not even `GET /v1/health`.** No Play, Google or OAuth console; no accounts, no purchases, no
 keystore, no emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory was
 **read, never written**.
+
+---
+
+## RUN 67 — 2026-08-20. The thirty-second firing; cancellation swallowed by the retry loop, closed in `:core`.
+
+**Fetch first, and it mattered again: both checkouts arrived detached at a stale `main`.** Every
+number below is post-fetch.
+
+### Milestone 1 — the assigned slice, verified rather than rebuilt (C-67-1)
+
+The prompt assigned S5's spec half for the **thirty-second** time: amend §4.3 with the
+`entitlement_ack` body, add the vector via `generate.mjs`, close PQ-A2-1/-2/-3. **It has existed
+since 2026-08-09.** Re-derived in the **engine** repo, where the generator and the three slice
+commits live:
+
+```
+$ cd <engine>
+$ for c in 8575539 22b028e 7328a0b; do git merge-base --is-ancestor $c origin/main; echo "$c exit=$?"; done
+8575539 exit=1     22b028e exit=1     7328a0b exit=1
+```
+
+All three **exist**, all three report **not on `main`**. `8575539` (2026-08-09) amends
+`docs/Sync-Protocol.md` only; `22b028e` adds both ack vectors plus the generator arm; `7328a0b`
+(2026-08-12) adds `invalid-unknown-field`, closing PQ-A2-3. This is a **landing** problem, not a
+**building** one — the merge condition is a Windows gate no cloud session can run.
+
+The pin, re-measured (**C-67-2**): the vendored corpus reports
+`7328a0bc043335491cd96a67d634e8eea2a13af9`, and `node docs/sync-vectors/generate.mjs --check` at
+that pin returns **`OK: 29 vector files match the generator.`, `exit=0`**. **The prompt's
+`679a317` is still stale**, for the thirty-second time.
+
+### Milestone 2 — what this run added: cancellation reported as an unreachable relay (C-67-3)
+
+`RelayClient.request` wraps each attempt in `try { … } catch (e: Exception)`, turning a dead
+network into `RelayResult.Unavailable`. On the JVM **`CancellationException` is an `Exception`**
+(`kotlinx.coroutines.CancellationException` → `kotlin.coroutines.cancellation.CancellationException`
+→ `java.util.concurrent.CancellationException` → `IllegalStateException`), so that clause absorbed
+it: **a coroutine that had been told to stop returned a value instead**, and the value said the
+relay was unreachable — a claim about the network, made at the moment nothing was asked of the
+network.
+
+**Why it survived, and why it is narrow rather than imaginary.** On every attempt *but the last*
+the swallow is masked **by accident**: the loop's own `delay()` between attempts is itself a
+cancellation point, so it re-throws and the cancellation escapes. The **final** attempt has no
+`delay()` after it, so there the loop runs off the end and returns. That is the whole window — and
+it is the widest one in the sequence, because it opens after the longest backoff, which is
+precisely when a user is most likely to have backgrounded the app.
+
+**Nothing in `:core` tested coroutine cancellation at all** — `grep -rn "Cancell\|withTimeout"`
+over the suite returned only `PairingFlow`'s *user-pressed-cancel* (a domain concept, unrelated)
+and a `SyncPumpTest` title using the English word. The neighbouring test
+*"a thrown transport error is retried, not propagated"* pins the general catch and is the reason
+the gap looked covered.
+
+### Milestone 3 — the fix, and the part of it that is load-bearing (C-67-4)
+
+One clause, placed **above** the general catch:
+
+```kotlin
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
+    "transport failure: ${e::class.simpleName}"
+}
+```
+
+**The position is the load-bearing half, not the presence.** Kotlin matches catch clauses in
+order and **does not flag an unreachable one** — M2 below compiles cleanly with the clause moved
+underneath, and is silently dead. A future refactor that reorders these two reintroduces the
+defect with no compiler complaint, which is why M2 is pinned by its own mutation.
+
+This is phone-side transport hygiene, **not protocol**: no engine behaviour is being matched, **no
+vector moved**, and `docs/Sync-Protocol.md` was not touched.
+
+### Milestone 4 — executed, negative control first (C-67-5, C-67-6)
+
+Baseline on the **clean** worktree, before a line was written:
+
+```
+$ scripts/core-probe.sh --rerun
+BUILD SUCCESSFUL in 1m 43s
+core-probe: 316 tests, 0 failed, 0 skipped, across 22 classes
+```
+
+**The negative control ran before the fix** and failed **exactly the two new tests**, every one of
+the 316 existing tests green — that is the evidence the defect was real and not a test written to
+match code already correct:
+
+```
+RelayClientTest > cancellation on the final attempt escapes rather than becoming a value() FAILED
+RelayClientTest > cancellation is not swallowed into an unavailable relay() FAILED
+318 tests completed, 2 failed
+```
+
+With the fix:
+
+```
+BUILD SUCCESSFUL in 37s
+core-probe: 318 tests, 0 failed, 0 skipped, across 22 classes
+```
+
+**Three mutations, each red** (**C-67-6**):
+
+| | mutation | measured |
+| --- | --- | --- |
+| **M1** | the `CancellationException` clause deleted | both new tests fail |
+| **M2** | the clause moved **below** the general catch | **compiles**, both new tests fail |
+| **M3** | the general catch rethrows too (fix made too broad) | **exactly one** test fails — the pre-existing *"a thrown transport error is retried, not propagated"* |
+
+**M3 is the one worth reading twice.** It fails a *pre-existing* test while both new tests stay
+green, which is what shows two things at once: the fix is **narrow** (an offline phone still gets
+`Unavailable`, not a propagated `IOException`), and the two new tests are **guards** rather than
+second copies of the general-catch behaviour.
+
+A first attempt at M2 spliced the file badly and produced a **compile error**. That is not a
+mutation result and is **not** reported as one — it was redone cleanly, and the table above is the
+redone run. The restored file was then confirmed **byte-identical** to the pre-mutation original
+(`diff` silent) before the final green run above.
+
+### Milestone 5 — two findings this run did NOT fix, recorded rather than carried in someone's head (C-67-7)
+
+Both are real, both are in `:core`, and both were **deliberately left** — a slice is one coherent
+change, and neither belongs to this one. Recorded in `BLOCKED.md` with reproduction so the next
+session does not have to re-find them:
+
+1. **`OutboundEnvelopeFactory.outcome()` interpolates `app_id` into JSON unescaped**, while its
+   sibling `entitlement()` escapes every field through `jsonString()` — and
+   `OutboundEnvelopesTest:215` exists *precisely* to catch sloppy escaping on that sibling. The
+   asymmetry is real. **Severity is honestly low**: `app_id` is an engine-internal ULID
+   (`app_01H8XK` in every vector), the engine's own `SyncPayloads.cs` calls entity ids
+   "engine-internal structured identifiers, not untrusted job text", and the snapshot carrying it
+   is AEAD-sealed, so a blind relay cannot reach it. **Defense in depth, not a live defect** — and
+   stated that way rather than dressed up.
+2. **`PullPolicy` measures a §6.2 gap against the replica's *applied* mark**, which only advances
+   for `APPLIED`/`APPLIED_SNAPSHOT`. A run of `gapThreshold + 1` consecutive **non-projected**
+   envelopes (`doc`, `conflict`, `entitlement_ack` → `IGNORED`) therefore makes the *next*
+   projected envelope report a `SEQUENCE_GAP` that nothing was missing from. **Latent, not live**:
+   `SyncPublisher.cs` publishes only `snapshot`, `delta`, `heartbeat`, `evidence` today — all four
+   projected — so no run of ignored kinds can occur until a `doc` or `conflict` publisher lands.
+   `EntitlementRoutingApplier`'s own KDoc names this hazard for the ack *itself* and solves it by
+   returning `IGNORED`; the hazard survives for the envelope **after** it.
+
+### Milestone 6 — freshness, and the standing state is unmoved (C-67-8)
+
+| | measured, post-fetch |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`**, unmoved since 2026-08-12 |
+| android `main` | **`ebfaf81`** |
+| android PRs | **6 open, all draft** — none merged, closed or undrafted |
+| **#32** (the assigned slice, engine repo) | still open, still draft |
+| Terra | **COMPLETE**, *files claimed: none* — **no collision** |
+| vendored corpus | **29/29 byte-identical** to pin `7328a0b`, `diff -r` silent |
+
+**No H1–H8 item has been acted on.** **No rung moved, and none is claimed to have** — this is S4
+transport hygiene, the same family as runs 65 and 66, not a rung. **S4 still needs the E2E rig**
+and **S6 still needs S3's key**, both behind **B-4**. **B-19 unmoved: no `:app` file was written.**
+
+`repo1.maven.org` returned **no 429 this run** — the baseline resolved on the **first** attempt,
+where run 66 needed four. **B-21 stays open**: it is a transient rate limit on an allowed host, and
+one clean run does not close it.
+
+### Milestone 7 — prohibition paragraph: what this run did not touch
+
+**Nothing was merged, closed, rebased, undrafted or force-pushed in either repo**; the 18 engine
+PRs and the 6 android drafts are exactly as found, and **#53's fate stays Brandon's**. **No vector
+byte was written in either repo** — corpus **29/29** byte-identical to pin `7328a0b`,
+`VECTORS.lock` not edited, **the pin did not move (H7)**. **No `:app` file was written** — not one;
+**B-19** stays open. **No C# was written, no `generate.mjs`, no `docs/Sync-Protocol.md`, no
+`ci.yml`**; **`$ExpectedOfflineTotal` was not moved**, and **no nineteenth engine PR was opened**.
+**Nothing was written in the engine repo at all** except `STATE.md` on the docs-only
+`autonomy/claude-state` branch. **`Verify-Alpha.ps1` was not run and no result for it is claimed**
+— no `pwsh`, no `dotnet`, and it is a Windows gate besides. **The android gate was not run** —
+only `:core:test` executed, via `scripts/core-probe.sh`; **`:app:assembleDebug`, `:app:lintDebug`,
+`:app:test` and `checkCoreIsAndroidFree` are unrun and unclaimed** (**B-7**), and **no
+zero-warning claim is made**. The only host mutation was **`apt-get update` +
+`openjdk-17-jdk-headless`** inside a disposable container. No history rewrite, no branch deleted,
+no deploy of any kind. **The production relay was not contacted at all, not even
+`GET /v1/health`.** No Google, Play or OAuth console; no accounts, no purchases, no keystore, no
+emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory was **read, never
+written**.
