@@ -169,6 +169,45 @@ class EntitlementAckTest {
     }
 
     @Test
+    fun `an order_id of JSON null drops the whole ack, and only this test says so`() {
+        // PQ-A2-6. This pins CURRENT behaviour, and current behaviour is a choice nobody has
+        // ratified: `"order_id": null` is not "order_id present but not a string" in the sense
+        // the case above means it, and it is not absence either. §4.3.3 spells the field
+        // `<string> // OPTIONAL` and says "an ack without it is complete and MUST be honoured".
+        // It never says whether a null spelling counts as "without it".
+        //
+        // The consequence is the expensive kind and it is silent: `parse` returns null, so
+        // `apply` hands back the caller's state, so an authentic, correctly sequenced,
+        // AEAD-verified ack for a product this build knows unlocks NOTHING, and no layer
+        // reports a failure. That is run 58's shape exactly -- the difference is that this one
+        // needs the engine to spell the field a way it currently cannot.
+        val nulled = (
+            """{"kind":"entitlement_ack","body":{"product_id":"pro_unlock",""" +
+                """"acknowledged_at":"2026-06-11T14:02:11Z","order_id":null}}"""
+            ).toByteArray()
+
+        assertNull(applier.parse(nulled), "current behaviour: a null order_id fails the whole parse")
+        assertEquals(
+            ProState.Free,
+            applier.apply(ProState.Free, nulled),
+            "a paid user stays Free, silently, on an ack that differs from a valid one by one spelling",
+        )
+
+        // The same file's own contrast, asserted rather than described. `:core` contains BOTH
+        // readings of "optional field", chosen independently, neither citing the other:
+        // EnvelopeJson takes JSON null for `sig` to mean absent -- deliberately, with a comment
+        // about why the distinction matters -- and EnvelopeJsonTest pins it. The body parser
+        // above takes JSON null to mean malformed. Whichever is right, they cannot both be.
+        val envelope = EnvelopeJson.parse(
+            """{"v":1,"pairing":"p_7Fq2mXk9LtVbN3wR","dir":"e2p","seq":1,""" +
+                """"ts":"2026-06-11T14:02:11Z","key_id":"k-2026-06-01",""" +
+                """"nonce":"3q2-796tvu_erb7v","ciphertext":"AAAA","sig":null}""",
+        )
+        assertTrue(envelope.ok, "EnvelopeJson accepts a null sig as absent")
+        assertNull(envelope.envelope!!.sig)
+    }
+
+    @Test
     fun `a payload of another kind cannot unlock Pro even if it carries a product_id`() {
         // Guards a caller that dispatched on the wrong branch. The receiver reports the kind it
         // found; this class re-checks it, because "the heartbeat happened to contain the right

@@ -1,6 +1,9 @@
 package app.careerseeker.core
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
@@ -127,6 +130,56 @@ class VectorCorpusCoverageTest {
                 "A vendored vector that nothing reads is not evidence. Write a consumer for it " +
                 "(see ProtocolVectorsTest.ackVectors() for the shape) and record it in " +
                 "VectorCorpusCoverageTest.consumers.",
+        )
+    }
+
+    @Test
+    fun `no vector spells an absent optional field as an explicit JSON null`() {
+        // PQ-A2-6, and this test exists because a comment in the suite cites this corpus as
+        // evidence for a behaviour the corpus does not actually witness. EnvelopeJsonTest's
+        // `a non-string sig is malformed, and must not degrade into unsigned` justifies
+        // accepting `"sig": null` with *"the vectors encode it that way"*. They do not.
+        //
+        // `sig` is §3's only optional envelope field, and every vector that omits a signature
+        // omits the KEY -- absence is spelled by omission across the whole corpus, exactly as
+        // `entitlement-ack-no-order-id` spells an absent `order_id`. So the null spelling is
+        // unwitnessed on the wire, in either direction, and the two parsers in :core that had
+        // to guess what it means guessed differently (EnvelopeJson: absent; the ack body
+        // parser: malformed, dropping the whole payload).
+        //
+        // This pins the fact, not the resolution. If a future vector deliberately introduces a
+        // null spelling, this test fails and whoever adds it has to answer PQ-A2-6 first --
+        // which is the point, because that vector would silently change what one of the two
+        // parsers is claiming to be conformant with.
+        // Only the two fields that ARE wire representations are scanned. The vector schema's own
+        // metadata (`expect_error`, `expected`, and an absent `plaintext_json` on a vector whose
+        // ciphertext never decrypts) legitimately uses null to mean "not applicable", and that is
+        // a property of the harness format, not of anything either implementation parses.
+        val nulled = mutableListOf<String>()
+        fun scan(where: String, element: JsonElement) {
+            when (element) {
+                is JsonObject -> element.forEach { (key, value) ->
+                    if (value is JsonNull) nulled += "$where.$key" else scan("$where.$key", value)
+                }
+                is JsonArray -> element.forEachIndexed { i, value -> scan("$where[$i]", value) }
+                else -> Unit
+            }
+        }
+        for (entry in entries()) {
+            val name = entry.str("name")
+            val vector = load(name)
+            for (field in listOf("envelope_json", "plaintext_json")) {
+                scan("$name.$field", vector[field] ?: continue)
+            }
+        }
+
+        assertEquals(
+            emptyList(), nulled,
+            "a vector spells an optional field as an explicit JSON null. The corpus has never " +
+                "done this, and :core's two parsers disagree about what it means (PQ-A2-6): " +
+                "EnvelopeJson reads a null sig as absent, EntitlementAckApplier reads a null " +
+                "order_id as malformed and drops the entire ack. Answer PQ-A2-6 before " +
+                "vendoring this vector.",
         )
     }
 

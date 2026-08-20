@@ -78,7 +78,13 @@ class EnvelopeJsonTest {
         // Silently treating a broken sig as "no sig" would change which check fires: a
         // state-changing p2e envelope would report a MISSING signature instead of a bad one.
         assertTrue(!EnvelopeJson.parse(valid.dropLast(1) + ""","sig":42}""").ok)
-        // Explicit JSON null, however, genuinely means absent — the vectors encode it that way.
+        // Explicit JSON null is read as absent. The justification here used to be "the vectors
+        // encode it that way"; that was false and is now pinned as false — every `sig` in the
+        // corpus is a string, and absence is spelled by OMISSION in all 29 files
+        // (VectorCorpusCoverageTest, `no vector spells an absent optional field as an explicit
+        // JSON null`). So this branch is an unwitnessed choice, not a conformance fact, and
+        // `:core` makes the opposite choice one file over: EntitlementAckApplier treats a null
+        // `order_id` as malformed and drops the whole ack. Both cannot be right. PQ-A2-6.
         val nulled = EnvelopeJson.parse(valid.dropLast(1) + ""","sig":null}""")
         assertTrue(nulled.ok)
         assertNull(nulled.envelope!!.sig)
