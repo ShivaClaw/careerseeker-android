@@ -12899,3 +12899,185 @@ no deploy of any kind. **The production relay was not contacted at all, not even
 `GET /v1/health`.** No Google, Play or OAuth console; no accounts, no purchases, no keystore, no
 emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory was **read, never
 written**.
+
+---
+
+## RUN 68 — 2026-08-20. The thirty-third firing; a §6.2 gap measured against the wrong mark, closed in `:core`.
+
+**Rule one first.** `git fetch --all --prune` in **both** checkouts before a single number was
+taken. Both again arrived **detached at a stale `main`** — the android checkout at `ebfaf81`, which
+is `main`, not the work branch, and **247 commits behind** `claude/android-a0-probe`. Every figure
+below is post-fetch.
+
+### Milestone 1 — the assigned slice was declined for the thirty-third time, and verified rather than assumed (C-68-1, C-68-2)
+
+The prompt assigns S5's spec half: §4.3 `entitlement_ack`, the ack vectors, PQ-A2-1/-2/-3. **It has
+been built since 2026-08-09.** Verified this run, not inherited:
+
+```
+$ cd <engine>
+$ for c in 8575539 22b028e 7328a0b; do git merge-base --is-ancestor $c origin/main; echo "$c -> exit=$?"; done
+8575539 -> exit=1        # not on main
+22b028e -> exit=1
+7328a0b -> exit=1
+$ git checkout -q 7328a0b && node docs/sync-vectors/generate.mjs --check
+OK: 29 vector files match the generator.
+exit=0
+```
+
+`26` vectors on `main`, **`29`** at the pin and on the phone. **The prompt's pin `679a317` is still
+stale**; the live pin is **`7328a0b`** (**C-68-2**). Nothing about that changed this run and nothing
+was done to change it — landing those commits needs a `Verify-Alpha.ps1` this box cannot run.
+
+### Milestone 2 — the slice actually taken, and why this one (C-68-3)
+
+**F-67-2**, filed by run 67 in `BLOCKED.md` and deliberately left there: *"it deserves its own slice
+with its own mutations rather than being smuggled into a transport-hygiene fix."* This is that
+slice. It is `:core`, which is the one module this environment compiles and tests, and it is the
+topmost item on the board that is genuinely verifiable here — S3/S4/S6 still want an emulator
+(**B-4**), S8 still wants Robolectric (**B-5**), and nothing on the ladder moved.
+
+**The defect.** `PullPolicy.onEnvelope` decided a §6.2 large gap with
+
+```kotlin
+envelopeSeq - positionBefore.highestAppliedSeq > gapThreshold
+```
+
+and `highestAppliedSeq` advances **only** for `APPLIED` / `APPLIED_SNAPSHOT`. So the measurement
+conflated two different facts: envelopes the phone **never received** — a genuine gap — and
+envelopes it **received and deliberately did not project** (`doc`, `conflict`, `entitlement_ack`,
+and anything `MALFORMED`). A run of `gapThreshold + 1` of the second kind made the **next**
+projected envelope report a `SEQUENCE_GAP`, and what follows a `SEQUENCE_GAP` is a `pull_request`
+asking the engine for a **full snapshot that nothing was missing from** — traffic on a healthy
+pairing, which is the exact outcome `EntitlementRoutingApplier`'s KDoc says the design exists to
+avoid. That KDoc closes the hazard for the ack **itself** by returning `IGNORED`; the hazard
+survived for the envelope **after** it, which nothing addressed.
+
+**Latent, not live, and said that way.** `src/Sync/SyncPublisher.cs` publishes exactly four kinds —
+`snapshot`, `delta`, `heartbeat`, `evidence` — and `:app` projects all four, so no run of `IGNORED`
+can occur today. It becomes reachable the moment a `doc` or `conflict` publisher lands, or if S5's
+ack emitter ever emits in volume.
+
+**The fix.** A second, in-memory mark — `highestHandledSeq`, the highest seq this policy has been
+*told about* whatever the replica did with it — and the gap measured against
+`maxOf(positionBefore.highestAppliedSeq, highestHandledSeq)`.
+
+**The half F-67-2 did not predict, and it is the load-bearing half.** F-67-2 proposed the `max`
+shape and got it right. What it did not say is that the **order** matters: the handled mark must
+advance **after** the decision. Advance it first and the envelope's own seq folds into the baseline
+it is about to be measured against, so **every** gap measures zero and §6.2 stops being implemented
+at all. That is the same trap the `positionBefore` parameter's own KDoc warns about, one field
+along — and **Kotlin flags none of it**. The reordered version compiles clean. It is pinned by M2.
+
+This is **phone-side policy, not protocol**: the engine never *sends* `pull_request`, so there is no
+engine behaviour to match, **no vector moved**, and `docs/Sync-Protocol.md` was not touched.
+
+### Milestone 3 — executed, negative control first (C-68-4)
+
+Baseline on the **clean** worktree, before a line was written:
+
+```
+$ scripts/core-probe.sh
+BUILD SUCCESSFUL in 59s
+core-probe: 318 tests, 0 failed, 0 skipped, across 22 classes
+```
+
+**The four tests were written before the fix.** Three failed; all 318 existing tests stayed green:
+
+```
+PullPolicyTest > a run of unprojected envelopes does not make the next applied one look like a gap() FAILED
+PullPolicyTest > a run of malformed envelopes does not make the next applied one look like a gap() FAILED
+PullPolicyTest > a reopen does not forget the envelopes already handled() FAILED
+322 tests completed, 3 failed
+```
+
+**The fourth new test passed unfixed, by design, and that is not a failed control.** *"a genuine gap
+after unprojected envelopes is still detected"* is a **guard against over-fixing** — it is what
+stops the next reader "simplifying" this into *never ask after an ignored envelope*. It is red under
+M2, which is where a guard is supposed to fire.
+
+With the fix:
+
+```
+BUILD SUCCESSFUL in 41s
+core-probe: 322 tests, 0 failed, 0 skipped, across 22 classes
+```
+
+### Milestone 4 — three mutations, each red (C-68-5)
+
+| | mutation | measured |
+| --- | --- | --- |
+| **M1** | the baseline reverts to the applied mark alone (the pre-fix expression) | the same **3** tests fail; the other 319 green |
+| **M2** | the handled mark advances **before** the decision instead of after | **compiles**; **7** fail, **6 of them pre-existing** |
+| **M3** | `onOpen` clears the handled mark along with the latch | **exactly 1** fails — the reopen test |
+
+**M2 was predicted to fail 4 and failed 7 — recorded as measured, not as predicted.** The three
+beyond the prediction are the interesting ones: it takes down `SyncPumpTest > a real gap larger than
+the threshold asks for a snapshot exactly once` and `EntitlementRoutingApplierTest > reporting an
+ack as APPLIED would manufacture a sequence-gap request` as well as `PullPolicyTest`. The ordering
+is therefore not a local detail of one file — three test classes depend on it, and none of them
+would have noticed at compile time.
+
+**M3 is the narrowness proof.** It fails **one** test and no other, which is what shows the
+not-clearing-at-`onOpen` decision is genuinely pinned rather than incidentally covered — and that
+the other three new tests are not just three copies of the same assertion.
+
+Each mutation was restored from a pre-mutation copy and the restored file **verified byte-identical**
+before the next run. **No mutation produced a compile error**; had one, it would not have been
+reported as a mutation result.
+
+### Milestone 5 — what this run did NOT fix, again recorded rather than carried in someone's head (C-68-6)
+
+**F-67-1 is still open and untouched.** `OutboundEnvelopeFactory.outcome()` still interpolates
+`app_id` into JSON unescaped while its sibling `entitlement()` escapes every field. It is a
+different file and a different defect; folding it in would have made this run two changes wearing
+one commit. Its severity bound is unchanged — engine-internal ULID, inside an AEAD-sealed snapshot,
+unreachable by the blind relay: **defense in depth, not a live defect**. `BLOCKED.md` carries the
+reproduction and the three-line unblock.
+
+### Milestone 6 — freshness, and the standing state is unmoved (C-68-7)
+
+| | measured, post-fetch |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`**, unmoved since 2026-08-12 |
+| android `main` | **`ebfaf81`** |
+| engine PRs | **18 open, all draft** — `#26`, `#32`–`#39`, `#45`–`#53` |
+| android PRs | **6 open, all draft** — `#1`–`#6` |
+| **#32** (the assigned slice) and **#53** (H1) | both still open, still draft |
+| Terra (`autonomy/codex-state`) | **COMPLETE**, *files claimed: none* — **no collision** |
+| vendored corpus | **29/29 byte-identical** to pin `7328a0b`, `diff -r` silent |
+
+**Both PR counts were measured this run via the GitHub API, not carried forward** — an inherited
+count stated as a measurement is exactly the drift `AUDIT-REQUEST.md` exists to stop.
+
+**No rung moved, and none is claimed to have.** This is S4 policy correctness — the same family as
+runs 65, 66 and 67 — not a rung. **No H1–H8 item was acted on. B-19 is unmoved: no `:app` file was
+written.**
+
+**B-21 reproduced, and one word of its original entry corrected.** The baseline needed **three**
+attempts (two `429 Too Many Requests`); every later run this session resolved first time. The
+original entry names `repo1.maven.org`; the 429s measured this run came from
+**`repo.maven.apache.org`** — the same Maven Central under the name Gradle's `mavenCentral()`
+actually contacts. Same allowed host, same transient limit, same remedy. Corrected in `BLOCKED.md`
+so a future session grepping for the literal string does not conclude it has found something new.
+
+### Milestone 7 — prohibition paragraph: what this run did not touch
+
+**Nothing was merged, closed, rebased, undrafted or force-pushed in either repo**; the **18** engine
+PRs and the **6** android drafts are exactly as found, and **#53's fate stays Brandon's**. **No
+vector byte was written in either repo** — corpus **29/29** byte-identical to pin `7328a0b`,
+`VECTORS.lock` not edited, **the pin did not move (H7)**. **No `:app` file was written** — not one;
+**B-19** stays open. **No C# was written, no `generate.mjs`, no `docs/Sync-Protocol.md`, no
+`docs/protocol-questions.md`, no `ci.yml`**; **`$ExpectedOfflineTotal` was not moved**, and **no
+nineteenth engine PR was opened**. **Nothing was written in the engine repo at all** except
+`STATE.md` on the docs-only `autonomy/claude-state` branch; the engine checkout was otherwise
+read-only, and it was left detached where it was found. **`Verify-Alpha.ps1` was not run and no
+result for it is claimed** — no `pwsh`, no `dotnet`, and it is a Windows gate besides. **The android
+gate was not run**: only `:core:test` executed, via `scripts/core-probe.sh`; **`:app:assembleDebug`,
+`:app:lintDebug`, `:app:test` and `checkCoreIsAndroidFree` are unrun and unclaimed** (**B-7**), and
+**no zero-warning claim is made** — two `No cast needed` warnings are pre-existing in files this run
+did not touch. The only host mutation was **`apt-get update` + `openjdk-17-jdk-headless`** inside a
+disposable container. No history rewrite, no branch deleted, **no deploy of any kind**. **The
+production relay was not contacted at all, not even `GET /v1/health`.** No Google, Play or OAuth
+console; no accounts, no purchases, no keystore, no emulator, no Gmail. **No secret was read,
+printed or echoed.** Terra's territory was **read, never written**.

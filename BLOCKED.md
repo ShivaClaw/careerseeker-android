@@ -3042,3 +3042,78 @@ where run 66 needed four. That is consistent with a **transient** rate limit on 
 host and does **not** close B-21 — a session that hits it must still retry with backoff rather
 than filing `:core` as unreachable. **B-7 is unchanged and still bounds this run**: four of the
 android gate's five tasks need the Android SDK and did not run.
+
+---
+
+## Sixty-eighth cloud iteration (2026-08-20) — no new blocker, one finding closed, one deliberately left
+
+### F-67-2 RESOLVED — 2026-08-20 (sixty-eighth run), in `:core`, executed
+
+The finding above is **fixed**. `PullPolicy` now measures §6.2's gap against
+`maxOf(positionBefore.highestAppliedSeq, highestHandledSeq)`, where `highestHandledSeq` is the
+highest e2p seq the policy has been told about **whatever the replica did with it**
+(`core/src/main/kotlin/app/careerseeker/core/PullPolicy.kt`). The applied mark alone could not tell
+an envelope the phone **never received** from one it **received and deliberately did not project**;
+the new mark can, and the gap is measured against whichever is higher.
+
+**The prediction F-67-2 wrote down was right, and one detail of it was not.** It proposed
+"`max(highestAppliedSeq, lastHandledSeq)`" — that is exactly the shape landed. What it did not say
+is that the **order** of the two operations inside `onEnvelope` is load-bearing: the handled mark
+must advance **after** the decision, never before, or the envelope's own seq folds into the baseline
+it is being measured against and **every** gap measures zero. That is the same trap the
+`positionBefore` parameter's own KDoc warns about, one field along, and Kotlin flags none of it —
+the reordered version compiles and passes nothing. It is pinned by mutation **M2** below.
+
+**Executed, negative control first.** Clean-worktree baseline **`318 tests, 0 failed, 0 skipped,
+across 22 classes`**. The four new tests written **before** the fix failed **exactly three** of
+themselves — the fourth (`a genuine gap after unprojected envelopes is still detected`) passes
+unfixed **by design**: it is a guard against over-fixing, not a control. With the fix: **`BUILD
+SUCCESSFUL`**, **`322 tests, 0 failed, 0 skipped, across 22 classes`**. Three mutations, each red:
+
+| | mutation | measured |
+| --- | --- | --- |
+| **M1** | the baseline reverts to the applied mark alone | the same **3** tests fail; all 318 existing green |
+| **M2** | the handled mark advances **before** the decision | **compiles**; **7** fail — 6 of them **pre-existing** |
+| **M3** | `onOpen` clears the handled mark with the latch | **exactly 1** fails — the reopen test |
+
+**M3 is the narrowness proof**, and M2 is the one worth reading twice: it takes down
+`SyncPumpTest` and `EntitlementRoutingApplierTest` as well as `PullPolicyTest`, which is the
+measurement that the ordering is not a local detail of one file.
+
+Re-verify: `AUDIT-REQUEST.md` **C-68-4**, **C-68-5**.
+
+### F-67-1 — still OPEN, deliberately, and nothing about it changed
+
+`OutboundEnvelopeFactory.outcome()` still interpolates `app_id` unescaped. **It was not fixed and
+is not claimed to be.** It is a different file, a different defect, and a different slice; folding
+it in would have made this run two changes wearing one commit. Its severity bound is unchanged
+(defense in depth: engine-internal ULID, AEAD-sealed, unreachable by the blind relay), and its
+smallest unblock is still *none needed*. Re-verify it is untouched: `git diff main..HEAD --
+core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt` returns **nothing**.
+
+### B-21 status (sixty-eighth run) — REPRODUCED, and the host name in the original entry is narrower than the fact
+
+**429s occurred this run**, so B-21 is not merely still open — it is **re-measured live**. The
+clean-worktree baseline needed **three** attempts: attempts 1 and 2 died on `429 Too Many Requests`
+and attempt 3 succeeded. **Every later run this session — the negative control, the fix, and all
+three mutations — resolved on its first attempt**, so the burst was at the start of the session and
+did not recur. That asymmetry is itself the evidence for "transient": nothing about the build
+changed between the run that needed three attempts and the five that needed one.
+
+**One correction to the original entry.** It names the host as `repo1.maven.org`. The 429s measured
+this run came back from **`repo.maven.apache.org`** — the same Maven Central service under its other
+name, which is what the Gradle `mavenCentral()` resolver actually contacts. A session grepping its
+log for the literal string `repo1.maven.org` would conclude it had hit something new. It has not:
+**same allowed host, same transient rate limit, same remedy** — retry with backoff, do not file
+`:core` as unreachable, and do not report a gate result you never got.
+
+Notably, each failed attempt still got **further** than the last (attempt 1 died resolving
+`kotlin-gradle-plugin`, attempt 2 resolving `kotlin-daemon-embeddable`), because what does resolve
+is cached. That is why backoff works here and why a single retry is not enough.
+
+### B-7 is unchanged and still bounds this run
+
+Only `:core:test` ran, via `scripts/core-probe.sh`. **`:app:assembleDebug`, `:app:lintDebug`,
+`:app:test` and `checkCoreIsAndroidFree` did not run and no result is claimed for them.** Two
+`No cast needed` warnings persist in `PairingSessionTest.kt:53` and `RelayClientTest.kt:383` —
+**pre-existing, in files this run did not touch**; no zero-warning claim is made.

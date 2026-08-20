@@ -12158,3 +12158,158 @@ diff -r "$tmp/docs/sync-vectors/v1" <android>/core/src/test/resources/sync-vecto
 
 *Expected, and **observed**:* **silent**, **`exit=0`**, **29 files each side** — measured **after**
 this run's commit.
+
+---
+
+## Run 68 (2026-08-20) — re-verification commands
+
+Every claim run 68 makes, with the command that re-derives it. Substitute `<engine>` for a
+`ShivaClaw/careerseeker` checkout and `<android>` for this one. **Run `git fetch --all --prune` in
+both first** — run 68, like the four before it, arrived detached at a stale `main`, and every number
+here is post-fetch.
+
+### C-68-1 — the assigned slice exists and is still not on `main`
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  git merge-base --is-ancestor $c origin/main; echo "$c -> exit=$?"
+done
+```
+
+*Expected, and **observed**:* **`exit=1`** for all three — *not on `main`*. Run this in the
+**engine** repo; in the android checkout the same command returns `exit=128`, which reads like a
+broken command rather than a wrong repository.
+
+### C-68-2 — the corpus is anchored to a generator, and the prompt's pin is stale
+
+```bash
+cd <engine> && git checkout -q 7328a0b && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+git ls-tree -r --name-only origin/main -- docs/sync-vectors/v1 | wc -l
+ls <android>/core/src/test/resources/sync-vectors/v1 | wc -l
+```
+
+*Expected, and **observed**:* **`OK: 29 vector files match the generator.`**, **`exit=0`**;
+**26** on `main`, **29** on the phone. The prompt's `679a317` is stale; the live pin is
+**`7328a0b`**, and `VECTORS.lock` says so.
+
+### C-68-3 — the defect F-67-2 described, located in the code
+
+```bash
+cd <android>
+git show main:core/src/main/kotlin/app/careerseeker/core/PullPolicy.kt | grep -n "highestAppliedSeq > gapThreshold"
+grep -rn "APPLIED_SNAPSHOT\|APPLIED ->" core/src/main/kotlin/app/careerseeker/core/PullPolicy.kt | head
+grep -rn "PublishSnapshotAsync\|PublishDeltaAsync\|PublishHeartbeatAsync\|PublishEvidenceAsync" <engine>/src/Sync/SyncPublisher.cs
+```
+
+*Expected, and **observed**:* the pre-fix expression measures the gap against
+`positionBefore.highestAppliedSeq` alone; that mark advances only on `APPLIED` /
+`APPLIED_SNAPSHOT`; and `SyncPublisher.cs` exposes **exactly four** publish methods — `snapshot`,
+`delta`, `heartbeat`, `evidence` — all of which `:app` projects. **The third command is what bounds
+the severity to *latent*:** no unprojected kind is published today, so no run of `IGNORED` can
+occur yet.
+
+### C-68-4 — baseline, negative control, and the green run
+
+```bash
+cd <android>
+# The probe needs a JDK 17 (:core pins jvmToolchain(17)); the image ships 21.
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+
+fix=$(git log --format=%H -1 --grep='a §6.2 gap is what was never received')
+
+git checkout -q $fix^ -- core/src/main/kotlin/app/careerseeker/core/PullPolicy.kt \
+                         core/src/test/kotlin/app/careerseeker/core/PullPolicyTest.kt
+scripts/core-probe.sh --rerun   # baseline: neither the fix nor the tests
+
+git checkout -q $fix  -- core/src/test/kotlin/app/careerseeker/core/PullPolicyTest.kt
+scripts/core-probe.sh --rerun   # the negative control: the tests, without the fix
+
+git checkout -q $fix  -- core/src/main/kotlin/app/careerseeker/core/PullPolicy.kt
+scripts/core-probe.sh --rerun   # with the fix
+```
+
+*Expected, and **observed**:*
+
+| | measured |
+| --- | --- |
+| baseline, clean worktree | `BUILD SUCCESSFUL`, **`318 tests, 0 failed, 0 skipped, across 22 classes`** |
+| negative control (tests, no fix) | **`322 tests completed, 3 failed`** — the three new tests that need the fix; **all 318 existing green** |
+| with the fix | `BUILD SUCCESSFUL`, **`322 tests, 0 failed, 0 skipped, across 22 classes`** |
+| re-run after all three mutations were restored | `BUILD SUCCESSFUL`, **`322 tests, 0 failed, 0 skipped, across 22 classes`** |
+
+**The fourth new test — *"a genuine gap after unprojected envelopes is still detected"* — passes
+unfixed, deliberately.** It is a guard against over-fixing, not a control, and it is red under M2.
+Read the "3 failed" line with that in mind: **4 tests added, 3 of them controls**.
+
+`repo.maven.apache.org` returned **429 Too Many Requests** on the first two baseline attempts and
+succeeded on the third; every later run resolved first time. See **B-21** — retry with backoff, and
+do **not** report a gate result you did not get.
+
+### C-68-5 — the three mutations
+
+```bash
+cd <android>
+# M1: revert the baseline to the applied mark alone
+#   maxOf(positionBefore.highestAppliedSeq, highestHandledSeq)  ->  positionBefore.highestAppliedSeq
+# M2: move `if (envelopeSeq > highestHandledSeq) highestHandledSeq = envelopeSeq`
+#   from AFTER the `decide(...)` call to BEFORE it
+# M3: add `highestHandledSeq = 0L` next to `pending = false` in onOpen
+# ...then, for each:
+scripts/core-probe.sh
+git checkout -- core/src/main/kotlin/app/careerseeker/core/PullPolicy.kt
+```
+
+*Expected, and **observed**:*
+
+| | measured |
+| --- | --- |
+| **M1** | **3 failed** — `a run of unprojected envelopes…`, `a run of malformed envelopes…`, `a reopen does not forget…` |
+| **M2** | **compiles**, **7 failed** — adds `a genuine gap after unprojected envelopes is still detected`, `a gap larger than the threshold asks for a fresh snapshot`, `every reason sends since_seq zero`, `an unsolicited snapshot also releases the latch`, `a reopen releases a gap request latched on a warm replica`, `SyncPumpTest > a real gap larger than the threshold asks for a snapshot exactly once`, `EntitlementRoutingApplierTest > reporting an ack as APPLIED would manufacture a sequence-gap request` |
+| **M3** | **exactly 1 failed** — `a reopen does not forget the envelopes already handled` |
+
+**M2 is the row to read twice.** It compiles, it is silently wrong, and it breaks **three test
+classes** — so the *order* of the two operations inside `onEnvelope` is not a local detail. **It was
+predicted to fail 4 and failed 7; the table reports what was measured.** **M3 is the narrowness
+proof:** one failure, no collateral, which is what shows the not-clearing-at-`onOpen` decision is
+pinned on purpose rather than covered by accident. Each mutated file was restored from a
+pre-mutation copy and confirmed **byte-identical** before the next run; **no mutation produced a
+compile error.**
+
+### C-68-6 — F-67-1 was not fixed, and is not claimed to be
+
+```bash
+cd <android>
+grep -n "app_id" core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+git diff main..HEAD -- core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+```
+
+*Expected, and **observed**:* `outcome()` still interpolates `app_id` **raw**, and the diff is
+**empty** — the file was not touched this run. Symptom, bound and unblock stay in `BLOCKED.md`.
+
+### C-68-7 — standing state, unmoved
+
+```bash
+cd <engine>  && git rev-parse --short origin/main    # aac05f3
+cd <android> && git rev-parse --short origin/main    # ebfaf81
+cd <engine>  && git show origin/autonomy/codex-state:STATE.md | head -20
+# PR counts — measured via the GitHub API this run, both repos, state=open:
+#   ShivaClaw/careerseeker          -> 18 open, all draft  (#26, #32-#39, #45-#53)
+#   ShivaClaw/careerseeker-android  ->  6 open, all draft  (#1-#6)
+```
+
+*Expected, and **observed**:* the two SHAs above; **18 engine PRs, all open, all draft**, with
+**#32** (the assigned slice) and **#53** (H1) both still open; **6 android PRs, all open, all
+draft**; Terra **COMPLETE, files claimed: none**. **Both counts were measured this run, not carried
+forward.**
+
+### C-68-8 — no vector byte written
+
+```bash
+cd <engine> && tmp=$(mktemp -d) && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C "$tmp"
+diff -r "$tmp/docs/sync-vectors/v1" <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+cd <android> && git diff main..HEAD -- core/src/test/resources/sync-vectors/
+```
+
+*Expected, and **observed**:* the `diff -r` is **silent**, **`exit=0`**, **29 files each side**; the
+second command is **empty**. Measured **after** this run's commits.
