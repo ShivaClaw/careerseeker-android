@@ -207,6 +207,103 @@ class OutboundEnvelopesTest {
         }
     }
 
+    // ---------------------------------------------------------------- outcome body escaping
+
+    /**
+     * F-67-1. `outcome()` built its body by raw interpolation while its `entitlement()` sibling
+     * routed every field through `jsonString()`. The three tests below are the escaping guard the
+     * outcome path never had — the mirror of the quote/backslash fixture at line 215, which exists
+     * for exactly this reason on the other path.
+     *
+     * Severity is defense in depth, not a live defect, and the tests do not claim otherwise:
+     * `app_id` is an engine-internal ULID inside an AEAD-sealed snapshot, so no untrusted §8.6 job
+     * text reaches this field today. The convention is not an enforced invariant, which is what
+     * makes it worth a test rather than a comment.
+     */
+    @Test
+    fun `an app_id containing a quote and a backslash survives the round trip`() {
+        val key = TestKey()
+        val (f, _) = factory(signer = key.signer)
+        val appId = """app_1"quote\backslash"""
+
+        val wire = f.outcome(appId, Outcome.SENT, at = "2026-06-11T14:02:11Z")
+        val result = EnvelopeReceiver(keyId, key.publicPoint).receiveWire(wire) { kP2e }
+
+        // Unescaped, the body is malformed JSON and the receiver refuses the whole envelope —
+        // a mark the user made, sent, accepted by the relay, and silently never applied.
+        assertTrue(result.accepted, "outcome envelope rejected: ${result.error?.wire}")
+        val body = json.parseToJsonElement(result.plaintext!!.toString(Charsets.UTF_8))
+            .jsonObject["body"]!!.jsonObject
+        assertEquals(appId, body["app_id"]!!.jsonPrimitive.content)
+        assertEquals("sent", body["outcome"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `an at timestamp containing a quote survives the round trip`() {
+        // `timestamp` is passed explicitly and left clean: `at` defaults into it, and the header
+        // is a different interpolation surface with a different bound (see F-69-1). This test is
+        // about the body only.
+        val key = TestKey()
+        val (f, _) = factory(signer = key.signer)
+        val at = """2026-06-11T14:02:11Z","injected":"field"""
+
+        val wire = f.outcome("app_1", Outcome.SENT, at = at, timestamp = "2026-06-11T14:02:11Z")
+        val result = EnvelopeReceiver(keyId, key.publicPoint).receiveWire(wire) { kP2e }
+
+        assertTrue(result.accepted, "outcome envelope rejected: ${result.error?.wire}")
+        val body = json.parseToJsonElement(result.plaintext!!.toString(Charsets.UTF_8))
+            .jsonObject["body"]!!.jsonObject
+        assertEquals(at, body["at"]!!.jsonPrimitive.content)
+        assertNull(body["injected"], "a crafted `at` must not be able to add a sibling field")
+    }
+
+    @Test
+    fun `a crafted app_id cannot forge the outcome field`() {
+        // The load-bearing half. Unescaped, this appId closes the app_id string and opens a
+        // SECOND "outcome" key. Unlike the quote case above the result is still *valid* JSON, so
+        // nothing rejects it: the envelope is accepted and applied with a body carrying two
+        // outcomes. Which one survives is parser-dependent — kotlinx and the engine's
+        // System.Text.Json need not agree — so the two implementations can record different
+        // outcomes for one signed envelope. Injected through `at`, the body's LAST field, the
+        // forged key lands after the real one, where last-wins makes it decisive.
+        val key = TestKey()
+        val (f, _) = factory(signer = key.signer)
+        val appId = """x","outcome":"offer"""
+
+        val wire = f.outcome(appId, Outcome.SENT, at = "2026-06-11T14:02:11Z")
+        val result = EnvelopeReceiver(keyId, key.publicPoint).receiveWire(wire) { kP2e }
+        assertTrue(result.accepted, "outcome envelope rejected: ${result.error?.wire}")
+
+        val plaintext = result.plaintext!!.toString(Charsets.UTF_8)
+        assertEquals(
+            1,
+            Regex("\"outcome\":").findAll(plaintext).count(),
+            "the body carries a second `outcome` key: $plaintext",
+        )
+        val body = json.parseToJsonElement(plaintext).jsonObject["body"]!!.jsonObject
+        assertEquals("sent", body["outcome"]!!.jsonPrimitive.content)
+        assertEquals(appId, body["app_id"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `an ordinary outcome body is byte-for-byte what it always was`() {
+        // A guard against over-fixing, not a control: this one passes before the fix as well.
+        // Escaping must be a no-op on the ids v1 actually carries — a "fix" that re-encoded or
+        // double-escaped ordinary text would change bytes the engine already parses.
+        val key = TestKey()
+        val (f, _) = factory(signer = key.signer)
+
+        val wire = f.outcome("app_01H8XK", Outcome.INTERVIEW, at = "2026-06-11T14:02:11Z")
+        val plaintext = EnvelopeReceiver(keyId, key.publicPoint)
+            .receiveWire(wire) { kP2e }.plaintext!!.toString(Charsets.UTF_8)
+
+        assertEquals(
+            """{"kind":"outcome","body":{"app_id":"app_01H8XK","outcome":"interview",""" +
+                """"at":"2026-06-11T14:02:11Z"}}""",
+            plaintext,
+        )
+    }
+
     // ---------------------------------------------------------------- entitlement courier
 
     @Test

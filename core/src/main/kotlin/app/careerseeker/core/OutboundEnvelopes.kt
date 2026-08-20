@@ -116,9 +116,25 @@ class OutboundEnvelopeFactory(
         }
     }
 
-    /** `outcome` (§4.3): `{app_id, outcome, at}`. Always signed. */
+    /**
+     * `outcome` (§4.3): `{app_id, outcome, at}`. Always signed.
+     *
+     * [appId] and [at] go through [jsonString] for the same reason every field of [entitlement]
+     * does. Raw interpolation here was F-67-1: a `"` or `\` in [appId] yields a malformed body
+     * the receiver rejects as `unknown_kind` — a mark the user made, signed, and had silently
+     * dropped — and a crafted value that stays *valid* JSON can open a second `outcome` key,
+     * leaving two implementations free to resolve the duplicate differently.
+     *
+     * [Outcome.wire] is not escaped and must not need to be: it is a closed enum of five ASCII
+     * literals, and that is the invariant `the phone can only send the five outcomes it is
+     * allowed to set` pins.
+     */
     fun outcome(appId: String, outcome: Outcome, at: String, timestamp: String = at): String =
-        build("outcome", """{"app_id":"$appId","outcome":"${outcome.wire}","at":"$at"}""", timestamp)
+        build(
+            "outcome",
+            """{"app_id":${jsonString(appId)},"outcome":"${outcome.wire}","at":${jsonString(at)}}""",
+            timestamp,
+        )
 
     /**
      * `entitlement` (§4.3.2): the phone is a **courier**. `original_json` is forwarded verbatim
