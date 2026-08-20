@@ -12959,6 +12959,12 @@ survived for the envelope **after** it, which nothing addressed.
 can occur today. It becomes reachable the moment a `doc` or `conflict` publisher lands, or if S5's
 ack emitter ever emits in volume.
 
+**That bound was re-measured this run, not inherited from run 67.** `grep -nE 'public
+.*Publish[A-Za-z]*Async' src/Sync/SyncPublisher.cs` returns **four** lines, at `:57`, `:63`, `:70`
+and `:77`. It is the **only** engine source file this run read, and the read is what turns "latent"
+from a quotation into a measurement — a severity bound copied forward is the same failure as a
+count copied forward, and this bound is the one thing standing between this fix and "live".
+
 **The fix.** A second, in-memory mark — `highestHandledSeq`, the highest seq this policy has been
 *told about* whatever the replica did with it — and the gap measured against
 `maxOf(positionBefore.highestAppliedSeq, highestHandledSeq)`.
