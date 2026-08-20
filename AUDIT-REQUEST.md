@@ -12281,11 +12281,17 @@ compile error.**
 ```bash
 cd <android>
 grep -n "app_id" core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
-git diff main..HEAD -- core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+# f1bdc95 is run 67's tip -- i.e. THIS RUN'S BASE. Not `main`: the android `main`
+# branch predates the whole :core module, so `main..HEAD` diffs 68 runs of work and
+# answers a different question entirely.
+git diff f1bdc95..HEAD -- core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt
+git diff f1bdc95..HEAD --name-only
 ```
 
-*Expected, and **observed**:* `outcome()` still interpolates `app_id` **raw**, and the diff is
-**empty** — the file was not touched this run. Symptom, bound and unblock stay in `BLOCKED.md`.
+*Expected, and **observed**:* `outcome()` still interpolates `app_id` **raw**; the first diff is
+**empty** — the file was not touched this run; and the second lists **exactly six** files —
+`AUDIT-REQUEST.md`, `BLOCKED.md`, `LOG.md`, `STATE.md`, `PullPolicy.kt`, `PullPolicyTest.kt`.
+Symptom, bound and unblock for F-67-1 stay in `BLOCKED.md`.
 
 ### C-68-7 — standing state, unmoved
 
@@ -12308,7 +12314,7 @@ forward.**
 ```bash
 cd <engine> && tmp=$(mktemp -d) && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C "$tmp"
 diff -r "$tmp/docs/sync-vectors/v1" <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
-cd <android> && git diff main..HEAD -- core/src/test/resources/sync-vectors/
+cd <android> && git diff f1bdc95..HEAD -- core/src/test/resources/sync-vectors/   # run 67's tip = this run's base
 ```
 
 *Expected, and **observed**:* the `diff -r` is **silent**, **`exit=0`**, **29 files each side**; the

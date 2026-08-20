@@ -3088,8 +3088,10 @@ Re-verify: `AUDIT-REQUEST.md` **C-68-4**, **C-68-5**.
 is not claimed to be.** It is a different file, a different defect, and a different slice; folding
 it in would have made this run two changes wearing one commit. Its severity bound is unchanged
 (defense in depth: engine-internal ULID, AEAD-sealed, unreachable by the blind relay), and its
-smallest unblock is still *none needed*. Re-verify it is untouched: `git diff main..HEAD --
-core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt` returns **nothing**.
+smallest unblock is still *none needed*. Re-verify it is untouched: `git diff f1bdc95..HEAD --
+core/src/main/kotlin/app/careerseeker/core/OutboundEnvelopes.kt` returns **nothing** — `f1bdc95` is
+run 67's tip, i.e. this run's base. **Not `main`**: the android `main` branch predates the whole
+`:core` module, so `main..HEAD` diffs sixty-eight runs of work and answers a different question.
 
 ### B-21 status (sixty-eighth run) — REPRODUCED, and the host name in the original entry is narrower than the fact
 
