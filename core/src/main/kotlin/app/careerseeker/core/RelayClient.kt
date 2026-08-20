@@ -11,6 +11,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -321,6 +322,18 @@ class RelayClient(
                     // and adds load to a relay that already told us the answer.
                     else -> "relay answered ${response.status.value}"
                 }
+            } catch (e: CancellationException) {
+                // Cancellation is not a relay outcome, so it must not become a RelayResult.
+                // CancellationException IS an Exception on the JVM, so the blanket catch below
+                // used to absorb it and report the relay as unavailable — a claim about the
+                // network, made when nothing was asked of the network. On every attempt but the
+                // last that was masked by accident: the loop's own `delay()` is a cancellation
+                // point and re-threw. The final attempt has no delay after it, so the loop ran
+                // off the end and returned a value from a coroutine that had been told to stop.
+                //
+                // Rethrowing is the whole fix. It must stay ABOVE the general catch — Kotlin
+                // matches catch clauses in order, and below it this clause is dead code.
+                throw e
             } catch (e: Exception) {
                 "transport failure: ${e::class.simpleName}"
             }

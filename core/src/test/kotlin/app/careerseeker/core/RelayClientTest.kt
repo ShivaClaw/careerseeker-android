@@ -408,6 +408,57 @@ class RelayClientTest {
         assertTrue(result is RelayResult.Unavailable)
     }
 
+    // ---------------------------------------------------------------- cancellation
+
+    /**
+     * The counterpart to the test above, and the reason that one is not enough.
+     *
+     * `request`'s retry loop catches `Exception` to turn a dead network into a
+     * [RelayResult.Unavailable]. `CancellationException` **is** an `Exception` on the JVM
+     * (`kotlinx.coroutines.CancellationException` → `kotlin.coroutines.cancellation.CancellationException`
+     * → `java.util.concurrent.CancellationException` → `IllegalStateException`), so the same
+     * `catch` swallows the one signal that must never be converted into a value: the coroutine
+     * that owns this call has been cancelled and is required to stop.
+     *
+     * Cancellation is not a relay outcome. Reporting it as one tells the caller the relay was
+     * unreachable, which is a claim about the network made at the exact moment nothing was asked
+     * of the network at all.
+     */
+    @Test
+    fun `cancellation is not swallowed into an unavailable relay`() = runTest {
+        val engine = MockEngine { throw kotlinx.coroutines.CancellationException("scope cancelled") }
+        val client = RelayClient(
+            HttpClient(engine), "https://relay.careerseeker.app", pairing, bearer,
+            RelayClient.RetryPolicy(attempts = 1, initialDelayMillis = 1, maxDelayMillis = 1),
+        )
+
+        assertFailsWith<kotlinx.coroutines.CancellationException> { client.push("{}") }
+    }
+
+    /**
+     * The same rule under the retry budget a real phone runs, and the case that makes this a
+     * defect rather than a curiosity.
+     *
+     * On every attempt **but the last**, the swallow is masked by accident: the loop's own
+     * `delay()` is itself a cancellation point, so it re-throws and the cancellation escapes.
+     * The final attempt has no `delay()` after it, so there the loop simply runs off the end and
+     * **returns a value from a cancelled coroutine**. That is the window, and it is the widest
+     * one in the sequence — it opens after the longest backoff, which is precisely when a user
+     * is most likely to have backgrounded the app.
+     */
+    @Test
+    fun `cancellation on the final attempt escapes rather than becoming a value`() = runTest {
+        var calls = 0
+        val engine = MockEngine {
+            calls++
+            if (calls < 3) respondError(HttpStatusCode.BadGateway)
+            else throw kotlinx.coroutines.CancellationException("cancelled mid-retry")
+        }
+
+        assertFailsWith<kotlinx.coroutines.CancellationException> { clientOver(engine).push("{}") }
+        assertEquals(3, calls, "the cancellation should have arrived on the final attempt")
+    }
+
     @Test
     fun `a malformed pairing id is refused before any request`() {
         assertFailsWith<IllegalArgumentException> {
