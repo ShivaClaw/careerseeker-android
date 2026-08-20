@@ -118,6 +118,14 @@ sealed interface PullDecision {
  * from here, from one still in flight — so without a release at [onOpen] the latch outlives the
  * thing it was latching for. See [onOpen]'s doc; it is the case that fails silently.
  *
+ * ## A gap is what was never received, not what was never projected
+ *
+ * §6.2's "large gap" is a statement about the *stream*, so it has to be measured against what this
+ * phone has **seen** — not against what its replica chose to **keep**. Those two numbers are the
+ * same only while every published kind is projected, which is true of the engine that exists today
+ * and stops being true the moment a `doc` or `conflict` publisher lands. See [highestHandledSeq];
+ * the gap branch of [onEnvelope] measures against the higher of the two marks for that reason.
+ *
  * Not thread-safe: drive it from the single coroutine that owns the transport loop.
  *
  * @param gapThreshold how large a seq gap must be before it counts as §6.2's "large gap". The
@@ -133,6 +141,26 @@ class PullPolicy(val gapThreshold: Long = DEFAULT_GAP_THRESHOLD) {
     }
 
     private var pending = false
+
+    /**
+     * The highest e2p seq this policy has been **told about**, whatever the replica did with it.
+     *
+     * Deliberately distinct from [ReplicaPosition.highestAppliedSeq], and the distinction is the
+     * whole of the §6.2 rule below. The persisted mark advances only for
+     * [ApplyDisposition.APPLIED] and [ApplyDisposition.APPLIED_SNAPSHOT], so on its own it cannot
+     * tell an envelope the phone **never received** from one it **received and deliberately did
+     * not project** ([ApplyDisposition.IGNORED], [ApplyDisposition.MALFORMED]). §6.2's gap is only
+     * the first of those; measuring against the applied mark alone counted the second as well, and
+     * a run of `gapThreshold + 1` unprojected envelopes then made the *next* projected one report a
+     * `SEQUENCE_GAP` that nothing was missing from — a full snapshot asked for on a healthy
+     * pairing.
+     *
+     * In memory only, and deliberately so: this is a statement about *this process's* receive
+     * history, not a replica fact worth persisting. Losing it at process death is safe, because the
+     * only thing that can do is lower the baseline back to the persisted mark — where this started.
+     * It is not cleared at [onOpen] either; see that method's doc for why.
+     */
+    private var highestHandledSeq = 0L
 
     /** True once a request has been issued and not yet satisfied or released. */
     val hasPendingRequest: Boolean get() = pending
@@ -178,6 +206,15 @@ class PullPolicy(val gapThreshold: Long = DEFAULT_GAP_THRESHOLD) {
      * unconditional rather than cold-only on purpose — a warm replica holding a latched
      * [PullReason.SEQUENCE_GAP] ask across a reconnect has lost it the same way, and gets the same
      * second chance the moment the next gap appears.
+     *
+     * ## What is released is the latch, and only the latch
+     *
+     * [highestHandledSeq] is deliberately **not** cleared here. Those envelopes really were
+     * received; a reopen does not un-receive them, and forgetting them would reinstate the spurious
+     * `SEQUENCE_GAP` this policy just stopped emitting, one reconnect later. Nor does keeping it
+     * hide a real gap opened *across* the downtime: the envelopes on the far side of that gap were
+     * never handled either, so they never raised the mark, and the first envelope past it still
+     * measures the full distance. Pinned by its own test and its own mutation.
      */
     fun onOpen(position: ReplicaPosition): PullDecision {
         // Before the decision, not after: the release must happen even on the warm path that
@@ -195,6 +232,22 @@ class PullPolicy(val gapThreshold: Long = DEFAULT_GAP_THRESHOLD) {
      *   it after would fold this envelope's own seq into the high-water mark and hide every gap.
      */
     fun onEnvelope(
+        envelopeSeq: Long,
+        disposition: ApplyDisposition,
+        positionBefore: ReplicaPosition,
+    ): PullDecision {
+        val decision = decide(envelopeSeq, disposition, positionBefore)
+
+        // After the decision, never before. Folding this envelope's own seq into the baseline it
+        // is about to be measured against would make every gap measure zero -- the same trap the
+        // positionBefore parameter's doc warns about, one field along. Kotlin will not flag the
+        // reordering, so it is pinned by its own mutation.
+        if (envelopeSeq > highestHandledSeq) highestHandledSeq = envelopeSeq
+
+        return decision
+    }
+
+    private fun decide(
         envelopeSeq: Long,
         disposition: ApplyDisposition,
         positionBefore: ReplicaPosition,
@@ -216,8 +269,12 @@ class PullPolicy(val gapThreshold: Long = DEFAULT_GAP_THRESHOLD) {
                 // ask. This also makes the policy correct for a caller that never called onOpen.
                 !positionBefore.snapshotSeen -> request(PullReason.COLD_START)
 
-                envelopeSeq - positionBefore.highestAppliedSeq > gapThreshold ->
-                    request(PullReason.SEQUENCE_GAP)
+                // Against whichever mark is higher: the replica's persisted *applied* seq, or the
+                // highest seq this policy has *handled*. See [highestHandledSeq] -- the two
+                // disagree exactly when the phone received something it chose not to project, and
+                // that is a receipt, not a gap.
+                envelopeSeq - maxOf(positionBefore.highestAppliedSeq, highestHandledSeq) >
+                    gapThreshold -> request(PullReason.SEQUENCE_GAP)
 
                 else -> PullDecision.None
             }

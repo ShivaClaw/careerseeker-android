@@ -123,6 +123,90 @@ class PullPolicyTest {
         }
     }
 
+    // ---- §6.2: what the gap is measured against (F-67-2) ----
+
+    /**
+     * The defect `BLOCKED.md` records as F-67-2. `highestAppliedSeq` advances only for `APPLIED` /
+     * `APPLIED_SNAPSHOT`, so measuring the gap against it alone conflates two different things:
+     * envelopes the phone **never received**, and envelopes it **received and deliberately did not
+     * project**. A run of `gapThreshold + 1` unprojected envelopes therefore made the next
+     * projected one report a `SEQUENCE_GAP` that nothing was missing from — and what follows a
+     * `SEQUENCE_GAP` is a full snapshot requested on a healthy pairing.
+     */
+    @Test
+    fun `a run of unprojected envelopes does not make the next applied one look like a gap`() {
+        val policy = PullPolicy(gapThreshold = 32L)
+        // 33 envelopes the replica sees and does not project: seq 11..43, all IGNORED. The
+        // persisted position never moves, because nothing was applied.
+        for (seq in 11L..43L) {
+            assertEquals(PullDecision.None, policy.onEnvelope(seq, ApplyDisposition.IGNORED, warm))
+        }
+
+        assertEquals(
+            PullDecision.None,
+            policy.onEnvelope(44L, ApplyDisposition.APPLIED, warm),
+            "44 - 10 == 34 against the applied mark, but nothing was missed: 43 was handled",
+        )
+        assertFalse(policy.hasPendingRequest)
+    }
+
+    /**
+     * The same rule for the other disposition that leaves the applied mark still. A malformed
+     * payload is a defect to report rather than a gap to fill — and it is equally not evidence
+     * that anything went missing, because it *arrived*.
+     */
+    @Test
+    fun `a run of malformed envelopes does not make the next applied one look like a gap`() {
+        val policy = PullPolicy(gapThreshold = 32L)
+        for (seq in 11L..43L) {
+            assertEquals(PullDecision.None, policy.onEnvelope(seq, ApplyDisposition.MALFORMED, warm))
+        }
+
+        assertEquals(PullDecision.None, policy.onEnvelope(44L, ApplyDisposition.APPLIED, warm))
+        assertFalse(policy.hasPendingRequest)
+    }
+
+    /**
+     * The negative space, and the reason the fix is not "stop measuring gaps". Envelopes that were
+     * handled raise the baseline; envelopes that were never seen still open a gap above it, and
+     * §6.2 still asks.
+     */
+    @Test
+    fun `a genuine gap after unprojected envelopes is still detected`() {
+        val policy = PullPolicy(gapThreshold = 32L)
+        for (seq in 11L..13L) {
+            assertEquals(PullDecision.None, policy.onEnvelope(seq, ApplyDisposition.IGNORED, warm))
+        }
+
+        assertEquals(
+            PullReason.SEQUENCE_GAP,
+            request(policy.onEnvelope(100L, ApplyDisposition.APPLIED, warm)).reason,
+            "the 86 envelopes between 13 and 100 were neither applied nor handled",
+        )
+    }
+
+    /**
+     * The handled mark survives a reopen, and that is a decision rather than an oversight. Those
+     * unprojected envelopes really were received; forgetting them at the next reconnect would
+     * reinstate exactly the spurious ask above, one reconnect later. A gap that opened *across*
+     * the downtime is still caught, because the envelopes on its far side were never handled
+     * either — which is what the test above pins.
+     */
+    @Test
+    fun `a reopen does not forget the envelopes already handled`() {
+        val policy = PullPolicy(gapThreshold = 32L)
+        for (seq in 11L..43L) {
+            assertEquals(PullDecision.None, policy.onEnvelope(seq, ApplyDisposition.IGNORED, warm))
+        }
+
+        assertEquals(PullDecision.None, policy.onOpen(warm), "a warm replica asks nothing at open")
+        assertEquals(
+            PullDecision.None,
+            policy.onEnvelope(44L, ApplyDisposition.APPLIED, warm),
+            "the reconnect must not turn 33 handled envelopes back into a gap",
+        )
+    }
+
     // ---- dispositions that must not generate traffic ----
 
     @Test
