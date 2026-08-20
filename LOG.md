@@ -13462,3 +13462,153 @@ branch deleted, **no deploy of any kind**. **The production relay was not contac
 even `GET /v1/health`.** No Google, Play or OAuth console; no accounts, no purchases, no keystore,
 no emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory was **read,
 never written**.
+
+---
+
+## RUN 71 — 2026-08-20. The thirty-sixth firing; a question closed in code and read open in the ledger, closed on the ledger
+
+**Fetch first, rule one.** `git fetch --all --prune` in **both** checkouts before anything was read
+or counted. The android tree arrived detached at a stale `main` (`ebfaf81`), **261** commits behind
+this branch's tip — **measured this run** (`git rev-list --count origin/main..HEAD`), not carried
+forward from run 70's **260**. Every number below is post-fetch.
+
+### Milestone 1 — the assigned slice, declined for the thirty-sixth time (C-71-1, C-71-2, C-71-3)
+
+The prompt again assigned S5's spec half: amend §4.3 with the `entitlement_ack` body, add the
+vector via `generate.mjs`, close PQ-A2-1/-2/-3. **It has been built since 2026-08-09.** Verified
+this run rather than inherited from the banner — all three commits exist in the **engine** repo and
+all three report `not on main` (exit **1**): `8575539`, `22b028e`, `7328a0b`.
+
+The pin is `7328a0b`; **the prompt's `679a317` is still stale.** The vendored corpus was measured
+against a fresh clone at that commit, both sides addressed by absolute path (run 69's process
+finding): **`diff -r` silent, `exit=0`, 29 files present on both sides**. **Both ack vectors are
+vendored** — `entitlement-ack.json` and `entitlement-ack-no-order-id.json` — which is what makes
+the phone-side re-vendor half of PQ-A2-5's "To close" line a `done`, not a `todo`.
+
+### Milestone 2 — the slice was on the ledger, not the code: PQ-A2-5's phone half read open
+
+**PQ-A2-5's phone-side half has been closed since 2026-08-12** by the re-vendor to pin `7328a0b`
+and by commit `60a20d5` ("S5: make the phone READ the ack vectors, closing PQ-A2-5 on this side").
+`EntitlementAckTest`'s two bodies are `ackPlaintext("entitlement-ack")` and
+`ackPlaintext("entitlement-ack-no-order-id")` — loaded from the classpath, decrypted through
+`SyncCrypto.open`, and pinned by a compact-JSON byte-level test that would have failed the old
+line-wrapped transcription. `ProtocolVectorsTest:242` — *"entitlement ack vectors decrypt to the
+exact bytes that unlock Pro"* — enumerates every `type == "entitlement_ack"` vector from
+`index.json`, round-trips the plaintext in a sorted-key canonical form, and reads the optional
+`order_id` off the vector so an omission and a `null` remain distinguishable.
+
+**`docs/protocol-questions.md` §PQ-A2-5 did not say so.** Its table still read *"phone
+transcribes the two bodies verbatim into the test source; the vector files are never opened"*,
+and its "Until it closes" caveat still asked readers not to cite the ack vectors as
+cross-implementation evidence. The prescription's stated blocker — *"neither doable in a session
+that cannot run `:core:test` (B-7)"* — is also stale: **B-7 was scope-corrected on 2026-08-11**
+(BLOCKED.md:850) to say it never covered `:core`, and `:core:test` has run in every cloud session
+since via `scripts/core-probe.sh`.
+
+**That is doc/verifier drift by the strict CLAUDE.md definition** — the entry in the ledger says
+one thing, the code says another — and it is the same shape the run 70 process finding named:
+*"`BLOCKED.md` and `protocol-questions.md` are inputs to a slice, not just outputs of one."* A
+question that reads open when it is half-closed will send the next reader hunting for a phantom,
+which is exactly what happened when run 70 wrote a `key_id` guard that PQ-AAD-1 had already ruled
+against a week earlier. The cost of not closing PQ-A2-5's phone half on the ledger is that
+someone will re-do the re-vendor, or re-do the test rewrite, or cite the caveat and steer past a
+vector that would have caught a real drift.
+
+### Milestone 3 — what changed on the ledger, and what did not (C-71-4, C-71-5, C-71-7)
+
+`docs/protocol-questions.md` gains a `### CLOSED IN PART 2026-08-20 (seventy-first cloud
+iteration) — the phone half, executed` section under PQ-A2-5. It records:
+
+1. **The vendored evidence** — pin `7328a0b`, both ack vectors present, corpus 29/29 byte-identical
+   to the pin measured this run against a fresh clone.
+2. **The test-side evidence** — `EntitlementAckTest`'s `ackPlaintext` reader, landed by `60a20d5`,
+   with the byte-level compact-JSON pin the old transcription could not pass; and
+   `ProtocolVectorsTest:242`'s cross-implementation ack test, which is exactly the vector-driven
+   assertion the "To close" section asked for.
+3. **The three-line "prescription vs actual" table**, item by item — re-vendor done, test rewrite
+   done, "cannot run `:core:test`" removed by B-7's scope correction.
+4. **What stays open**: §10.2 of the normative `docs/Sync-Protocol.md` — on the engine repo's
+   `claude/s2-*` branches — still carves the ack vectors out as evidence about *one* implementation,
+   and this run does not amend it. Same interpretation rule that kept run 70 out of §4.1's AAD:
+   do not amend a normative wire document unilaterally. **The main-repo half of PQ-A2-5 is still
+   open.**
+
+Nothing changes in `:core`, in `:app`, in the vendored corpus, in the pin, in `ci.yml`, in the
+generator, or on any engine branch. **The only edits are `docs/protocol-questions.md`, `LOG.md`,
+`AUDIT-REQUEST.md`, `STATE.md`, and the engine repo's docs-only `autonomy/claude-state:STATE.md`.**
+
+### Milestone 4 — evidence, executed rather than reasoned (C-71-6)
+
+Ran `scripts/core-probe.sh` on a clean worktree, no code change, after installing `openjdk-17-jdk-
+headless` in this disposable container (`api.foojay.io` is denied by the same egress policy as
+`dl.google.com`, so Gradle's toolchain auto-provisioning cannot fetch a JDK 17):
+
+```
+core-probe: running :core:test against /home/user/careerseeker-android/core (no Android SDK, no google() repo)
+...
+BUILD SUCCESSFUL in 1m 28s
+5 actionable tasks: 5 executed
+core-probe: 334 tests, 0 failed, 0 skipped, across 22 classes
+```
+
+**`334 tests, 0 failed, 0 skipped, across 22 classes`** — identical to run 70's post-fix count.
+`:core` is unchanged, and this run's edits do not touch anything Gradle compiles or tests, so the
+count carrying is the correct outcome. **This is `:core:test` only** — the other four gate tasks
+(`:app:assembleDebug`, `:app:lintDebug`, `:app:test`, `checkCoreIsAndroidFree`) need the Android
+SDK and did not run (**B-7**); no zero-warning claim is made. `Verify-Alpha.ps1` did not run and
+could not — no `pwsh`, no `dotnet`, and it is a Windows gate.
+
+### Milestone 5 — freshness, and the standing state is unmoved (C-71-8)
+
+| | measured, post-fetch |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`**, unmoved since 2026-08-12 |
+| android `origin/main` | **`ebfaf81`** |
+| engine PRs | **18 open, all draft** — `#26`, `#32`–`#39`, `#45`–`#53` |
+| android PRs | **6 open, all draft** — `#1`–`#6`; **`#6`** carries this branch |
+| **#32** (the assigned slice) and **#53** (H1) | both still open, still draft |
+| Terra (`autonomy/codex-state`) | **COMPLETE**, *files claimed: none* — **no collision** |
+| vendored corpus | **29/29 byte-identical** to pin `7328a0b`, `diff -r` silent, `exit=0` |
+
+**Both PR counts were measured this run via the GitHub API, not carried forward.** The drift check
+was run with **absolute paths on both sides**, per run 69's process finding.
+
+**No rung moved, and none is claimed to have.** This is the record catching up to code, not a
+rung advance. **B-19 is unmoved: no `:app` file was written.** **B-21 was not exercised this run**
+— no repeated Maven fetches, no baseline to observe a 429 against — and stays open exactly as
+runs 67 through 70 concluded from the same posture.
+
+### Milestone 6 — process note
+
+**A question that reads open when it is half-closed is not neutral.** It steers the next slice
+away from the surface the closure would have re-verified, and it counts as evidence against the
+implementation surface that already closed it. The last five runs each closed a small `:core`
+runtime defect and correctly refused to touch the wider wire surface; the honest generalization is
+that the audit trail can drift the same way, and closing that drift is a legitimate slice on the
+same discipline. **The one edit that would have saved run 70 half its work is the same shape as
+this slice: reading `protocol-questions.md` for status, not just for background.**
+
+### Milestone 7 — prohibition paragraph: what this run did not touch
+
+**Nothing was merged, closed, rebased, undrafted or force-pushed in either repo**; the **18**
+engine PRs and the **6** android drafts are exactly as found, and **#53's fate stays Brandon's**.
+**No vector byte was written in either repo** — corpus **29/29** byte-identical to pin `7328a0b`,
+`VECTORS.lock` not edited, **the pin did not move (H7)**. **No `.kt`, `.kts`, `.json`, `.yml`,
+`.mjs`, or `.sh` file was written in either repo.** **`EnvelopeHeader.aad()` was not touched**,
+nor was any receive path: `EnvelopeJson`, `EnvelopeReceiver`, `SyncCrypto`, `EntitlementAckTest`,
+`ProtocolVectorsTest` are unmodified, so nothing this run did can make the phone reject an
+envelope it used to accept. **No `:app` file was written** — not one; **B-19** stays open. **No
+C# was written** — the engine checkout was read-only and left detached where it was found, apart
+from `STATE.md` on the docs-only `autonomy/claude-state` branch. **No `generate.mjs`, no
+`docs/Sync-Protocol.md`, no `ci.yml`, no `$ExpectedOfflineTotal` move**, and **no nineteenth
+engine PR was opened**. **`Verify-Alpha.ps1` was not run and no result for it is claimed** — no
+`pwsh`, no `dotnet`, and it is a Windows gate besides. **The android gate was not run**: only
+`:core:test` executed, via `scripts/core-probe.sh`; **`:app:assembleDebug`, `:app:lintDebug`,
+`:app:test` and `checkCoreIsAndroidFree` are unrun and unclaimed** (**B-7**), and **no
+zero-warning claim is made** — the two `No cast needed` warnings in `PairingSessionTest.kt:53` and
+`RelayClientTest.kt:383` are pre-existing in files this run did not touch. The only host mutation
+was **`apt-get update` + `openjdk-17-jdk-headless`** inside a disposable container. No history
+rewrite, no branch deleted, **no deploy of any kind**. **The production relay was not contacted
+at all, not even `GET /v1/health`.** No Google, Play or OAuth console; no accounts, no purchases,
+no keystore, no emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory
+was **read, never written**.

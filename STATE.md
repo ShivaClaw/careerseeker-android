@@ -2,11 +2,63 @@
 
 > **READ [`RETURN-DAY.md`](RETURN-DAY.md) FIRST — it is the window's closing handoff, and the
 > mission's stop condition is already met.** Written at run 47; re-verified green at runs 48, 49,
-> **50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 and 70**. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
+> **50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70 and 71**. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **thirty-five**
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **thirty-six**
 > runs have now been assigned it. **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
+>
+> ## ▶ RUN 71 — 2026-08-20. Thirty-sixth firing; a question closed in code and read open in the ledger, closed on the ledger.
+>
+> **Fetch first: both checkouts again arrived detached at a stale `main`** — the android tree at
+> `ebfaf81`, **261** commits behind this branch's tip, **measured this run**
+> (`git rev-list --count origin/main..HEAD`), not carried forward from run 70's **260**. Every
+> number below is post-fetch.
+>
+> **Declined for the thirty-sixth time and verified instead** (**C-71-1**, **C-71-2**): all three
+> slice commits exist and report `not on main` (exit **1**) in the **engine** repo. The pin is
+> **`7328a0b`**; the vendored corpus is **29/29 byte-identical** to it against a fresh clone
+> (`diff -r` silent, `exit=0`), **both sides addressed by absolute path** (run 69's process
+> finding). Both ack vectors are vendored (**C-71-3**).
+>
+> **The slice taken instead was on the ledger, not in the code.** **PQ-A2-5's phone half has
+> been closed since 2026-08-12** — the re-vendor to `7328a0b` (`056a1dd`) and commit `60a20d5`
+> (*"S5: make the phone READ the ack vectors"*) satisfied every line of the question's own "To
+> close" prescription — **and `docs/protocol-questions.md` still read as if it were open**, table
+> still saying *"phone transcribes... vector files are never opened"*, caveat still saying *"do
+> not cite the ack vectors as cross-implementation evidence"*. That is doc/verifier drift by the
+> strict CLAUDE.md definition, and it is the same shape as run 70's closing process finding:
+> **`protocol-questions.md` is an input to a slice, not just an output of one.**
+>
+> **What changed** (**C-71-4**, **C-71-5**, **C-71-7**). `docs/protocol-questions.md` §PQ-A2-5
+> gains `### CLOSED IN PART 2026-08-20 (seventy-first cloud iteration) — the phone half, executed`.
+> It records the two code sites — `EntitlementAckTest`'s `ackPlaintext` reader (`60a20d5`) and
+> `ProtocolVectorsTest:242`'s cross-implementation `entitlement ack vectors decrypt to the exact
+> bytes that unlock Pro` — and a three-line "prescription vs actual" table showing the re-vendor,
+> the test rewrite, and B-7's scope correction. **What stays open**: §10.2 of the normative
+> `docs/Sync-Protocol.md`, on the engine repo's `claude/s2-*` branches, still carves the ack
+> vectors out as one-implementation evidence, and this run does not amend it. Same interpretation
+> rule that kept run 70 out of §4.1's AAD.
+>
+> **Evidence, executed rather than reasoned** (**C-71-6**). `scripts/core-probe.sh` on a clean
+> worktree, no code change: **`BUILD SUCCESSFUL`, `core-probe: 334 tests, 0 failed, 0 skipped,
+> across 22 classes`** — identical to run 70's post-fix count. `:core` is unchanged, so the count
+> carrying is the correct outcome. **This is `:core:test` only** (**B-7**); no zero-warning claim
+> is made. `Verify-Alpha.ps1` did not run and could not — Windows gate, no `pwsh`, no `dotnet`.
+>
+> **Standing state unmoved** (**C-71-8**). `main` **`aac05f3`** / **`ebfaf81`**; **18 engine + 6
+> android PRs open and draft**, none merged, closed or undrafted; **#32** and **#53** both open;
+> both counts **measured this run** via the API. Terra: **COMPLETE, files claimed: none**. **No
+> vector byte was written** — corpus 29/29 identical, `VECTORS.lock` not edited, pin not moved.
+> **No rung moved** — the record catching up to code, not a rung advance; **B-19 unmoved, no
+> `:app` file written**. **B-21 was not exercised this run** and stays open, same posture as
+> runs 67 through 70.
+>
+> **One process note**: the last five runs correctly refused to touch the wire surface and each
+> closed a small `:core` runtime defect. The honest generalization is that the audit trail can
+> drift the same way, and closing that drift is a legitimate slice on the same discipline. The
+> one edit that would have saved run 70 half its work is the same shape as this slice: reading
+> `protocol-questions.md` for **status**, not just for background.
 >
 > ## ▶ RUN 70 — 2026-08-20. Thirty-fifth firing; the header's two surfaces, and the one that was not mine to change.
 >

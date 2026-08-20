@@ -1612,6 +1612,67 @@ this is not a blocker.
 **Until it closes**, `docs/Sync-Protocol.md` §10.2 says in the document itself that these vectors are
 evidence about **one** implementation. Do not cite the ack vectors as cross-implementation evidence.
 
+### CLOSED IN PART 2026-08-20 (seventy-first cloud iteration) — the phone half, executed
+
+**The phone-side half of this question is closed on this branch and has been for a while**; the
+main-repo half (§10.2's "one implementation" carve-out, and the parallel enforcement in
+`SyncHarness`) stays open, so the question is not fully retired. The reason this section exists
+today is that the entry above still reads as if the whole thing is open — the doc/verifier drift
+CLAUDE.md names by name — and run 70's closing process finding was that
+`docs/protocol-questions.md` is an **input** to a slice, not just an output of one. A question
+that is closed in code but reads open in the ledger sends the next reader hunting for a phantom.
+
+**What actually holds on the phone side, measured this run.**
+
+1. **The vectors are vendored.** `core/src/test/resources/sync-vectors/VECTORS.lock` is pinned at
+   main-repo commit `7328a0bc043335491cd96a67d634e8eea2a13af9` (pin moved from `679a317` on
+   2026-08-12 with the re-vendor `056a1dd`). Both ack vectors are present in
+   `core/src/test/resources/sync-vectors/v1/`: `entitlement-ack.json` and
+   `entitlement-ack-no-order-id.json`. The vendored corpus is **29/29 byte-identical to the pin**
+   (`diff -r` silent, exit 0), measured against a fresh clone this run.
+2. **`EntitlementAckTest` reads the vectors rather than transcribing them.** The two grant bodies
+   `ackWithOrderId` and `ackNoOrderId` are produced by `ackPlaintext(name)` at
+   `core/src/test/kotlin/app/careerseeker/core/EntitlementAckTest.kt:51-64`, which loads
+   `sync-vectors/v1/$name.json` off the classpath, reads `key_hex` / `nonce_b64u` / `aad` /
+   `ciphertext_b64u`, and returns whatever `SyncCrypto.open` yields. **No literal body appears in
+   the source.** Landed by `60a20d5` (*"S5: make the phone READ the ack vectors, closing PQ-A2-5
+   on this side"*), and pinned by `the grant bodies are the vectors' own bytes and not a
+   re-wrapped copy` — a byte-level compact-JSON check that fails on the exact whitespace-drift
+   defect the old transcription had.
+3. **`ProtocolVectorsTest` has the cross-implementation ack test the "To close" section asked
+   for.** `entitlement ack vectors decrypt to the exact bytes that unlock Pro` at
+   `core/src/test/kotlin/app/careerseeker/core/ProtocolVectorsTest.kt:242-274` enumerates every
+   vector with `type == entitlement_ack` from `index.json`, decrypts `ciphertext_b64u` under the
+   vector's own key / nonce / AAD, and asserts the round-trip against `plaintext_json` in a
+   sorted-key canonical form, then round-trips `product_id`, `acknowledged_at` and the
+   optional `order_id` — the last read straight off the vector as `body["order_id"]?...content`,
+   so an omitted `order_id` and a `null` `order_id` remain distinguishable. The applier's grant
+   is asserted, and the two acks are asserted to be **byte-equal grants** — the property the
+   original question said had to be pinned.
+
+**The three points the "To close" prescription asked for, item by item.**
+
+| step | prescribed | actual |
+| --- | --- | --- |
+| re-vendor `docs/sync-vectors/` at a commit that includes the ack vectors | 2026-08-12 (`056a1dd`, pin `7328a0b`), corpus 29/29 identical to the pin this run | **done** |
+| convert transcribed constants to vector-driven assertion | `EntitlementAckTest` reads via `ackPlaintext`; `ProtocolVectorsTest:242` is the cross-implementation assertion the question named | **done** |
+| the reason it could not be done at the time (*"neither doable in a session that cannot run `:core:test` (B-7)"*) | **B-7 was scope-corrected 2026-08-11**: it never covered `:core`, and `:core:test` has run in every cloud session since via `scripts/core-probe.sh` | **removed** |
+
+**What is not closed here, deliberately.** §10.2 of the normative `docs/Sync-Protocol.md`, which
+lives on the engine repo's `claude/s2-*` branches, still carves the ack vectors out as
+one-implementation evidence. That is a normative wire-document change and belongs on an engine
+branch, not on this phone branch — the same interpretation rule that keeps this session out of
+§4.1's AAD: do not amend a normative document unilaterally. The engine's `SyncHarness` also
+reads the ack vectors and asserts byte-identity on the seal side; nothing in this run touched
+that half. **The main-repo half of PQ-A2-5 is still open.**
+
+**Executed, this run** (`:core:test` via `scripts/core-probe.sh`, JDK 17 present):
+**`BUILD SUCCESSFUL`, `core-probe: 334 tests, 0 failed, 0 skipped, across 22 classes`** —
+unchanged from run 70's post-fix count. No code changed this run; the closure is on the record,
+not on the executable. **Nothing here regresses the previous seventy runs.**
+
+**Re-verification:** `AUDIT-REQUEST.md` **C-71-1..8**.
+
 ---
 
 ## PQ-CUR-1 — §6.4's carve-out is drawn for parse failures, and a failed AEAD tag falls through it

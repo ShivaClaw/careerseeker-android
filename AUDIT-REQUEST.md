@@ -12666,3 +12666,170 @@ cd <android> && sed -n '33,45p' scripts/core-probe.sh
 zero-warning claim is made**: `PairingSessionTest.kt:53` and `RelayClientTest.kt:383` emit
 `No cast needed`, pre-existing, in files this run did not touch. **`Verify-Alpha.ps1` did not run
 and could not** — no `pwsh`, no `dotnet`, and it is a Windows gate.
+
+---
+
+## Run 71 — the ledger's turn: PQ-A2-5's phone half is closed in code and read open in the ledger
+
+Every claim run 71 made has a command below. The slice was documentation, not code — the "To close"
+prescription in `docs/protocol-questions.md` §PQ-A2-5 was satisfied on 2026-08-12 by the re-vendor
+and by commit `60a20d5` on the phone side, and its own entry did not say so. Nothing here changes
+`.kt`, `.kts` or any generated artefact; the only edits are `docs/protocol-questions.md` (adds
+`### CLOSED IN PART`), `LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`, and the engine repo's docs-only
+`autonomy/claude-state` branch.
+
+### C-71-1 — the assigned S5 spec slice is still not on `main` in the engine repo
+
+> **Claim.** Same as C-70-1 (thirty-sixth firing): the three commits the recurring prompt names as
+> "S5 spec half to build" — `8575539`, `22b028e`, `7328a0b` — exist in `ShivaClaw/careerseeker` and
+> report `not on main` (exit **1**) this run. The gap is landing, not building; landing needs a
+> Windows gate (**B-18**).
+
+```bash
+cd <careerseeker> && git fetch --all --prune >/dev/null && \
+  for c in 8575539 22b028e 7328a0b; do \
+    printf '%s: ' "$c"; git cat-file -t $c && \
+      git merge-base --is-ancestor $c origin/main && echo "  on main" || echo "  not on main"; \
+  done
+```
+
+*Expected, and **observed**:* three commits, each `commit` typed, each `not on main` — the exact
+result run 70 saw, and runs 47..70 before it.
+
+### C-71-2 — the pin is `7328a0b`, and the vendored corpus is byte-identical to it
+
+> **Claim.** `VECTORS.lock` names `7328a0bc043335491cd96a67d634e8eea2a13af9`; the vendored
+> `core/src/test/resources/sync-vectors/v1/` is **29 files, `diff -r` silent** against a fresh
+> checkout of that commit's `docs/sync-vectors/v1/`.
+
+```bash
+cd <android> && awk '/^# Pinned commit:/ {print $NF; exit}' core/src/test/resources/sync-vectors/VECTORS.lock
+# separately, in a scratch dir:
+git clone --depth 1 --branch main https://github.com/ShivaClaw/careerseeker fresh-cs
+cd fresh-cs && git fetch --depth 1 origin 7328a0bc043335491cd96a67d634e8eea2a13af9 && \
+  git checkout 7328a0bc043335491cd96a67d634e8eea2a13af9 -- docs/sync-vectors/v1
+cd .. && diff -r <android>/core/src/test/resources/sync-vectors/v1 fresh-cs/docs/sync-vectors/v1; echo exit=$?
+ls <android>/core/src/test/resources/sync-vectors/v1 | wc -l
+```
+
+*Expected, and **observed**:* `7328a0bc043335491cd96a67d634e8eea2a13af9`, `exit=0`, `29`. **Both
+sides addressed by absolute path** (run 69's process finding).
+
+### C-71-3 — both ack vectors are vendored, by name
+
+> **Claim.** `entitlement-ack.json` and `entitlement-ack-no-order-id.json` are present in the
+> vendored corpus. This is what makes the phone-side re-vendor half of PQ-A2-5's "To close" line a
+> `done`.
+
+```bash
+cd <android> && ls core/src/test/resources/sync-vectors/v1/ | grep -E '^entitlement-ack'
+```
+
+*Expected, and **observed**:* `entitlement-ack-no-order-id.json`, `entitlement-ack.json`.
+
+### C-71-4 — `EntitlementAckTest` reads the vectors, not transcribes them
+
+> **Claim.** `ackWithOrderId` and `ackNoOrderId` are produced by `ackPlaintext(name)`, which loads
+> `sync-vectors/v1/$name.json` and returns whatever `SyncCrypto.open` decrypts — **no literal body
+> appears in the source**. Landed by `60a20d5` (*"S5: make the phone READ the ack vectors, closing
+> PQ-A2-5 on this side"*), and pinned by a byte-level compact-JSON test the old transcription
+> could not pass.
+
+```bash
+cd <android> && sed -n '45,80p' core/src/test/kotlin/app/careerseeker/core/EntitlementAckTest.kt
+cd <android> && git log --oneline --all -- core/src/test/kotlin/app/careerseeker/core/EntitlementAckTest.kt | head
+```
+
+*Expected, and **observed**:* `ackPlaintext` reads the classpath resource and calls
+`SyncCrypto.open`; the commit list includes `60a20d5 S5: make the phone READ the ack vectors,
+closing PQ-A2-5 on this side` and, earlier, `13d7318 S5 phone half: the entitlement_ack applier`.
+
+### C-71-5 — `ProtocolVectorsTest` has the cross-implementation ack test §PQ-A2-5 asked for
+
+> **Claim.** `ProtocolVectorsTest:242` — `entitlement ack vectors decrypt to the exact bytes that
+> unlock Pro` — enumerates every `type == entitlement_ack` vector from `index.json`, decrypts each
+> under the vector's own key/nonce/AAD, round-trips against `plaintext_json` in a sorted-key
+> canonical form, and reads `product_id`, `acknowledged_at`, and the **optional** `order_id`
+> straight off the vector (so an omitted `order_id` and a `null` `order_id` remain
+> distinguishable). It asserts both acks grant byte-equal `ProState`, which is the exact property
+> the question said had to be pinned across implementations.
+
+```bash
+cd <android> && sed -n '225,275p' core/src/test/kotlin/app/careerseeker/core/ProtocolVectorsTest.kt
+```
+
+*Expected, and **observed**:* the section starts with `// ---- entitlement acks`, filters
+`type == "entitlement_ack"` from the manifest, and the test does the exact-byte plaintext
+round-trip described above.
+
+### C-71-6 — B-7 was scope-corrected and `:core:test` is green at 334
+
+> **Claim.** The reason PQ-A2-5's "To close" thought the work undoable — *"neither doable in a
+> session that cannot run `:core:test` (B-7)"* — is out of date: B-7 was scope-corrected
+> 2026-08-11 (BLOCKED.md:850) to say it never covered `:core`, and `:core:test` runs here via
+> `scripts/core-probe.sh`. Executed this run, on a clean worktree, no code change:
+> **`BUILD SUCCESSFUL`, `core-probe: 334 tests, 0 failed, 0 skipped, across 22 classes`**,
+> unchanged from run 70's post-fix count.
+
+```bash
+cd <android> && sed -n '850,860p' BLOCKED.md
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+cd <android> && bash scripts/core-probe.sh 2>&1 | tail -5
+```
+
+*Expected, and **observed**:* BLOCKED.md carries the scope-correction; `core-probe.sh` prints
+`core-probe: 334 tests, 0 failed, 0 skipped, across 22 classes` and `BUILD SUCCESSFUL`.
+
+### C-71-7 — the main-repo half stays open, deliberately
+
+> **Claim.** §10.2 of `docs/Sync-Protocol.md` — the normative wire doc, on the engine repo's
+> `claude/s2-*` branches — still carves the ack vectors out as evidence about *one*
+> implementation. **This branch does not change that**, and nothing this run touches the
+> `SyncHarness` side either. That is the same interpretation rule that kept run 70 out of §4.1's
+> AAD: do not amend a normative wire document unilaterally.
+
+```bash
+cd <careerseeker> && git grep -n 'entitlement' -- 'docs/Sync-Protocol.md' | head
+cd <careerseeker> && git log --oneline --all --diff-filter=M -- docs/Sync-Protocol.md \
+  | grep -v -f <(git log --oneline origin/main -- docs/Sync-Protocol.md | awk '{print $1}') | head
+```
+
+*Expected, and **observed**:* the ack sections live on the `claude/s5-*` and `claude/s2-*`
+branches and are not on `main`; nothing since run 70 has been pushed by this session to any file
+under `docs/Sync-Protocol.md` — the engine checkout was read-only this run apart from the
+docs-only `autonomy/claude-state` heartbeat.
+
+### C-71-8 — freshness and the standing state (measured, not carried forward)
+
+> **Claim.** engine `origin/main` **`aac05f3`**, unmoved since 2026-08-12; android `origin/main`
+> **`ebfaf81`**; **18 engine PRs open, all draft** (`#26, #32–#39, #45–#53`); **6 android PRs
+> open, all draft** (`#1–#6`, this branch is `#6`); Terra (`autonomy/codex-state:STATE.md`)
+> **COMPLETE, files claimed: none** — no collision.
+
+```bash
+cd <careerseeker> && git rev-parse origin/main
+cd <android> && git rev-parse origin/main
+# via MCP: mcp__github__list_pull_requests(owner=ShivaClaw, repo=careerseeker,        state=open, perPage=30)
+# via MCP: mcp__github__list_pull_requests(owner=ShivaClaw, repo=careerseeker-android, state=open, perPage=20)
+cd <careerseeker> && git show origin/autonomy/codex-state:STATE.md | head -10
+```
+
+*Expected, and **observed**:* `aac05f3f93f0ca06cbc9dfa7884f74a126f078dc` / `ebfaf81…`, the PR
+lists above, and *"Current rung: COMPLETE. R0, R1, R4, R5, R6(a), R6(c), R6(d), and R7 are
+DONE... Files claimed: none"*.
+
+### C-71-9 — the bound: `:core:test` only, no code changed
+
+> **Claim.** No `.kt`, `.kts`, `.json`, `.yml`, `.sh`, or generated artefact was written by run
+> 71. The only edits are `docs/protocol-questions.md`, `LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`,
+> and the engine repo's `autonomy/claude-state:STATE.md`. **`:core:test` was executed as
+> evidence, not as a fix.** **The android gate did not run**: `:app:assembleDebug`,
+> `:app:lintDebug`, `:app:test` and `checkCoreIsAndroidFree` are unrun and unclaimed (**B-7**),
+> and **no zero-warning claim is made**. **`Verify-Alpha.ps1` did not run and could not** — no
+> `pwsh`, no `dotnet`, and it is a Windows gate.
+
+```bash
+cd <android> && git diff --stat origin/claude/android-a0-probe..HEAD
+```
+
+*Expected, and **observed**:* the diff touches only the five files named above.
