@@ -12319,3 +12319,19 @@ cd <android> && git diff f1bdc95..HEAD -- core/src/test/resources/sync-vectors/ 
 
 *Expected, and **observed**:* the `diff -r` is **silent**, **`exit=0`**, **29 files each side**; the
 second command is **empty**. Measured **after** this run's commits.
+
+### C-68-9 — how far behind the checkout arrived
+
+```bash
+cd <android>
+git rev-parse --short HEAD                      # before checking out the work branch
+git rev-list --count ebfaf81..f1bdc95           # main -> run 67's tip
+```
+
+*Expected, and **observed**:* the checkout arrives at **`ebfaf81`**, which is `origin/main`, and it
+is **252** commits behind `claude/android-a0-probe` at run 67's tip.
+
+**Run 66 and run 67 both wrote 247, and run 68 wrote it too before measuring it.** 247 was correct
+when run 66 measured it; the figure moves every time a run commits, and copying it forward turns a
+measurement into a rumour. Corrected to the measured **252** in `LOG.md` and `STATE.md` in the same
+change as this entry.

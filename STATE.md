@@ -11,7 +11,8 @@
 > ## ▶ RUN 68 — 2026-08-20. Thirty-third firing; a §6.2 gap measured against the wrong mark, closed in `:core`.
 >
 > **Fetch first: both checkouts again arrived detached at a stale `main`** — the android tree at
-> `ebfaf81`, **247** commits behind its own work branch. Every number below is post-fetch.
+> `ebfaf81`, **252** commits behind its own work branch — **measured this run** (`git rev-list --count
+> ebfaf81..f1bdc95`), not carried forward from run 66's **247**. Every number below is post-fetch.
 >
 > **Declined for the thirty-third time and verified instead** (**C-68-1**): all three slice commits
 > exist and report `not on main` (exit **1**) — run this in the **engine** repo. The pin is

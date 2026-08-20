@@ -12906,7 +12906,8 @@ written**.
 
 **Rule one first.** `git fetch --all --prune` in **both** checkouts before a single number was
 taken. Both again arrived **detached at a stale `main`** — the android checkout at `ebfaf81`, which
-is `main`, not the work branch, and **247 commits behind** `claude/android-a0-probe`. Every figure
+is `main`, not the work branch, and **252 commits behind** `claude/android-a0-probe` — measured this
+run (`git rev-list --count ebfaf81..f1bdc95`), not carried forward from run 66's 247. Every figure
 below is post-fetch.
 
 ### Milestone 1 — the assigned slice was declined for the thirty-third time, and verified rather than assumed (C-68-1, C-68-2)
