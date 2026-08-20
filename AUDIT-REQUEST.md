@@ -12136,10 +12136,18 @@ Full symptom and reproduction in `BLOCKED.md`. **Neither is claimed as fixed.**
 cd <engine>  && git rev-parse --short origin/main    # aac05f3
 cd <android> && git rev-parse --short origin/main    # ebfaf81
 cd <engine>  && git show origin/autonomy/codex-state:STATE.md | head -20
+# PR counts — measured via the GitHub API, both repos, state=open:
+#   ShivaClaw/careerseeker          -> 18 open, all draft
+#   ShivaClaw/careerseeker-android  ->  6 open, all draft
 ```
 
-*Expect:* the two SHAs above; **6 android PRs, all open, all draft**; Terra **COMPLETE, files
-claimed: none**.
+*Expected, and **observed**:* the two SHAs above; **18 engine PRs, all open, all draft** —
+`#26, #32..#39, #45..#53`, with **#32** (the assigned slice) and **#53** (H1) both still open;
+**6 android PRs, all open, all draft** — `#1..#6`; Terra **COMPLETE, files claimed: none**.
+
+**The engine count was measured this run, not carried forward.** It is recorded here because the
+LOG's prohibition paragraph asserts "the 18 engine PRs … are exactly as found", and an inherited
+count stated as a measurement is precisely the drift this file exists to stop.
 
 ### C-67-9 — no vector byte written
 
