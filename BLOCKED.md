@@ -3293,3 +3293,39 @@ Only `:core:test` ran, via `scripts/core-probe.sh`. **`:app:assembleDebug`, `:ap
 None was acted on, narrowed or re-attempted. **B-18** fired for the **thirty-fifth** time and its
 premise is unchanged: the work exists, the landing needs a Windows gate. **B-19** is unmoved — **no
 `:app` file was written this run.**
+
+---
+
+## No new blocker arose 2026-08-20 (PQ-A2-6, seventy-second cloud iteration)
+
+**Nothing this run is blocked, and PQ-A2-6 is deliberately NOT filed here.** It needs a
+**decision** — whether an absent optional field may be spelled as an explicit JSON `null` — and a
+decision with an owner is a gate in `docs/protocol-questions.md`, not a blocker. Calling it
+BLOCKED would send the next session hunting for a missing tool or a denied permission, when what
+is missing is one sentence in §3 and §4.3.3 that only Brandon can authorise. Everything this run
+set out to do, it did.
+
+**What was reachable and was done:** `node docs/sync-vectors/generate.mjs --check` on both
+`origin/main` and pin `7328a0b`; the 29/29 corpus diff, twice; `:core:test` four times
+(baseline, post-change, and once per mutation); the two-mutation negative control. **All of it
+executed here.**
+
+### B-7 status 2026-08-20 (seventy-second run) — reproduced, and one detail is new
+
+Unchanged in substance and it bounded exactly the usual claims: `:app:assembleDebug`,
+`:app:lintDebug`, `:app:test` and `checkCoreIsAndroidFree` did not run and are unclaimed; no
+zero-warning claim is made; `Verify-Alpha.ps1` did not run and could not (no `pwsh`, no `dotnet`,
+Windows gate).
+
+**New detail worth carrying:** this sandbox shipped **JDK 21**, not 17, and `:core` pins
+`jvmToolchain(17)`, so `scripts/core-probe.sh` refused to start until
+`openjdk-17-jdk-headless` was installed — the same per-session `apt-get` the twentieth run logged.
+A JDK being *present* is not the same as the *pinned* JDK being present, and a session that checks
+`which java` and stops there will conclude it can run `:core:test` when it cannot.
+
+### B-19, B-21 — untouched this run
+
+**B-19** unmoved: **no `:app` file was written**, so the `ProStateStore` implementation, the
+`knownProductIds` set and the composition root are exactly as they were. **B-21** was not
+exercised — no repeated Maven fetches beyond the four ordinary probe runs, no 429 observed — and
+**stays open**, the same posture runs 67 through 71 reached from the same evidence.

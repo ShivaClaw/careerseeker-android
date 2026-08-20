@@ -13612,3 +13612,194 @@ rewrite, no branch deleted, **no deploy of any kind**. **The production relay wa
 at all, not even `GET /v1/health`.** No Google, Play or OAuth console; no accounts, no purchases,
 no keystore, no emulator, no Gmail. **No secret was read, printed or echoed.** Terra's territory
 was **read, never written**.
+
+---
+
+## RUN 72 — 2026-08-20. The thirty-seventh firing; "optional" has two spellings, and `:core` reads them both
+
+**Fetch first, rule one.** `git fetch --all --prune` in **both** checkouts before anything was
+read or counted. Both again arrived detached at a stale `main` — the android tree at `ebfaf81`,
+**262** commits behind this branch's tip, **measured this run**
+(`git rev-list --count origin/main..HEAD`), not carried forward from run 71's **261**. Every
+number below is post-fetch.
+
+### Milestone 1 — the assigned slice, declined for the thirty-seventh time (C-72-1, C-72-2)
+
+The prompt again assigned S5's spec half: amend §4.3 with the `entitlement_ack` body, add the
+vector via `generate.mjs`, close PQ-A2-1/-2/-3. **It has been built since 2026-08-09.** Verified
+rather than inherited: all three commits exist in the **engine** repo and all three report
+`not on main` (exit 1) — `8575539`, `22b028e`, `7328a0b`.
+
+The prompt's pin `679a317` is **still stale** — it is `7328a0b`, and has been since 2026-08-12.
+`node docs/sync-vectors/generate.mjs --check` is the one protocol gate this environment genuinely
+owns, and it was run on both sides: **`OK: 26 vector files match the generator.`** on `origin/main`
+and **`OK: 29 vector files match the generator.`** at the pin, both `exit=0`. The 26/29 gap is
+**not drift** — the three S5 vectors sit on the unmerged draft stack and `main` has never carried
+them, which is exactly what `VECTORS.lock`'s own 2026-08-17 note already records.
+
+### Milestone 2 — the slice taken instead: a body field with two legal spellings and two readings
+
+Re-reading §4.3.3 for the assigned amendment turned up a gap in it. The body is specified as:
+
+```
+"order_id": <string>    // OPTIONAL — Play orderId, for support correspondence
+```
+
+with the MUST *"An ack without it is complete and MUST be honoured."* That settles an ack that
+**omits** the field. It says nothing about `"order_id": null`. §3 has the identical hole for
+`sig`, its only optional envelope field.
+
+**Both readings are already implemented, in `:core`, one file apart** (**C-72-4**):
+
+| site | field | reads JSON `null` as | consequence |
+| --- | --- | --- | --- |
+| `EnvelopeJson.kt:63-69` | `sig` | **absent** | envelope accepted, `sig == null` |
+| `EntitlementAck.kt:95-100` | `order_id` | **malformed** | `parse` → null, **the whole ack is dropped** |
+
+Neither cites the other. The second is the expensive one and it is **silent**: an authentic,
+correctly sequenced, AEAD-verified ack for a product this build knows — differing from a valid one
+by a single field's spelling — unlocks nothing, and no layer reports a failure. That is run 58's
+shape exactly. The difference is that this one needs the engine to spell the field a way it
+currently cannot, which is what makes it latent rather than live.
+
+### Milestone 3 — the justification for the lenient half is false (C-72-5)
+
+`EnvelopeJsonTest`'s `a non-string sig is malformed, and must not degrade into unsigned` justified
+accepting a null `sig` with *"the vectors encode it that way"*. **They do not.** Measured across
+all 29 vendored vectors at pin `7328a0b`: every `sig` that appears is a **string** — nine of the
+29 files carry one — and every vector without a signature **omits the key**. Absence is spelled by
+omission corpus-wide, exactly as `entitlement-ack-no-order-id` spells an absent `order_id`.
+
+So the null spelling is **unwitnessed on the wire in either direction**. Neither parser's choice is
+a conformance fact; both are guesses, they disagree, and one of them cited evidence that does not
+exist. That last part is the reason this was worth a slice rather than a note: a false
+justification makes a divergence look settled, and a settled-looking divergence does not get
+re-examined.
+
+### Milestone 4 — why it is latent, and where the guard actually lives (C-72-6)
+
+The engine cannot currently emit the null spelling. `src/Sync/SyncPayloads.cs:19-22` sets
+`DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull`, and its own docstring says *"null
+omits the field entirely rather than writing a null, which is exactly what the
+`entitlement-ack-no-order-id` vector pins"*. That option is **global to all five payload builders**,
+and what holds it in place is `SyncHarness`'s byte-identity assertion against the vectors — an
+**engine-side** test that pins the omission **incidentally**, as one property of a whole-body byte
+comparison.
+
+**The phone's strictness is safe because of a test in the other repository, and nothing on the
+phone said so.** That is the B-16 shape applied to behaviour instead of to the pin: a real
+guarantee, held by a mechanism neither repo names from the side that depends on it.
+
+### Milestone 5 — pinned, not fixed, and the reason is the interpretation rule (C-72-9)
+
+**PQ-A2-6 is filed as a gate, and the behaviour was left exactly as found.** Making the phone
+lenient unilaterally would put it ahead of both the spec and the engine's harness — the "more
+correct than the engine" field bug the interpretation rule exists to prevent, and the same
+reasoning that keeps PQ-PSH-1's 405/426 half closed. Making it stricter would break `sig`. The
+recommended answer is written into the question and **not applied**: one sentence covering both
+optional fields in §3 and §4.3.3, one shared vector carrying the null spelling, both parsers moved
+in one change — the shape PQ-AAD-1's answer took for `ts`/`key_id`. The cost asymmetry is recorded
+with it: `order_id` is explicitly *"not authorisation"*, so honouring the null spelling grants
+nothing extra, while refusing it costs a paying user their purchase, silently.
+
+What this run **did** close is that the divergence was invisible and one half of it was
+mis-justified. Three test-file edits, no production code:
+
+1. `EntitlementAckTest.an order_id of JSON null drops the whole ack, and only this test says so`
+   — asserts the drop, **and** asserts `EnvelopeJson`'s opposite reading in the same test body, so
+   the divergence is visible in one place rather than inferable across two files.
+2. `VectorCorpusCoverageTest.no vector spells an absent optional field as an explicit JSON null`
+   — pins the corpus fact the false comment claimed, scanning `envelope_json` and `plaintext_json`
+   recursively across every manifest entry. A future vector introducing the null spelling turns
+   this red and forces whoever vendors it to answer PQ-A2-6 first.
+3. `EnvelopeJsonTest`'s comment no longer claims the vectors witness the null spelling.
+
+**One correction to the first draft of test 2, recorded because it was a real error.** It first
+scanned every top-level key of every vector and went red on eighteen legitimate metadata nulls
+(`expect_error`, `expected`, and an absent `plaintext_json` on vectors whose ciphertext never
+decrypts). Those are the harness format's way of saying "not applicable" and are nothing either
+implementation parses. Narrowed to `envelope_json` and `plaintext_json` — the two fields that
+**are** wire representations — it passes. The over-broad version would have been a test asserting
+a property of the vector schema while claiming to assert one about the wire.
+
+### Milestone 6 — evidence, executed (C-72-7)
+
+Baseline on a clean tree, after installing `openjdk-17-jdk-headless` (this sandbox ships JDK **21**
+this run, and `:core` pins `jvmToolchain(17)`; `api.foojay.io` is denied by the same egress policy
+as `dl.google.com`, so Gradle cannot auto-provision):
+
+```
+BUILD SUCCESSFUL in 1m 24s
+core-probe: 334 tests, 0 failed, 0 skipped, across 22 classes
+```
+
+With the two new tests: **`BUILD SUCCESSFUL`**, **`core-probe: 336 tests, 0 failed, 0 skipped,
+across 22 classes`**, `exit=0`.
+
+**Both mutations go red.** **M1** — make `EntitlementAck.kt` treat a null `order_id` as absent,
+i.e. apply the candidate fix — turns **exactly one** test red, the ack test, which is the
+prediction: nothing else in the suite exercises that spelling. **M2** — set `order_id` to an
+explicit null in a vector — turns the corpus test red. M2 also turned `ProtocolVectorsTest >
+entitlement ack vectors decrypt to the exact bytes that unlock Pro` red, and **that second failure
+is an artefact of the mutation method rather than independent evidence**: editing `plaintext_json`
+without re-sealing the ciphertext breaks byte-identity whatever the edit was. Stated rather than
+counted as a second confirmation.
+
+**M2 was applied in a throwaway `git worktree`, never in the real checkout**, and the vendored
+corpus was re-diffed against the pin afterwards: **29/29, `diff -r` silent, `exit=0`**, both sides
+by absolute path (**C-72-3**). `git status --porcelain` after the restores lists only the three
+test files.
+
+**One evidence-discipline note on my own commands.** The first baseline was run as
+`scripts/core-probe.sh 2>&1 | tail -25` and reported `exit code 0` for a run that had executed
+**zero tests** — the script correctly `exit 1`s when no JDK 17 is present, and the pipeline
+returned `tail`'s status instead. It was caught immediately because the output said so, but the
+shape is precisely the one this program hunts: **a gate invocation that reports success it did not
+earn.** Every subsequent run in this session used `set -o pipefail` and reported the script's own
+status. This is a note about how a session runs commands, not a defect in `core-probe.sh`, whose
+guard is correct.
+
+### Milestone 7 — freshness, and the standing state is unmoved (C-72-8)
+
+| | measured, post-fetch |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`**, unmoved since 2026-08-12 |
+| android `origin/main` | **`ebfaf81`** |
+| engine PRs | **18 open, all draft** — `#26`, `#32`–`#39`, `#45`–`#53` |
+| android PRs | **6 open, all draft** — `#1`–`#6`; **`#6`** carries this branch |
+| **#32** (the assigned slice) and **#53** (H1) | both still open, still draft |
+| Terra (`autonomy/codex-state`) | **COMPLETE**, *files claimed: none* — **no collision** |
+| vendored corpus | **29/29 byte-identical** to pin `7328a0b`, `diff -r` silent, `exit=0` |
+
+**Both PR counts were measured this run via the GitHub API, not carried forward.**
+
+**No rung moved, and none is claimed to have.** This is S5 wire-interpretation, filed as a gate —
+not a rung advance. **B-19 is unmoved: no `:app` file was written.** **B-21 was not exercised**
+(no repeated Maven fetches beyond the ordinary runs, no 429 observed) and stays open, same posture
+as runs 67 through 71.
+
+### Milestone 8 — prohibition paragraph: what this run did not touch
+
+**Nothing was merged, closed, rebased, undrafted or force-pushed in either repo**; the **18**
+engine PRs and the **6** android drafts are exactly as found, and **#53's fate stays Brandon's**.
+**No vector byte was written in either repo** — corpus **29/29** byte-identical to pin `7328a0b`
+re-measured *after* the mutation work, `VECTORS.lock` not edited, **the pin did not move (H7)**;
+the one vector mutation lived and died in a throwaway worktree. **No `:core` main-source file was
+written** — `EntitlementAck.kt`, `EnvelopeJson.kt`, `EnvelopeReceiver.kt`, `SyncCrypto.kt` and
+every receive path are unmodified, so **nothing this run did can change which envelopes the phone
+accepts or which acks it honours**; M1 was reverted and `git status` proves it. **The behaviour
+PQ-A2-6 describes was pinned, not changed.** **No `:app` file was written** — not one; **B-19**
+stays open. **No C# was written** — the engine checkout was read-only and left detached where it
+was found, apart from `STATE.md` on the docs-only `autonomy/claude-state` branch. **No
+`generate.mjs`, no `docs/Sync-Protocol.md`, no `ci.yml`**; **`$ExpectedOfflineTotal` was not
+moved**, and **no nineteenth engine PR was opened**. **`Verify-Alpha.ps1` was not run and no
+result for it is claimed** — no `pwsh`, no `dotnet`, and it is a Windows gate besides. **The
+android gate was not run**: only `:core:test` executed, via `scripts/core-probe.sh`;
+**`:app:assembleDebug`, `:app:lintDebug`, `:app:test` and `checkCoreIsAndroidFree` are unrun and
+unclaimed** (**B-7**), and **no zero-warning claim is made** — the two `No cast needed` warnings
+in `PairingSessionTest.kt:53` and `RelayClientTest.kt:383` are pre-existing in files this run did
+not touch. The only host mutation was **`apt-get update` + `openjdk-17-jdk-headless`** inside a
+disposable container. No history rewrite, no branch deleted, **no deploy of any kind**. **The
+production relay was not contacted at all, not even `GET /v1/health`.** No Google, Play or OAuth
+console; no accounts, no purchases, no keystore, no emulator, no Gmail. **No secret was read,
+printed or echoed.** Terra's territory was **read, never written**.

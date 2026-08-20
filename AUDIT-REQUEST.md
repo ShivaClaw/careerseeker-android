@@ -12833,3 +12833,160 @@ cd <android> && git diff --stat origin/claude/android-a0-probe..HEAD
 ```
 
 *Expected, and **observed**:* the diff touches only the five files named above.
+
+---
+
+## RUN 72 — 2026-08-20. PQ-A2-6: two spellings of "optional", and a justification the corpus does not support
+
+### C-72-1 — the assigned slice is built, and is still not on main (thirty-seventh firing)
+
+> **Claim.** The prompt's slice (§4.3 `entitlement_ack` body, the ack vectors, PQ-A2-1/-2/-3) has
+> existed since 2026-08-09 as commits `8575539`, `22b028e`, `7328a0b` in the **engine** repo, all
+> three still unmerged. It was verified, not rebuilt.
+
+```bash
+cd <careerseeker> && for c in 8575539 22b028e 7328a0b; do
+  git cat-file -e "$c^{commit}" && git merge-base --is-ancestor "$c" origin/main \
+    && echo "$c ON MAIN" || echo "$c exists, not on main"; done
+```
+
+*Expected, and **observed**:* all three print `exists, not on main`. Subjects: *"S5: define the
+entitlement_ack body…"*, *"S5: pin section 4.3.3 with two entitlement_ack vectors…"*, *"S5: add
+the invalid-unknown-field vector, closing PQ-A2-3 and B-6"*.
+
+### C-72-2 — the prompt's vendored pin `679a317` is stale; it is `7328a0b`
+
+> **Claim.** The pin moved on 2026-08-12. `generate.mjs --check` reports **29** vector files at
+> the pin and **26** on `origin/main` — the three S5 vectors are on the unmerged draft stack, so
+> the difference is expected and is not drift.
+
+```bash
+cd <android>  && grep 'Pinned commit' core/src/test/resources/sync-vectors/VECTORS.lock
+cd <careerseeker> && node docs/sync-vectors/generate.mjs --check          # on main
+cd <careerseeker> && git worktree add --detach /tmp/pin 7328a0b \
+  && (cd /tmp/pin && node docs/sync-vectors/generate.mjs --check)
+```
+
+*Expected, and **observed**:* `7328a0bc043335491cd96a67d634e8eea2a13af9`;
+`OK: 26 vector files match the generator.` on main, exit 0;
+`OK: 29 vector files match the generator.` at the pin, exit 0.
+
+### C-72-3 — the vendored corpus is byte-identical to the pin, before AND after this run
+
+> **Claim.** 29/29 identical, `diff -r` silent, exit 0 — measured twice, the second time **after**
+> the mutation testing in C-72-7, to prove no vector byte was written. Both sides addressed by
+> absolute path (run 69's process finding).
+
+```bash
+diff -r /abs/<android>/core/src/test/resources/sync-vectors/v1 \
+        /abs/<pin-worktree>/docs/sync-vectors/v1 ; echo "exit=$?"
+```
+
+*Expected, and **observed**:* no output, `exit=0`, 29 files on each side, both times.
+
+### C-72-4 — `:core` contains both readings of "optional field", one file apart
+
+> **Claim.** `EnvelopeJson.kt:63-69` reads an explicit JSON `null` `sig` as **absent** (envelope
+> accepted). `EntitlementAck.kt:95-100` reads an explicit JSON `null` `order_id` as **malformed**,
+> so `parse` returns null and `apply` drops the entire ack, leaving a paying user `Free` with no
+> error on any layer. Neither site cites the other. This is PQ-A2-6.
+
+```bash
+cd <android> && sed -n '60,70p'  core/src/main/kotlin/app/careerseeker/core/EnvelopeJson.kt
+cd <android> && sed -n '93,101p' core/src/main/kotlin/app/careerseeker/core/EntitlementAck.kt
+```
+
+*Expected, and **observed**:* the `sig` branch has an explicit `sigElement.toString() == "null"
+-> null` arm; the `order_id` branch has no null arm and falls through to `?: return null`.
+
+### C-72-5 — the leniency's stated justification is false: no vector spells absence as null
+
+> **Claim.** `EnvelopeJsonTest` justified accepting a null `sig` with *"the vectors encode it that
+> way"*. Across all 29 vendored vectors, every `sig` present is a **string** (9 of 29 files carry
+> one) and every vector without a signature **omits the key**. The null spelling is unwitnessed on
+> the wire in either direction, so neither parser's choice is a conformance fact.
+
+```bash
+cd <android>/core/src/test/resources/sync-vectors/v1 && grep -o '"sig"[^,}]*' *.json | sort
+cd <android>/core/src/test/resources/sync-vectors/v1 && grep -l '"sig": *null' *.json ; echo "exit=$?"
+```
+
+*Expected, and **observed**:* nine `"sig": "<base64url string>"` lines, one per file; the second
+command matches nothing and exits 1.
+
+### C-72-6 — the engine cannot currently emit the null spelling, and the guard is in the other repo
+
+> **Claim.** `src/Sync/SyncPayloads.cs` sets `DefaultIgnoreCondition = JsonIgnoreCondition.
+> WhenWritingNull`, **global to all five payload builders**, so `orderId = null` omits the field.
+> What holds that in place is `SyncHarness`'s byte-identity assertion against the ack vectors — an
+> **engine-side** test that pins the omission incidentally. The phone's strictness is therefore
+> safe because of a test in the other repository. This is why PQ-A2-6 is latent, not live.
+
+```bash
+cd <careerseeker> && git show origin/claude/s5-entitlement-ack-emitter:src/Sync/SyncPayloads.cs \
+  | sed -n '18,23p;58,62p'
+```
+
+*Expected, and **observed**:* the `JsonSerializerOptions` block carrying `DefaultIgnoreCondition
+= JsonIgnoreCondition.WhenWritingNull`, and `EntitlementAck(...)` passing `order_id = orderId`
+through `Encode`.
+
+### C-72-7 — the two new tests are load-bearing: both mutations go red
+
+> **Claim.** Baseline **334**. With the two tests, **336**, 0 failed. **M1** — make
+> `EntitlementAck.kt` treat a null `order_id` as absent (the candidate fix) — turns **exactly one**
+> test red, `an order_id of JSON null drops the whole ack…`. **M2** — set `order_id` to an explicit
+> null in a vector — turns `no vector spells an absent optional field as an explicit JSON null`
+> red. Both mutations were reverted; M2 was applied in a **throwaway git worktree**, so the real
+> vendored corpus was never written (re-proved by C-72-3's second run).
+
+```bash
+cd <android> && scripts/core-probe.sh                      # baseline, then after each mutation
+cd <android> && git status --porcelain                     # after restore
+```
+
+*Expected, and **observed**:* baseline `core-probe: 334 tests, 0 failed, 0 skipped, across 22
+classes`, exit 0. After the two tests: `336 tests, 0 failed, 0 skipped, across 22 classes`, exit 0.
+M1: `BUILD FAILED`, one FAILED line, the ack test. M2: `BUILD FAILED`, two FAILED lines — the
+corpus test, **plus** `ProtocolVectorsTest > entitlement ack vectors decrypt to the exact bytes
+that unlock Pro`. **The second failure is an artefact of the mutation method, not independent
+evidence**: editing `plaintext_json` without re-sealing the ciphertext breaks byte-identity
+regardless of the null. `git status --porcelain` after restore lists only the three test files.
+
+### C-72-8 — freshness and the standing state (measured this run, not carried forward)
+
+> **Claim.** engine `origin/main` **`aac05f3`**, unmoved since 2026-08-12; android `origin/main`
+> **`ebfaf81`**, **262** commits behind this branch's tip; **18 engine PRs open, all draft**
+> (`#26, #32–#39, #45–#53`); **6 android PRs open, all draft** (`#1–#6`, this branch is `#6` at
+> `4fcfaf4`); **#32** and **#53** both still open and draft; Terra
+> (`autonomy/codex-state:STATE.md`) **COMPLETE, files claimed: none** — no collision.
+
+```bash
+cd <careerseeker> && git rev-parse --short origin/main
+cd <android> && git rev-parse --short origin/main && git rev-list --count origin/main..HEAD
+# via MCP: mcp__github__list_pull_requests(owner=ShivaClaw, repo=careerseeker,         state=open)
+# via MCP: mcp__github__list_pull_requests(owner=ShivaClaw, repo=careerseeker-android, state=open)
+cd <careerseeker> && git show origin/autonomy/codex-state:STATE.md | head -12
+```
+
+*Expected, and **observed**:* `aac05f3` / `ebfaf81` / `262`; the two PR lists above, every entry
+`"draft": true, "state": "open"`; *"Current rung: COMPLETE… Files claimed: none"*.
+
+### C-72-9 — the bound: `:core:test` only, and no production code changed
+
+> **Claim.** Run 72 wrote **no `:core` main-source file, no `:app` file, no vector, no `.mjs`, no
+> `.yml`, no C#**. The only edits are three **test** files, `docs/protocol-questions.md`,
+> `LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`, `BLOCKED.md`, and the engine repo's docs-only
+> `autonomy/claude-state:STATE.md`. **The behaviour PQ-A2-6 describes was pinned, not changed** —
+> the fix belongs on an engine branch with the spec amendment and a shared vector.
+> **The android gate did not run**: `:app:assembleDebug`, `:app:lintDebug`, `:app:test` and
+> `checkCoreIsAndroidFree` need the Android SDK (**B-7**), are unrun and unclaimed, and **no
+> zero-warning claim is made**. **`Verify-Alpha.ps1` did not run and could not** — no `pwsh`, no
+> `dotnet`, and it is a Windows gate.
+
+```bash
+cd <android> && git diff --stat origin/claude/android-a0-probe..HEAD
+```
+
+*Expected, and **observed**:* the diff touches only the files named above; no path under
+`core/src/main/`, `app/`, or `core/src/test/resources/`.

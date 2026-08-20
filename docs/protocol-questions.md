@@ -1954,3 +1954,92 @@ fails something that says why. If the engine ever widens, the phone follows — 
 
 **Still unrun, and unclaimed:** the full android gate. `:app:assembleDebug`, `:app:lintDebug`,
 `:app:test` and `checkCoreIsAndroidFree` need the Android SDK (**B-7**) and did not execute.
+
+---
+
+## PQ-A2-6 — "Optional" has two spellings, `:core` reads them differently, and the leniency cites evidence that does not exist
+
+**Opened 2026-08-20 (S5 / entitlement body, seventy-second cloud iteration).** Found while
+re-reading §4.3.3's body definition, which the assigned slice has been landing since run 22.
+**Not a code defect on either side today** — it is an underspecification whose two independent
+resolutions are already shipped in the same module, plus a false statement in the suite that
+makes the divergence look settled when it is not.
+
+**What §4.3.3 says, and does not.**
+
+```
+"order_id": <string>    // OPTIONAL — Play orderId, for support correspondence
+```
+
+> `order_id` is optional because it is Play correspondence data, not authorisation. An ack
+> without it is complete and MUST be honoured.
+
+The MUST is unambiguous about an ack **without** the field. It never says whether
+`"order_id": null` is an ack "without it" or an ack whose shape disagrees with §4.3.3.
+The same gap exists in §3 for `sig`, the only optional envelope field.
+
+**Both readings are implemented, in `:core`, one file apart.**
+
+| site | optional field | reads explicit JSON `null` as | consequence |
+| --- | --- | --- | --- |
+| `core/.../EnvelopeJson.kt:63-69` | `sig` | **absent** — envelope accepted, `sig == null` | a signature-free envelope proceeds normally |
+| `core/.../EntitlementAck.kt:95-100` | `order_id` | **malformed** — `parse` returns null | `apply` returns the caller's state and **the entire ack is dropped** |
+
+Neither site cites the other. The second is the expensive one and it is **silent**: an
+authentic, correctly sequenced, AEAD-verified ack for a product this build knows, differing
+from a valid one by a single field's spelling, unlocks nothing and reports no failure on any
+layer. That is exactly the shape run 58 found (`EntitlementAckApplier` had no caller at all) —
+Pro does not unlock, and nothing anywhere says why.
+
+**The leniency's stated justification is false, and that is the part worth acting on.**
+`EnvelopeJsonTest`'s `a non-string sig is malformed, and must not degrade into unsigned`
+justified accepting a null `sig` with *"the vectors encode it that way"*. **They do not.**
+Measured this run across all 29 vendored vectors at pin `7328a0b`: every `sig` that appears is
+a **string** (9 of 29 files carry one), and every vector without a signature **omits the key**.
+Absence is spelled by omission corpus-wide — exactly as `entitlement-ack-no-order-id` spells an
+absent `order_id`. The null spelling is **unwitnessed on the wire in either direction**, so
+neither parser's choice is a conformance fact; both are guesses, and they disagree.
+
+**Why this is latent rather than live, and what the guard actually is.** The engine cannot
+currently emit the null spelling: `src/Sync/SyncPayloads.cs:19-22` sets
+`DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull`, and its own docstring says
+*"null omits the field entirely rather than writing a null, which is exactly what the
+`entitlement-ack-no-order-id` vector pins"*. That option is **global to all five payload
+builders**, and what holds it in place is `SyncHarness`'s byte-identity assertion against the
+vectors — which pins the omission **incidentally**, as one property of a whole-body byte
+comparison, on the **engine** side only. So the phone's strictness is safe because of a test in
+the other repository. Nothing on the phone said so until this run.
+
+**Answering it needs a decision, not a patch, which is why this is a gate and not a fix.**
+Making the phone lenient unilaterally would put it ahead of both the spec and the engine's
+harness — the "more correct than the engine" field bug the interpretation rule exists to
+prevent (PQ-PSH-1's 405/426 half, same reasoning). Making it stricter would break `sig`.
+
+**Recommended answer (not applied):** amend §3 and §4.3.3 with one sentence covering **both**
+optional fields together — an absent optional field MAY be spelled as omission or as JSON
+null, and receivers MUST treat the two identically — then add **one shared vector** carrying
+the null spelling and apply it to both parsers in one change. That is the shape PQ-AAD-1's
+answer took for `ts`/`key_id`, and it is the shape that keeps the two implementations from
+diverging on the fix itself. The cost asymmetry favours leniency: `order_id` is explicitly
+*"not authorisation"* and *"gains no additional weight"*, so honouring the null spelling grants
+nothing extra (`product_id` must still be known, `acknowledged_at` still required, and the
+envelope still had to pass AEAD and the replay window), while refusing it costs a paying user
+their purchase, silently.
+
+**To close:** the amendment above lands on an engine branch (normative wire document — not this
+phone branch, per the same rule that kept run 70 out of §4.1's AAD and run 71 out of §10.2),
+the vector is generated by `docs/sync-vectors/generate.mjs`, and both parsers move with it.
+
+**Until it closes**, current behaviour is **pinned on the phone side** so it cannot drift
+unnoticed in either direction:
+
+- `EntitlementAckTest.an order_id of JSON null drops the whole ack, and only this test says so`
+  asserts the drop **and** asserts `EnvelopeJson`'s opposite reading of a null `sig` in the same
+  test body, so the divergence is visible in one place rather than inferable across two files.
+- `VectorCorpusCoverageTest.no vector spells an absent optional field as an explicit JSON null`
+  pins the corpus fact the false comment claimed, scanning `envelope_json` and `plaintext_json`
+  recursively across every manifest entry. A future vector introducing the null spelling turns
+  this red, which forces whoever vendors it to answer this question first.
+- `EnvelopeJsonTest`'s comment no longer claims the vectors witness the null spelling.
+
+**Re-verification:** `AUDIT-REQUEST.md` **C-72-1..9**.

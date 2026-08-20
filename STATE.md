@@ -2,11 +2,75 @@
 
 > **READ [`RETURN-DAY.md`](RETURN-DAY.md) FIRST — it is the window's closing handoff, and the
 > mission's stop condition is already met.** Written at run 47; re-verified green at runs 48, 49,
-> **50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70 and 71**. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
+> **50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71 and 72**. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **thirty-six**
-> runs have now been assigned it. **Run 58 found the half
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **thirty-seven**
+> runs have now been assigned it. **The prompt's vendored pin `679a317` is stale too: it is
+> `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
+>
+> ## ▶ RUN 72 — 2026-08-20. Thirty-seventh firing; "optional" has two spellings and `:core` reads them both.
+>
+> **Fetch first: both checkouts again arrived detached at a stale `main`** — the android tree at
+> `ebfaf81`, **262** commits behind this branch's tip, **measured this run**
+> (`git rev-list --count origin/main..HEAD`), not carried forward from run 71's **261**. Every
+> number below is post-fetch.
+>
+> **Declined for the thirty-seventh time and verified instead** (**C-72-1**, **C-72-2**): all three
+> slice commits exist and report `not on main` (exit **1**) in the **engine** repo. The prompt's pin
+> `679a317` is **still stale** — it is **`7328a0b`**. `generate.mjs --check` was run on both sides:
+> **`OK: 26 …`** on `origin/main`, **`OK: 29 …`** at the pin, both `exit=0`; the gap is the three S5
+> vectors on the unmerged stack, **not drift**.
+>
+> **The slice taken instead is in §4.3.3's own body definition, and it is filed as a gate.**
+> **PQ-A2-6**: `order_id` is specified `<string> // OPTIONAL` with *"an ack without it … MUST be
+> honoured"*, and **nothing says whether `"order_id": null` is "without it"**. §3 has the identical
+> hole for `sig`. **Both readings are already shipped in `:core`, one file apart** (**C-72-4**):
+> `EnvelopeJson.kt:63-69` reads a null `sig` as **absent**; `EntitlementAck.kt:95-100` reads a null
+> `order_id` as **malformed and drops the entire ack** — silently, leaving a paying user `Free` with
+> no error on any layer. **Run 58's shape**, latent rather than live only because the engine cannot
+> currently spell it that way.
+>
+> **The lenient half cited evidence that does not exist** (**C-72-5**). `EnvelopeJsonTest` justified
+> accepting a null `sig` with *"the vectors encode it that way"*. **They do not**: across all **29**
+> vendored vectors every `sig` present is a **string** (9 of 29 carry one) and every vector without a
+> signature **omits the key**. The null spelling is **unwitnessed on the wire in either direction**,
+> so neither parser's choice is a conformance fact — both are guesses, and one was mis-justified.
+>
+> **Where the real guard lives, and it is not in this repo** (**C-72-6**). `SyncPayloads.cs` sets
+> `DefaultIgnoreCondition = WhenWritingNull` — **global to all five payload builders** — and what
+> holds it is `SyncHarness`'s byte-identity assertion against the ack vectors, which pins the
+> omission **incidentally**. **The phone's strictness is safe because of a test in the other
+> repository.** B-16's shape applied to behaviour instead of to the pin.
+>
+> **Pinned, not fixed** (**C-72-9**). Leniency applied unilaterally would put the phone ahead of both
+> the spec and the engine's harness — the "more correct than the engine" bug the interpretation rule
+> prevents (PQ-PSH-1's 405/426 half, same reasoning). The recommended answer is written into PQ-A2-6
+> and **not applied**: one sentence in §3 **and** §4.3.3 covering both optional fields, one shared
+> vector, both parsers moved together — PQ-AAD-1's shape. **Three test files changed; no production
+> code, in either module.**
+>
+> **Executed, with both mutations red** (**C-72-7**). Baseline **`334 tests, 0 failed`**; with the two
+> tests **`BUILD SUCCESSFUL`, `core-probe: 336 tests, 0 failed, 0 skipped, across 22 classes`**,
+> `exit=0`. **M1** (apply the candidate fix) → **exactly one** test red, as predicted. **M2** (null
+> `order_id` in a vector) → the corpus test red; its second failure is **an artefact of editing
+> `plaintext_json` without re-sealing**, stated rather than counted. **M2 lived in a throwaway
+> worktree** — corpus re-diffed *after*: **29/29**, `exit=0` (**C-72-3**). **This is `:core:test`
+> only** (**B-7**); no zero-warning claim, and `Verify-Alpha.ps1` did not run and could not.
+>
+> **Standing state unmoved** (**C-72-8**). `main` **`aac05f3`** / **`ebfaf81`**; **18 engine + 6
+> android PRs open and draft**, none merged, closed or undrafted; **#32** and **#53** both open; both
+> counts **measured this run** via the API. Terra: **COMPLETE, files claimed: none**. **No vector byte
+> written, `VECTORS.lock` untouched, the pin did not move (H7).** **No rung moved** — a wire-
+> interpretation gate, not a rung advance; **B-19 unmoved, no `:app` file written**. **B-21 not
+> exercised** and stays open, same posture as runs 67–71.
+>
+> **One process note, and it is about how this session ran a command rather than about the code.**
+> The first baseline was invoked as `core-probe.sh … | tail -25` and reported **`exit code 0` for a
+> run that executed zero tests** — the script correctly `exit 1`s with no JDK 17, and the pipeline
+> returned `tail`'s status. Caught immediately, but it is exactly the shape this program hunts: **a
+> gate invocation reporting success it did not earn.** Every later run used `set -o pipefail`.
+> `core-probe.sh` is not at fault; its guard is correct.
 >
 > ## ▶ RUN 71 — 2026-08-20. Thirty-sixth firing; a question closed in code and read open in the ledger, closed on the ledger.
 >
