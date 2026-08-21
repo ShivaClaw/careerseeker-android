@@ -14299,3 +14299,113 @@ in this repository checks that a cited `C-` id resolves**, which is now the stro
 `C-\d+-\d+` and `B-\d+` that fails when the referent is absent. Filed as the successor target in
 `STATE.md` beside the HKDF hypothesis; **not built this run** — it is one slice per iteration, and
 this one is spent.
+
+---
+
+## RUN 76 — 2026-08-21 (Linux sandbox). The lane's first successor target was a hypothesis, and measuring it refuted it.
+
+**Rung: none moved.** The slice was the target run 75 filed and explicitly refused to believe:
+*"This is a hypothesis, not a finding… Measure it before believing it."* Measured. It is wrong, and
+the run spent itself proving that to the standard the records require rather than asserting it.
+
+### Milestone 1 — rule one, and a stale checkout caught before it mattered
+
+Both trees fetched before any read (**C-76-1**). The android checkout arrived **detached at
+`ebfaf81`** — a docs-only `main` carrying none of the mission files the prompt names. Had this run
+read `STATE.md` from where it landed, it would have found no file; had it *written* there, it would
+have written onto a branch nobody works. Checked out `origin/claude/android-a0-probe` at `0c1895a`
+first. Engine `origin/main` is **`aac05f3`**, last non-Claude commit **2026-08-12**.
+
+### Milestone 2 — the prompt, declined for the forty-first time
+
+The assigned S5 spec half has existed since 2026-08-09 (`8575539`, `22b028e`, `7328a0b`), and the
+prompt's vendored pin `679a317` is still **`7328a0b`** (**C-76-2**). The corpus was re-diffed
+blob-by-blob against that pin: **29 files compared, 0 mismatches.** Declined and verified, not
+rebuilt. **No vector byte was written this run**; the cross-repo pin did not move.
+
+### Milestone 3 — the toolchain, and what it is not
+
+`scripts/core-probe.sh` needs a JDK 17 that this image does not ship; installed
+`openjdk-17-jdk-headless` per the script's own message. Baseline **`341 tests, 0 failed, 0 skipped,
+across 22 classes`, `exit=0`** — reproducing run 75's figure exactly, which is the first evidence
+that the lane is intact on a fresh machine (**C-76-6**). **This is `:core:test` alone.** Four of the
+gate's five tasks still need the Android SDK (**B-7**); no gate result is claimed anywhere below.
+
+### Milestone 4 — seven mutations, seven red, hypothesis refuted
+
+Run 75's target: no test asserts the HKDF info strings equal the literals §5.2 prints, `HkdfTest`
+uses its own literals, and the envelope vectors carry `key_hex` directly — so the phone could derive
+from wrong info strings, pass everything here, and fail against the engine **only in the field**.
+
+Each of the seven `careerseeker/v1/` constants was mutated alone and the suite re-run.
+**All seven went red** (**C-76-3**). The guard is the **pairing** vectors: `pairing-basic.json`
+carries `k_e2p_hex`, `k_p2e_hex`, `relay_token_b64u`, `provisional_token_b64u` and `confirm` as
+**derived** values, and `ProtocolVectorsTest` recomputes all five through `PairingDerivation.derive`.
+**The hypothesis generalised from the envelope vectors to the corpus**, and the pairing vectors are
+the half that derives.
+
+**The premise was true; only the conclusion was false.** That distinction is the finding. And one
+row of the table is worth keeping: **`INFO_ENGINE_TO_PHONE` reddened exactly one test** where the
+others reddened two to five — the phone *seals* under `k_p2e` and only *opens* under `k_e2p`, so no
+flow test recomputes the e2p direction.
+
+### Milestone 5 — the defect the sweep actually turned up
+
+`PairingDerivationTest > signatureInput hashes the ciphertext as lower-case hex` pinned §5.4's
+domain separator as `assertEquals(Protocol.COMMAND_SIG_PREFIX, parts[0])` — **the production output
+compared against the very constant that produced it.** True for any value of the constant; it reads
+like a pin and is not one. Not a hole (the signature vectors reach `cmd`), but **not a guard at the
+line written to be one**, and the `cmd` row of C-76-3 proves it: pre-fix, that mutation reddened
+`EntitlementVectorsTest` and two `ProtocolVectorsTest` cases and left this test **green**. Replaced
+with the literal (`201b781`).
+
+### Milestone 6 — pinned anyway, for three measured reasons
+
+`231bc07` adds two tests to `ProtocolTest`: the seven literals, **transcribed by hand** from §5.2/§5.4
+at pin `7328a0b` — run 74/75's lesson, one file along — and a pairwise-distinctness test. Justified
+by measurement, not taste: (1) every existing guard runs through the corpus, whose own `VECTORS.lock`
+states the guarantee as *"the phone matches the pin"*, **never** *"the phone matches the engine"*;
+(2) the e2p direction had a single guard; (3) the literals belong where a reader looks. Checked
+constant-by-constant against spec §5.2/§5.4 and the engine's `src/Sync/Protocol.cs:23-29` — **seven
+on each side, every literal identical, no eighth** (**C-76-4**). Unlike §7.2's error table, this
+vocabulary **never drifted**; the answer is boring, and that is the result.
+
+**Suite 341 → 343**, 0 failed, 0 skipped, 22 classes, `exit=0` (**C-76-6**).
+
+### Milestone 7 — the new pins bite, proven by three more mutations
+
+On the post-fix tree, all three `exit=1`, every prediction matched (**C-76-7**). `cmd` now reddens
+**5** tests including the repaired `PairingDerivationTest` case, against **3** before. A **collision**
+mutation — `BOOTSTRAP_SALT` set equal to `INFO_RELAY_TOKEN` — is the case the literal pins alone
+cannot catch, since each literal assertion still holds individually; the pairwise test catches it.
+`e2p` now has **2** guards where it had 1.
+
+### Milestone 8 — run 75's own off-by-one, corrected
+
+Run 75's banner says return day is *"four days past"*; run 74, same date, says *"three"*.
+2026-08-21 − 2026-08-18 = **3** (**C-76-8**). Corrected in the open rather than silently, because
+*every number reproduces* is the property these records sell. Nothing else in that banner changes.
+**24 drafts — 18 engine, 6 android — all still `draft: true`, none merged, closed or undrafted.**
+
+### Milestone 9 — the C-75-13 hazard, met and survived
+
+Run 75's dangling-citation incident came from a bare relative path outliving its `cd`. **It
+recurred this run** — a `sed` against `core/src/...` failed with `No such file or directory` because
+the shell's cwd was the *engine* checkout, not the phone's. It failed **loudly and immediately**,
+because the command read a file rather than appending to one. Every subsequent path in this run is
+absolute. **The guard itself is still not built**, and remains the lane's strongest records-side
+candidate; it stays filed in `STATE.md`.
+
+### What this run did not touch
+
+**No rung moved and no rung's status changed.** No `:app` file, no `:core` **production** file — the
+diff is **two test files** — no vector byte, no `index.json`, no `VECTORS.lock`; the cross-repo pin
+did not move. `docs/Sync-Protocol.md` was **read at pin `7328a0b`, never edited**, and no file in
+the `careerseeker` repo was written except `autonomy/claude-state`'s `STATE.md`. **B-22 was not
+fixed** — its patch needs an `:app` compile (**B-7**) — and was not worked around by skipping a
+test. Nothing was merged, closed or undrafted in either repo; no branch was force-pushed, rewritten
+or deleted. No deploy of any kind; **the production relay was not contacted at all this run, not
+even `/v1/health`.** No Play/Google/OAuth console, no accounts, no purchases, no Play Billing code,
+no email or Gmail, no secrets read or printed, no `.appdata`. Terra's territory was untouched:
+`scripts/Verify-Alpha.ps1`, `$ExpectedOfflineTotal` and every count-reporting doc are **unmodified
+on every pushed branch**, and no nineteenth engine PR was opened.

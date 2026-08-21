@@ -13605,3 +13605,156 @@ repo checks that a cited `C-\d+-\d+` or `B-\d+` resolves to a real entry, so a d
 invisible. The catch here was luck — a later command happened to fail loudly with `fatal: not a git
 repository`. A silent `cat >>` would have closed the iteration with green CI and two citations
 pointing at nothing.
+
+---
+
+## Run 76 — 2026-08-21 (Linux sandbox). The HKDF successor target, measured and refuted.
+
+Auditor setup for this run's claims (Linux, no Android SDK):
+
+```bash
+sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+git -C <android> checkout claude/android-a0-probe && git -C <android> pull
+```
+
+`scripts/core-probe.sh` runs **`:core:test` only**. Four of the gate's five tasks still need the
+Android SDK (**B-7**), so nothing below is a gate result and none is claimed as one.
+
+### C-76-1 — every count below is post-fetch (rule one)
+
+```bash
+git -C <android> fetch --all --prune && git -C <engine> fetch --all --prune
+git -C <engine> log --oneline -1 origin/main
+```
+
+*Expected, and **observed**:* both fetched before any read. `origin/main` is **`aac05f3`**, its last
+non-Claude commit **2026-08-12** (`Portable G & Shiva's Claw`, merge of #44). The android checkout
+arrived **detached at a stale `main` (`ebfaf81`, docs-only)**; the work branch was checked out from
+`origin/claude/android-a0-probe` at **`0c1895a`** before anything was measured.
+
+### C-76-2 — the assigned slice is built; the prompt's pin is still stale (forty-first firing)
+
+```bash
+git -C <engine> log --oneline --all --grep='entitlement_ack' | head
+grep 'Pinned commit' <android>/core/src/test/resources/sync-vectors/VECTORS.lock
+```
+
+*Expected, and **observed**:* the prompt's S5 spec half (§4.3 body, the ack vectors, PQ-A2-1/-2/-3)
+exists on the `claude/s5-*` drafts as `8575539`, `22b028e`, `7328a0b`, unchanged since 2026-08-09.
+The prompt's vendored pin `679a317` is stale: the lock says **`7328a0bc043335491cd96a67d634e8eea2a13af9`**.
+**Declined and verified rather than rebuilt, for the forty-first time.**
+
+### C-76-3 — the seven §5 domain separators, mutated one at a time: seven red, hypothesis refuted
+
+Run 75 filed the HKDF info strings as the lane's first successor target, on the reading that
+`ProtocolTest` asserted only that two of them *differ*, `HkdfTest` uses its own literals, and the
+envelope vectors carry `key_hex` directly — so the phone could derive from wrong info strings, stay
+green, and disagree with the engine only in the field. Run 75 said: *measure it before believing it.*
+
+**On the pre-fix tree `0c1895a`**, each constant mutated alone, restored between runs:
+
+```bash
+P=<android>/core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+# for each: sed -i 's|"careerseeker/v1/X"|"careerseeker/v1/X-MUTANT"|' $P
+#           scripts/core-probe.sh --rerun; echo "exit=$?"; git checkout -- $P
+```
+
+*Expected by the hypothesis: green. **Observed: all seven red**, `exit=1`.*
+
+| mutation | tests reddened | which |
+| --- | --- | --- |
+| `e2p` | **1** | `ProtocolVectorsTest > pairing derivation reproduces every vector value` |
+| `p2e` | **5** | above + 3 × `PairingFlowTest` + `PairingSessionTest` |
+| `relay-token` | **4** | above + 2 × `PairingFlowTest` + `PairingSessionTest` |
+| `confirm` | **4** | above + 2 × `PairingFlowTest` + `PairingSessionTest` |
+| `bootstrap` | **3** | above + `PairingFlowTest` + `PairingSessionTest` |
+| `pair` | **2** | above + `PairingDerivationTest > completionAad is the pinned four-field format` |
+| `cmd` | **3** | `EntitlementVectorsTest` + 2 × `ProtocolVectorsTest` |
+
+**The premise was true and the conclusion was false.** What guards them is the **pairing** vectors:
+`pairing-basic.json` carries `k_e2p_hex`, `k_p2e_hex`, `relay_token_b64u`,
+`provisional_token_b64u` and `confirm` as **derived** values, and `ProtocolVectorsTest:110-124`
+recomputes all five through `PairingDerivation.derive`. The hypothesis generalised from the
+*envelope* vectors (which do carry `key_hex` directly) to the corpus as a whole.
+
+**`INFO_ENGINE_TO_PHONE` had exactly one guard** where the others had two to five — the phone
+*seals* under `k_p2e` and only *opens* under `k_e2p`, so the flow tests never recompute it.
+
+### C-76-4 — the same seven literals in all three places
+
+```bash
+git -C <engine> show 7328a0b:docs/Sync-Protocol.md | grep -n 'careerseeker/v1/'
+git -C <engine> grep -n 'careerseeker/v1/' 7328a0b -- 'src/Sync/*.cs'
+grep -n 'careerseeker/v1/' <android>/core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+grep -rn 'careerseeker/v1/' <android>/core/src/main/ | grep -v Protocol.kt   # expect: nothing
+```
+
+*Expected, and **observed**:* spec §5.2 lines **414-417** and **444**, §5.2.2 line **464**, §5.4 line
+**522**; engine `src/Sync/Protocol.cs:23-29`; phone `Protocol.kt:38-46`. **Seven on each side, no
+eighth, and every literal identical** — unlike §7.2's error table (**C-75-4**), this vocabulary
+never drifted. The phone holds no `careerseeker/v1/` literal outside `Protocol.kt`.
+
+### C-76-5 — the defect actually found: an assertion that compared the constant against itself
+
+`PairingDerivationTest > signatureInput hashes the ciphertext as lower-case hex` pinned §5.4's
+domain separator as `assertEquals(Protocol.COMMAND_SIG_PREFIX, parts[0])` — the production output
+against the very constant that produced it, true for **any** value of the constant.
+
+```bash
+git -C <android> show 201b781 -- core/src/test/kotlin/app/careerseeker/core/PairingDerivationTest.kt
+```
+
+*Expected, and **observed**:* the row for `cmd` in **C-76-3** (pre-fix) does **not** list
+`PairingDerivationTest`; the row in **C-76-7** (post-fix) does. **The constant was never
+unguarded** — the signature vectors reach it — but not at the line written to guard it.
+
+### C-76-6 — the suite before and after
+
+```bash
+cd <android> && scripts/core-probe.sh --rerun; echo "exit=$?"
+```
+
+*Expected, and **observed**:* baseline on `0c1895a` **`341 tests, 0 failed, 0 skipped, across 22
+classes`**, `exit=0` — reproducing run 75's figure exactly. After this run's two commits,
+**`343 tests, 0 failed, 0 skipped, across 22 classes`**, `exit=0`. Two new tests, both in the
+existing `ProtocolTest`, so the class count is unchanged.
+
+### C-76-7 — three post-fix mutations; every prediction matched
+
+Run **on the post-fix tree `231bc07`**:
+
+```bash
+P=<android>/core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+sed -i 's|COMMAND_SIG_PREFIX = "careerseeker/v1/cmd"|COMMAND_SIG_PREFIX = "careerseeker/v1/cmd-MUTANT"|' $P        # R-M1
+sed -i 's|BOOTSTRAP_SALT = "careerseeker/v1/bootstrap"|BOOTSTRAP_SALT = "careerseeker/v1/relay-token"|' $P          # R-M2
+sed -i 's|INFO_ENGINE_TO_PHONE = "careerseeker/v1/e2p"|INFO_ENGINE_TO_PHONE = "careerseeker/v1/e2p-MUTANT"|' $P     # R-M3
+# after each: scripts/core-probe.sh --rerun; echo "exit=$?"; git checkout -- $P
+```
+
+*Expected, and **observed**:* all three `exit=1` —
+
+| | mutation | red | pre-fix |
+| --- | --- | --- | --- |
+| **R-M1** | `cmd` domain separator | **5** — incl. `PairingDerivationTest > signatureInput…` and `ProtocolTest > …section 5 prints` | **3**, neither of those two |
+| **R-M2** | `BOOTSTRAP_SALT` **collides with** `INFO_RELAY_TOKEN` | **5** — incl. `ProtocolTest > …pairwise distinct` | the collision test did not exist |
+| **R-M3** | `e2p` | **2** — the vector test **and** `ProtocolTest > …section 5 prints` | **1** |
+
+**R-M2 is the case the literal pins alone cannot catch**: every literal assertion still holds
+individually when two constants collide, which is why the pairwise-distinct test is separate.
+R-M3 is C-76-3's thin row, now two guards instead of one.
+
+### C-76-8 — 24 drafts, none merged; return day three days past
+
+```bash
+gh pr list --repo ShivaClaw/careerseeker         --state open --json number,isDraft | jq length
+gh pr list --repo ShivaClaw/careerseeker-android --state open --json number,isDraft | jq length
+```
+
+*Expected, and **observed**:* **18 engine + 6 android = 24**, every one `draft: true`; **none
+merged, closed or undrafted.** Engine `main` unmoved at `aac05f3` since **2026-08-12**. Return day
+was **2026-08-18**; today is **2026-08-21**, so it is **three days past**, not four.
+
+> **Correction to run 75.** Its banner says *"Return day is now four days past"*; run 74, same date,
+> says *"three days past"*. 2026-08-21 − 2026-08-18 = **3**, so run 74 is right and run 75 is off by
+> one. Corrected here rather than silently, because "every number reproduces" is the property these
+> records sell. **Nothing else in run 75's banner changes.**
