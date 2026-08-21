@@ -14215,3 +14215,46 @@ any kind. **The production relay was not contacted at all, not even `GET /v1/hea
 Play or OAuth console; no accounts, no purchases, no Gmail. **No secret was read, printed or
 echoed.** Terra's territory was **read, never written** — `autonomy/codex-state` reports
 **COMPLETE, files claimed: none**, so there was **no collision**.
+
+### Milestone 8 — CI reported, and the report is the run's second finding (C-75-11, C-75-12)
+
+Added after the fact, because the milestones above were written while it was still running.
+
+**CI came back RED on `592afa4`**, and the failure was in `:app` —
+`ScreensFromFixtureTest > theBannerFollowsIntoTheApplicationDetailOverlay`,
+`AssertionError at ScreensFromFixtureTest.kt:87`, `35 tests completed, 1 failed, 3 skipped`. This
+run's diff is **`:core`-only** (`git diff --name-only … | grep -c '^app/'` → **0**) and `:app`
+references neither `ErrorCode` nor `RESERVED_FOR_L2` (grep: no output), so there is **no causal path
+from the change to the failure**. That is a reason to look harder, not a reason to dismiss it.
+
+**The failed job was re-run once — the permitted single re-run — and passed on the identical
+commit.** Same tree, no push between them: `96726656919` **failure** → `96728744410` **success**,
+both at head `592afa4`, the second finalising `app-debug.zip` at 12,741,153 bytes. **That is proof
+of nondeterminism by itself.**
+
+**The precedent turns an incident into a pattern.** Workflow run `32119765602` (run number 177,
+2026-08-18, head `0c4ca8f`) failed the **same test class on a different assertion** —
+`theProvenanceBannerIsShownOnEveryTab`, `ScreensFromFixtureTest.kt:69` — and `0c4ca8f` is a
+**records-only** commit. **Two different assertions, two diffs that touch no `:app` file: timing,
+not behaviour.** Frequency across run numbers 172–201: **2 failures in 24 completed runs (~8%)**.
+
+**Why this is worth a blocker rather than a shrug.** **B-7** means no cloud session can run the
+android gate locally, so this program's *entire* `:app` evidence base is read out of CI logs. A
+nondeterministic gate makes every one of those greens **a single sample** — run 74's **C-74-10**
+included, and this run's own. The qualification is **scoped**: the vendored-vector step,
+`checkCoreIsAndroidFree`, `:core:test` and `:app:lintDebug` are deterministic; `:app:test`'s
+Compose-UI subset is not. A green there means **"passed this time"**, and **no record before this
+one said so.** Filed as **B-22**.
+
+**Not fixed here, deliberately, and the reason is the standing rule rather than convenience.** The
+fix is an `:app` file; `:app` needs the SDK this sandbox cannot reach (**B-7**), so the patch in
+B-22 — `waitForIdle()`/`waitUntil` between the navigating `performClick()` and the assertion, per
+the deprecation warning the build itself prints about `UnconfinedTestDispatcher` — is **written but
+uncompiled, and labelled unverified**. Pushing blind source into the very suite whose reliability is
+in question, on a slice that was about `:core` vocabulary, is what the rule forbids. The house rule
+for a failure unrelated to the diff is to state it with a proposed patch rather than widen the PR.
+**And it must not be fixed by skipping or `@Ignore`-ing the test:** the provenance banner is the
+honest-UI rule, and it is the last assertion this program should quarantine.
+
+**The head this run leaves behind is green** (**C-75-12**), and green is claimed as exactly one
+sample, not as a gate result reproduced.

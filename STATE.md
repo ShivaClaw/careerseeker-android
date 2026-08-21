@@ -54,6 +54,24 @@
 > pin did not move; `docs/Sync-Protocol.md` was read, never edited — §7.2 is correct and the defect
 > was entirely phone-side.**
 >
+> **CI WENT RED, THEN GREEN ON THE SAME COMMIT — new blocker B-22** (**C-75-11**, **C-75-12**).
+> Head `592afa4` failed on `ScreensFromFixtureTest > theBannerFollowsIntoTheApplicationDetailOverlay`
+> (`:app`, `AssertionError` at line 87), and the **re-run of the failed job passed on the identical
+> commit** — same tree, no push between: `96726656919` failure → `96728744410` success. This run's
+> diff is **`:core`-only** (0 `:app` files; `:app` references neither symbol), and the **precedent is
+> a records-only commit** (`0c4ca8f`, run 177) failing the **same class on a different assertion**.
+> **2 failures in 24 completed runs (~8%)**, both provenance-banner assertions, both missing any
+> `waitForIdle`/`waitUntil` after a navigating `performClick()` — the hazard the build's own
+> `UnconfinedTestDispatcher` deprecation warning names.
+>
+> **This retroactively qualifies every "CI green" in these records, C-74-10 and this run's own
+> included** — under **B-7** all `:app` evidence is read out of CI logs, so each green is **one
+> sample**. **Scoped, not total:** the vector step, `checkCoreIsAndroidFree`, `:core:test` and
+> `:app:lintDebug` are deterministic; `:app:test`'s Compose subset is not. **Not fixed here** — the
+> fix is an `:app` file needing the SDK (**B-7**), so B-22 carries a **written but uncompiled**
+> patch, labelled unverified, and explicitly forbids fixing it by skipping the test. **The head this
+> run leaves behind is green.**
+>
 > ## ▶ RUN 74 — 2026-08-21. **The guard written for B-19 could not see the kind it was written for.**
 >
 > **Return day is still three days past and no human has acted** — engine `main` **`aac05f3`**, last
@@ -1138,6 +1156,7 @@ respectively and they can be done today.
 
 | ID | Status |
 | --- | --- |
+| **B-22** android gate is flaky | **new 2026-08-21** (seventy-fifth run). CI on head `592afa4` went **red then green on the identical commit** — `96726656919` failure → `96728744410` success, no push between (**C-75-11**). The failure is `:app`'s `ScreensFromFixtureTest` (a provenance-banner `assertIsDisplayed()` immediately after a navigating `performClick()`, no `waitForIdle`/`waitUntil`); the **precedent is a records-only commit** (`0c4ca8f`, run 177) failing the **same class on a different assertion**. **2 failures in 24 completed runs (~8%).** **Consequence beyond the test:** under **B-7** every `:app` claim in these records is read out of CI logs, so **each green is one sample** — C-74-10 included. **Scoped:** the vector step, `checkCoreIsAndroidFree`, `:core:test` and `:app:lintDebug` are deterministic; `:app:test`'s Compose subset is not. Patch written in B-22, **uncompiled and labelled unverified** (`:app` needs the SDK, B-7). **Must not be closed by skipping or `@Ignore`-ing the test** — the banner is the honest-UI rule |
 | **B-1** pairing UI | gate answered; device half **still blocked** — see B-4 (the earlier "scheduled at S3" note was written before anyone checked `sdkmanager` existed) |
 | **B-2** live E2E | **ENGINE HALF DONE, entry CORRECTED 2026-08-14** — the `/pair` page merged to `main` 2026-08-12 (PR #42, `d1bc698`); its 11 assertions ran green here. Not CLOSED (needs a device = **B-4**) but **no longer blocked on anything of its own**. Historical text below is stale: **most of the way closed** — engine ↔ local relay proven 30/30; remaining gap is exactly the `/pair` page. **Unmoved 2026-08-11 (sixteenth run)**, and worth stating: S2's *transport* has now been hardened three times (size cap, retention predicate, `seq` bound) while B-2 sat still — the transport was never what B-2 was about **Unmoved again 2026-08-13 (twenty-eighth run)** — a fifth transport hardening (`latest`'s range) landed while B-2 sat still. Five hardenings, zero `/pair` progress: the next session picking S2 should treat that as the signal it is |
 | ~~**B-3** vector drift~~ | **CLOSED** — 26/26 byte-identical to pin `679a317`, confirmed by CI's own step (run `31278769047`). **RE-QUALIFIED 2026-08-16 (forty-fifth run), and it stays closed:** the pin is now `7328a0b` and the vendored set **29/29 byte-identical** to it, re-verified after this run's edits (**C-PIN-1**). But the CI step that "confirmed" it compared only files the phone already had, so it confirmed *no tampering*, never *no omission* (**C-CI-1**) — fixed this run (**C-CI-2**, runner-unverified, **B-15**). **And more importantly it compared against the PIN, not upstream**, which is why this row could read CLOSED while the phone was ~4 days behind (**C-CI-4**, **B-16**). The drift this ID was opened for is genuinely absent; the guarantee is **"matches the pin"**, not "matches the engine" |
