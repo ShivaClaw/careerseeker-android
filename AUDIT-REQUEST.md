@@ -13506,3 +13506,102 @@ this branch's tip before this run's push.
 
 **This is the number every run's prohibition paragraph asserts**, and it is measured here rather
 than carried forward from the previous entry, per the stale-refs rule that opens every iteration.
+
+### C-75-11 — the android gate is nondeterministic: the same commit went red, then green
+
+```bash
+# attempt 1 and attempt 2 are the SAME workflow run, the SAME head, no push between them
+# run 32467317566, head 592afa4
+gh run view 32467317566 --repo ShivaClaw/careerseeker-android            # or the Actions UI
+gh api repos/ShivaClaw/careerseeker-android/actions/jobs/96726656919 --jq .conclusion   # attempt 1
+gh api repos/ShivaClaw/careerseeker-android/actions/jobs/96728744410 --jq .conclusion   # attempt 2
+# the precedent, on a records-only commit that cannot touch :app
+gh run view 32119765602 --repo ShivaClaw/careerseeker-android --log-failed | grep -E "FAILED|tests completed"
+# and confirm this run's diff cannot reach :app
+cd <android> && git diff --name-only dddb806^ 592afa4 | grep -c '^app/'    # expect 0
+grep -rn "ErrorCode\|RESERVED_FOR_L2" --include=*.kt app/src              # expect no output
+```
+
+*Expected, and **observed**:*
+
+| attempt | job | head | conclusion |
+| --- | --- | --- | --- |
+| 1 | `96726656919` | `592afa4` | **failure** — `ScreensFromFixtureTest > theBannerFollowsIntoTheApplicationDetailOverlay`, `AssertionError at ScreensFromFixtureTest.kt:87`, `35 tests completed, 1 failed, 3 skipped` |
+| 2 | `96728744410` | **`592afa4`, unchanged** | **success**, every step, artifact `app-debug.zip` finalized at **12,741,153 bytes** |
+
+The precedent run `32119765602` (run number 177, 2026-08-18, head `0c4ca8f` — **records-only**)
+prints `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab FAILED`,
+`AssertionError at ScreensFromFixtureTest.kt:69`, `35 tests completed, 1 failed, 3 skipped`. **Two
+different assertions, two diffs that touch no `:app` file.** The two greps return **`0`** and **no
+output**: this run's diff is `:core`-only and `:app` references neither symbol, so there is no causal
+path from the change to the failure.
+
+**What this establishes, and the limit on it.** The same-commit red→green is proof of
+nondeterminism on its own; the precedent makes it a pattern (**2 failures in 24 completed runs,
+numbers 172–201, both in `ScreensFromFixtureTest`**). It does **not** establish the mechanism —
+that reading is `B-22`'s, and it is argued from the deprecation warning the build prints and from
+the absence of any `waitForIdle`/`waitUntil` between `performClick()` and `assertIsDisplayed()`.
+**No `:app` code was compiled or run to confirm it** (**B-7**), so the proposed patch in B-22 is
+**unverified** and is labelled so.
+
+**This retroactively qualifies every CI-green claim in these records, including C-74-10 and this
+run's own.** The qualification is **scoped, not total**: the vendored-vector step,
+`checkCoreIsAndroidFree`, `:core:test` and `:app:lintDebug` are deterministic; it is `:app:test`'s
+Compose-UI subset that is not. A green on that step means **"passed this time"** — which is what
+*one sample* is worth, and no record before this one said it.
+
+### C-75-12 — `592afa4` is green (superseded by the completed entry below)
+
+```bash
+gh pr checks 6 --repo ShivaClaw/careerseeker-android
+```
+
+*Expected, and **observed**:* head **`592afa4`**, check `Build and test` **`success`** — the gate's
+every step, including `checkCoreIsAndroidFree`, the vendored-vector drift check, `:core:test`,
+`:app:test`, `:app:assembleDebug` and `:app:lintDebug`, on a real runner with a real SDK. **Per
+C-75-11 this is one sample of a suite with a nondeterministic subset**, and is not claimed as more.
+
+### C-75-12 (completed) — CI green on `af0cef8`, and the standing limit on saying so
+
+```bash
+gh pr checks 6 --repo ShivaClaw/careerseeker-android
+```
+
+*Expected, and **observed**:* head **`af0cef8`**, check `Build and test` **`success`**
+(job `96731456292`, run `32468925718`) — every step on a real runner with a real SDK:
+`checkCoreIsAndroidFree`, the vendored-vector drift check, `:core:test`, `:app:test`,
+`:app:assembleDebug`, `:app:lintDebug`, and the no-analytics assertion. The earlier green on
+`592afa4` (**C-75-11**, attempt 2) held on the next head too.
+
+**Two limits, both standing rather than new.** Per **C-75-11 / B-22** this is **one sample** of a
+suite whose `:app` Compose subset is nondeterministic — `:app:test` green means *"passed this
+time"*. And per the convention run 176 settled, **each push supersedes the previous run**, so the
+commit that records this line is itself not covered by it: **the last commit of any iteration is
+never CI-observed by that iteration.** That is why this cites the **PR** rather than promising a
+run ID, and why no green is claimed for the addendum commit itself.
+
+### C-75-13 — every `C-` and `B-` id this run cites resolves to an entry that exists
+
+```bash
+cd <android>
+grep -c '^## B-22' BLOCKED.md                       # expect 1
+grep -c '^### C-75-11' AUDIT-REQUEST.md             # expect 1
+grep -c '^### C-75-12' AUDIT-REQUEST.md             # expect 2 (pending + completed)
+ls /home/user/BLOCKED.md /home/user/AUDIT-REQUEST.md 2>&1   # expect: No such file
+git status --porcelain                                       # expect: clean after commit
+```
+
+*Expected, and **observed**:* `1`, `1`, `2`, both strays **absent**, tree clean.
+
+**This check exists because this run failed it.** B-22's entry and C-75-11/-12 were appended with a
+bare relative path after the shell's cwd had reset to `/home/user`, so they landed outside any
+repository while `f0b0a0a` and the PR body already **cited them as filed** (LOG.md milestone 9).
+Restored and verified. **Run 69's "address both sides by absolute path" rule already covered this
+hazard and was applied only to the command that produced it** — the same shape as the §7.2 drift
+this run's slice is about, one document class over.
+
+**The general form is not built and is the lane's strongest successor candidate:** nothing in either
+repo checks that a cited `C-\d+-\d+` or `B-\d+` resolves to a real entry, so a dangling citation is
+invisible. The catch here was luck — a later command happened to fail loudly with `fatal: not a git
+repository`. A silent `cat >>` would have closed the iteration with green CI and two citations
+pointing at nothing.

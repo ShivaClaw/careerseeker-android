@@ -3527,3 +3527,88 @@ whole of B-19 and which `:core` structurally cannot check (**B-7**: `:app` needs
 this sandbox cannot reach). A vocabulary can be complete, spec-exact and fully mutation-covered on
 a phone where nothing ever reads it — which is, precisely, `unimplemented`'s situation today, and
 `entitlement_ack`'s for nine days before it.
+
+---
+
+## B-22 — the android gate is nondeterministic in its `:app` half, and every "CI green" in these records is one sample (seventy-fifth run, 2026-08-21)
+
+**Symptom.** CI failed on head `592afa4`, then **passed on the identical commit** with no change to
+the tree (**C-75-11**):
+
+| attempt | job | head | result |
+| --- | --- | --- | --- |
+| 1 | `96726656919` | `592afa4` | **FAILURE** — `ScreensFromFixtureTest > theBannerFollowsIntoTheApplicationDetailOverlay`, `AssertionError at ScreensFromFixtureTest.kt:87`; `35 tests completed, 1 failed, 3 skipped` |
+| 2 (`rerun_failed_jobs`) | `96728744410` | **`592afa4` — same commit** | **SUCCESS**, every step, `app-debug.zip` uploaded (12,741,153 bytes) |
+
+**Same tree, red then green.** That alone is proof; the precedent makes it a pattern rather than an
+incident. Workflow run **`32119765602`** (run number 177, 2026-08-18, head **`0c4ca8f`**) failed the
+**same test class on a different assertion** — `theProvenanceBannerIsShownOnEveryTab`,
+`AssertionError at ScreensFromFixtureTest.kt:69`, also `35 tests completed, 1 failed, 3 skipped` —
+and `0c4ca8f` is a **records-only commit** which cannot affect `:app` by any causal path. **Two
+different assertions failing on two diffs, neither of which touches `:app`, is timing, not
+behaviour.** Measured frequency across run numbers 172–201: **2 failures in 24 completed runs (~8%)**,
+both in `ScreensFromFixtureTest`, both provenance-banner assertions.
+
+**Why it matters more than a flaky test usually would.** **B-7** means no cloud session can run the
+android gate locally, so this program's *entire* body of `:app` evidence — `:app:assembleDebug`,
+`:app:lintDebug`, `:app:test`, `checkCoreIsAndroidFree` — is **read out of CI runner logs**. A
+nondeterministic gate makes every one of those greens a **single sample**, including run 74's
+**C-74-10** and this run's own. It does not make them worthless, and the qualification is scoped:
+the vector-drift step, `checkCoreIsAndroidFree`, `:core:test` and lint are deterministic. **It is
+`:app:test`'s Compose-UI subset that is not**, so a green there means *"passed this time"*, and
+nothing in the records has ever said so.
+
+**Root cause, as far as `:core`-only tooling can establish it.** `ScreensFromFixtureTest` uses the
+**deprecated** `createComposeRule()`, whose own compiler warning names the hazard verbatim in every
+build log:
+
+> *The v2 APIs use `StandardTestDispatcher` instead of `UnconfinedTestDispatcher` … **Tests relying
+> on immediate execution may require explicit synchronization.***
+
+Both failing assertions are `assertIsDisplayed()` called **immediately after** a `performClick()`
+that navigates, in a tree whose data arrives through Room `Flow`s seeded in `@Before`. There is no
+`waitForIdle`, no `waitUntil`, and no idling resource between the click and the assertion. Under
+`UnconfinedTestDispatcher` the recomposition usually lands first; **usually** is the defect.
+
+**Attempts.** One, and it was the diagnosis rather than a fix: the failed job was re-run **once** —
+the permitted single re-run — which produced the same-commit green that proves the nondeterminism.
+**No further re-run should be spent on this**; the question is settled and a second one would only
+re-sample.
+
+**Why this run did not fix it.** The fix is an **`:app`** file, and `:app` needs the Android SDK and
+AGP from `dl.google.com`, which this sandbox's egress policy denies (**B-7**); `scripts/core-probe.sh`
+reaches `:core` only. Pushing a synchronization change no one has compiled — into the very suite
+whose reliability is in question, on a slice that was about `:core` vocabulary — is the thing this
+program's standing rule forbids and would also have widened the slice. **The failure is unrelated to
+this run's diff** (`:core`-only; `:app` references neither `ErrorCode` nor `RESERVED_FOR_L2`), so the
+house rule is to state it with a proposed patch rather than widen the PR. **The head is green.**
+
+**Smallest human unblock.** On the Windows box (or any machine with the SDK), in `:app`:
+
+```kotlin
+// ScreensFromFixtureTest.kt — after each navigating performClick(), before the assertion:
+compose.onNodeWithText("Applications").performClick()
+compose.waitForIdle()                                    // <- the missing synchronization
+compose.onNodeWithText("Senior Platform Engineer").performClick()
+compose.waitForIdle()
+```
+
+and preferably, for the assertions that wait on `Flow`-backed content, the stronger form:
+
+```kotlin
+compose.waitUntil(timeoutMillis = 5_000) {
+    compose.onAllNodesWithText("Demo data — not a live engine").fetchSemanticsNodes().isNotEmpty()
+}
+```
+
+Then run the full gate with `--rerun-tasks`, and — because a flake is only proved fixed by
+repetition — `./gradlew :app:testDebugUnitTest --rerun-tasks` **twenty times**, expecting 20/20.
+Migrating to `androidx.compose.ui.test.junit4.v2.createComposeRule` (what the deprecation warning
+asks for) is the larger, better fix and is a separate decision, because the v2 dispatcher **queues**
+rather than executing immediately and would likely require synchronization in more places than the
+two that have failed so far.
+
+**Do not fix this by skipping, disabling, `@Ignore`-ing or retrying the test.** The provenance banner
+is the honest-UI rule — *"Demo data — not a live engine"* on every screen including the detail
+overlay — and it is exactly the assertion this program would least like to see quarantined. The bug
+is in the test's synchronization, not in what it asserts.

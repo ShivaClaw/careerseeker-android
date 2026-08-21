@@ -14258,3 +14258,44 @@ honest-UI rule, and it is the last assertion this program should quarantine.
 
 **The head this run leaves behind is green** (**C-75-12**), and green is claimed as exactly one
 sample, not as a gate result reproduced.
+
+### Milestone 9 — a records defect of this run's own making, caught before close (C-75-13)
+
+**Two of this run's own record entries were written to files outside the repository, and two pushed
+commits asserted they existed.** `B-22`'s blocker entry and `AUDIT-REQUEST.md`'s **C-75-11** and
+**C-75-12** were appended with a bare relative path after the shell's working directory had reset to
+`/home/user`, so they landed in `/home/user/BLOCKED.md` and `/home/user/AUDIT-REQUEST.md` — files
+belonging to no repository. Meanwhile `f0b0a0a` ("Records: B-22 — the android gate is
+nondeterministic") and the PR body both **referred to B-22 and C-75-11 as filed**.
+
+**What was actually in the repo at that moment**, measured rather than assumed:
+
+```
+BLOCKED.md       ## B-22 heading      -> 0 hits   (MISSING)
+AUDIT-REQUEST.md C-75-11 / C-75-12    -> 0 hits   (MISSING)
+LOG.md           Milestone 8          -> present
+STATE.md         B-22 banner + row    -> present
+```
+
+So the run had a **STATE.md** row and a **LOG.md** milestone pointing at a blocker entry that did not
+exist, and audit citations `C-75-11`/`C-75-12` that resolved to nothing — *"a claim with no command
+is a bug in the document"*, and this was worse: a command that had been written and then filed
+outside the building. Restored from the stray files, verified present, the strays deleted.
+
+**Why it happened, and it is not a new lesson.** The edits that survived used either an absolute
+path or a Python script run from the repo root; the ones that were lost used `cat >> FILE.md` after
+a `cd` that no longer held. **Run 69 already recorded this exact hazard** and its rule — *address
+both sides by absolute path* — for the vector diff. The rule was right and was applied to the
+command it was written for, not to the class of commands it belongs to. **A house rule scoped to
+the instance that produced it is the same defect this run spent its slice on** (§7.2's drift trap,
+obeyed perfectly inside one repo and reaching nothing across the boundary), and it turned up twice
+in one run, in the records and in the protocol.
+
+**The catch was luck, and should not have been.** It surfaced only because a *later* append failed
+loudly with `fatal: not a git repository` — had the last command been another silent `cat >>`, the
+iteration would have closed with a green CI, a refreshed PR, and two dangling citations. **Nothing
+in this repository checks that a cited `C-` id resolves**, which is now the strongest candidate the
+`:core` lane has produced for a records-side guard: a grep over `LOG.md`/`STATE.md`/PR bodies for
+`C-\d+-\d+` and `B-\d+` that fails when the referent is absent. Filed as the successor target in
+`STATE.md` beside the HKDF hypothesis; **not built this run** — it is one slice per iteration, and
+this one is spent.
