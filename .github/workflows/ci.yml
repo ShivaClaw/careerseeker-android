@@ -43,6 +43,22 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
+      # These records sell one property: every claim has a command that re-verifies it.
+      # The mechanism is a citation -- "(C-76-3)" in LOG.md, looked up in AUDIT-REQUEST.md.
+      # A citation pointing at nothing reads exactly like one that works, so it spends the
+      # reader's trust and returns nothing.
+      #
+      # Run 75 shipped two of them and caught it by luck: B-22, C-75-11 and C-75-12 were
+      # appended with a bare relative path after the shell's cwd had reset, so they landed
+      # outside the repository while the pushed commit already cited them as filed. A
+      # silent `cat >>` would have closed that iteration green. Nothing checked it; now
+      # this does. It needs no toolchain, which is the point -- the hazard lands in
+      # records-only commits, exactly the ones that look too cheap to gate.
+      - name: Assert every cited C-/B- id resolves
+        run: |
+          ./scripts/check-citations.sh --self-test
+          ./scripts/check-citations.sh
+
       - name: Assert :core has no Android dependency
         run: ./gradlew checkCoreIsAndroidFree
 
