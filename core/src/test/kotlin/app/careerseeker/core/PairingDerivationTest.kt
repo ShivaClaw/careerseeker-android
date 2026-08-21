@@ -373,7 +373,13 @@ class PairingDerivationTest {
             val parts = input.split("|")
 
             assertEquals(4, parts.size)
-            assertEquals(Protocol.COMMAND_SIG_PREFIX, parts[0])
+            // The literal, not `Protocol.COMMAND_SIG_PREFIX`. Until run 76 this line read
+            // `assertEquals(Protocol.COMMAND_SIG_PREFIX, parts[0])`, which compares the
+            // production output against the very constant that produced it -- true for any
+            // value of the constant, so it could not fail from a mutation of it. It read like
+            // a pin of §5.4's domain separator and was not one. (The constant is guarded --
+            // mutating it reddens the signature vectors -- but not here; see C-76-3.)
+            assertEquals("careerseeker/v1/cmd", parts[0])
             assertEquals("aad-here", parts[1])
             assertEquals("nonce-here", parts[2])
             assertTrue(lowerHex64.matches(parts[3]), "digest was not 64 lower-case hex: ${parts[3]}")
