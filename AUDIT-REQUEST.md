@@ -13331,13 +13331,18 @@ that dropping `error` is right.
 ### C-75-1 — every count below is post-fetch (rule one)
 
 ```bash
-cd <android> && git fetch --all --prune && git rev-list --left-right --count origin/main...HEAD
+cd <android> && git fetch --all --prune && git rev-list --left-right --count origin/main...b5fd218
 cd <engine>  && git fetch --all --prune && git rev-parse origin/main
 ```
 
-*Expected, and **observed**:* android `10  270` — this branch is **270** ahead of a `main` the
-checkout arrived detached at (`ebfaf81`), 10 behind. Engine `origin/main` =
-**`aac05f3f93f0ca06cbc9dfa7884f74a126f078dc`**, unmoved since 2026-08-12.
+*Expected, and **observed**:* android `10  270` — **at this run's starting tip `b5fd218`**, which is
+**270** ahead of a `main` the checkout arrived detached at (`ebfaf81`), and 10 behind. Engine
+`origin/main` = **`aac05f3f93f0ca06cbc9dfa7884f74a126f078dc`**, unmoved since 2026-08-12.
+
+> **The starting tip is named on purpose.** A first draft of this block wrote `…origin/main...HEAD`,
+> which stops reproducing the moment this run commits — it reads **273** at the pushed head. The
+> same trap the records caught once before with `HEAD~1` (the banner commit shifts it): **a
+> re-verification command must not be anchored to a moving ref.**
 
 ### C-75-2 — the assigned slice is built, and is still not on `main` (fortieth firing)
 
