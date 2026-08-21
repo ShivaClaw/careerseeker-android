@@ -14068,3 +14068,150 @@ blobs and diffs them.
 cannot invent a caller — `:app` still constructs nothing from `:core`, so **B-19 is exactly as
 open as it was**. And a green gate says the applier's `else` branch **compiles**, not that dropping
 `error` is correct: **PQ-ERR-1 is untouched by this result.**
+
+---
+
+## RUN 75 — 2026-08-21 (Linux sandbox). §7.2 grew a tenth row two days after the phone copied it, and nothing in either repo compares the two.
+
+**Fetch first, and it mattered again.** Both checkouts arrived **detached at a stale `main`** — the
+android tree at `ebfaf81`, **270** commits behind this branch's tip, measured this run
+(`git rev-list --left-right --count origin/main...HEAD` → `10  270`), not carried forward from run
+74's 265. Every number below is post-fetch (**C-75-1**).
+
+**Declined for the fortieth time and verified instead** (**C-75-2**, **C-75-3**). All three S5 slice
+commits exist and report `not on main`, `exit=1`, in the **engine** repo. The prompt's vendored pin
+`679a317` is **still stale** — it is **`7328a0b`** — and the vendored corpus is **29/29
+byte-identical** to it (`diff -r` silent, `exit=0`), generator-clean at both ends
+(`OK: 29 vector files match the generator.`). **Return day is four days past and no human has
+acted**: engine `main` still `aac05f3`, last non-Claude commit **2026-08-12**.
+
+### Milestone 1 — the finding, and it is a cross-repo drift with a date on it (C-75-4)
+
+`ErrorCode` in `core/.../Protocol.kt` is declared *"Rejection reasons. Sync-Protocol.md section
+7.2"* — a hand copy of a normative table. It carried **nine** rows. §7.2's table has **ten**.
+
+The missing row is **`unimplemented`**, and its history is exact:
+
+| | |
+| --- | --- |
+| phone's `ErrorCode` written | **2026-07-22**, `6bdddbd` (nine rows) |
+| §7.2 grows a tenth row | **2026-07-24**, `e1e7a90` — spec **and** `src/Sync/Protocol.cs` amended **in one commit** |
+| phone follows | **never**, until this run — **28 days** |
+
+The engine did exactly what `CLAUDE.md`'s drift trap requires: it moved the document and its own
+transcription together, in one commit. **The rule has no clause that reaches across the repo
+boundary**, and the string `unimplemented` appears **nowhere** in the phone's Kotlin.
+
+### Milestone 2 — why nothing said so, and the control that proves it (C-75-5)
+
+The omission was not merely unnoticed; it was **unnoticeable**. `ErrorCode.entries` is enumerated by
+**no test in the repository**. The only guard on any of these codes is indirect and partial:
+`ProtocolVectorsTest` compares a vector's `expect_error` against `ErrorCode.wire`, which pins only
+the codes the shared corpus happens to exercise. `rev_conflict`, `pairing_unknown` and
+`unimplemented` have **no vector**.
+
+**The negative control is deletion of a row that was never missing**, on the pre-fix tree:
+
+```
+P-M1  ErrorCode loses PAIRING_UNKNOWN (a real §7.2 row)  ->  exit=0   338 tests, 0 failed
+P-M3  RESERVED_FOR_L2 loses "metric"                     ->  exit=0   338 tests, 0 failed
+```
+
+**Green, both.** So the vocabulary was unguarded *in full*, not short by one — and
+`PayloadKind.RESERVED_FOR_L2` has the identical shape: five call sites **iterate** it and assert a
+property of each member, so dropping a member makes those loops test **less** rather than fail.
+
+### Milestone 3 — a claim withdrawn before it was written down (C-75-6)
+
+The sweep began on a third suspect and **it is not one**. `PayloadKindCoverageTest`'s
+`state-changing kinds are all phone to engine` reads
+
+```kotlin
+Protocol.STATE_CHANGING_KINDS.mapNotNull { PayloadKind.fromWire(it) }.filter { … }
+```
+
+and `mapNotNull` **silently drops** any string that is not a valid kind — so that assertion, read on
+its own, launders a typo in the set that decides which envelopes need §5.4's device signature. That
+reads like a security hole. **Measured, it is not:**
+
+```
+P-M2  STATE_CHANGING_KINDS loses "outcome"          ->  exit=1   2 tests red
+P-M4  STATE_CHANGING_KINDS typo outcome->outcomes   ->  exit=1   4 tests red
+P-M5  STATE_CHANGING_KINDS gains a bogus 4th entry  ->  exit=1   2 tests red
+```
+
+Three independent **behavioural** tests — `EnvelopeReceiverTest`, `OutboundEnvelopesTest`,
+`OutboundQueueTest` — catch every mutation direction, because they drive the set through the
+receiver and the builder rather than inspecting it. **The weak assertion is real and the hole is
+not**, and that distinction is the finding: recorded here so the next reader who spots `mapNotNull`
+does not "fix" it believing it is the gap. §5.4's list is the **best**-guarded of the three, not the
+worst.
+
+### Milestone 4 — what changed (C-75-7, C-75-8)
+
+`UNIMPLEMENTED("unimplemented")` added to `ErrorCode`, and both vocabularies pinned in
+`ProtocolTest` against copies of their normative tables **transcribed by hand** — run 74's lesson
+applied one file along: a derivation compared against itself agrees with itself while both sides
+disagree with the document, so one side of the comparison must not be derived.
+
+`:core:test` **338 → 341 tests, 0 failed, 0 skipped, across 22 classes**, `exit=0`, baseline 338/0
+measured on the same tree this run. Four mutations, every prediction matched:
+
+```
+Q-M1  ErrorCode loses PAIRING_UNKNOWN       ->  1 red   (was GREEN pre-fix)
+Q-M2  drop UNIMPLEMENTED — the exact
+      historical defect, re-introduced       ->  1 red   (was GREEN pre-fix, for 28 days)
+Q-M3  RESERVED_FOR_L2 loses "metric"        ->  1 red   (was GREEN pre-fix)
+Q-M4  wire typo too_large -> tooLarge       ->  3 red   (2 new + ProtocolVectorsTest)
+```
+
+**Q-M2 is the one that matters**: the defect as it actually existed, for 28 days, now fails a test.
+
+### Milestone 5 — the addition is vocabulary and decides nothing (C-75-9)
+
+**`unimplemented` changes no behaviour, and this run makes no claim that it does.** The phone
+produces no case for it: every kind it refuses is refused as `unknown_kind`, and the shipping kinds
+it accepts-and-drops — `doc`, `conflict`, `error` — are dropped without a reply at all. Nothing
+parses this string today, because whether the phone reads an inbound `error` code **at all** is
+**PQ-ERR-1**, filed open by run 74 and **untouched here**.
+
+It is added because the enum's job is to **be §7.2**, not to be the subset the phone currently
+reaches — and because §7.2 states its rule *about the phone*: `unimplemented` is *"distinct from
+`unknown_kind` — the kind IS known, so the phone should not treat it as a version/vocabulary
+error."* An enum that cannot represent a code cannot honour a rule about how to read it. Had
+PQ-ERR-1 been answered *"surface the code"* first, `code: "unimplemented"` would have resolved to
+`null` and been indistinguishable from an unrecognised one — the exact confusion the row exists to
+forbid. **Vocabulary first, behaviour at the gate.**
+
+### Milestone 6 — what did NOT happen, honestly
+
+**No rung moved, and none is claimed to have.** This is `:core` vocabulary and its guard, on S8's
+coverage lane; it advances no rung. **S5 is unchanged — still PARTIAL, still not blocked, still off
+`main`.** **B-19 is unmoved**: nothing in `:app` was written, and nothing here constructs anything
+— `ProtocolTest` proves a transcription is faithful, which is strictly weaker than proving a caller
+exists, and that gap is the whole of B-19. **PQ-ERR-1 is not decided, not narrowed and not
+answered.** No new blocker arose.
+
+### Milestone 7 — prohibition paragraph: what this run did not touch
+
+**Nothing was merged, closed, rebased, undrafted, force-pushed or deleted in either repo** — the
+**18** engine drafts and **6** android drafts are exactly as found, and **#53's fate stays
+Brandon's**. **No vector byte was written in either repo**: the corpus was re-diffed against pin
+`7328a0b` at **29/29, `diff -r` silent, `exit=0`**, `VECTORS.lock` was not edited, **the pin did not
+move (H7)**, and `generate.mjs` was run **only** with `--check`, which writes nothing. **No `:app`
+file was written** — **B-19** stays open. **No C# was written**; the engine checkout was read-only
+apart from `STATE.md` on the docs-only `autonomy/claude-state` branch, and was left detached at
+`aac05f3` where it was found. **`docs/Sync-Protocol.md` was read, never edited** — §7.2 is the
+engine's normative document and it is **correct**; this run's defect was entirely on the phone side,
+so there was nothing to amend and amending would have been the wrong direction. Same rule that kept
+run 70 out of §4.1's AAD and run 74 out of §4.3. **No `ci.yml`, no `generate.mjs`, no
+`repin-vectors.sh`; `$ExpectedOfflineTotal` was not moved**, and **no nineteenth engine PR was
+opened**. **`Verify-Alpha.ps1` was not run and no result for it is claimed** — no `pwsh`, no
+`dotnet`, Windows gate besides. **The android gate was not run locally**: `:app:assembleDebug`,
+`:app:lintDebug`, `:app:test` and `checkCoreIsAndroidFree` are **unrun and unclaimed here**
+(**B-7**), and **no zero-warning claim is made**. JDK 17 was installed into this sandbox to run
+`scripts/core-probe.sh` (machine change, as run 56 logged). No emulator, no keystore, no deploy of
+any kind. **The production relay was not contacted at all, not even `GET /v1/health`.** No Google,
+Play or OAuth console; no accounts, no purchases, no Gmail. **No secret was read, printed or
+echoed.** Terra's territory was **read, never written** — `autonomy/codex-state` reports
+**COMPLETE, files claimed: none**, so there was **no collision**.

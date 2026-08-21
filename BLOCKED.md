@@ -3460,3 +3460,56 @@ No Maven 429 was seen across four `core-probe.sh` runs (baseline, control, three
 ### B-1, B-2, B-4, B-5, B-6, B-8, B-9, B-12, B-13, B-14, B-15, B-16, B-17, B-20 — untouched this run
 
 None was worked, none moved, and none is re-derived here.
+
+---
+
+## No new blocker arose 2026-08-21 (§7.2 vocabulary drift, seventy-fifth cloud iteration)
+
+This run wrote `:core` Kotlin and hit nothing it could not finish. Recorded explicitly, because a
+run that files nothing should say so rather than leave the reader wondering whether it forgot.
+
+**One near-miss is worth naming, because it is a blocker that did not need to be filed.** The sweep
+that found this run's defect began on a third suspect — `PayloadKindCoverageTest`'s `mapNotNull`,
+which launders a typo in the set governing §5.4's device-signature requirement. That reads like a
+security hole worth a blocker entry. **Three mutations showed it is not one** (**C-75-6**): the
+behavioural tests catch every direction. It was withdrawn before it was written down anywhere but
+here. The precedent is run 56's withdrawn `entitlement`/`entitlement_ack` claim — *grep instead of
+assuming, and narrow the finding before publishing it, not after*.
+
+### B-18 status 2026-08-21 (seventy-fifth run) — the fortieth firing, and the twelfth attempt is silence
+
+**Unchanged as a blocker.** The scheduled prompt again assigned S5's spec half, which has existed
+since **2026-08-09** and is re-verified rather than assumed (**C-75-2**). The prompt's pin
+`679a317` is still stale (**`7328a0b`**, **C-75-3**), its "S5 is NOT STARTED" is still wrong, and
+its *"you cannot compile the Kotlin applier"* is still half-false — this run compiled and tested
+`:core` four times over. **Nothing has been merged, closed or undrafted in either repo**: engine
+`main` still `aac05f3`, last non-Claude commit **2026-08-12**; **18 engine + 6 android drafts**,
+all open, all draft. **Return day was 2026-08-18 — four days past.**
+
+**Attempt 12 is deliberately to send nothing.** Run 73 pushed the escalation to Brandon's phone and
+inbox (attempt 10) carrying the state, the re-verified landing plan, step 0 and the re-pin command.
+Run 74 declined to repeat it the same day. **This run declines again, and the reason is now a
+measurement rather than a courtesy:** nothing in the world state has changed since attempt 10 —
+same `main`, same 24 drafts, same human queue, same four-day-old return date — so a second
+notification would carry **no new fact** and would spend attention that the first one still needs.
+A notification whose content is identical to one already sent trains its recipient to ignore the
+channel, which would damage the one escalation path this program has that does not require someone
+to open a 950 KB `LOG.md`.
+
+**This is a judgement, not a rule, and it inverts the moment a fact changes.** If a later run
+measures **any** movement — a merge, a close, a human commit in either repo, or a genuine new
+blocker — that is a new fact and it should go out immediately. **B-18 stays open**: whether the
+routine stops is Brandon's action, and a sent notification is still not a read one.
+
+### B-19 status 2026-08-21 (seventy-fifth run) — unchanged, and this run is not progress on it
+
+**Still open, still exactly as run 58 scoped it.** The three `:app` pieces — a `ProStateStore`
+implementation, the configured `knownProductIds` set, and the composition root that constructs
+`EntitlementRoutingApplier` — are untouched. **No `:app` file was written this run.**
+
+**Read this run's tests for what they are.** `ProtocolTest`'s two new pins prove a **transcription
+is faithful to a document**. That is strictly weaker than proving a **caller exists**, which is the
+whole of B-19 and which `:core` structurally cannot check (**B-7**: `:app` needs the Android SDK
+this sandbox cannot reach). A vocabulary can be complete, spec-exact and fully mutation-covered on
+a phone where nothing ever reads it — which is, precisely, `unimplemented`'s situation today, and
+`entitlement_ack`'s for nine days before it.

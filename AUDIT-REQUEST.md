@@ -13323,3 +13323,163 @@ re-fetches the pin's blobs and diffs them, so the 29/29 identity is now checked 
 `:app` still constructs nothing from `:core` (**B-19**), and a green gate on an unwired module is
 not a working phone. **PQ-ERR-1 is unaffected** — a green gate says the `else` branch compiles, not
 that dropping `error` is right.
+
+---
+
+## RUN 75 — 2026-08-21. §7.2's tenth row, and the two vocabularies nothing compared to the document
+
+### C-75-1 — every count below is post-fetch (rule one)
+
+```bash
+cd <android> && git fetch --all --prune && git rev-list --left-right --count origin/main...HEAD
+cd <engine>  && git fetch --all --prune && git rev-parse origin/main
+```
+
+*Expected, and **observed**:* android `10  270` — this branch is **270** ahead of a `main` the
+checkout arrived detached at (`ebfaf81`), 10 behind. Engine `origin/main` =
+**`aac05f3f93f0ca06cbc9dfa7884f74a126f078dc`**, unmoved since 2026-08-12.
+
+### C-75-2 — the assigned slice is built, and is still not on `main` (fortieth firing)
+
+```bash
+cd <engine> && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do
+  git cat-file -t $c
+  git merge-base --is-ancestor $c origin/main; echo "$c on main? exit=$?"
+done
+```
+
+*Expected, and **observed**:* all three print **`commit`** and all three report **`exit=1`**, *not
+on main*. **Built since 2026-08-09; assigned again this run.** See **B-18**.
+
+### C-75-3 — the pin is `7328a0b`, and the vendored corpus is byte-identical to it
+
+```bash
+cd <engine> && git worktree add --detach /tmp/pin75 7328a0b
+diff -r /tmp/pin75/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+cd /tmp/pin75 && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected, and **observed**:* `diff -r` **silent, `exit=0`**; **29** files at the pin and **29**
+vendored; **`OK: 29 vector files match the generator.`**, `exit=0`. **The recurring prompt's pin
+`679a317` is stale — it is `7328a0b`.**
+
+### C-75-4 — the defect: §7.2 has ten rows and the phone transcribed nine, with a date
+
+```bash
+cd <engine> && git show origin/main:docs/Sync-Protocol.md | sed -n '/^### 7.2 Error kinds/,/^## 8/p'
+git log --oneline --all -S'`unimplemented`' -- docs/Sync-Protocol.md | tail -1
+git log --oneline --all -S'Unimplemented'   -- src/Sync/Protocol.cs   | tail -1
+cd <android> && git show dddb806^:core/src/main/kotlin/app/careerseeker/core/Protocol.kt | sed -n '/enum class ErrorCode/,/^}/p'
+git log --format='%h %ad' --date=short -S'REV_CONFLICT' -- core/src/main/kotlin/app/careerseeker/core/Protocol.kt | tail -1
+grep -rn "unimplemented" --include=*.kt .
+```
+
+*Expected, and **observed**:* §7.2's table lists **ten** codes — the nine the phone had plus
+**`unimplemented`** (*"A recognised shipping kind the engine does not yet handle … Distinct from
+`unknown_kind` — the kind IS known, so the phone should not treat it as a version/vocabulary
+error."*). **Both** `git log -S` lines print the same commit, **`e1e7a90` (2026-07-24)** — the spec
+and `src/Sync/Protocol.cs` were amended **in one commit**, as `CLAUDE.md`'s drift trap requires. The
+pre-fix `ErrorCode` has **nine** constants, written **2026-07-22** (`6bdddbd`). The `grep` returns
+**no hit in any Kotlin file**: the string existed nowhere on the phone for **28 days**.
+
+### C-75-5 — negative control: the vocabularies were unguarded in full, not merely short
+
+Run **on the pre-fix tree** (`dddb806^`). Each mutation is the deletion of a row that was *not*
+missing, so a passing suite is a statement about the guard, not about the row:
+
+```bash
+cd <android> && git checkout dddb806^ -- core/
+P=core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+sed -i '/PAIRING_UNKNOWN("pairing_unknown"),/d' $P
+scripts/core-probe.sh --rerun; echo "exit=$?"          # P-M1
+git checkout dddb806^ -- core/
+sed -i 's|"config_change", "lesson_proposal", "metric",|"config_change", "lesson_proposal",|' $P
+scripts/core-probe.sh --rerun; echo "exit=$?"          # P-M3
+git checkout dddb806 -- core/
+```
+
+*Expected, and **observed**:* **both green** — `exit=0`, **`338 tests, 0 failed, 0 skipped, across
+22 classes`**, twice. `ErrorCode.entries` is enumerated by no test in the repository, and
+`RESERVED_FOR_L2`'s five call sites all **iterate** it, so a dropped member makes them test less
+rather than fail. The only pre-existing guard on any error code is indirect: `ProtocolVectorsTest`
+compares a vector's `expect_error` against `ErrorCode.wire`, which reaches only the codes the corpus
+exercises — **`rev_conflict`, `pairing_unknown` and `unimplemented` have no vector**.
+
+### C-75-6 — the claim that was withdrawn: §5.4's list is the best-guarded, not the worst
+
+`PayloadKindCoverageTest`'s `state-changing kinds are all phone to engine` reads
+`STATE_CHANGING_KINDS.mapNotNull { PayloadKind.fromWire(it) }`, and `mapNotNull` **discards** any
+string that is not a valid kind — so that assertion, alone, launders a typo in the set that decides
+which envelopes require §5.4's device signature. Measured rather than assumed, **on the pre-fix
+tree**:
+
+```bash
+P=core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+# P-M2 removal:
+sed -i 's|setOf("doc_edit", "outcome", "entitlement")|setOf("doc_edit", "entitlement")|' $P
+# P-M4 typo:
+sed -i 's|setOf("doc_edit", "outcome", "entitlement")|setOf("doc_edit", "outcomes", "entitlement")|' $P
+# P-M5 bogus addition:
+sed -i 's|setOf("doc_edit", "outcome", "entitlement")|setOf("doc_edit", "outcome", "entitlement", "not_a_kind")|' $P
+```
+
+*Expected, and **observed**:* **all three red** — `exit=1`, **2 / 4 / 2** tests failing
+respectively, in `EnvelopeReceiverTest`, `OutboundEnvelopesTest` and `OutboundQueueTest`. Those
+drive the set **through the receiver and the builder** rather than inspecting it, so they catch
+every mutation direction. **The weak assertion is real; the hole is not.** Recorded so a later
+reader who spots `mapNotNull` does not "fix" it believing it to be the gap — and so this run's
+finding is not read as wider than it is.
+
+### C-75-7 — the fix, and the suite after it
+
+```bash
+cd <android> && scripts/core-probe.sh --rerun; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`341 tests, 0 failed, 0 skipped, across 22 classes`**, `exit=0`.
+Baseline **338/0** measured on the same tree this run, before the change. Three new tests, all in
+the existing `ProtocolTest`, so the class count is unchanged. `UNIMPLEMENTED("unimplemented")` added
+to `ErrorCode`; `section72Codes` and `section43Reserved` transcribed **by hand** in `ProtocolTest`,
+never derived from the enums they check — run 74's lesson, one file along.
+
+### C-75-8 — four mutations, and Q-M2 is the historical defect itself
+
+Run **on the post-fix tree**:
+
+```bash
+P=core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+sed -i '/PAIRING_UNKNOWN("pairing_unknown"),/d' $P            # Q-M1
+sed -i '/UNIMPLEMENTED("unimplemented"),/d' $P                # Q-M2
+sed -i 's|"config_change", "lesson_proposal", "metric",|"config_change", "lesson_proposal",|' $P   # Q-M3
+sed -i 's|TOO_LARGE("too_large")|TOO_LARGE("tooLarge")|' $P   # Q-M4
+# after each: scripts/core-probe.sh --rerun; echo "exit=$?"; git checkout dddb806 -- core/
+```
+
+*Expected, and **observed**:* all four `exit=1`, with these exact failures —
+
+| | mutation | red | pre-fix |
+| --- | --- | --- | --- |
+| **Q-M1** | `ErrorCode` loses `PAIRING_UNKNOWN` | **1** — `error codes are exactly section 7-2's table` | **GREEN** |
+| **Q-M2** | `ErrorCode` loses `UNIMPLEMENTED` | **1** — same test | **GREEN, for 28 days** |
+| **Q-M3** | `RESERVED_FOR_L2` loses `metric` | **1** — `reserved L2 kinds are exactly section 4-3's list` | **GREEN** |
+| **Q-M4** | wire typo `too_large` → `tooLarge` | **3** — both new tests **plus** `ProtocolVectorsTest` | red already |
+
+**Q-M2 re-introduces the defect exactly as it existed** and it now fails. Q-M4's third failure is
+the pre-existing partial guard firing on a code the corpus *does* cover, which is the boundary
+C-75-5 describes.
+
+### C-75-9 — the addition is vocabulary; it decides nothing, and PQ-ERR-1 is untouched
+
+```bash
+cd <android> && git diff dddb806^ dddb806 --stat
+grep -rn "UNIMPLEMENTED" --include=*.kt core/src/main
+git log -1 --format=%H -- docs/protocol-questions.md
+```
+
+*Expected, and **observed**:* the diff touches **exactly two files**, both under `core/`
+(`Protocol.kt`, `ProtocolTest.kt`) — **no `:app` file, no vector, no `.md`**. `UNIMPLEMENTED` is
+referenced in **no production code path**: nothing on the phone emits it, and nothing parses an
+inbound `error` body at all, because whether it should is **PQ-ERR-1**, open since run 74 and
+**unmodified this run** (`docs/protocol-questions.md`'s last commit predates this run). The
+constant exists so the enum **is** §7.2; the behaviour question goes to the gate.
