@@ -14012,3 +14012,51 @@ because the fence carries the exact tokens reproducibly, which is what this docu
 exemption rather than a convenience that blinds the check. It is falsifiable as written — case 7b
 fails if prose after a fence stops being checked, and `C-77-7`'s M1/M2 (whose citations are all in
 prose) still go red.
+
+### C-77-12 — a phantom definition would fail SILENTLY, and closing it hit an awk portability trap
+
+The citation side skips fences because a fenced id is a harmless fixture. The **definition** side
+needs the same skip for the opposite reason: a heading-shaped line quoted inside a fence — an
+unfiled blocker heading shown as an example — would register as a **definition**, and a phantom
+definition makes a genuinely dangling citation **look resolved**. Noisy failures are recoverable;
+this one is silent, which is strictly worse.
+
+```bash
+cd <android>
+# 1. how many heading-shaped id lines sit inside fences today?
+python3 - <<'PY'
+import re
+for path in ("AUDIT-REQUEST.md","BLOCKED.md"):
+    infence=False; n=0
+    for line in open(path,encoding='utf-8'):
+        if re.match(r'^[ \t]*(```|~~~)',line): infence=not infence; continue
+        if infence and re.match(r'^#{2,4} ',line) and re.search(r'\b(C-[A-Za-z0-9]+-\d+|B-\d+)\b',line): n+=1
+    print(path, n)
+PY
+# 2. the trap: mawk does not support interval quantifiers
+awk --version | head -1
+printf '### C-1-1 — a check\n' | awk '/^#{2,4} / {print "MATCHED"}'      # prints NOTHING under mawk
+printf '### C-1-1 — a check\n' | awk '/^(##|###|####) / {print "MATCHED"}'
+./scripts/check-citations.sh --self-test; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **0 and 0** — the hazard is **latent, not live**; no phantom definition
+exists in the corpus today, and the fix is a guard against growth rather than a repair. `awk` is
+**mawk 1.3.4**, and `/^#{2,4} /` matches **nothing** under it while `/^(##|###|####) /` matches. The
+self-test reports **ten cases, all passing, `exit=0`**.
+
+**The attempt failed first, and the failure is the point.** Written the short way, the definition
+extractor returned **27** definitions instead of **707** and the entire corpus read as dangling.
+**mawk does not error on an unsupported interval quantifier — it silently matches nothing**, and
+`grep -E` (which the original used) *does* support intervals, so the rewrite looked equivalent and
+was not. **The self-test caught it on the first run**, which is what it is for: five cases went red
+immediately.
+
+**It fails loud, not quiet, even when broken.** A definition extractor that returns nothing makes
+*every* citation dangle, so the build goes red on a correct tree — the safe direction, and the same
+property claimed for the check as a whole.
+
+**Attack this first if you doubt the fix:** the new self-test case is falsifiable exactly as written
+— a fenced heading for an unfiled id must **not** satisfy a prose citation of it. And re-run the mawk
+line above: if this repo's runner image ships **gawk** rather than mawk, the short spelling would
+have worked there and failed only here, which is precisely the class of unknown **B-15** records.

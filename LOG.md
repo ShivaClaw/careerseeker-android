@@ -14556,6 +14556,26 @@ for. The three prose mentions were rewritten to describe the fixture and let the
 paragraph above this one, which named an unfiled id while explaining that prose must not — three
 green runs and one red, on live prose, before this entry could be written.
 
+### Milestone 10 — a latent silent-failure hazard closed, and an awk trap met on the way
+
+The citation side skips fences; the **definition** side did not, and needed to for the opposite
+reason. A heading-shaped line quoted inside a fence would register as a **definition**, making a
+genuinely dangling citation **look resolved** — a **silent** failure, where every other failure mode
+here is loud. Measured first: **0 such lines in the corpus today** (**C-77-12**), so this is a guard
+against growth, not a repair, and it is recorded as latent rather than dressed up as a catch.
+
+**The first attempt broke the guard, and the self-test caught it immediately.** Written as
+`/^#{2,4} /`, the extractor returned **27** definitions instead of **707** and the whole corpus read
+as dangling. **`awk` here is mawk 1.3.4, which does not support interval quantifiers and silently
+matches nothing rather than erroring** — while `grep -E`, which the original used, does support them,
+so the rewrite looked equivalent and was not. Spelled `/^(##|###|####) /` and pinned by a tenth
+self-test case. **Five cases went red on the first run**, which is exactly what a self-test is for,
+and the reason this run has a Milestone 10 instead of a regression.
+
+**Even broken, it failed loud** — an extractor returning nothing makes every citation dangle and the
+build red on a correct tree. That is the safe direction, and the same property claimed for the check
+as a whole.
+
 ### What this run did not touch
 
 **No rung moved and no rung's status changed.** The diff is **one new script, one CI step, and these

@@ -118,8 +118,24 @@ extract_definitions() {
   local root="$1" doc
   for doc in "${DEF_DOCS[@]}"; do
     [ -f "$root/$doc" ] || continue
-    grep -hE '^#{2,4} ' "$root/$doc" \
-      | grep -ohE '\b(C-[A-Za-z0-9]+-[0-9]+|B-[0-9]+)\b'
+    # Fences are skipped on THIS side too, and the reason is the opposite of the
+    # citation side's. There, a fenced id is a harmless fixture. Here, a
+    # heading-shaped line inside a fence -- "### B-23 -- a blocker" quoted in an
+    # example -- would register as a DEFINITION, and a phantom definition makes a
+    # genuinely dangling citation look resolved. That failure is SILENT, which is
+    # strictly worse than the noisy one. Zero such lines exist in the corpus today
+    # (C-77-12); this keeps it that way as the records grow.
+    # NOTE the heading pattern is spelled out rather than written /^#{2,4} /.
+    # mawk -- the default awk on Ubuntu, including this repo's runner image --
+    # does NOT support interval quantifiers, and silently matches NOTHING rather
+    # than erroring. Written the short way, this extractor returned 27
+    # definitions instead of 707 and the whole corpus read as dangling (C-77-12).
+    # grep -E supports intervals and awk may not; do not "simplify" this back.
+    awk '
+      /^[ \t]*(```|~~~)/ { infence = !infence; next }
+      infence { next }
+      /^(##|###|####) / { print }
+    ' "$root/$doc" | grep -ohE '\b(C-[A-Za-z0-9]+-[0-9]+|B-[0-9]+)\b'
   done | sort -u
 }
 
@@ -328,6 +344,16 @@ self_test() {
   printf '## B-1 — a blocker\n' > "$tmp/case/BLOCKED.md"
   printf '```bash\necho B-23\n```\n\nAnd then B-24 was filed.\n' > "$tmp/case/LOG.md"
   _case "prose after a closed fence is still checked" 1
+
+  # 7c. a heading-shaped line INSIDE a fence does not define anything (C-77-12).
+  #     Without this, the quoted example below would "define" B-23 and the
+  #     dangling citation in the prose would pass silently.
+  _fixture
+  printf '### C-1-1 — a check\n\nExample of a filed blocker:\n\n```\n## B-23 — a blocker\n```\n' \
+    > "$tmp/case/AUDIT-REQUEST.md"
+  printf '## B-1 — a blocker\n' > "$tmp/case/BLOCKED.md"
+  printf 'Filed as B-23 this run.\n' > "$tmp/case/LOG.md"
+  _case "fenced heading does not define an id" 1
 
   # 8. abbreviated continuation cites its siblings
   _fixture
