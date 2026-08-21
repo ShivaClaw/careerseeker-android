@@ -176,6 +176,80 @@ class ProtocolTest {
         assertTrue(Protocol.INFO_ENGINE_TO_PHONE != Protocol.INFO_PHONE_TO_ENGINE)
     }
 
+    /**
+     * **The seven domain-separation strings of §5.2 and §5.4, pinned against literals
+     * transcribed by hand** — run 75's lesson for `ErrorCode` and `PayloadKind`, applied to
+     * the strings those two vocabularies sit beside.
+     *
+     * **This test was written to close a hypothesis, and the hypothesis was wrong.** Run 75
+     * filed these constants as a successor target on the reading that `ProtocolTest` asserted
+     * only that two of them *differ*, `HkdfTest` uses its own literals, and the envelope
+     * vectors carry `key_hex` directly rather than deriving it — so the phone could derive
+     * from wrong info strings, stay green here, and disagree with the engine only in the
+     * field. **Measured, all seven are already guarded**: each was mutated one at a time and
+     * `scripts/core-probe.sh --rerun` went red on every one (C-76-3). The premise was true;
+     * the conclusion was not. What catches them is the *pairing* vectors — `pairing-basic`
+     * carries `k_e2p_hex`, `k_p2e_hex`, `relay_token_b64u`, `provisional_token_b64u` and
+     * `confirm` as **derived** values, and `ProtocolVectorsTest` recomputes all five.
+     *
+     * **So why add this at all?** Because that guard is the corpus, and `VECTORS.lock` states
+     * the corpus's guarantee precisely: *"the phone matches the pin"*, never *"the phone
+     * matches the engine"*. Three properties follow, and this test supplies all three.
+     *
+     * 1. **It is independent of the corpus.** Every existing guard runs through a vector, so
+     *    a re-pin, a dropped vector or a skipped enumeration takes the guard with it. This one
+     *    reads no file.
+     * 2. **`INFO_ENGINE_TO_PHONE` had exactly one guard.** Measured: mutating it reddened
+     *    `ProtocolVectorsTest > pairing derivation reproduces every vector value` **and nothing
+     *    else**, where `p2e`, `relay-token`, `confirm` and `bootstrap` each reddened three to
+     *    five tests across `PairingFlowTest` and `PairingSessionTest`. The e2p direction is the
+     *    thin one, because the phone *seals* under `k_p2e` and only *opens* under `k_e2p`.
+     * 3. **It states the contract where a reader looks for it.** The literals below are
+     *    transcribed from `docs/Sync-Protocol.md` §5.2 lines 414-417 and 444, §5.2.2 line 464
+     *    and §5.4 line 522 at vector pin `7328a0b`, and they match the engine's
+     *    `src/Sync/Protocol.cs:23-29` at that same commit — verified constant by constant
+     *    (C-76-4). Seven on the phone, seven in the engine, no eighth on either side.
+     *
+     * Nothing here is read from `Protocol.kt`; a copy of the source would assert nothing, which
+     * is the defect fixed one file over in `PairingDerivationTest`.
+     */
+    @Test
+    fun `the domain-separation strings are the ones section 5 prints`() {
+        assertEquals("careerseeker/v1/e2p", Protocol.INFO_ENGINE_TO_PHONE)
+        assertEquals("careerseeker/v1/p2e", Protocol.INFO_PHONE_TO_ENGINE)
+        assertEquals("careerseeker/v1/relay-token", Protocol.INFO_RELAY_TOKEN)
+        assertEquals("careerseeker/v1/confirm", Protocol.INFO_CONFIRM)
+        assertEquals("careerseeker/v1/bootstrap", Protocol.BOOTSTRAP_SALT)
+        assertEquals("careerseeker/v1/pair", Protocol.PAIR_AAD_PREFIX)
+        assertEquals("careerseeker/v1/cmd", Protocol.COMMAND_SIG_PREFIX)
+    }
+
+    /**
+     * The seven above are seven *different* strings. A copy-paste that gave two derivations
+     * the same label would keep every literal assertion above green — each one still equals
+     * what it is compared to — while collapsing two domains into one.
+     *
+     * `directional key derivation uses distinct info strings` makes this point for the two
+     * directional keys only, which is where replay lives; this widens it to the whole set,
+     * because `BOOTSTRAP_SALT` colliding with `INFO_RELAY_TOKEN` would make §5.2.1's
+     * provisional token equal to §5.2.3's final one and the bootstrap credential would never
+     * expire — the ladder `PairingDerivationTest` calls load-bearing.
+     */
+    @Test
+    fun `the domain-separation strings are pairwise distinct`() {
+        val all = listOf(
+            Protocol.INFO_ENGINE_TO_PHONE,
+            Protocol.INFO_PHONE_TO_ENGINE,
+            Protocol.INFO_RELAY_TOKEN,
+            Protocol.INFO_CONFIRM,
+            Protocol.BOOTSTRAP_SALT,
+            Protocol.PAIR_AAD_PREFIX,
+            Protocol.COMMAND_SIG_PREFIX,
+        )
+        assertEquals(7, all.size)
+        assertEquals(all.size, all.toSet().size, "two domain separators collided")
+    }
+
     @Test
     fun `sequence tracker rejects regressions but tolerates gaps`() {
         val tracker = SequenceTracker()
