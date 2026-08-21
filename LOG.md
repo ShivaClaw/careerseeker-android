@@ -14495,11 +14495,25 @@ M3 is the control that matters: a guard that fires on correct citations would be
 
 ### Milestone 7 — wired into CI, and proven on both sides of its threshold
 
-`.github/workflows/ci.yml` gains a step running the self-test then the check. Placed **before** the
-toolchain steps because it needs none. **Extracted verbatim from the YAML and run under `bash -e`,
+`.github/workflows/ci.yml` gains a step running the self-test then the check, placed before every
+step that **uses** the toolchain — **not** before the toolchain itself, which is a correction this
+run made against its own first draft after reading the runner's step list rather than the YAML's
+(**C-77-8**): `Set up JDK 17`/`Set up Android SDK`/`Set up Gradle` are `uses:` setup actions and run
+ahead of every `run:` step regardless. What the placement buys is real but smaller than first
+claimed — a dangling citation fails the build **before** the `:core`/`:app` test, assemble and lint
+steps, not before the setup. **Extracted verbatim from the YAML and run under `bash -e`,
 as GitHub runs it** — run 46's lesson, that invoking a script without its shebang semantics proves
 nothing: **`exit=0` on the real tree, `exit=1` with one dangling citation appended** (**C-77-8**).
 YAML re-parsed: valid, **13 steps**.
+
+**Runner-verified for the pass path, in the same run** (**C-77-8**): job `96848840383` of run
+`32506850632`, head `05463d7`, `ubuntu-latest` — step 6, `Assert every cited C-/B- id resolves`,
+**`completed`/`success`**. So the runner's `bash`/`awk` do execute this script, which is more than
+**B-15**'s vector step could say for two runs. **The failure path stays stub-only** — a green check
+proves it does not false-alarm, not that it still fires — and proving otherwise on a runner would
+mean pushing a knowingly-dangling citation, which this run declines to do. **The step's log could
+not be read** (`http=000` through the sandbox proxy), so **nothing is claimed about what it
+printed**, only that it exited zero.
 
 **And the guard is cwd-independent by construction** — it resolves the repository root from
 `BASH_SOURCE`, not from the caller's directory. Verified from `/tmp` and from `/` (**C-77-9**). This

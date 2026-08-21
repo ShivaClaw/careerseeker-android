@@ -13918,15 +13918,44 @@ bash -e /tmp/step.sh; echo "STEP exit=$?"                # want 1
 cp /tmp/L.bak LOG.md
 ```
 
-*Expected, and **observed**:* YAML valid, **13 steps**; the new step is step **5**, before every
-toolchain step, because it needs none. **`exit=0` on the real tree**; with one dangling citation
+*Expected, and **observed**:* YAML valid, **13 steps**; the new step is the **5th entry in the YAML's
+`steps` array**.
+
+> **CORRECTED, after reading the runner rather than the YAML.** The first draft of this block said it
+> runs "before every toolchain step, because it needs none". **On the runner that is false**, and the
+> job listing says so plainly: `Set up JDK 17`, `Set up Android SDK` and `Set up Gradle` are steps
+> **3, 4 and 5**, and the guard is step **6** (the runner prepends `Set up job`, so YAML index 5
+> becomes runner step 6). Those three are `uses:` **setup actions** and run ahead of every `run:`
+> step in the job. **The accurate claim is narrower and is the one worth making:** the guard runs
+> before every step that *uses* the toolchain — before the first Gradle invocation, and before the
+> `:core`/`:app` test, assemble and lint steps — so a dangling citation fails the build **without
+> waiting for the expensive half**. It does not, and cannot, save the setup. Caught by reading the
+> step list on this run's own CI; the YAML index was mistaken for the runner's numbering. **`exit=0` on the real tree**; with one dangling citation
 appended, **`exit=1`** printing `::error::dangling citation(s)` and naming the fictional id. Run under **`bash -e`**
 deliberately — run 46 recorded that invoking a script without its shebang semantics proves nothing,
 and that re-running it as `bash -e` is what made it evidence.
 
-**Runner-unverified until CI executes it**, exactly as **B-15** records for the vector step: the
-image's `bash`/`awk` are not this sandbox's. **It fails loud, not quiet** — the worst case is a red
-build on a correct tree, never a green one on a drifting tree.
+**RUNNER-VERIFIED for the pass path, same run** — and therefore **narrowed, not deleted**, exactly as
+**B-15** was:
+
+```bash
+# job 96848840383 of run 32506850632, head 05463d7, ubuntu-latest
+curl -s .../actions/runs/32506850632/jobs | python3 -c '...print step name/status/conclusion...'
+```
+
+*Expected, and **observed**:* step **6**, `Assert every cited C-/B- id resolves`, **`completed` /
+`success`** on `ubuntu-latest`. So the image's `bash` and `awk` do run this script, and the two
+unknowns that mattered — GNU `awk`'s handling of the UTF-8 ellipsis byte sequence, and `grep -vxF -f`
+with process substitution under the runner's shell — are resolved **for the green path**.
+
+**The failure path is still stub-only**, which is the same qualification B-15 carries: a green check
+proves it does not false-alarm, **not** that it still fires. Proving the red path on a runner would
+mean pushing a knowingly-dangling citation, and that is a deliberate choice not to. **It fails loud,
+not quiet** — the worst case is a red build on a correct tree, never a green one on a drifting tree.
+
+**I could not read the step's log**, only its conclusion: the Actions log endpoint returned
+`http=000` through this sandbox's proxy. **So no claim is made about what the step printed** — only
+that it exited zero on the runner.
 
 ### C-77-9 — the guard is cwd-independent, which is the whole hazard it guards
 
