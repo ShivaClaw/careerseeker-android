@@ -216,7 +216,24 @@ enum class PayloadKind(val wire: String, val flow: KindFlow) {
     }
 }
 
-/** Rejection reasons. Sync-Protocol.md section 7.2. */
+/**
+ * Rejection reasons. Sync-Protocol.md section 7.2.
+ *
+ * ## This enum is a transcription, and it was short by a row for twenty-eight days
+ *
+ * §7.2's table is normative and this is a hand copy of it. The copy was written on
+ * 2026-07-22 (`6bdddbd`) with nine rows. Two days later, on 2026-07-24, the engine added a
+ * tenth — `unimplemented` — amending the spec and `src/Sync/Protocol.cs` **in one commit**
+ * (`e1e7a90`), exactly as the drift rule requires. Nothing carried it across the repo
+ * boundary, and nothing here could notice: `ErrorCode.entries` was never enumerated by any
+ * test, so deleting a genuine §7.2 row left `:core:test` green at 338/0 (measured, run 75).
+ * The vocabulary was unguarded in full, not merely incomplete.
+ *
+ * [ProtocolTest.section72Codes] now pins the whole table by hand. Hand-transcribed on
+ * purpose: the seventy-fourth run's finding was that a derivation compared against itself
+ * agrees with itself and disagrees with the document, so one side of this comparison must
+ * not be derived from the other.
+ */
 enum class ErrorCode(val wire: String) {
     VERSION_UNSUPPORTED("version_unsupported"),
     REPLAY_REJECTED("replay_rejected"),
@@ -227,6 +244,31 @@ enum class ErrorCode(val wire: String) {
     REV_CONFLICT("rev_conflict"),
     PAIRING_UNKNOWN("pairing_unknown"),
     TOO_LARGE("too_large"),
+
+    /**
+     * A recognised **shipping** kind the receiver does not yet handle — §7.2's tenth row.
+     *
+     * Engine-emitted. The phone has no case that produces it today: every kind it refuses is
+     * refused as [UNKNOWN_KIND] (unrecognised or reserved-for-L2), and the shipping kinds it
+     * accepts but drops — `doc`, `conflict`, `error` — are dropped without a reply at all.
+     * Present anyway, because this enum's job is to be §7.2, not to be the subset the phone
+     * currently reaches. Two consequences follow from that job, and both are why the absence
+     * mattered rather than being cosmetic:
+     *
+     *  - §7.2 states the rule **about the phone**: `unimplemented` is *"distinct from
+     *    `unknown_kind` — the kind IS known, so the phone should not treat it as a
+     *    version/vocabulary error."* An enum that cannot represent the code cannot honour a
+     *    rule about how to read it.
+     *  - Whether the phone reads inbound `error` codes at all is **PQ-ERR-1**, open. Today
+     *    `error` is accepted and dropped ([PayloadKind.RECEIVED_WITHOUT_A_DESTINATION]), so
+     *    nothing parses this string yet. If PQ-ERR-1 is answered "surface the code", a
+     *    `code: "unimplemented"` would have resolved to `null` and been indistinguishable
+     *    from an unrecognised one — the precise confusion §7.2's row exists to forbid.
+     *
+     * So this is added as **vocabulary**, and it changes no behaviour. It is not a decision
+     * about PQ-ERR-1, and adding it must not be read as one.
+     */
+    UNIMPLEMENTED("unimplemented"),
 }
 
 /**
