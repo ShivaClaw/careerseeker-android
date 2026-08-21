@@ -13803,3 +13803,138 @@ disposable container. No history rewrite, no branch deleted, **no deploy of any 
 production relay was not contacted at all, not even `GET /v1/health`.** No Google, Play or OAuth
 console; no accounts, no purchases, no keystore, no emulator, no Gmail. **No secret was read,
 printed or echoed.** Terra's territory was **read, never written**.
+
+---
+
+## Seventy-third cloud iteration — 2026-08-21 (Linux sandbox): the plan was revalidated on the day it was overdue, and the finding was pushed to a phone
+
+**Fetch first, rule one.** `git fetch --all --prune` in **both** checkouts before any count below.
+Both again arrived **detached at a stale `main`** — android at `ebfaf81`, engine at `aac05f3`.
+Every number in this entry is post-fetch, measured this run.
+
+**Declined for the thirty-eighth time.** The assigned slice — §4.3's `entitlement_ack` body, the
+generator vector, PQ-A2-1/-2/-3 — was verified rather than rebuilt (**C-73-1**): `8575539`
+(2026-08-09, `docs/Sync-Protocol.md` only, **+114/−3**), `22b028e` (both ack vectors **and**
+`generate.mjs`), `7328a0b` (`invalid-unknown-field.json`). All three exist, in the **engine** repo,
+and none is on `main`. The prompt's vendored pin `679a317` is **still stale** — it is **`7328a0b`**
+(**C-73-2**) — and its "S5 is NOT STARTED" is still wrong.
+
+### Milestone 1 — the fact that is new this run, and it is a date (C-73-4)
+
+**Return day was 2026-08-18. It is 2026-08-21.** The window this mission was written for closed
+**three days ago**, and nothing human has happened in either repository.
+
+| measured this run | value |
+| --- | --- |
+| engine `origin/main` | **`aac05f3`**, authored **2026-08-12** — **8 days old** |
+| android `origin/main` | **`ebfaf81`** |
+| last commit by a human, either repo | **2026-08-12**, `Portable G & Shiva's Claw` |
+| every commit since, all branches | **`Claude`** — runs 48–72's heartbeats and records |
+| engine PRs | **18 open, all draft** (`#26`, `#32`–`#39`, `#45`–`#53`) |
+| android PRs | **6 open, all draft** (`#1`–`#6`) |
+| merged, closed or undrafted since run 47 | **none, in either repo** |
+
+Both PR counts were taken from the GitHub API this run, not carried forward. **No session can
+change this row.** The merge condition is a full local `Verify-Alpha.ps1` on a Windows machine
+(**C-ENV-1**, **C-LAND-7**), and the android repo is never-self-merge by standing law.
+
+### Milestone 2 — so the slice taken was the plan itself, re-measured the day it is overdue
+
+`RETURN-DAY.md` §3 is the document Brandon acts on. It was last revalidated at **run 49
+(2026-08-17)** — *"the day before this plan is acted on"*. That day came and went. A plan whose
+freshness evidence predates its own use is exactly the shape this program hunts, so this run
+re-derived **every number in it**, executed.
+
+**Inputs unmoved (C-73-5).** All **seven** landing branches still match their **live PR head SHAs**
+exactly — `#48`, `#35`, `#36`, `#51`, `#52`, `#49`, `#53` — **0 mismatches**, and `origin/main` is
+still `aac05f3`. The plan's premises are intact.
+
+**The six merges were replayed for real, in a throwaway clone (C-73-6)**, in §3's recommended
+configuration (#53 closed) and in §3's stated order:
+
+```
+#48 claude/s8-harness-linux-reach      -> CLEAN
+#35 claude/s2-seq-bound                -> CLEAN
+#36 claude/s2-transport-vocabulary     -> CLEAN
+#51 claude/s3-pairing-confirm-consumer -> CLEAN
+#52 claude/s6-outcome-disposition      -> STOP  (README.md, docs/CareerSeeker-Project-Summary.md,
+                                                 docs/External-Audit-Handoff.md,
+                                                 scripts/Verify-Alpha.ps1, src/Engine/README.md)
+#49 claude/s6-composition-root-decision-> STOP  (the same five + tests/SyncHarness/Program.cs)
+=== TOTAL STOPS = 2 ===
+```
+
+**Two stops, exactly as §3 predicts**, and the *composition* of each stop reproduces its
+description too: #52 is the **pin family, 5 files**; #49 is the **pin family + `SyncHarness`**.
+Nothing in `src/Sync/` conflicted — which is §3's stated reason for closing #53, now re-measured
+rather than cited.
+
+### Milestone 3 — the re-pin step, and the one command in the plan nothing else checks (C-73-7)
+
+Against the replayed post-landing tree:
+
+```
+30 vector files;  node docs/sync-vectors/generate.mjs --check  ->  OK: 30 vector files match the generator.  exit=0
+diff vs the phone's pin 7328a0b:  only index.json differs, and only pairing-high-bit-confirm.json is added
+```
+
+Then `scripts/repin-vectors.sh --check` was run for real, pointed at the replayed `main`:
+
+```
+current pin  : 7328a0bc043335491cd96a67d634e8eea2a13af9
+generator check: OK: 30 vector files match the generator.
+vendored: 29 files    at pin: 30 files
+  + added upstream, not vendored (1):  pairing-high-bit-confirm.json
+  ~ same name, different bytes (1):    index.json
+DRIFT: 2 file(s) differ.   exit=1
+```
+
+**Every token of that output matches what `RETURN-DAY.md` says to expect**, `exit=1` included
+(`--check` reports drift as failure, by design). The re-pin instruction is executable as written.
+
+### Milestone 4 — B-18 attempt 10: the first attempt that leaves the repository (C-73-8)
+
+B-18's smallest human unblock has read *"turn the routine off, or replace its slice section"* since
+run 55, and **nine attempts have written that sentence into documents the schedule does not read
+and Brandon has not opened.** Runs 62–64 went as far as locating the schedule from the inside; none
+could reach a person.
+
+**This run could, and did.** This session runs as a scheduled routine with a notification channel
+to Brandon's phone and inbox, and it was used — carrying the state (24 drafts, nothing merged,
+return day passed), the fact that the landing plan is **re-verified valid as written**, §3's step 0
+(**decide #53**) and its load-bearing order, the re-pin command, and the recommendation to **pause
+the schedule** until the queue is cleared.
+
+**This is an attempt, not a closure.** B-18 stays **open**: whether the routine stops is Brandon's
+action, not this run's, and a delivered notification is not a read one. But it is the first attempt
+whose delivery does not depend on someone opening a 913 KB `LOG.md`.
+
+### Milestone 5 — what did NOT happen, honestly
+
+**No rung moved, and none is claimed to have.** This run advanced no rung: it re-measured a landing
+plan and pushed a notification. **S5 is unchanged — still PARTIAL, still not blocked, still off
+`main`.** No `:core` test was added this run and **`:core:test` was not run** — this slice touched
+no Kotlin, so running it would have proved nothing about the work done, and no count is claimed
+from it. The 336/0 figure stands from run 72 and is **not** re-asserted here as if re-measured.
+
+### Milestone 6 — prohibition paragraph: what this run did not touch
+
+**Nothing was merged, closed, rebased, undrafted, force-pushed or deleted in either repo** — the
+**18** engine drafts and **6** android drafts are exactly as found, and **#53's fate stays
+Brandon's**. **The six merges existed only in `/tmp/replay`, a throwaway clone that was never
+pushed and shares no ref with either origin**; no merge commit reached any branch. **No vector byte
+was written in either repo** — the vendored corpus was re-diffed against pin `7328a0b` at **29/29,
+`diff -r` silent, `exit=0`**, `VECTORS.lock` was not edited, **the pin did not move (H7)**, and
+`repin-vectors.sh` was run **only** with `--check`, which writes nothing. **No `:core` and no
+`:app` file was written** — **B-19** stays open. **No C# was written**; the engine checkout was
+read-only and left detached at `aac05f3` where it was found, apart from `STATE.md` on the docs-only
+`autonomy/claude-state` branch. **No `generate.mjs`, no `docs/Sync-Protocol.md`, no `ci.yml`;
+`$ExpectedOfflineTotal` was not moved**, and **no nineteenth engine PR was opened**.
+**`Verify-Alpha.ps1` was not run and no result for it is claimed** — no `pwsh`, no `dotnet`, and it
+is a Windows gate besides. **The android gate was not run**: `:app:assembleDebug`, `:app:lintDebug`,
+`:app:test` and `checkCoreIsAndroidFree` are **unrun and unclaimed** (**B-7**), **no zero-warning
+claim is made**, and this run did not run `:core:test` either. No emulator, no keystore, no deploy
+of any kind. **The production relay was not contacted at all, not even `GET /v1/health`.** No
+Google, Play or OAuth console; no accounts, no purchases, no Gmail. **No secret was read, printed
+or echoed.** Terra's territory was **read, never written** — `autonomy/codex-state` reports
+**COMPLETE, files claimed: none**, so there was **no collision**.

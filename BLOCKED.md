@@ -3329,3 +3329,70 @@ A JDK being *present* is not the same as the *pinned* JDK being present, and a s
 `knownProductIds` set and the composition root are exactly as they were. **B-21** was not
 exercised — no repeated Maven fetches beyond the four ordinary probe runs, no 429 observed — and
 **stays open**, the same posture runs 67 through 71 reached from the same evidence.
+
+---
+
+## Run 73 — 2026-08-21. No new blocker; B-18 attempt 10, and the first that leaves the repository
+
+**Nothing this run set out to do was blocked.** The slice was a revalidation of `RETURN-DAY.md` §3
+against live refs, and every part of it is runnable here: git, `node`, and `repin-vectors.sh
+--check`. All of it executed.
+
+### B-18 — the schedule assigned a slice finished on 2026-08-09, for the thirty-eighth time
+
+**Unchanged as a blocker, and its premise re-verified rather than assumed** (**C-73-1**,
+**C-73-2**): all three slice commits exist in the **engine** repo, none is on `main`, and the
+prompt's pin `679a317` is still stale (**`7328a0b`**).
+
+**What is new is the date, and it is the reason this entry matters more than it did yesterday**
+(**C-73-4**). **Return day was 2026-08-18; it is now 2026-08-21.** The last commit by a human in
+either repository is **2026-08-12** — six days *before* the return date, nine days ago. **18 engine
+drafts + 6 android drafts, none merged, closed or undrafted.** The queue this program has been
+filling since run 47 has not been touched, and the schedule has kept firing into it: **26 runs since
+the stop condition was met.**
+
+**Attempt 10, and it is the first one that is not a document.** Attempts 1–9 wrote the unblock
+sentence into `BLOCKED.md`, `STATE.md` and `RETURN-DAY.md` — files reachable only by someone who
+opens this repository, which is the same person the entry is waiting on. Runs 62–64 located the
+schedule from the inside but could not reach a person from there. **This session had a notification
+channel to Brandon's phone and inbox, and used it** (**C-73-8**), carrying the state, the
+re-verified landing plan, step 0 (**decide #53**), the merge order, the re-pin command, and an
+explicit recommendation to **pause the schedule**.
+
+**It stays OPEN.** A sent notification is not a read one, and stopping the routine is Brandon's
+action. But the failure mode that kept attempts 1–9 inert — *the unblock was written where only the
+blocked party would find it* — no longer applies.
+
+**Smallest human unblock — unchanged, and now also delivered out of band.** Turn the routine off,
+**or** replace its "YOUR SLICE THIS ITERATION" section with: *read `RETURN-DAY.md` §5; re-derive
+what this environment can run before assuming what it cannot (`:core` builds and tests here via
+`scripts/core-probe.sh` once a JDK 17 is installed; `:app`, .NET and the emulator do not); and note
+that the sync spec, generator and vectors live in the **engine** repo.* The real bottleneck is
+unchanged and is **not authoring capacity**: one merge decision (**#53**) plus a Windows gate.
+
+### B-7 status 2026-08-21 (seventy-third run) — reproduced, and it bounded this run's claims
+
+Unchanged: `:app:assembleDebug`, `:app:lintDebug`, `:app:test` and `checkCoreIsAndroidFree` **did
+not run and are unclaimed**; **no zero-warning claim is made**; `Verify-Alpha.ps1` **did not run and
+could not** (no `pwsh`, no `dotnet`, Windows gate). **New this run:** the same bound applies to the
+merge replay — **C-73-6** proves merge *topology* only. That the six merges produce a tree which
+**builds** or **passes the gate** is **unproven**, and the `--theirs` resolutions used to continue
+the replay are a replay mechanism, **not** a recommended resolution.
+
+**Also unclaimed this run: `:core:test`.** It was **not run** — this slice touched no Kotlin. Run
+72's **336/0** stands as run 72's measurement and is **not** re-asserted here as if re-measured.
+
+### B-14, B-16 — re-measured, both still open, and both now have a fresher number
+
+**B-14** (the phone never asserts `pairing-high-bit-confirm.json`) and **B-16** (android CI stays
+green straight through an un-vendored upstream vector) both turn on the post-landing corpus being
+**30** where the phone vendors **29**. That gap was re-measured this run against a real replay of
+the six merges (**C-73-7**): **`+ pairing-high-bit-confirm.json`, `~ index.json`, `exit=1`** — the
+exact output `RETURN-DAY.md` predicts. **Neither is closed, and neither can be from here**: both
+close when the merges land and the re-pin runs, which needs the Windows gate first.
+
+### B-1, B-2, B-4, B-5, B-6, B-8, B-9, B-12, B-13, B-15, B-17, B-19, B-20, B-21 — untouched this run
+
+None was acted on, narrowed or re-attempted. **B-19** is unmoved — **no `:app` file was written**.
+**B-21** was **not exercised**: this run fetched no Maven artefact at all (no Gradle invocation),
+so it stays open on runs 67–72's evidence, not on new evidence.

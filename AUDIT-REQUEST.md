@@ -12990,3 +12990,146 @@ cd <android> && git diff --stat origin/claude/android-a0-probe..HEAD
 
 *Expected, and **observed**:* the diff touches only the files named above; no path under
 `core/src/main/`, `app/`, or `core/src/test/resources/`.
+
+---
+
+## Seventy-third run — 2026-08-21 (Linux sandbox): revalidating the landing plan after its use-by date
+
+Run `git fetch --all --prune` in **both** trees first, or every count below is stale — rule one.
+`<engine>` = a checkout of `ShivaClaw/careerseeker`; `<android>` = this repo.
+
+### C-73-1 — the assigned slice is built, for the thirty-eighth consecutive run
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  echo "== $c =="; git log -1 --format='%ad  %s' $c; git show --stat --format='' $c
+done
+```
+
+*Expected, and **observed** this run:* `8575539` (**Sun Aug 9 2026**) touches `docs/Sync-Protocol.md`
+**only**, **+114/−3**; `22b028e` adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`,
+`index.json` **and** `generate.mjs`; `7328a0b` (**Wed Aug 12 2026**) adds `invalid-unknown-field.json`.
+**All four gates named in the recurring prompt are already closed.** Re-building would duplicate
+`8575539` and regenerate a corpus next to the one the phone vendors.
+
+### C-73-2 — the pin, and where it is not
+
+```bash
+cd <android> && grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1
+cd <engine>  && git merge-base --is-ancestor 7328a0bc043335491cd96a67d634e8eea2a13af9 origin/main \
+                 && echo "on main" || echo "NOT on main"
+cd <engine>  && git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l
+```
+
+*Expected, and **observed**:* `7328a0bc043335491cd96a67d634e8eea2a13af9`; **`NOT on main`**; **26**.
+**Run this in the engine tree.** In `<android>` the ancestor check returns **`exit=128`** ("Not a
+valid commit name") because the commit lives in the other repository — which reads like a broken
+command rather than a wrong tree. That is C-66-1's warning, and this run reproduced it by making the
+mistake: the first invocation was run in `<android>` and had to be re-run.
+
+### C-73-3 — the vendored corpus is still byte-identical to its pin
+
+```bash
+mkdir -p /tmp/pin-check && cd <engine> && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pin-check
+diff -r /tmp/pin-check/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1
+echo "exit=$?"; ls /tmp/pin-check/docs/sync-vectors/v1 | wc -l
+```
+
+*Expected, and **observed**:* no output, **`exit=0`**, **29** files — measured **after** this run's
+replay work, not before it.
+
+### C-73-4 — return day passed, and no human has acted (NEW; this is the run's finding)
+
+```bash
+cd <engine>  && git log -1 --format='%h %ad %an' --date=short origin/main && git log -1 --format='%ar' origin/main
+cd <android> && git log -1 --format='%h %ad %an' --date=short origin/main
+cd <engine>  && git log --all --format='%ad %an' --date=short | head -15
+```
+
+*Expected, and **observed** on 2026-08-21:* engine `origin/main` = **`aac05f3`, 2026-08-12,
+`Portable G & Shiva's Claw`**, reported as **8 days ago**; android `origin/main` = **`ebfaf81`**;
+and **every** commit in the recent list is authored **`Claude`** — runs 48–72's heartbeats. **The
+last human commit in either repo predates the 2026-08-18 return date by six days.**
+
+**Attack this first if you doubt the run.** The claim is *"no human action since 2026-08-12"*, and it
+is falsifiable exactly as written: any commit, merge, close, undraft or review by a non-`Claude`
+author after that date refutes it. It is deliberately scoped to **repository** activity — this
+session cannot see Brandon's calendar, mail or intentions, and does **not** claim he is unaware.
+
+### C-73-5 — the landing plan's inputs are unmoved (live heads, not local refs)
+
+```bash
+cd <engine>
+# live heads via the API; compare to fetched refs
+for spec in "48 claude/s8-harness-linux-reach" "35 claude/s2-seq-bound" \
+            "36 claude/s2-transport-vocabulary" "51 claude/s3-pairing-confirm-consumer" \
+            "52 claude/s6-outcome-disposition" "49 claude/s6-composition-root-decision" \
+            "53 claude/s6-resume-reconciliation"; do
+  pr=${spec%% *}; br=${spec#* }
+  echo "#$pr $br $(git rev-parse origin/$br)"
+done
+git rev-parse --short origin/main
+```
+
+*Expected, and **observed**:* all **seven** local refs equal their PR's live head SHA — **0
+mismatches** — and `origin/main` is **`aac05f3`**. Live heads this run: `#48 c93e88d`, `#35 2be00fc`,
+`#36 b0b6c77`, `#51 edee32b`, `#52 94fd979`, `#49 f5e0c0a`, `#53 8177353`. **`RETURN-DAY.md` §3's
+premises are intact**, four days after its last revalidation.
+
+### C-73-6 — the two stops reproduce, and so does each one's composition
+
+```bash
+rm -rf /tmp/replay && git clone -q --no-hardlinks <engine> /tmp/replay
+cd /tmp/replay && git fetch -q <engine> '+refs/remotes/origin/*:refs/remotes/origin/*'
+git checkout -q -B replay origin/main
+git config user.email claude@local && git config user.name Claude
+stops=0
+for br in claude/s8-harness-linux-reach claude/s2-seq-bound claude/s2-transport-vocabulary \
+          claude/s3-pairing-confirm-consumer claude/s6-outcome-disposition \
+          claude/s6-composition-root-decision; do
+  if git merge --no-edit origin/$br >/dev/null 2>&1; then echo "$br CLEAN"
+  else stops=$((stops+1)); echo "$br STOP"; git diff --name-only --diff-filter=U | sed 's/^/   /'
+       git checkout --theirs . 2>/dev/null; git add -A; git commit -q --no-edit; fi
+done; echo "TOTAL STOPS = $stops"
+```
+
+*Expected, and **observed**:* **`TOTAL STOPS = 2`** in §3's recommended (#53-closed) configuration
+and §3's stated order. **#52** conflicts on exactly **5** files — `README.md`,
+`docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`, `scripts/Verify-Alpha.ps1`,
+`src/Engine/README.md` — the **pin family**; **#49** on those five **plus
+`tests/SyncHarness/Program.cs`**. **Nothing under `src/Sync/` conflicts**, which is the measured form
+of §3's reason for closing #53.
+
+**Scope of this evidence, stated plainly.** This proves the **merge topology** — which merges stop
+and on what. It proves **nothing about whether the result builds or passes**: `Verify-Alpha.ps1` is a
+Windows gate that did not run here (**C-ENV-1**), and the stops above were resolved `--theirs`
+mechanically only to continue the replay, **which is not a resolution anyone should copy.**
+
+### C-73-7 — the post-landing corpus, and the re-pin command's exact output
+
+```bash
+cd /tmp/replay && ls docs/sync-vectors/v1/ | wc -l && node docs/sync-vectors/generate.mjs --check
+diff -rq /tmp/pin-check/docs/sync-vectors/v1 /tmp/replay/docs/sync-vectors/v1
+cd <android> && scripts/repin-vectors.sh --check --engine /tmp/replay HEAD; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **30** files, **`OK: 30 vector files match the generator.`**; the diff
+names exactly **`index.json` differs** and **`pairing-high-bit-confirm.json` only in the replay**;
+and `--check` prints `vendored: 29 files    at pin: 30 files`, **`+ pairing-high-bit-confirm.json`**,
+**`~ index.json`**, `DRIFT: 2 file(s)`, **`exit=1`**. **Every token matches what `RETURN-DAY.md`
+says to expect** — the re-pin step is executable as written. `--check` **writes nothing**; the
+vendored corpus was re-verified 29/29 afterwards (**C-73-3**).
+
+### C-73-8 — B-18 attempt 10 was delivered, and what that does and does not establish
+
+Not reproducible by command — it is an out-of-band act, recorded here so it is auditable rather than
+invisible. **This run sent a push notification to Brandon** (phone + inbox) carrying: return day
+passed with 24 drafts unmerged and no human commit since 2026-08-12; that `RETURN-DAY.md` §3 is
+**re-verified valid as written**; step 0 (**decide #53**); the load-bearing order
+`#48, #35, #36, #51, #52, #49`; the same-sitting re-pin command; and a recommendation to **pause the
+schedule** until the queue is cleared.
+
+**What this establishes:** the finding left the repository. **What it does not:** that it was read,
+or that anything will change. **B-18 stays open** — closing it is Brandon's action. A session
+auditing this claim should treat it as *"a notification was sent"*, which is all it says.
