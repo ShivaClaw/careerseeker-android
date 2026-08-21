@@ -13133,3 +13133,161 @@ schedule** until the queue is cleared.
 **What this establishes:** the finding left the repository. **What it does not:** that it was read,
 or that anything will change. **B-18 stays open** — closing it is Brandon's action. A session
 auditing this claim should treat it as *"a notification was sent"*, which is all it says.
+
+---
+
+## Seventy-fourth run — 2026-08-21 (Linux sandbox): a coverage guard that could not see the kind it was written for
+
+### C-74-1 — the assigned slice is built, and is still not on `main` (thirty-ninth firing)
+
+```bash
+cd <engine> && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do
+  git cat-file -t $c
+  git merge-base --is-ancestor $c origin/main; echo "$c on main? exit=$?"
+done
+```
+
+*Expected, and **observed**:* all three print **`commit`** — the S5 spec half (§4.3 body +
+PQ-A2-1/-2), both ack vectors, and `invalid-unknown-field` (PQ-A2-3) — and all three report
+**`exit=1`**, *not on main*. **Built since 2026-08-09; assigned again this run.** See **B-18**.
+
+### C-74-2 — the pin is `7328a0b`, and the vendored corpus is byte-identical to it
+
+```bash
+cd <engine> && git worktree add --detach /tmp/pin74 7328a0b
+diff -r /tmp/pin74/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+cd /tmp/pin74 && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected, and **observed**:* `diff -r` **silent, `exit=0`**; **29** files at the pin and **29**
+vendored; **`OK: 29 vector files match the generator.`**, `exit=0`. **The recurring prompt's pin
+`679a317` is stale — it is `7328a0b`**, unchanged since 2026-08-12. Both sides addressed by
+absolute path (run 69's process finding).
+
+### C-74-3 — the defect: §4.3's engine→phone table has eight rows and the derived set had seven
+
+```bash
+cd <engine> && git show origin/main:docs/Sync-Protocol.md | sed -n '/### 4.3 Payload kinds/,/^Phone → engine/p'
+git show origin/main:src/Sync/Protocol.cs | sed -n '31,36p'
+cd <android> && git show e1496ab^:core/src/main/kotlin/app/careerseeker/core/Protocol.kt | sed -n '125,128p'
+```
+
+*Expected, and **observed**:* the engine→phone table lists **eight** kinds — `snapshot`, `delta`,
+`doc`, `evidence`, `heartbeat`, `conflict`, `entitlement_ack`, **`error`** — and `Protocol.cs:34-35`
+carries `error` in `ShippingKinds`. The pre-fix `ENGINE_TO_PHONE_KINDS` reads
+**`entries.filter { it.flow == KindFlow.ENGINE_TO_PHONE }`**, which drops every `KindFlow.BOTH`
+kind and therefore yields **seven**. That set is the **input to `PayloadKindCoverageTest`**, so
+`error` was exempt from the B-19 guard by the shape of the guard's input.
+
+### C-74-4 — negative control: the gap was invisible from both ends, and naming it turns the guard red
+
+The control is the enumerator widened **and nothing else** — no fourth set, no test edits:
+
+```bash
+cd <android> && git checkout e1496ab^ -- core/
+sed -i 's|it.flow == KindFlow.ENGINE_TO_PHONE }.toSet()|it.flow != KindFlow.PHONE_TO_ENGINE }.toSet()|' \
+  core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+scripts/core-probe.sh --rerun; echo "exit=$?"
+git checkout HEAD -- core/
+```
+
+*Expected, and **observed**:* **`exit=1`**, exactly **two** red, and the guard's own message names
+the kind:
+
+```
+flow matches section 4-3's direction tables() FAILED
+  expected: <[snapshot, delta, doc, evidence, heartbeat, conflict, entitlement_ack]>
+       but was: <[snapshot, delta, doc, evidence, heartbeat, conflict, entitlement_ack, error]>
+every engine to phone kind is classified exactly once() FAILED
+  engine->phone kinds with no declared destination: [error]. ...
+```
+
+**Both halves of the file were wrong in complementary directions**, which is why fifteen runs of
+green told nobody: the direction-table case asserted the same seven names the enum produced — a
+derivation compared against itself — and the second case's filter (`!= ENGINE_TO_PHONE`) did not
+merely miss `error`, it **failed any attempt to classify it**, on the stated grounds that it
+"cannot be received by the replica".
+
+### C-74-5 — with the fix, `:core:test` is green at 338
+
+```bash
+cd <android> && set -o pipefail && scripts/core-probe.sh --rerun; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`BUILD SUCCESSFUL`**, `exit=0`, and
+**`core-probe: 338 tests, 0 failed, 0 skipped, across 22 classes`**. Baseline before this run's
+commits was **336/0** on the same tree, measured this run and not carried forward from run 72.
+`set -o pipefail` is not optional — run 72's process finding was a `| tail` that reported `exit 0`
+for a run that executed zero tests.
+
+### C-74-6 — three mutations, each red, every prediction matched
+
+```bash
+# M1 -- narrow the derivation back to == ENGINE_TO_PHONE
+# M2 -- RECEIVED_WITHOUT_A_DESTINATION = emptySet()
+# M3 -- RECEIVED_WITHOUT_A_DESTINATION = setOf(ERROR, CONFLICT)
+# after each: scripts/core-probe.sh --rerun; echo "exit=$?"; then restore Protocol.kt
+```
+
+*Expected, and **observed**:* all three `exit=1`.
+
+| mutation | predicted | observed |
+| --- | --- | --- |
+| **M1** narrow the derivation | 1 red — the hand-transcribed §4.3 table | `flow matches section 4-3's direction tables` |
+| **M2** empty the fourth set | 2 red — the set's pin, and coverage | `the undecided set holds exactly error`, `every engine to phone kind is classified exactly once` |
+| **M3** park a second kind in it | 2 red — the set's pin, and **disjointness** | the same two, the second on `conflict` in two sets |
+
+**M1 is the one that matters**: before this run the same narrowing turned **nothing** red. What
+holds it is the hand-transcribed constant, not a smarter derivation — the failure mode was a
+derivation agreeing with itself, so one side of the comparison must not be derived. After all
+three, `Protocol.kt` was restored and re-diffed **byte-identical** to the committed version.
+
+### C-74-7 — an engine→phone `error` is accepted, and therefore reaches the applier
+
+```bash
+cd <android> && scripts/core-probe.sh --rerun 2>&1 | grep "error payload is accepted"
+```
+
+*Expected, and **observed**:*
+**`EnvelopeReceiverTest > an engine to phone error payload is accepted, and therefore reaches the
+applier() PASSED`** — the receiver accepts an authentic `error` and reports `kind = "error"`.
+
+**Read the bound before reading it as more.** This proves the payload **gets to** the single
+`ReplicaApplier`; it does **not** execute the drop. `:app`'s `when` covers four projected kinds
+with `else -> Ignored`, and `:app` needs the Android SDK (**B-7**), so the last step is **read, not
+compiled** and is labelled that way in the source. The classification half is
+`PayloadKindCoverageTest`; the decision half is **PQ-ERR-1** and is nobody's here.
+
+### C-74-8 — freshness and the standing state (measured this run, not carried forward)
+
+```bash
+cd <engine> && git fetch --all --prune && git rev-parse origin/main
+git log origin/main --format='%h|%an|%ad' --date=short -20 | grep -v '|Claude|' | head -1
+cd <android> && git fetch --all --prune && git rev-parse origin/main
+git show origin/autonomy/codex-state:STATE.md | head -12   # in <engine>
+# PR counts via the API, state=open
+```
+
+*Expected, and **observed**:* engine `main` **`aac05f3`**, android `main` **`ebfaf81`**; the last
+non-Claude commit on engine `main` is **`aac05f3`, 2026-08-12** — **nine days ago, three days after
+return day**. **18 engine drafts + 6 android drafts open; none merged, closed or undrafted.**
+Terra: heartbeat **2026-08-12T20:28:36**, **COMPLETE**, **files claimed: none** — **no collision**.
+Both checkouts again arrived **detached at a stale `main`**; the android tree was **265** commits
+behind this branch's tip pre-commit (run 73 measured 262), which is why rule one is rule one.
+
+### C-74-9 — the bound: `:core:test` only, and what was not written
+
+```bash
+cd <android> && git status --porcelain core/src/test/resources/sync-vectors/ app/ | wc -l
+git diff --stat 5694edc..HEAD
+```
+
+*Expected, and **observed**:* **`0`** — **no vector byte written, `VECTORS.lock` untouched, the pin
+did not move (H7)**, and **no `:app` file written** (**B-19** unmoved). The diff is four files:
+`Protocol.kt`, `PayloadKindCoverageTest.kt`, `EnvelopeReceiverTest.kt`, `docs/protocol-questions.md`,
+plus this run's records. **`Verify-Alpha.ps1` did not run and no result is claimed for it** — no
+`pwsh`, no `dotnet`, Windows gate (**B-7**). **The android gate did not run**: `:app:assembleDebug`,
+`:app:lintDebug`, `:app:test` and `checkCoreIsAndroidFree` are **unrun and unclaimed**, and **no
+zero-warning claim is made**. `docs/Sync-Protocol.md` was **read, never edited** — the normative
+document is the engine's, and PQ-ERR-1's amendment, if any, follows a decision this run did not make.

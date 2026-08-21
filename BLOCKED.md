@@ -3396,3 +3396,67 @@ close when the merges land and the re-pin runs, which needs the Windows gate fir
 None was acted on, narrowed or re-attempted. **B-19** is unmoved — **no `:app` file was written**.
 **B-21** was **not exercised**: this run fetched no Maven artefact at all (no Gradle invocation),
 so it stays open on runs 67–72's evidence, not on new evidence.
+
+---
+
+## Run 74 — 2026-08-21. No new blocker; one new question, and B-18's thirty-ninth firing
+
+This run wrote `:core` Kotlin and hit nothing it could not finish. Recorded explicitly, because a
+run that files nothing should say so rather than leave the reader wondering whether it forgot.
+
+**What it filed is a question, not a blocker, and the distinction is deliberate.** **PQ-ERR-1** —
+the phone accepts an engine→phone `error` and drops it, because `:app`'s applier `when` covers four
+kinds and returns `Ignored` for the rest — is **not blocked**. Nothing prevents it being answered;
+it needs a *decision* about what the user should see, and the three defensible answers differ in
+exactly that. Filing it as BLOCKED would send the next session hunting for an obstacle that does not
+exist. Its `:app` half **would** be blocked by **B-7** once the decision is made, and PQ-ERR-1 says
+so in the entry rather than here.
+
+### B-18 — the schedule assigned a slice finished on 2026-08-09, for the thirty-ninth time
+
+**Unchanged as a blocker, and its premise is stale in the same three measured ways** (**C-74-1**,
+**C-74-2**): the S5 spec half exists as commits `8575539`, `22b028e`, `7328a0b` on the engine repo's
+`claude/s5-*` drafts, all reporting `not on main` (`exit=1`); the prompt's vendored pin `679a317` is
+**`7328a0b`**; and "S5 is NOT STARTED" is wrong — its emitter landed too.
+
+**No out-of-band attempt was made this run, and that is a decision rather than an omission.**
+Attempt 10 (run 73) pushed a notification to Brandon's phone and inbox **the same day**, carrying
+the state, the re-verified landing plan, step 0, the merge order, the re-pin command, and the
+recommendation to pause the schedule. **Nothing has changed since**: `main` is still `aac05f3`, the
+last human commit is still 2026-08-12, and the draft counts are unmoved at 18 + 6 (**C-74-8**). A
+second notification carrying the same facts on the same day spends attention and delivers no new
+one. **Attempt 11 should carry a new fact or a new channel, not a repeat.**
+
+**Smallest human unblock — unchanged since run 55:** turn the routine off, or replace its slice
+section. The one-command check that the assigned slice is already built is **C-STOP-1**.
+
+### B-19 status 2026-08-21 (run 74) — unchanged, and this run's finding is NOT progress on it
+
+**Still open, still exactly as run 58 scoped it.** The three `:app` pieces — a `ProStateStore`
+implementation, the configured `knownProductIds` set, and the composition root that constructs
+`EntitlementRoutingApplier` — are untouched. **No `:app` file was written this run.**
+
+**Read the boundary before reading the `error` work as movement here.** Widening
+`ENGINE_TO_PHONE_KINDS` and adding a fourth classification set makes the guard **see** a kind it was
+blind to. It still cannot prove that **anything constructs** a destination — that is the warning
+`ROUTED_OUTSIDE_REPLICA`'s own KDoc carries, and it now applies to a second set. The thing that
+catches a composition root that does not exist is the android gate, which needs the Android SDK
+(**B-7**) and did not run.
+
+### B-7 status 2026-08-21 (run 74) — reproduced, and it bounded exactly two claims
+
+`:app` still cannot be built here; `scripts/core-probe.sh` reaches `:core` only. It bounded (1) the
+drop half of **C-74-7** — the `when` that returns `Ignored` for `error` was **read, not compiled**,
+and is labelled as read in the source and the test — and (2) any claim about PQ-ERR-1's eventual
+`:app` surface. **Four of the android gate's five tasks did not run and no result is claimed for
+them.** JDK 17 was installed from apt this run, as runs 56 onward have done; the image ships 21 and
+`:core` pins `jvmToolchain(17)`.
+
+### B-21 — not exercised this run, and stays open
+
+No Maven 429 was seen across four `core-probe.sh` runs (baseline, control, three mutations, final).
+**One clean session does not close it** — same posture as runs 67–73.
+
+### B-1, B-2, B-4, B-5, B-6, B-8, B-9, B-12, B-13, B-14, B-15, B-16, B-17, B-20 — untouched this run
+
+None was worked, none moved, and none is re-derived here.

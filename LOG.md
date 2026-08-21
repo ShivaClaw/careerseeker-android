@@ -13938,3 +13938,113 @@ of any kind. **The production relay was not contacted at all, not even `GET /v1/
 Google, Play or OAuth console; no accounts, no purchases, no Gmail. **No secret was read, printed
 or echoed.** Terra's territory was **read, never written** — `autonomy/codex-state` reports
 **COMPLETE, files claimed: none**, so there was **no collision**.
+
+---
+
+## RUN 74 — 2026-08-21 (Linux sandbox). The guard written for B-19 could not see the kind that carries the engine's rejections.
+
+**Fetch first, and it mattered again.** Both checkouts arrived **detached at a stale `main`** — the
+android tree at `ebfaf81`, **265** commits behind this branch's tip, **measured this run**
+(`git rev-list --count origin/main..HEAD`), not carried forward from run 73's 262. Every number
+below is post-fetch (**C-74-8**).
+
+**Declined for the thirty-ninth time and verified instead** (**C-74-1**, **C-74-2**). All three S5
+slice commits exist and report `not on main`, `exit=1`, in the **engine** repo. The prompt's
+vendored pin `679a317` is **still stale** — it is **`7328a0b`** — and the vendored corpus is
+**29/29 byte-identical** to it (`diff -r` silent, `exit=0`), generator-clean at both ends.
+
+### Milestone 1 — the finding, and it is in a guard rather than in the protocol (C-74-3)
+
+`PayloadKind.ENGINE_TO_PHONE_KINDS` was derived as `flow == KindFlow.ENGINE_TO_PHONE`, which drops
+every `KindFlow.BOTH` kind. **§4.3's engine→phone table has eight rows and the set had seven** —
+`error` is in that table by name, and `src/Sync/Protocol.cs:34-35` carries it in `ShippingKinds`.
+
+That set is the **input to `PayloadKindCoverageTest`**, the guard run 60 wrote so that no kind could
+reach the phone without a declared destination. So `error` — the kind carrying the engine's §7.2
+reason for rejecting what the phone sent — **was exempt from the guard because of how the guard's
+input was derived**. B-19's defect class, unguarded, for exactly the kind that reports failures.
+
+### Milestone 2 — why fifteen runs of green said nothing (C-74-4)
+
+The two halves of that test file were wrong in **complementary** directions, and each concealed the
+other:
+
+- `flow matches section 4-3's direction tables` asserted the **same seven names the enum produced**.
+  A derivation compared against itself. Enum and test agreed perfectly; both disagreed with the
+  normative document.
+- `no phone to engine kind is classified as something the phone receives` filtered
+  `!= ENGINE_TO_PHONE`. That did not merely miss `error` — it **forbade the fix**. A reader who
+  noticed the gap and placed `error` in a set was told by a failing assertion that `error` "cannot
+  be received by the replica", which §4.3 contradicts by name.
+
+**The negative control is the enumerator widened and nothing else**: two tests red, and the guard's
+own message prints `engine->phone kinds with no declared destination: [error]`. The gap was one
+character of filter away from announcing itself, in a file whose whole purpose was to announce it.
+
+### Milestone 3 — what changed, and the one thing deliberately not derived (C-74-5, C-74-6)
+
+`ENGINE_TO_PHONE_KINDS` now derives `!= PHONE_TO_ENGINE`; the second filter narrows to
+`== PHONE_TO_ENGINE`; and **§4.3's table is transcribed by hand** into
+`PayloadKindCoverageTest.section43EngineToPhone`. That last one is the load-bearing choice and it
+looks like a step backwards: a hand-written constant is the only side of the comparison that **can**
+disagree with the enum, and a self-agreeing derivation is what failed. Mutation **M1** — narrowing
+the derivation back — now turns exactly one test red where it previously turned **none**.
+
+`:core:test` **`338 tests, 0 failed, 0 skipped, across 22 classes`**, `exit=0`, baseline **336/0**
+measured on the same tree this run. All three mutations red, every prediction matched (M1 → 1 red;
+M2, emptying the fourth set → 2; M3, parking a second kind in it → 2, the second on disjointness).
+`Protocol.kt` restored **byte-identical** afterwards.
+
+### Milestone 4 — the classification is honest, and the decision is not mine (C-74-7)
+
+With the guard widened `error` needs a destination and does not have one. What is established,
+**executed**: the receiver **accepts** an authentic `error` and reports `kind = "error"`; `SyncPump`
+hands every accepted payload to the single `ReplicaApplier`; `:app`'s is a `when` over four
+projected kinds with `else -> Ignored`. The engine's only channel for saying *"I rejected that"*
+decrypts cleanly, counts as a healthy envelope, and is consumed by nothing.
+
+**It is classified `RECEIVED_WITHOUT_A_DESTINATION` — a defect marker, not a destination.** Putting
+`error` in `NOT_PROJECTED_IN_V1` would have borrowed that set's stated reasons (`doc` is not emitted
+in v1; `conflict` answers a `doc_edit` the phone cannot send) for a case that has never had one, and
+no later reader could have told the two apart. **That laundering is how `entitlement_ack` looked
+handled for nine days.** The set is pinned at exactly one member so it cannot become a parking bay.
+
+**What the phone should DO with a received `error` is filed as PQ-ERR-1 and left open.** Three
+defensible behaviours exist — drop deliberately, surface the code, retry on `ref_seq` — and they
+differ in what the user sees; the failure mode is the one PQ-S6-1 circles from the other side (an
+`outcome` the engine refuses is indistinguishable on the phone from one that landed). Product
+behaviour with a user-visible failure mode goes to a gate, and the receiving surface is `:app`
+besides. Choosing here would also put the phone ahead of an engine whose e2p `error` emission is
+**not established** — the kind is listed; no emitter was found on `origin/main`.
+
+### Milestone 5 — what did NOT happen, honestly
+
+**No rung moved, and none is claimed to have.** This is a guard repair and a filed question, not a
+rung advance. **S5 is unchanged — still PARTIAL, still not blocked, still off `main`.** **B-19 is
+unmoved**: nothing in `:app` was written, and this run's `error` finding is **not** progress on it —
+`PayloadKindCoverageTest` still cannot prove a production caller exists, which is the whole of
+B-19's KDoc warning. **B-18 was not re-attempted out of band this run**: run 73 sent that
+notification **the same day**, nothing has changed since, and a duplicate would cost attention
+without carrying a new fact.
+
+### Milestone 6 — prohibition paragraph: what this run did not touch
+
+**Nothing was merged, closed, rebased, undrafted, force-pushed or deleted in either repo** — the
+**18** engine drafts and **6** android drafts are exactly as found, and **#53's fate stays
+Brandon's**. **No vector byte was written in either repo**: the corpus was re-diffed against pin
+`7328a0b` at **29/29, `diff -r` silent, `exit=0`**, `VECTORS.lock` was not edited, **the pin did not
+move (H7)**, and `generate.mjs` was run **only** with `--check`, which writes nothing. **No `:app`
+file was written** — **B-19** stays open. **No C# was written**; the engine checkout was read-only
+apart from `STATE.md` on the docs-only `autonomy/claude-state` branch, and was left detached at
+`aac05f3` where it was found. **`docs/Sync-Protocol.md` was read, never edited** — it is the
+engine's normative document, and PQ-ERR-1's amendment, if any, follows a decision this run did not
+make; same rule that kept run 70 out of §4.1's AAD and run 71 out of §10.2. **No `ci.yml`, no
+`generate.mjs`, no `repin-vectors.sh`; `$ExpectedOfflineTotal` was not moved**, and **no nineteenth
+engine PR was opened**. **`Verify-Alpha.ps1` was not run and no result for it is claimed** — no
+`pwsh`, no `dotnet`, Windows gate besides. **The android gate was not run**: `:app:assembleDebug`,
+`:app:lintDebug`, `:app:test` and `checkCoreIsAndroidFree` are **unrun and unclaimed** (**B-7**),
+and **no zero-warning claim is made**. No emulator, no keystore, no deploy of any kind. **The
+production relay was not contacted at all, not even `GET /v1/health`.** No Google, Play or OAuth
+console; no accounts, no purchases, no Gmail. **No secret was read, printed or echoed.** Terra's
+territory was **read, never written** — `autonomy/codex-state` reports **COMPLETE, files claimed:
+none**, so there was **no collision**.
