@@ -122,9 +122,29 @@ enum class PayloadKind(val wire: String, val flow: KindFlow) {
             "config_change", "lesson_proposal", "metric",
         )
 
-        /** Derived from [flow], never listed a second time. */
+        /**
+         * Every kind that can arrive **at the phone**. Derived from [flow], never listed a
+         * second time.
+         *
+         * ## `!= PHONE_TO_ENGINE`, not `== ENGINE_TO_PHONE`, and the difference was a live gap
+         *
+         * Until the seventy-fourth run this read `it.flow == KindFlow.ENGINE_TO_PHONE`, which
+         * silently excluded every [KindFlow.BOTH] kind — and §4.3's engine→phone table has
+         * **eight** rows, not seven: `error` is in it, by name. So the set that decides "what
+         * the phone must be prepared to receive" could not see the one kind that carries the
+         * engine's reason for rejecting what the phone sent.
+         *
+         * The consequence was not that the set was merely short. `PayloadKindCoverageTest`
+         * enumerates *this* set to require that every receivable kind declare a destination —
+         * the guard written for B-19 — so `error` was exempt from the guard **because of how
+         * the guard's input was derived**, and the exemption was invisible from either end:
+         * the set looked complete, and the test that pins it against §4.3 asserted the same
+         * seven names, so doc and code agreed with each other and both disagreed with the
+         * normative table. Widening it here is what makes the omission fail a test instead of
+         * reading as a decision.
+         */
         val ENGINE_TO_PHONE_KINDS: Set<PayloadKind> =
-            entries.filter { it.flow == KindFlow.ENGINE_TO_PHONE }.toSet()
+            entries.filter { it.flow != KindFlow.PHONE_TO_ENGINE }.toSet()
 
         /**
          * Kinds the `:app` [ReplicaApplier] projects into the Room replica.
@@ -158,6 +178,41 @@ enum class PayloadKind(val wire: String, val flow: KindFlow) {
          * reader from "fixing" it.
          */
         val NOT_PROJECTED_IN_V1: Set<PayloadKind> = setOf(DOC, CONFLICT)
+
+        /**
+         * Receivable kinds that reach the replica's `else` branch because **nobody decided**
+         * where they should go. A defect marker, not a destination.
+         *
+         * This set exists so the partition can be complete without the completeness being a
+         * lie. The other three sets each assert a decision: `snapshot` is projected, an
+         * `entitlement_ack` is routed past the replica, `doc` and `conflict` are dropped **for
+         * stated reasons** — `doc` is not emitted in v1 at all and `conflict` answers a
+         * `doc_edit` the phone cannot yet send. Placing `error` beside `doc` would have
+         * borrowed that sentence for a case that has never had one, and a later reader would
+         * have had no way to tell the two apart. That laundering is precisely how
+         * `entitlement_ack` spent nine days looking handled (B-19), so it is worth a fourth
+         * set to avoid repeating it one kind along.
+         *
+         * **What is true of `error` today**, and all of it is executed rather than reasoned
+         * (`PayloadKindCoverageTest`, `EnvelopeReceiverTest`): §4.3 lists it engine→phone;
+         * `Protocol.cs` has it in `ShippingKinds`; [EnvelopeReceiver] therefore **accepts** an
+         * authentic one and reports `kind = "error"`; [SyncPump] hands it to the single
+         * [ReplicaApplier]; `:app`'s `when` covers four kinds and returns
+         * [ApplyDisposition.IGNORED] for the rest. The engine's only channel for saying *"I
+         * rejected what you sent, and here is the §7.2 code"* is consumed by nothing and
+         * surfaced nowhere.
+         *
+         * **What should happen instead is not decided here.** Whether the phone retries,
+         * surfaces the code, or goes on dropping it is product behaviour with a user-visible
+         * failure mode — an `outcome` the engine refused reads on the phone as an `outcome`
+         * that landed — and this program's standing rule sends that to a gate rather than to a
+         * unilateral fix. Filed as **PQ-ERR-1** in `docs/protocol-questions.md`.
+         *
+         * **Do not park a new kind here to make the build go green.** Its membership is pinned
+         * to exactly `{error}` by its own test, so adding a second occupant means editing an
+         * assertion that says, in its failure message, that you are doing so.
+         */
+        val RECEIVED_WITHOUT_A_DESTINATION: Set<PayloadKind> = setOf(ERROR)
     }
 }
 
