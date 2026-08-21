@@ -3661,3 +3661,52 @@ the rest were neither acted on, narrowed nor re-attempted. The dangling-citation
 (**C-75-13**) is **still not built**; its hazard recurred this run and failed loudly rather than
 silently, and every `C-`/`B-` id cited in this run's records and PR body was checked to resolve
 before pushing.
+
+---
+
+## Run 77 — 2026-08-21. No new blocker; B-18's forty-second firing, and the criterion re-measured
+
+### B-18 status 2026-08-21 (seventy-seventh run) — the forty-second firing, and the fourteenth attempt is silence
+
+**Unchanged as a blocker.** The scheduled prompt again assigned S5's spec half, built since
+**2026-08-09** and re-verified rather than assumed (**C-77-2**). The prompt's pin `679a317` is still
+stale (**`7328a0b`**, corpus **29/29** byte-identical, **C-77-3**), and its "S5 is NOT STARTED" is
+still wrong.
+
+**The criterion was re-measured this run, not inherited**, and both triggers read negative
+(**C-77-10**):
+
+| trigger | measured this run | fires? |
+| --- | --- | --- |
+| **movement in the blocking state** — a merge, close, undraft, or human commit in either repo | engine `main` still **`aac05f3`**, last non-Claude commit **2026-08-12**; **18 engine + 6 android drafts**, read live, all open, all draft; **none** merged, closed or undrafted | **no** |
+| **something needing an action before return day** | return day (**2026-08-18**) is **three days past**; this run's output is a records-side guard that is **green**, needing nothing from anyone | **no** |
+
+**So: nothing sent, for the fourth consecutive run.** Attempt 10 (run 73) reached Brandon's phone and
+inbox with the state, the re-verified landing plan, step 0 and the re-pin command, and remains
+unanswered. Nothing in the world state has changed since. **A fifth message carrying the same facts
+would train its recipient to ignore the one escalation path this program has that does not require
+opening a ~1 MB `LOG.md`** — and this run's finding is the weakest case yet for spending it: a guard
+that found **no live defect** in the records it checks.
+
+**The criterion still inverts on a new fact**, unchanged: movement in the blocking state, or
+something needing an action, goes out immediately. **B-18 stays open** — whether the routine stops is
+Brandon's action, and a sent notification is still not a read one.
+
+### C-75-13 is CLOSED — built, and it is the first successor target to survive measurement and ship
+
+Filed by run 75 as the lane's strongest records-side candidate, left unbuilt by run 76, built this
+run as `scripts/check-citations.sh` and wired into CI. **Its predicted difficulty was real but
+smaller than predicted** (three false positives across 698 cited ids, **C-77-4**), and **the defect
+it actually found was in its own documentation** (**C-77-11**). No entry is filed against it.
+
+### Nothing else moved
+
+No new blocker was filed this run. **B-22 was not re-attempted** — its patch needs an `:app` compile
+(**B-7**) — and was **not** worked around by skipping or `@Ignore`-ing a test; no Gradle task ran at
+all this iteration, so B-22's nondeterminism was neither observed nor sampled. **B-15's remaining
+half was deliberately not taken:** its failure paths need a knowingly-broken vendored corpus pushed
+to a runner, and writing a wrong vector byte is the cross-repo drift event the mission forbids
+outright. **B-4**, **B-5**, **B-16**, **B-19**, **B-20**, **B-21** were neither acted on, narrowed
+nor re-attempted. Every `C-`/`B-` id cited in this run's records and PR body resolves — checked by
+this run's own new guard, which is the first iteration where that claim is machine-checked rather
+than asserted (**C-77-5**).

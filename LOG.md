@@ -14409,3 +14409,155 @@ even `/v1/health`.** No Play/Google/OAuth console, no accounts, no purchases, no
 no email or Gmail, no secrets read or printed, no `.appdata`. Terra's territory was untouched:
 `scripts/Verify-Alpha.ps1`, `$ExpectedOfflineTotal` and every count-reporting doc are **unmodified
 on every pushed branch**, and no nineteenth engine PR was opened.
+
+---
+
+## RUN 77 — 2026-08-21 (Linux sandbox). The records' one load-bearing property had no check; now it has one, and it caught two defects in itself.
+
+**Assigned slice: S5's spec half, for the forty-second time.** Declined and re-verified rather than
+rebuilt, as the last thirteen runs have — it has existed since 2026-08-09 (**C-77-2**). The slice
+taken instead is the one **run 75 named as the lane's strongest records-side successor candidate and
+run 76 left unbuilt**: the dangling-citation guard, **C-75-13**. It needs no toolchain, which is why
+it is takeable here when four fifths of the android gate is not.
+
+### Milestone 1 — rule one, and every count below is post-fetch
+
+`git fetch --all --prune` in **both** checkouts before anything was read (**C-77-1**). The android
+checkout again arrived **detached at a stale docs-only `main`** (`ebfaf81`); the work branch was
+checked out from `origin/claude/android-a0-probe` at **`7991e31`** before any measurement. Engine
+`origin/main` is **`aac05f3`**, last non-Claude commit **2026-08-12**.
+
+### Milestone 2 — the assigned slice, verified rather than rebuilt (forty-second firing)
+
+`8575539` (2026-08-09) amends `docs/Sync-Protocol.md` **only**, +114/−3 — §4.3.3's
+`{product_id, acknowledged_at, order_id?}` body (**PQ-A6-1**), the 1 MiB cap on the decoded
+ciphertext (**PQ-A2-1**), structural rejection as `decrypt_failed` (**PQ-A2-2**). `22b028e` adds both
+ack vectors **and** the generator; `7328a0b` adds `invalid-unknown-field` (**PQ-A2-3**). All four
+gates the prompt names are closed. `node docs/sync-vectors/generate.mjs --check` on the carrying
+branch: **`OK: 29 vector files match the generator.`**, `exit=0` — the one runnable verification the
+prompt asked for, run and reported (**C-77-2**). The prompt's pin `679a317` is still stale: it is
+**`7328a0b`**, corpus **29/29 byte-identical**, blob-by-blob (**C-77-3**). `origin/main` still holds
+**26** vectors; the work is unmerged, not unwritten.
+
+### Milestone 3 — what the guard is, and the one thing it deliberately is not
+
+`scripts/check-citations.sh`: definitions are headings in `AUDIT-REQUEST.md`/`BLOCKED.md`, citations
+are every `C-`/`B-` id in prose across ten record documents, and a cited id defined nowhere fails the
+run. **It does not check that a citation is *apt*** — that `C-76-3` says what the sentence citing it
+claims. That needs a reader. It checks that the referent **exists**, which is the half a machine can
+do and **exactly the half that failed in run 75**.
+
+### Milestone 4 — C-75-13 predicted the difficulty correctly in shape and wrongly in size
+
+It warned a naive parser "will drown in false positives" on ranges and ellipses. Against the real
+corpus — **698 distinct ids cited** — the first draft produced **three**, and all three were worth
+having (**C-77-4**):
+
+- **`C-RES-2`, cited five times, reported dangling — and it is defined.** The heading is
+  `### C-RES-1 / C-RES-2 — what each STOP actually contains`. Reading only the *first* id off a
+  heading line missed it. **A parser defect, not a records defect.**
+- **`S5.B-0`, reported dangling as a bare `B-` id — and it was never cited.** `LOG.md` has `### S5.B-0 The environment
+  finding that decided the slice`; a word-boundary match finds a `B-` id inside a **milestone label**.
+  An id must not be preceded by an alphanumeric or a dot. **Also a parser defect.**
+- **`B-11` — genuinely absent, and correctly so.** It was reserved for a CI stall that an iteration
+  then proved was its own churn under `cancel-in-progress` read through a cache: *"B-11 was never
+  warranted and is not filed"*. **B-12's opening paragraph exists to explain the hole** to whoever
+  reaches for the missing number. Both mentions are that explanation. Listed in `KNOWN_ABSENT` **with
+  its reason** — an unexplained entry there is how a guard rots into a rubber stamp.
+
+**The range hazard is real and the em-dash is its trap.** `C-CUR-1…13` cites all thirteen and must
+expand; `C-S4T-4 — a blind relay could truncate` is an id followed by **prose**, and reading that
+dash as a range invents citations from whatever number the sentence contains. Measured: **4 em-dash
+pairs in the corpus, all prose, zero ranges.** Only `…`, `..` and `...` introduce a range.
+
+### Milestone 5 — the corpus is clean, and that is the honest result
+
+**696 definitions, 697 cited, 1 documented-absent, 0 dangling**, `exit=0` (**C-77-5**). No live
+defect was found in the records. **The guard's value is prospective** — it catches the next one,
+which run 75 shipped and caught by luck.
+
+### Milestone 6 — a guard nobody has watched fail is not yet a guard
+
+**Nine** self-test cases, all passing, each pinning one decision above — including **run 75's
+incident reproduced literally** (a commit citing `B-22`/`C-75-11` that were never filed → `exit=1`)
+and both parser defects from Milestone 4 (**C-77-6**).
+
+Then **three mutations against the real corpus**, every prediction matched (**C-77-7**):
+
+| mutation | predicted | measured |
+| --- | --- | --- |
+| **M1** rename `B-22`'s heading (it is cited 30+ times) | red, naming sites | `exit=1`, five sites printed |
+| **M2** append run 75's incident verbatim — cite an unfiled blocker/check pair | red, both ids | `exit=1`, both named |
+| **M3** negative control — cite `C-76-3` and `B-18`, which exist | **green** | `exit=0` |
+
+M3 is the control that matters: a guard that fires on correct citations would be worse than none.
+**Tree restored to clean after each; `git status --porcelain` empty** (**C-77-7**).
+
+### Milestone 7 — wired into CI, and proven on both sides of its threshold
+
+`.github/workflows/ci.yml` gains a step running the self-test then the check. Placed **before** the
+toolchain steps because it needs none. **Extracted verbatim from the YAML and run under `bash -e`,
+as GitHub runs it** — run 46's lesson, that invoking a script without its shebang semantics proves
+nothing: **`exit=0` on the real tree, `exit=1` with one dangling citation appended** (**C-77-8**).
+YAML re-parsed: valid, **13 steps**.
+
+**And the guard is cwd-independent by construction** — it resolves the repository root from
+`BASH_SOURCE`, not from the caller's directory. Verified from `/tmp` and from `/` (**C-77-9**). This
+is not decoration: **the hazard it guards against is a bare relative path outliving its `cd`**, and
+during this very run the shell's cwd reset to `/home/user` between commands. A guard against that
+class must not contain one.
+
+### Milestone 8 — B-18's forty-second firing, and the criterion re-measured rather than inherited
+
+Run 75's notify criterion was applied to this run's own measurements, not carried forward
+(**C-77-10**). **Movement in the blocking state:** engine `main` **`aac05f3`**, last non-Claude
+commit **2026-08-12**; **18 engine + 6 android drafts, all open, all `draft: true`, none merged,
+closed or undrafted** — measured this run against the live API. **No.** **Something needing an action
+before return day:** return day (2026-08-18) is **three days past**, and this run's output is a
+records-side guard that is green. **No.** **So nothing was sent, for the fourth consecutive run.**
+Attempt 10 (run 73) reached Brandon's phone and inbox with the state, the landing plan and step 0,
+and is unanswered; nothing in the world state has changed since. A fifth message carrying the same
+facts would train its recipient to ignore the one escalation path this program has that does not
+require opening a ~1 MB `LOG.md`. **The criterion still inverts on a new fact.**
+
+### Milestone 9 — the guard failed its own records, and it was right to
+
+Run against this run's **own** `LOG.md` and `AUDIT-REQUEST.md`, the first green build went **red**
+(**C-77-11**). Three ids, and the diagnosis is a design question, not a nuisance:
+
+- **An unfiled blocker id and a fictional check id**, both inside the **command fixtures** that demonstrate the
+  guard catching an unfiled id. `AUDIT-REQUEST.md` is by design mostly commands, and **a command is a
+  fixture, not a claim.** The document that documents the guard failed the guard. Fixed in the
+  parser: **fenced code blocks are skipped**, pinned by two cases — a fence is exempt, and prose
+  **after** the fence closes is still checked, so the exemption cannot be used to smuggle a claim.
+- **A bare `B-` id in prose**, written while *describing* the milestone-label defect. The record's
+  real token is `S5.B-0`; naming it bare asserted a blocker that never existed. Rewritten to the
+  qualified form — **more accurate anyway**, since that is what the file actually says.
+
+**The second half of the fix is a convention, and it falls out of the guard's own rule.** A prose
+citation *is* a claim that the referent exists, so **prose must not name a deliberately fictional
+id** — the code fence carries the exact tokens, reproducibly, which is what `AUDIT-REQUEST.md` is
+for. The three prose mentions were rewritten to describe the fixture and let the fence name it.
+**This is the guard's first catch, and its subject was its own documentation.** It then caught the
+paragraph above this one, which named an unfiled id while explaining that prose must not — three
+green runs and one red, on live prose, before this entry could be written.
+
+### What this run did not touch
+
+**No rung moved and no rung's status changed.** The diff is **one new script, one CI step, and these
+records** — **no `:app` file, no `:core` file, no Kotlin, no production source of any kind**, and no
+test in the Gradle suite was added, removed, skipped or `@Ignore`d. **No vector byte, no
+`index.json`, no `VECTORS.lock`; the cross-repo pin did not move** and no existing vector's content
+was altered — the drift event the prompt warns about did not occur. `docs/Sync-Protocol.md` and
+`generate.mjs` were **read at pin `7328a0b`, never edited**; no C# was written. `:core:test` **did
+not run this iteration and no suite count is claimed** — this slice compiles nothing. Four of the
+android gate's five tasks remain unrun and unclaimed (**B-7**), and `Verify-Alpha.ps1` did not run
+and could not. **B-22 was not fixed** (it needs an `:app` compile) **and was not worked around by
+skipping a test**; **B-4**, **B-5**, **B-15**, **B-16**, **B-19**, **B-21** were neither acted on nor
+re-attempted. No file in the `careerseeker` repo was written except `autonomy/claude-state`'s
+`STATE.md`. Nothing was merged, closed or undrafted in either repo; no branch was force-pushed,
+rewritten or deleted. **No deploy of any kind; the production relay was not contacted at all this
+run, not even `/v1/health`.** No Play/Google/OAuth console, no accounts, no purchases, no Play
+Billing code, no email or Gmail, no secrets read or printed, no `.appdata`. Terra's territory is
+untouched: `scripts/Verify-Alpha.ps1`, `$ExpectedOfflineTotal` and every count-reporting doc are
+**unmodified on every pushed branch**, and no nineteenth engine PR was opened.

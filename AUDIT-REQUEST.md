@@ -13758,3 +13758,228 @@ was **2026-08-18**; today is **2026-08-21**, so it is **three days past**, not f
 > says *"three days past"*. 2026-08-21 − 2026-08-18 = **3**, so run 74 is right and run 75 is off by
 > one. Corrected here rather than silently, because "every number reproduces" is the property these
 > records sell. **Nothing else in run 75's banner changes.**
+
+---
+
+## Run 77 — 2026-08-21 (Linux sandbox). The citation guard: C-75-13, built.
+
+Auditor setup (Linux, no Android SDK, no JDK needed for this run's claims):
+
+```bash
+git -C <android> fetch --all --prune && git -C <engine> fetch --all --prune
+git -C <android> checkout claude/android-a0-probe && git -C <android> pull
+```
+
+**Nothing in this run needs a toolchain.** `scripts/check-citations.sh` is bash/awk/grep. No Gradle
+task ran, so **no `:core`/`:app` result is claimed and none appears below** (**B-7**).
+
+### C-77-1 — every count in this run is post-fetch (rule one)
+
+```bash
+git -C <android> fetch --all --prune && git -C <engine> fetch --all --prune
+git -C <engine> log --oneline -1 origin/main
+git -C <android> rev-parse origin/claude/android-a0-probe
+```
+
+*Expected, and **observed**:* both fetched before any read. `origin/main` is **`aac05f3`**, last
+non-Claude commit **2026-08-12**. The android checkout arrived **detached at `ebfaf81`** (stale
+docs-only `main`); the work branch was checked out at **`7991e31`** before anything was measured.
+
+### C-77-2 — the assigned slice is built (forty-second firing), and the generator check runs here
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do echo "== $c =="; git log -1 --format='%ad  %s' $c; git show --stat --format='' $c; done
+git checkout -B s5-check origin/claude/s5-entitlement-ack-emitter
+node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l
+```
+
+*Expected, and **observed**:* `8575539` (2026-08-09) touches `docs/Sync-Protocol.md` **only**,
+**+114/−3**; `22b028e` adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`, `index.json`
+**and `generate.mjs`**; `7328a0b` adds `invalid-unknown-field.json`. Generator check:
+**`OK: 29 vector files match the generator.`**, **`exit=0`**. `origin/main` still holds **26** —
+the work is **unmerged, not unwritten**.
+
+### C-77-3 — the prompt's pin is stale; the corpus is byte-identical to the real one
+
+```bash
+grep 'Pinned commit' <android>/core/src/test/resources/sync-vectors/VECTORS.lock
+mkdir -p /tmp/pin-check && cd <engine> && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pin-check
+diff -r /tmp/pin-check/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1
+echo "exit=$?"; ls /tmp/pin-check/docs/sync-vectors/v1 | wc -l
+```
+
+*Expected, and **observed**:* pin reads **`7328a0bc043335491cd96a67d634e8eea2a13af9`**, not the
+prompt's `679a317`. Diff: **no output, `exit=0`, 29 files.** **No vector byte was written by this
+run in either repo.**
+
+### C-77-4 — the three false positives the first draft produced, and what each one was
+
+Reproduce the pre-fix parser's verdict by disabling the two guards it lacked:
+
+```bash
+cd <android>
+# the two shapes, in the corpus, as they really appear:
+grep -n '^### C-RES-1 / C-RES-2' AUDIT-REQUEST.md      # combined heading: defines TWO ids
+grep -n '^### S5\.B-0' LOG.md                           # milestone label, not a citation
+grep -c '^### C-RES-2' AUDIT-REQUEST.md                 # expect 0 -- it has no heading of its own
+grep -onE '\bC-RES-2\b' LOG.md STATE.md | wc -l         # expect 5 -- and every one is legitimate
+# B-11: cited three times, defined nowhere, and correctly so
+grep -onE '\bB-11\b' BLOCKED.md
+grep -c '^## B-11' BLOCKED.md                           # expect 0
+```
+
+*Expected, and **observed**:* `AUDIT-REQUEST.md:11356` is
+`### C-RES-1 / C-RES-2 — what each STOP actually contains, from real merges`, so **`C-RES-2` is
+defined on a combined heading** and reading only the first id off a heading reported it dangling —
+**a parser defect**. `LOG.md:1848` is `### S5.B-0 The environment finding that decided the slice`, a
+**milestone label**; a word-boundary match finds the bare id inside it — **also a parser defect**, fixed by
+rejecting any id preceded by `[A-Za-z0-9.]`. **`B-11` is genuinely absent and deliberately so**:
+`BLOCKED.md:1669` reads *"B-11 was never warranted and is not filed"*, and `B-12`'s opening paragraph
+(`BLOCKED.md:1680`) exists to explain the missing number. It is in `KNOWN_ABSENT` **with that
+reason**.
+
+**The em-dash is not a range connector**, and this is the trap C-75-13 predicted:
+
+```bash
+grep -ohE '(C|B)-[A-Za-z0-9]+-[0-9]+ *(—|–) *-?[0-9]' LOG.md STATE.md BLOCKED.md AUDIT-REQUEST.md | wc -l
+```
+
+*Expected, and **observed**:* **4**, and reading each in context shows **all four are an id followed
+by prose that happens to contain a number** — zero are ranges. Only `…`, `..` and `...` expand.
+
+### C-77-5 — the corpus is clean; no live defect was found
+
+```bash
+cd <android> && ./scripts/check-citations.sh; echo "exit=$?"
+```
+
+*Expected, and **observed**:* `definitions: 696   cited: 697   documented-absent: 1` then
+**`OK: every cited C-/B- id resolves to an entry that exists.`**, **`exit=0`**. **This run found no
+live dangling citation.** The guard's value is prospective; the counts move as the records grow, so
+re-derive rather than compare to these.
+
+### C-77-6 — the guard fires, on seven pinned cases including run 75's actual incident
+
+```bash
+cd <android> && ./scripts/check-citations.sh --self-test; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **nine `PASS` lines, `self-test: all cases passed`, `exit=0`.** The
+cases pin, in order: a clean tree passes; **run 75's incident is caught** (a tree citing `B-22` and
+`C-75-11` that were never filed → `exit=1`); a **combined heading defines both** ids; a **milestone
+label is not a citation**; **range expansion** catches a missing endpoint; an **em-dash after an id
+is prose**; a **fenced code block is a fixture, not a claim**; **prose after a closed fence is still
+checked**; and a **`/-N` continuation** cites its siblings. Cases 3 and 4 are the two defects of
+**C-77-4**, and cases 7 and 7b are **C-77-11**'s — all pinned so they cannot regress.
+
+### C-77-7 — three mutations against the REAL corpus, and the negative control
+
+```bash
+cd <android>
+cp BLOCKED.md /tmp/B.bak
+sed -i 's/^## B-22 — the android gate/## B-XX22 — the android gate/' BLOCKED.md
+./scripts/check-citations.sh; echo "M1 exit=$?"          # want 1
+cp /tmp/B.bak BLOCKED.md
+
+cp LOG.md /tmp/L.bak
+printf '\nFiled this run as B-23, and re-verified (C-77-4).\n' >> LOG.md
+./scripts/check-citations.sh; echo "M2 exit=$?"          # want 1
+cp /tmp/L.bak LOG.md
+
+printf '\nRe-verified this run (C-76-3), and B-18 stays open.\n' >> LOG.md
+./scripts/check-citations.sh; echo "M3 exit=$?"          # want 0
+cp /tmp/L.bak LOG.md
+git status --porcelain LOG.md BLOCKED.md                 # want: empty
+```
+
+*Expected, and **observed**:* **M1 `exit=1`**, printing `B-22` and five of its citation sites —
+a definition removed while 30+ citations remain. **M2 `exit=1`**, naming **both** unfiled ids the
+appended line cites — run 75's incident, reproduced verbatim on the live corpus. **M3 `exit=0`** — the
+**negative control**, and the one that matters most: citing ids that **do** exist must stay green, or
+the guard is worse than nothing. **Tree clean after each**, `git status --porcelain` empty.
+
+### C-77-8 — the CI step, extracted verbatim from the YAML and run as GitHub runs it
+
+```bash
+cd <android>
+python3 -c "
+import yaml
+d=yaml.safe_load(open('.github/workflows/ci.yml'))
+steps=list(d['jobs'].values())[0]['steps']
+print('steps:',len(steps))
+for s in steps:
+    if 'cited' in str(s.get('name','')): open('/tmp/step.sh','w').write(s['run'])
+"
+bash -e /tmp/step.sh; echo "STEP exit=$?"                # want 0
+cp LOG.md /tmp/L.bak && printf '\nA dangling reference (C-99-99).\n' >> LOG.md
+bash -e /tmp/step.sh; echo "STEP exit=$?"                # want 1
+cp /tmp/L.bak LOG.md
+```
+
+*Expected, and **observed**:* YAML valid, **13 steps**; the new step is step **5**, before every
+toolchain step, because it needs none. **`exit=0` on the real tree**; with one dangling citation
+appended, **`exit=1`** printing `::error::dangling citation(s)` and naming the fictional id. Run under **`bash -e`**
+deliberately — run 46 recorded that invoking a script without its shebang semantics proves nothing,
+and that re-running it as `bash -e` is what made it evidence.
+
+**Runner-unverified until CI executes it**, exactly as **B-15** records for the vector step: the
+image's `bash`/`awk` are not this sandbox's. **It fails loud, not quiet** — the worst case is a red
+build on a correct tree, never a green one on a drifting tree.
+
+### C-77-9 — the guard is cwd-independent, which is the whole hazard it guards
+
+```bash
+cd /tmp && <android>/scripts/check-citations.sh; echo "exit=$?"
+cd /  && bash <android>/scripts/check-citations.sh --self-test >/dev/null; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`exit=0` from both.** The script resolves the repository root from
+`BASH_SOURCE`, never from the caller's cwd. **This is load-bearing, not tidiness:** the incident that
+motivated the guard was a bare relative path outliving its `cd`, and during this run the sandbox
+shell's cwd reset to `/home/user` between commands. A guard against that class must not contain one.
+
+### C-77-10 — B-18's notify criterion, re-measured this run rather than inherited
+
+```bash
+git -C <engine> log --oneline -1 origin/main
+git -C <engine> log -12 --format='%h %ad %an' --date=short origin/main | grep -v 'Claude' | head -3
+# live PR state, both repos -- state/draft/merged for every open PR
+```
+
+*Expected, and **observed**:* engine `main` **`aac05f3`**, last non-Claude commit **2026-08-12**;
+**18 engine + 6 android pull requests open, every one `draft: true`, none merged, closed or
+undrafted** — read from the live API this run, not carried forward. Return day (2026-08-18) is
+**three days past**. **Both triggers measured negative → nothing sent, fourth consecutive run.** The
+criterion inverts on a new fact: movement in the blocking state, or something needing an action,
+goes out immediately.
+
+### C-77-11 — the guard's first catch was its own documentation
+
+```bash
+cd <android>
+# with fence-skipping disabled, the run-77 records fail their own check:
+sed 's|^ *infence { next }||' scripts/check-citations.sh > /tmp/nofence.sh
+chmod +x /tmp/nofence.sh && bash /tmp/nofence.sh; echo "exit=$?"
+# and with it enabled, as shipped:
+./scripts/check-citations.sh; echo "exit=$?"
+```
+
+*Expected, and **observed**:* the first draft of this run's records went **red** on three ids. Two
+sat inside the **command fixtures** of `C-77-7`/`C-77-8` — the blocks that demonstrate the guard
+catching an unfiled id — and one was a bare `B-` id in prose describing the milestone-label defect of
+**C-77-4**. As shipped: **`exit=0`**.
+
+**Two fixes, and the second is a convention, not code.** (1) **Fenced code blocks are skipped**:
+`AUDIT-REQUEST.md` is by design mostly commands, and a command is a **fixture**, not a claim —
+otherwise the document that documents the guard cannot pass it. Pinned by self-test cases 7 and 7b,
+the second asserting that prose **after** a fence closes is still checked, so the exemption cannot
+smuggle a claim. (2) **Prose must not name a deliberately fictional id.** This falls straight out of
+the guard's own rule — a prose citation *is* a claim that the referent exists — and costs nothing,
+because the fence carries the exact tokens reproducibly, which is what this document is for.
+
+**Attack this first if you doubt the run:** the claim is that fence-skipping is a *principled*
+exemption rather than a convenience that blinds the check. It is falsifiable as written — case 7b
+fails if prose after a fence stops being checked, and `C-77-7`'s M1/M2 (whose citations are all in
+prose) still go red.
