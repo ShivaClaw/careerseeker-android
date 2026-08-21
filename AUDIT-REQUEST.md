@@ -14069,3 +14069,23 @@ property claimed for the check as a whole.
 — a fenced heading for an unfiled id must **not** satisfy a prose citation of it. And re-run the mawk
 line above: if this repo's runner image ships **gawk** rather than mawk, the short spelling would
 have worked there and failed only here, which is precisely the class of unknown **B-15** records.
+
+### C-77-13 — the `KNOWN_ABSENT` exemption is exact-match, not a prefix
+
+The one entry on that list is where this guard rots into a rubber stamp if the mechanism is loose.
+It matches whole ids only:
+
+```bash
+tmp=$(mktemp -d); mkdir -p "$tmp/scripts"
+cp <android>/scripts/check-citations.sh "$tmp/scripts/"
+printf '### C-1-1 — a check\n'  > "$tmp/AUDIT-REQUEST.md"
+printf '## B-1 — a blocker\n'   > "$tmp/BLOCKED.md"
+printf 'B-11 is explained. But B-110 was filed.\n' > "$tmp/LOG.md"
+(cd "$tmp" && ./scripts/check-citations.sh); echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`exit=1`**, flagging the **longer** id in that fixture and **not**
+`B-11`. The exemption is anchored (`^B-11$`), so an id sharing its digits as a prefix inherits
+nothing. **Attack this by adding a
+second entry and checking it is still anchored** — a list that silently became a prefix match would
+exempt a whole family and nothing would say so.

@@ -14579,6 +14579,13 @@ and the reason this run has a Milestone 10 instead of a regression.
 build red on a correct tree. That is the safe direction, and the same property claimed for the check
 as a whole.
 
+### Milestone 11 — the exemption list, checked rather than trusted
+
+`KNOWN_ABSENT` is the guard's only escape hatch and therefore the place it would rot first. Verified
+**exact-match, not prefix** (**C-77-13**): with `B-11` exempt, a citation of a longer id sharing
+its digits still goes **red**. One entry today, and it carries its reason inline; a list that silently became a prefix
+match would exempt a whole family with nothing to say so.
+
 ### What this run did not touch
 
 **No rung moved and no rung's status changed.** The diff is **one new script, one CI step, and these
