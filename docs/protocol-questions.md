@@ -2043,3 +2043,83 @@ unnoticed in either direction:
 - `EnvelopeJsonTest`'s comment no longer claims the vectors witness the null spelling.
 
 **Re-verification:** `AUDIT-REQUEST.md` **C-72-1..9**.
+
+---
+
+## PQ-ERR-1 — The engine's only channel for saying "I rejected that" is a kind the phone accepts and drops
+
+**Opened 2026-08-21 (payload-kind coverage, seventy-fourth cloud iteration).** Found while
+re-reading `PayloadKindCoverageTest` — the guard run 60 wrote for B-19 — rather than while
+implementing anything. **Two distinct things are recorded here: a guard defect, which this run
+fixed, and a product question, which it did not.**
+
+### The guard defect (fixed this run, `:core` only)
+
+`PayloadKind.ENGINE_TO_PHONE_KINDS` was derived as `flow == KindFlow.ENGINE_TO_PHONE`, which
+drops every `KindFlow.BOTH` kind. **§4.3's engine→phone table has eight rows and the set had
+seven** — `error` is in the table, by name, and `src/Sync/Protocol.cs:34-35` has it in
+`ShippingKinds` alongside the other eleven.
+
+That set is the **input to the coverage guard**: `PayloadKindCoverageTest` enumerates it to
+require that every receivable kind declare a destination. So `error` was exempt from the guard
+because of how the guard's input was derived — B-19's defect class, unguarded, for the one kind
+that carries the engine's §7.2 rejection reasons.
+
+It could not be seen from either end, and that is the part worth keeping:
+
+| | before run 74 | why it hid the gap |
+| --- | --- | --- |
+| `ENGINE_TO_PHONE_KINDS` | `flow == ENGINE_TO_PHONE` | seven kinds; `error` invisible |
+| `flow matches section 4-3's direction tables` | asserted the same seven names | **a derivation compared against itself** — enum and test agreed, both disagreed with the normative table |
+| `no phone to engine kind is classified…` | filtered `flow != ENGINE_TO_PHONE` | **actively forbade the fix**: classifying `error` failed with "cannot be received by the replica", which §4.3 contradicts by name |
+
+Fixed by deriving `!= PHONE_TO_ENGINE`, transcribing §4.3's table **by hand** into
+`PayloadKindCoverageTest.section43EngineToPhone` (a derivation comparing against itself is what
+failed, so one side of the comparison must not be derived), and narrowing the second filter to
+`== PHONE_TO_ENGINE`. Mutation **M1** — narrowing the derivation back — now turns exactly one
+test red where it previously turned none.
+
+### The product question (NOT decided here)
+
+With the guard widened, `error` needs a destination, and it does not have one. What is
+established, executed rather than reasoned:
+
+- §4.3 lists `error` engine→phone; §7.2 defines its body as `{code, detail?, ref_seq?}` over a
+  ten-code table.
+- `EnvelopeReceiver` **accepts** an authentic one and reports `kind = "error"`
+  (`EnvelopeReceiverTest.an engine to phone error payload is accepted, and therefore reaches the
+  applier`, added this run).
+- `SyncPump` hands every accepted payload to the single `ReplicaApplier`; `:app`'s
+  implementation is a `when` over four projected kinds with `else -> Ignored(kind)`.
+
+So an `error` decrypts cleanly, is counted as a healthy envelope, and is dropped — consumed by
+nothing, surfaced nowhere. **The user-visible failure mode is the one PQ-S6-1 already circles
+from the other side**: an `outcome` the engine refuses produces an `error` (§7.2 — "there is no
+negative form", §4.3.2's note), and on the phone that is indistinguishable from an `outcome`
+that landed.
+
+**Why this run did not fix it.** Three defensible behaviours exist — drop it deliberately,
+surface the code, or feed `ref_seq` back into a retry — and they differ in what the user sees.
+That is product behaviour with a user-visible failure mode, which this program's standing rule
+sends to a gate rather than to a unilateral phone-side change; and the receiving half would be
+`:app`, which no cloud session can compile (**B-7**). Choosing here would also put the phone
+ahead of an engine whose `error` emission on the e2p path is **not established** — `Protocol.cs`
+lists the kind, and no emitter was found on `origin/main`.
+
+**Until it closes**, the honest status is pinned rather than laundered:
+
+- `PayloadKind.RECEIVED_WITHOUT_A_DESTINATION = setOf(ERROR)` — a **defect marker, not a
+  destination**. Placing `error` in `NOT_PROJECTED_IN_V1` would have borrowed that set's stated
+  reasons (`doc` is not emitted in v1; `conflict` answers a `doc_edit` the phone cannot send)
+  for a case that has never had one, and no later reader could have told them apart. That
+  laundering is how `entitlement_ack` looked handled for nine days.
+- `PayloadKindCoverageTest.the undecided set holds exactly error` pins its membership at one, so
+  the fourth set cannot quietly become a place to park kinds and turn the guard into a
+  formality. Mutations **M2** (empty it) and **M3** (add a second kind) are both red.
+
+**To close:** decide the phone's behaviour on a received `error` (gate). If it is "drop it",
+that is a one-line move from `RECEIVED_WITHOUT_A_DESTINATION` to `NOT_PROJECTED_IN_V1` **with
+the reason written next to `doc`'s and `conflict`'s**, and this question closes with no code
+change. If it is anything else, the surface is `:app` and needs the Windows box.
+
+**Re-verification:** `AUDIT-REQUEST.md` **C-74-1..8**.
