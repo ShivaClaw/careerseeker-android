@@ -13944,7 +13944,16 @@ curl -s .../actions/runs/32506850632/jobs | python3 -c '...print step name/statu
 ```
 
 *Expected, and **observed**:* step **6**, `Assert every cited C-/B- id resolves`, **`completed` /
-`success`** on `ubuntu-latest`. So the image's `bash` and `awk` do run this script, and the two
+`success`** on `ubuntu-latest`.
+
+> **READ THE RUN STATE BEFORE THE STEP STATE.** Run `32506850632` shows overall
+> **`cancelled`** — it was superseded by the next push under `cancel-in-progress: true`, and the
+> cancellation landed at the `:app` step, **long after** step 6 had finished. **A cancelled run is
+> not a failed step**, and the per-step conclusion is the evidence here, not the run's. If that
+> distinction feels thin, use the run on the branch tip instead — the same step, same image, run
+> again from scratch. **Confirmed twice, on two heads:** run `32507159746` (head `4039579`) also shows
+> step 6 **`success`**, and was also cancelled later at the `:core` step by the next push. Two
+> independent runner executions of this step, both green. So the image's `bash` and `awk` do run this script, and the two
 unknowns that mattered — GNU `awk`'s handling of the UTF-8 ellipsis byte sequence, and `grep -vxF -f`
 with process substitution under the runner's shell — are resolved **for the green path**.
 

@@ -14508,7 +14508,10 @@ YAML re-parsed: valid, **13 steps**.
 
 **Runner-verified for the pass path, in the same run** (**C-77-8**): job `96848840383` of run
 `32506850632`, head `05463d7`, `ubuntu-latest` — step 6, `Assert every cited C-/B- id resolves`,
-**`completed`/`success`**. So the runner's `bash`/`awk` do execute this script, which is more than
+**`completed`/`success`**. **That run's overall conclusion reads `cancelled`**, because a later push
+superseded it under `cancel-in-progress`; the cancellation landed at the `:app` step, well after step
+6 finished. **A cancelled run is not a failed step** — the per-step conclusion is the evidence, and
+the tip's own run repeats it from scratch. So the runner's `bash`/`awk` do execute this script, which is more than
 **B-15**'s vector step could say for two runs. **The failure path stays stub-only** — a green check
 proves it does not false-alarm, not that it still fires — and proving otherwise on a runner would
 mean pushing a knowingly-dangling citation, which this run declines to do. **The step's log could
