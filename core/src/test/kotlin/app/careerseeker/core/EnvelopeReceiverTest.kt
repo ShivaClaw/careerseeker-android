@@ -192,6 +192,30 @@ class EnvelopeReceiverTest {
         }
     }
 
+    /**
+     * The receiver accepts an engine→phone `error`, which is the half of PQ-ERR-1 that can be
+     * executed here rather than argued.
+     *
+     * §4.3's engine→phone table lists `error`, and `Protocol.cs` has it in `ShippingKinds`, so
+     * an authentic one is a conforming envelope and must not be refused. Asserting that is not
+     * the point of this test — the point is what the acceptance *implies*: [SyncPump] hands
+     * every accepted payload to the single [ReplicaApplier], and `:app`'s implementation is a
+     * `when` over four projected kinds with `else -> Ignored`. So the engine's only channel for
+     * reporting a §7.2 rejection of something the phone sent decrypts cleanly, is counted as a
+     * healthy envelope, and is dropped — the run-58 shape, one kind along.
+     *
+     * `:core` cannot assert the drop itself: the `when` is `:app` and needs the Android SDK
+     * (**B-7**). What it can assert is that the payload gets that far, which is the step the
+     * question turns on, and [PayloadKindCoverageTest] carries the classification half.
+     */
+    @Test
+    fun `an engine to phone error payload is accepted, and therefore reaches the applier`() {
+        val r = receiver().receive(envelope(dir = "e2p", kind = "error"), ::keyFor)
+
+        assertTrue(r.accepted, "section 4.3 lists `error` engine->phone; it was rejected as ${r.error}")
+        assertEquals("error", r.kind, "the applier is dispatched on this string")
+    }
+
     @Test
     fun `a state-changing p2e kind without a signature is refused`() {
         for (kind in Protocol.STATE_CHANGING_KINDS) {
