@@ -1192,6 +1192,19 @@ prevent. `INFO_CONFIRM` and `PAIR_AAD_PREFIX` look **covered** (`PairingDerivati
 confirm code against a vector, and asserts the pair-AAD literal), so the suspected gap is narrow:
 `INFO_ENGINE_TO_PHONE`, `INFO_PHONE_TO_ENGINE`, `INFO_RELAY_TOKEN`.
 
+**SECOND SUCCESSOR TARGET, and this one is records-side — a dangling-citation guard (C-75-13).**
+This run cited `B-22` and `C-75-11`/`C-75-12` in a pushed commit and in the PR body while all three
+were sitting in `/home/user/`, outside any repository, because a bare relative path outlived the
+`cd` that made it valid. It was caught by luck — a later command failed loudly — and **nothing in
+either repo checks that a cited `C-\d+-\d+` or `B-\d+` resolves to an entry that exists.** The
+guard is a grep over `LOG.md`, `STATE.md`, `BLOCKED.md` and `RETURN-DAY.md` for those id shapes,
+failing when the referent is absent from `AUDIT-REQUEST.md`/`BLOCKED.md`. Cheap, needs no toolchain,
+and it protects the one property these records sell: *every claim has a command*. **Not built this
+run.** Note before building it: ids are cited in prose in many legitimate forms (`C-75-1…9`,
+`C-STOP-1..5`, `C-VR-1…11`), so the parser must handle ranges and ellipses or it will drown in
+false positives — that design choice is the whole difficulty and is why it is a target rather than
+a one-liner.
+
 **This is a hypothesis, not a finding.** It was derived by `grep`, and **no mutation was run against
 it this run** — one slice per iteration. Measure it before believing it: mutate each constant, run
 `scripts/core-probe.sh --rerun`, and if the suite stays green, that is the next defect. If it goes
