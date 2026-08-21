@@ -14586,6 +14586,21 @@ as a whole.
 its digits still goes **red**. One entry today, and it carries its reason inline; a list that silently became a prefix
 match would exempt a whole family with nothing to say so.
 
+### Milestone 12 — the full CI gate is green on the final head, and it is one sample
+
+Run `32507902496`, head `8a7f863`: **`success`, all 14 steps** — step 6 (this run's check), `:core`,
+`:app` Robolectric, `assembleDebug`, `Lint`, and the vendored-vector drift step (**C-77-14**). The
+first run-77 head to finish without being superseded; the three before it were cancelled by my own
+pushes, each time at `:app` and each time **after** step 6 had passed. **My new step has now passed
+on a runner four times, on four heads.**
+
+**Stated with its limits, because the green is the least interesting part.** It is **not** a local
+gate result — no Gradle task ran in this sandbox and **B-7** is unmoved; observing a gate is not
+running one. It is **one sample**, and **B-22** records the `:app` half as nondeterministic at ~8%,
+so a single green `:app` is consistent with B-22 and **does not narrow it**; B-22 stays open. And it
+does **not** close **B-15**'s shape for this check: the pass path is runner-proven, the **failure**
+path is still stub-only, since proving it would mean pushing a knowingly-dangling citation.
+
 ### What this run did not touch
 
 **No rung moved and no rung's status changed.** The diff is **one new script, one CI step, and these

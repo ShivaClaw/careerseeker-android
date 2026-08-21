@@ -60,6 +60,12 @@
 > is cwd-independent by construction** (**C-77-9**) — load-bearing, since the hazard it guards is a
 > bare relative path outliving its `cd`, and this run's shell cwd reset to `/home/user` mid-run.
 >
+> **FULL CI GATE GREEN on the final head** — run `32507902496`, `8a7f863`, **`success`, all 14 steps**
+> including `:app`, `assembleDebug` and `Lint` (**C-77-14**). **Read the limits with it:** it is
+> **not a local gate** (no Gradle task ran here; **B-7** unmoved, and observing a gate is not running
+> one), it is **ONE sample** so **B-22**'s ~8% `:app` nondeterminism is **not** narrowed and stays
+> open, and the check's **failure** path is still stub-only per **B-15**.
+>
 > **SCOPE: no Gradle task ran.** No `:core:test`, no suite count, no gate claim — this slice compiles
 > nothing (**B-7**). **No rung moved. B-22 unfixed and not worked around.** Diff is **one script, one
 > CI step, and these records**: no `:app` file, no `:core` file, no Kotlin, no vector byte, pin

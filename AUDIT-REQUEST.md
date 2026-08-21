@@ -14089,3 +14089,31 @@ printf 'B-11 is explained. But B-110 was filed.\n' > "$tmp/LOG.md"
 nothing. **Attack this by adding a
 second entry and checking it is still anchored** — a list that silently became a prefix match would
 exempt a whole family and nothing would say so.
+
+### C-77-14 — the full CI gate is green on this run's final head, and that is ONE sample
+
+```bash
+# run 32507902496, head 8a7f863
+curl -s .../actions/runs/32507902496/jobs | python3 -c '...print conclusion + every step...'
+```
+
+*Expected, and **observed**:* **`CONCLUSION: success`**, **all 14 steps green** — including step 6
+(this run's new citation check), `Unit tests (:core)`, `Unit tests (:app, Robolectric)`,
+`Assemble debug APK`, `Lint`, and the vendored-vector drift step. This is the **first run-77 head to
+complete without being superseded**; the three before it were cancelled by my own subsequent pushes,
+always at the `:app` step and always after step 6 had already passed.
+
+**Three things this does NOT license, and they matter more than the green:**
+
+1. **It is not a local gate result.** Nothing in this run ran `:core:test`, `:app:assembleDebug` or
+   `:app:lintDebug` **here** — **B-7** is unmoved and no local suite count is claimed anywhere in
+   run 77. **Observing a gate is not running one**, which is the distinction run 46 recorded and
+   this entry keeps.
+2. **It is ONE sample, and B-22 says exactly why that is not a guarantee.** B-22 records the `:app`
+   half as **nondeterministic** (`ScreensFromFixtureTest`, ~8% failure for timing reasons). A single
+   green `:app` step is consistent with B-22 and does **not** narrow it. **B-22 stays open**, and a
+   red `:app` on this head later would be B-22 — this diff contains no `:app` file.
+3. **It does not close B-15's shape for this check.** The **pass** path is now runner-proven four
+   times over; the **failure** path is still stub-only, because proving it on a runner means pushing
+   a knowingly-dangling citation. A green check proves it does not false-alarm, never that it still
+   fires.
