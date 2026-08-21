@@ -3497,9 +3497,23 @@ channel, which would damage the one escalation path this program has that does n
 to open a 950 KB `LOG.md`.
 
 **This is a judgement, not a rule, and it inverts the moment a fact changes.** If a later run
-measures **any** movement — a merge, a close, a human commit in either repo, or a genuine new
-blocker — that is a new fact and it should go out immediately. **B-18 stays open**: whether the
-routine stops is Brandon's action, and a sent notification is still not a read one.
+measures **movement in the blocking state** — a merge, a close, an undraft, a human commit in either
+repo — or finds something that **needs an action before return day**, that is a new fact and it
+should go out immediately. **B-18 stays open**: whether the routine stops is Brandon's action, and a
+sent notification is still not a read one.
+
+> **AMENDED LATER THE SAME RUN, because the first wording did not survive its own test.** This
+> paragraph originally said the trigger included *"a genuine new blocker"*. Then this run filed one
+> — **B-22** — and did **not** send, which would have left a written rule and the run's own conduct
+> disagreeing: the exact defect class this run spent its slice on, one document over. The criterion
+> is corrected to what was actually applied and is defensible: **notify on movement, or on something
+> needing action before return day.** B-22 is neither. It is a finding about how to *read* the
+> evidence base, it requires nothing of Brandon today, and it sits in `STATE.md`'s open-blocker
+> table and this file — both of which must be read before the landing plan is acted on anyway.
+> **Notifying a third time in one day, about something needing no action, would spend the attention
+> that attempt 10's still-unanswered escalation needs.** If B-22 had shown the gate producing false
+> **greens** rather than false reds, that would need an action before return day and the call would
+> invert.
 
 ### B-19 status 2026-08-21 (seventy-fifth run) — unchanged, and this run is not progress on it
 
