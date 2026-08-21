@@ -14048,3 +14048,23 @@ production relay was not contacted at all, not even `GET /v1/health`.** No Googl
 console; no accounts, no purchases, no Gmail. **No secret was read, printed or echoed.** Terra's
 territory was **read, never written** — `autonomy/codex-state` reports **COMPLETE, files claimed:
 none**, so there was **no collision**.
+
+### Milestone 7 — CI reported, and it is green (C-74-10)
+
+Added after the fact, because the claim above was written while it was still running.
+Run [32449896251](https://github.com/ShivaClaw/careerseeker-android/actions/runs/32449896251), job
+*Build and test*, head `dde704c`, `ubuntu-latest`, real SDK: **`conclusion: success`, every step** —
+`checkCoreIsAndroidFree`, the vendored-vector drift check, `:core:test`, `:app:test` (Robolectric),
+`:app:assembleDebug`, `:app:lintDebug`, and the no-analytics assertion.
+
+**This upgrades milestone 5's bound.** The android gate **ran** on this exact head and passed, so
+**B-7's limit does not apply to this slice's verdict**: `:app` compiled, lint held, and
+`checkCoreIsAndroidFree` **executed** rather than being inferred from an absence of imports. The
+vector step is an **independent** second check of the 29/29 pin identity — CI re-fetches the pin's
+blobs and diffs them.
+
+**What it does not establish, so the tick cannot imply it.** CI prints no test totals, so
+**`338 / 0 / 0` remains a `core-probe.sh` measurement** and is not restated as a CI number. CI
+cannot invent a caller — `:app` still constructs nothing from `:core`, so **B-19 is exactly as
+open as it was**. And a green gate says the applier's `else` branch **compiles**, not that dropping
+`error` is correct: **PQ-ERR-1 is untouched by this result.**

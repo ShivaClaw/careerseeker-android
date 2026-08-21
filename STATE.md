@@ -40,6 +40,14 @@
 > behaviour question is **PQ-ERR-1**. **No rung moved; B-19 unmoved; no `:app` file written; no
 > vector byte written; the pin did not move.**
 >
+> **CI REPORTED GREEN on this head** — run
+> [32449896251](https://github.com/ShivaClaw/careerseeker-android/actions/runs/32449896251),
+> `conclusion: success`, **every step**, including `checkCoreIsAndroidFree`, the vendored-vector
+> drift check, `:core:test`, `:app:test`, `:app:assembleDebug` and `:app:lintDebug` (**C-74-10**).
+> **The android gate ran and passed, so B-7 does not bound this slice's verdict** — but CI prints no
+> totals, so **`338/0/0` stays a `core-probe.sh` measurement**, and a green gate on an unwired
+> module is not a working phone (**B-19**).
+>
 > ## ▶ RUN 73 — 2026-08-21. **Return day passed three days ago and no human has acted.**
 >
 > **This is the state that matters, and no session can change it.** Return day was **2026-08-18**.

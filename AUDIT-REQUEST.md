@@ -13291,3 +13291,35 @@ plus this run's records. **`Verify-Alpha.ps1` did not run and no result is claim
 `:app:lintDebug`, `:app:test` and `checkCoreIsAndroidFree` are **unrun and unclaimed**, and **no
 zero-warning claim is made**. `docs/Sync-Protocol.md` was **read, never edited** — the normative
 document is the engine's, and PQ-ERR-1's amendment, if any, follows a decision this run did not make.
+
+### C-74-10 — CI reported GREEN on this head, and it is the gate this sandbox cannot run
+
+```bash
+# run 32449896251, job "Build and test" (96676292701), head dde704c, ubuntu-latest
+gh run view 32449896251 --repo ShivaClaw/careerseeker-android    # or the Actions UI
+```
+
+*Expected, and **observed**:* `conclusion: success`, **every step green**, including the four gate
+tasks this sandbox cannot execute:
+
+| step | conclusion |
+| --- | --- |
+| Assert `:core` has no Android dependency (`checkCoreIsAndroidFree`) | **success** |
+| Assert vendored sync vectors match the pinned main-repo commit | **success** |
+| Unit tests (`:core`) | **success** |
+| Unit tests (`:app`, Robolectric) | **success** |
+| Assemble debug APK (`:app:assembleDebug`) | **success** |
+| Lint (`:app:lintDebug`) | **success** |
+| Assert no analytics or tracking SDKs ship | **success** |
+
+**This upgrades C-74-5's bound and does not replace its number.** The android gate **ran** on this
+exact head and passed, so **B-7's limit does not apply to this slice's verdict** — `:app` compiled,
+lint held, and `checkCoreIsAndroidFree` **executed** rather than being argued from the absence of
+imports. The vendored-vector step passing is an **independent** confirmation of **C-74-2**: CI
+re-fetches the pin's blobs and diffs them, so the 29/29 identity is now checked by two mechanisms.
+
+**What it still does not establish.** CI prints no test totals, so **`338 / 0 / 0` remains a
+`core-probe.sh` measurement** and is not re-asserted as a CI figure. And CI cannot invent a caller:
+`:app` still constructs nothing from `:core` (**B-19**), and a green gate on an unwired module is
+not a working phone. **PQ-ERR-1 is unaffected** — a green gate says the `else` branch compiles, not
+that dropping `error` is right.
