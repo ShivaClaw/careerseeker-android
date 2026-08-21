@@ -3612,3 +3612,52 @@ two that have failed so far.
 is the honest-UI rule — *"Demo data — not a live engine"* on every screen including the detail
 overlay — and it is exactly the assertion this program would least like to see quarantined. The bug
 is in the test's synchronization, not in what it asserts.
+
+---
+
+## Run 76 — 2026-08-21. No new blocker; B-18's forty-first firing, and the criterion applied as written
+
+### B-18 status 2026-08-21 (seventy-sixth run) — the forty-first firing, and the thirteenth attempt is silence
+
+**Unchanged as a blocker.** The scheduled prompt again assigned S5's spec half, built since
+**2026-08-09** and re-verified rather than assumed (**C-76-2**). The prompt's pin `679a317` is still
+stale (**`7328a0b`**, corpus **29/29** byte-identical, **C-76-2**), its "S5 is NOT STARTED" is still
+wrong, and its *"you cannot compile the Kotlin applier"* is still half-false — this run compiled and
+tested `:core` **twelve** times (one baseline, ten mutations, one post-fix).
+
+**The criterion run 75 wrote was applied to this run without amendment, and it says send nothing.**
+It has two triggers, and both were measured rather than assumed (**C-76-1**, **C-76-8**):
+
+| trigger | measured this run | fires? |
+| --- | --- | --- |
+| **movement in the blocking state** — a merge, close, undraft, or human commit in either repo | engine `main` still **`aac05f3`**, last non-Claude commit **2026-08-12**; **18 engine + 6 android drafts**, all open, all draft; **none** merged, closed or undrafted | **no** |
+| **something needing an action before return day** | return day (**2026-08-18**) is **three days past**; this run's finding is a **refuted hypothesis** and a repaired test assertion | **no** |
+
+**So: nothing sent, for the third consecutive run.** Attempt 10 (run 73) reached Brandon's phone and
+inbox with the state, the re-verified landing plan, step 0 and the re-pin command, and remains
+unanswered. Nothing in the world state has changed since. A fourth message carrying the same facts
+would train its recipient to ignore the one escalation path this program has that does not require
+opening a ~1 MB `LOG.md`.
+
+**Two things about this run in particular, since a refuted target is exactly where a session might
+reach for the notification channel to have something to show.** First, the finding is *negative* —
+run 75's suspicion that the phone might derive its HKDF keys from wrong info strings is **wrong**
+(**C-76-3**), which is good news and good news needs no interrupt. Second, the one real defect found
+(**C-76-5**) was a test assertion comparing a constant against itself: a reader's signal, already
+fixed, requiring nothing of anyone. **Neither is movement and neither needs an action before a
+return day that has already passed.**
+
+**The criterion still inverts on a new fact**, unchanged: movement in the blocking state, or
+something needing action, goes out immediately. **B-18 stays open** — whether the routine stops is
+Brandon's action, and a sent notification is still not a read one.
+
+### Nothing else moved
+
+No new blocker was filed this run. **B-22 was re-read and not re-attempted**: its patch needs an
+`:app` compile (**B-7**), and it was **not** worked around by skipping or `@Ignore`-ing a test. Its
+qualification stands and applies to this run's own head — the diff contains **no `:app` file**, so a
+red `ScreensFromFixtureTest` on `f7e6586` is B-22, not this change. **B-4**, **B-5**, **B-19** and
+the rest were neither acted on, narrowed nor re-attempted. The dangling-citation guard
+(**C-75-13**) is **still not built**; its hazard recurred this run and failed loudly rather than
+silently, and every `C-`/`B-` id cited in this run's records and PR body was checked to resolve
+before pushing.
