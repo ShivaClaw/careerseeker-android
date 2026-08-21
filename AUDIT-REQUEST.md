@@ -13483,3 +13483,21 @@ referenced in **no production code path**: nothing on the phone emits it, and no
 inbound `error` body at all, because whether it should is **PQ-ERR-1**, open since run 74 and
 **unmodified this run** (`docs/protocol-questions.md`'s last commit predates this run). The
 constant exists so the enum **is** §7.2; the behaviour question goes to the gate.
+
+### C-75-10 — 24 drafts, none merged, none closed, none undrafted (measured, not carried forward)
+
+```bash
+# GitHub API (this run used the MCP `list_pull_requests`, state=open, fields incl. `draft`)
+gh pr list --repo ShivaClaw/careerseeker         --state open --json number,isDraft | jq length
+gh pr list --repo ShivaClaw/careerseeker-android --state open --json number,isDraft | jq length
+cd <engine> && git log origin/main -1 --format='%h %ad %an' --date=short
+```
+
+*Expected, and **observed**:* **18** open in `careerseeker` — #26 (Terra's) and #32…#53 — and **6**
+in `careerseeker-android` (#1…#6). **Every one reports `draft: true`**; none is merged, closed or
+undrafted. `origin/main` is **`aac05f3`, 2026-08-12, `Portable G & Shiva's Claw`** — the last commit
+by a human in either repo, **nine days old**. Android PR **#6**'s head at read time was `b5fd218`,
+this branch's tip before this run's push.
+
+**This is the number every run's prohibition paragraph asserts**, and it is measured here rather
+than carried forward from the previous entry, per the stale-refs rule that opens every iteration.
