@@ -15296,3 +15296,244 @@ trees, not a disagreement. **Not a cross-repo drift event.**
 android gate (**B-7**, **B-22** unmoved), and `Verify-Alpha.ps1`'s **`-IncludePublish`/`-IncludePackage`
 passes did not run — only the offline portion CI runs on every push. **The merge condition remains a
 full local gate**, which no cloud session can run, so this changes **nothing** about the landing policy.
+
+## Run 82 — 2026-08-22 (Linux cloud sandbox). ITEM 2 measured: the two high-water marks do disagree, and the harmless half was unguarded.
+
+### C-82-1 — rule one, and both checkouts arrived stale
+
+```bash
+cd <android> && git fetch --all --prune && git rev-parse HEAD origin/claude/android-a0-probe
+cd <engine>  && git fetch --all --prune && git rev-parse origin/main
+```
+
+*Expected, and **observed**:* the android checkout arrived **detached at `ebfaf81`** — the docs-only
+`main` — while the work branch `origin/claude/android-a0-probe` was **`5dcbca2`**, **302 commits**
+ahead. The engine checkout arrived detached at **`aac05f3`**, which **is** `origin/main`, unmoved
+since 2026-08-12. **Every count in run 82 is post-fetch.** This reproduces **C-81-1** exactly; it is
+a property of how the sandbox clones, not a one-off.
+
+### C-82-2 — the assigned slice, declined for the forty-seventh time
+
+```bash
+cd <engine> && git log --oneline -1 8575539 22b028e 7328a0b
+cd <engine> && node docs/sync-vectors/generate.mjs --check   # at 7328a0b
+cd <android> && grep -i 'Pinned commit' core/src/test/resources/*/VECTORS.lock
+```
+
+*Expected, and **observed**:* the stored prompt again assigns S5's spec half (§4.3 `entitlement_ack`,
+the ack vectors, PQ-A2-1/-2/-3). **It has been built since 2026-08-09** on the `claude/s5-*` drafts in
+the **engine** repo: `8575539`, `22b028e`, `7328a0b`. The prompt's vendored pin **`679a317` is stale**;
+`VECTORS.lock` reads **`7328a0bc043335491cd96a67d634e8eea2a13af9`**. This is **inherited from
+C-81-2 and re-checked at the lock file, not re-derived** — the three commits were not re-verified
+blob-by-blob this run, and this entry does not claim they were.
+
+**No notification was sent for it.** Run 81 delivered exactly this fact to Brandon on 2026-08-22 and
+**B-18**'s run-81 note says *"notify again only on a NEW fact."* One day later, unrepointed, is
+the **same** fact. Silence here is the rule being followed, not an omission.
+
+**A records gap found while citing this, and recorded rather than quietly patched.** Run 81's
+notification is written up in `STATE.md`'s RUN 81 banner, in `LOG.md` and in B-18's run-81 status —
+**but it was given no `C-` claim of its own**, so the one action of run 81 that left the repository is
+the one with no re-verification command. This run's citation guard caught the dangling citation it
+produced by assuming otherwise (**C-82-10**). **Not retro-filed as a C-81-x**: a claim belongs to the
+run that made it, and inventing one a day later would put a command in run 81's series that run 81
+never ran. Compare **C-B18-4**, which *did* record an earlier attempt properly and is the template.
+**The limit is the same one C-B18-4 states: "a notification was sent" is unverifiable from inside the
+repository, and an auditor should treat it as such.**
+
+### C-82-3 — ITEM 2's premise, measured rather than believed
+
+The ordered intent filed ITEM 2 as *"a hypothesis, not a finding… measure it before believing it:
+a relay test parking rows past their TTL, then reading both numbers. If they cannot disagree in
+practice, say so and cross it off."*
+
+```bash
+cd <engine>/relay && npm install && npx vitest run test/probe.test.ts --reporter=verbose
+```
+
+*Observed*, on `claude/s2-latest-since-invariant`, via a **throwaway** probe (`test/probe.test.ts`,
+**deleted before the commit — it is in no tree**):
+
+| state | push 409 `latest` | pull `latest` | page |
+| --- | --- | --- | --- |
+| expired seq 5, nothing live | **5** | **0** | 0 |
+| live seq 1 + expired seq 7 | **7** | **1** | `[1]` |
+| nothing expired (control) | **3** | **3** | — |
+
+**They disagree.** The control is the half that stops the finding being over-read: without an expired
+row the two predicates select the same rows and the marks coincide, so this is **retention-shaped**,
+not a standing off-by-one between the push and pull paths.
+
+**The reachability caveat, stated because it is the strongest attack on this run.** `expiredRow()`
+writes `expires_at = 1` straight into SQLite, which is a *test* reaching past the push path. In
+production a row is only in that state while the alarm has not yet collected it. **Alarm latency was
+not measured here and cannot be** — there is no Cloudflare runtime in this sandbox beyond the
+vitest workers pool. The reachability argument rests on `channel.ts`'s own comment that the alarm
+*"does not guarantee to run the instant a row expires"*, which is the same premise the three
+pre-existing retention tests already rest on. **If that premise is false, these tests pin a property
+nothing depends on.**
+
+### C-82-4 — why it is NOT a defect: each consumer reads the side its predicate needs
+
+```bash
+cd <engine> && git show origin/claude/s6-counter-reconciliation:src/Sync/SyncPublisher.cs | sed -n '121,126p'
+cd <engine> && git show origin/claude/s6-counter-reconciliation:src/Sync/RelaySink.cs      | sed -n '73,85p'
+cd <engine> && git show origin/claude/s6-counter-reconciliation:src/Sync/InboundPump.cs    | sed -n '224,226p'
+```
+
+*Expected, and **observed**:* both consumers are **raise-never-lower**.
+`SyncPublisher.ResumeSeq` is `ok.Latest > floor ? ok.Latest : floor` — a **pull** `latest` that is too
+low simply loses to the persisted floor. `RelaySink` feeds the **409's** mark to `reconcileTo`, which
+*"refuses to move the counter DOWN"*. `InboundPump.cs:225` is `MoreAvailable: _cursor < page.Latest`
+on the **filtered** mark, so it never waits for a row the page cannot return.
+
+**So the divergence is not merely deliberate-and-documented — it is load-bearing in both directions,
+and swapping either number breaks the corresponding consumer.** `channel.ts` already says the two
+*"want opposite things from the same rows"*; this is the measurement behind that sentence.
+**Do not re-open the divergence as a defect** (this supersedes nothing — **C-81-7** said the same of
+the retention divergence and this is the evidence for it).
+
+**Scope this correctly:** the three citations are into **`claude/s6-counter-reconciliation` (#46)**,
+not into this run's branch and not into `main`. A restack that reshapes either read makes the
+*justification* stale while the tests still pass — the identical exposure PR #54 names for itself.
+
+### C-82-5 — the mutation matrix, all four rows executed
+
+```bash
+cd <engine>/relay && npm test                      # clean, both test-file states
+# then, one at a time, against src/channel.ts, restoring from a pristine copy between rows:
+#   M1  the 409 reports a retention-filtered mark (refusal decision unchanged)
+#   M2  pull `latest` de-filtered  (drop `AND expires_at > ?`)
+#   M3  push guard retention-filtered (add `AND expires_at > ?`) -- the tidy the comment forbids
+```
+
+*Expected, and **observed**:*
+
+| mutation | baseline test file (52) | with run 82's tests (55) |
+| --- | --- | --- |
+| **M1 — 409 reports the filtered mark** | **52 passed — GREEN** | **2 failed / 53** |
+| M2 — pull `latest` de-filtered | 1 failed / 51 | 2 failed / 53 |
+| M3 — push guard filtered | 1 failed / 51 | 3 failed / 52 |
+| clean | **52 passed** | **55 passed** |
+
+**Row 1 is the whole finding.** M2 and M3 were each already caught by one pre-existing test
+(`'excludes expired rows from latest…'` and `'still refuses a seq at or below an expired-but-uncollected
+row'` respectively) — **measured, not assumed**: both "before" cells were run against the pristine
+test file, not inferred from reading it. **M1 was caught by nothing.**
+
+**The production shape of M1 is silent.** A filtered number is below the engine's counter,
+`ReconcileTo` declines to move a counter down (§6.2 — rewinding would re-issue seqs the phone may
+have accepted), so the reconciliation is refused and the engine walks up one seq at a time into the
+same 409, **once per expired row**, instead of resuming above the mark in one round trip. Every push
+stays individually well-formed and the engine does get through. **Only the round-trip count changes,
+and no status code reports it.**
+
+### C-82-6 — clean green and typecheck, and no production source touched
+
+```bash
+cd <engine>/relay && npm test && npm run typecheck && npx tsc --noEmit; echo "EXIT=$?"
+cd <engine> && git diff --stat src/ relay/src/
+```
+
+*Expected, and **observed**:* **`Tests  55 passed (55)`**, `Test Files  1 passed (1)` on the clean
+tree — up from a **52-passed** baseline that itself reproduces **C-81-14**'s CI row off-machine.
+`wrangler types` → *Runtime types generated*; `tsc --noEmit` → **no output, `EXIT=0`**.
+
+**`git diff --stat` over the source trees is EMPTY.** `src/channel.ts` was mutated **only** in the
+worktree and restored from a pre-mutation copy taken at the start; **`sha256sum` matches the pristine
+copy** (`55b3198…0ad659`) before the commit. The committed diff is
+**`relay/test/relay.test.ts`, 1 file, +84 lines**, and nothing else — the lockfile that `npm install`
+touched was reverted with `git checkout` and appears in no commit. This is the near-miss **C-81-12**
+recorded in its own run; the same discipline was applied and is re-stated because it is the one that
+would quietly ship a mutation.
+
+### C-82-7 — no vector byte, no pin move, not a drift event
+
+```bash
+cd <engine> && node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+cd <engine> && git diff --name-only HEAD -- docs/sync-vectors/
+cd <android> && git status --short core/src/test/resources/
+```
+
+*Expected, and **observed**:* **`OK: 28 vector files match the generator.`**, **`EXIT=0`** — the
+**base branch's** pre-pin state, exactly the number PR #54's CI printed (**C-81-14**), because
+`claude/s2-seq-bound` predates the third S5 vector. **28 here and 29 at `7328a0b` are two different
+trees, not a disagreement.** No file under `docs/sync-vectors/` appears in this run's diff, the
+android vendored corpus was **not touched at all**, and the pin is **unmoved at `7328a0b`**.
+**Not a cross-repo drift event.**
+
+`$ExpectedOfflineTotal` was **not touched**, so this branch adds **no** landing cost to the pin family
+(**B-17**) — the same zero PR #54 measured on Windows CI.
+
+### C-82-8 — what was pushed
+
+```bash
+cd <engine> && git log --oneline -1 origin/claude/s2-latest-retention-skew
+cd <engine> && git rev-parse origin/claude/s2-latest-since-invariant origin/claude/s2-seq-bound
+```
+
+*Expected, and **observed**:* new branch **`claude/s2-latest-retention-skew`** at **`c4ad6b0`**,
+**draft PR #55** into base **`claude/s2-latest-since-invariant`** (PR #54). Diff: **one test file,
++84 lines, no production source.**
+
+**Both branches below it are unmoved** — `claude/s2-latest-since-invariant` at **`f95b66e`**,
+`claude/s2-seq-bound` at **`2be00fc`**. Amending either in place would have invalidated **C-RD-3**
+(all seven landing branches checked against their PR heads) and **C-81-12**. **Nothing was merged,
+closed, undrafted, force-pushed or deleted.**
+
+**The base choice is a judgement and is defensible either way.** Stacking on #54 adds a level to a
+stack `RETURN-DAY.md` §3 already costs; it was chosen so the two relay test additions stay **linear**
+rather than conflicting as siblings in the same `relay.test.ts` hunk. The opposite choice —
+`s2-seq-bound` as base — trades one merge for one conflict.
+
+### C-82-9 — CI has NOT run PR #55, and no CI result is claimed for it
+
+At the time these records were written, **no CI run existed for `claude/s2-latest-retention-skew`**.
+Every number in run 82 is from **this Linux sandbox**: the relay's real vitest suite, not a stub, but
+**not** this repo's Windows gate. `scripts\Verify-Alpha.ps1` was **not executed** — no `dotnet`, no
+`pwsh`, no Windows DPAPI — and the **android** gate was not executed either (no SDK, `ANDROID_HOME`
+unset). **The merge condition is unchanged.**
+
+To close this claim later:
+
+```bash
+list_workflow_runs ci.yml branch=claude/s2-latest-retention-skew
+```
+
+### C-82-10 — the citation guard caught a dangling claim in this run's own records
+
+```bash
+cd <android> && scripts/check-citations.sh; echo "EXIT=$?"
+```
+
+*First run, **observed**:*
+
+```
+definitions: 774   cited: 776   documented-absent: 1
+::error::dangling citation(s) -- cited, but defined nowhere:
+  C-81-15
+      LOG.md  BLOCKED.md  AUDIT-REQUEST.md
+```
+
+**The id does not exist** — run 81's series ends at **C-81-14**, and its notification was recorded in
+prose without a claim of its own (see C-82-2). **The quote above sits in a fence deliberately:** the
+guard treats a fenced id as a fixture rather than a claim (its own comment — *"a citation is a claim
+made in PROSE"*), which is the only honest way to name a non-existent id in a document the guard
+reads. Adding it to `KNOWN_ABSENT` was the wrong tool — that would suppress the id corpus-wide and
+permanently, to document one run's mistake.
+
+*After the repair, and this is the row that counts:* the three citations were rewritten to name
+**B-18's run-81 status**, which does exist, and the guard re-run to **`OK: every cited C-/B- id
+resolves to an entry that exists.`**, **`EXIT=0`**.
+
+**This is the guard doing exactly the job `C-75-13` built it for, on the run that built nothing else
+for it** — and it caught a *fabricated* citation, which is the failure mode these records are least
+able to catch by reading. **Recorded rather than silently fixed**, because a guard that only ever
+reports green is indistinguishable from one that is not running.
+
+Sizes taken before and after with **absolute** paths, per **C-79-16**: `AUDIT-REQUEST.md`
+798,490 → **812,334**; `LOG.md` 1,018,810 → **1,027,842**; `BLOCKED.md` 276,201 → **279,089**;
+`STATE.md` 583,768 → **595,961**. (Taken after the citation repair, so they are the committed sizes,
+not the pre-repair ones an earlier draft of this line carried.) All four grew, all four in `<android>`, and `git status` in
+`<engine>` and in the engine worktree shows **no untracked record file** — the specific failure
+**C-79-16** describes, where an append lands in the wrong checkout.

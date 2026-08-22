@@ -15354,3 +15354,135 @@ itself repeatedly — the shell reset to `/home/user` after most `cd` commands �
 did land one *substantive* near-miss, recorded rather than hidden: the pin's ancestor check was first
 run in the **android** checkout, where the SHA does not exist, and printed the **right answer by the
 wrong route** (**C-81-3**). Re-run in the engine, it holds.
+
+## Run 82 — 2026-08-22 (Linux cloud sandbox). The ordered intent's ITEM 2 was a hypothesis; measuring it refuted the defect and found the unguarded half underneath.
+
+**The slice: ITEM 2, taken because the list filed it as *"a hypothesis, not a finding — measure it
+before believing it"* and because its stated method (*"a relay test parking rows past their TTL, then
+reading both numbers"*) is one of the two lanes this sandbox actually owns.** The two high-water marks
+**do** disagree. That is **not** a defect — each consumer reads the side its own predicate needs — but
+the property that makes it harmless, **the value in the 409 body**, was asserted by nothing, and a
+mutation of it leaves all 52 tests green.
+
+## Milestone 1 — rule one, and the state re-derived rather than inherited
+
+Both checkouts arrived **detached at stale refs** (**C-82-1**), reproducing **C-81-1**: the android
+tree at the docs-only `main` `ebfaf81`, **302 commits** behind the work branch `5dcbca2`. Engine
+`origin/main` is still **`aac05f3`**, unmoved since 2026-08-12. Every count below is post-fetch.
+
+**Terra was read before anything was claimed.** `autonomy/codex-state` reports **COMPLETE**, *"Files
+claimed: none"*, *"the ladder is exhausted"* — so there was **no collision** and no rebase was owed.
+
+## Milestone 2 — the assigned slice, declined for the forty-seventh time, and NOT re-notified
+
+The stored prompt again assigns S5's spec half. **It has been built since 2026-08-09** — `8575539`,
+`22b028e`, `7328a0b`, in the **engine** repo — and the prompt's vendored pin `679a317` is stale;
+`VECTORS.lock` reads **`7328a0b`** (**C-82-2**). This run **inherited** that from C-81-2 and
+re-checked it at the lock file rather than re-deriving it blob-by-blob, and says so.
+
+**No notification was sent.** **B-18's run-81 status** records that exact fact as delivered to Brandon yesterday, and its
+note is explicit: *"notify again only on a NEW fact."* One day later, unrepointed, is the
+**same** fact — a daily repeat is noise, and the silence is the rule being followed rather than an
+oversight. **The next run should read this before deciding to notify.**
+
+## Milestone 3 — the premise, measured before it was believed
+
+A **throwaway** probe (`relay/test/probe.test.ts`, **deleted before the commit — it is in no tree**)
+parked rows past their TTL and read both numbers in the same instant (**C-82-3**):
+
+| state | push 409 `latest` | pull `latest` |
+| --- | --- | --- |
+| expired seq 5, nothing live | **5** | **0** |
+| live seq 1 + expired seq 7 | **7** | **1** |
+| **nothing expired (control)** | **3** | **3** |
+
+**The control is what stops this being over-read.** Without an expired row the two predicates select
+the same rows and the marks coincide — the skew is **retention-shaped**, not a standing off-by-one.
+
+## Milestone 4 — and then the finding turned out to be the opposite of the hypothesis
+
+ITEM 2 asked *"what does a consumer do when the same direction reports two different high-water
+marks?"*, and the honest answer is **the right thing, in both cases** (**C-82-4**). Both consumers are
+**raise-never-lower**: `SyncPublisher.ResumeSeq` is `ok.Latest > floor ? ok.Latest : floor`, so a
+too-low **pull** mark loses to the persisted floor; `RelaySink` feeds the **409's** mark to
+`reconcileTo`, which *"refuses to move the counter DOWN"*; and `InboundPump.cs:225` bounds its loop on
+the **filtered** mark, so it never waits for a row the page cannot return.
+
+**So the divergence is not merely deliberate-and-documented — it is load-bearing in both directions.**
+Swapping either number breaks the corresponding consumer. **ITEM 2 is closed as a defect hypothesis,
+and it should not be re-opened as one.**
+
+## Milestone 5 — the half that was genuinely unguarded, measured not argued
+
+The pre-existing push test asserts `res.status` and **not** the `latest` it carries. Mutation matrix,
+every row executed, both "before" cells run against the pristine test file rather than inferred
+(**C-82-5**):
+
+| mutation | baseline (52) | with run 82's tests (55) |
+| --- | --- | --- |
+| **M1 — the 409 reports the retention-filtered mark** | **52 passed — GREEN** | **2 failed / 53** |
+| M2 — pull `latest` de-filtered | 1 failed / 51 | 2 failed / 53 |
+| M3 — push guard filtered (the tidy the comment forbids) | 1 failed / 51 | 3 failed / 52 |
+| clean | 52 passed | **55 passed** |
+
+**M1 was caught by nothing.** M2 and M3 were each already caught by one pre-existing test, which is
+why the new cases are three and not six — the two guarded axes did not need re-guarding.
+
+**M1's production shape is silent, which is what makes it worth a test.** A filtered number is below
+the engine's counter, `ReconcileTo` declines to move a counter down (§6.2), so the reconciliation is
+refused and the engine walks up one seq at a time into the same 409 — **once per expired row** —
+instead of resuming above the mark in a single round trip. Every push stays well-formed and the
+engine does eventually get through. Only the round-trip count changes, and **no status code reports
+it**.
+
+## Milestone 6 — what was pushed, and the near-miss that was not repeated
+
+Branch **`claude/s2-latest-retention-skew`** at **`c4ad6b0`**, **draft PR #55** into base
+`claude/s2-latest-since-invariant` (**C-82-8**). **One test file, +84 lines.** Clean tree: **55 passed
+(55)**; `wrangler types && tsc --noEmit` → **0 errors, EXIT=0** (**C-82-6**).
+
+`src/channel.ts` was mutated **only** in the worktree and restored from a pre-mutation copy taken
+before the first mutation — **`sha256` re-checked against the pristine copy before the commit**, and
+`git diff --stat` over the source trees is **empty**. The lockfile `npm install` touched was reverted
+and appears in no commit. This is exactly the hazard **C-81-12** recorded in its own run; the
+discipline was re-applied deliberately, because it is the one whose failure quietly ships a mutation.
+
+**The PR carries its self-audit**, and its first item is the attack this run considers strongest and
+could not close: `expiredRow()` writes `expires_at = 1` directly into SQLite, so **if Cloudflare's
+alarm latency is in practice short enough that a push never races an uncollected expired row, M1's
+failure is real but unreachable** and these tests pin a property nothing depends on. Alarm latency
+**cannot be measured in this sandbox**; the reachability argument rests on `channel.ts`'s own comment,
+which is the same premise the three pre-existing retention tests already rest on. **Recorded as a
+limit, not filed as a blocker** — nothing human-shaped unblocks it and inventing one would send the
+next session hunting a phantom.
+
+## What this run did NOT do
+
+**No gate ran here, and no gate result is claimed.** `scripts\Verify-Alpha.ps1` was **not executed**
+— no `dotnet`, no `pwsh`, no Windows DPAPI. The **android** gate was **not executed** — no Android
+SDK, `ANDROID_HOME` unset. **CI has not run PR #55** and **no CI result is claimed for it**
+(**C-82-9**); every number above is from this Linux sandbox — the relay's real vitest suite, not a
+stub, but not this repo's Windows gate. **No `:core` file was written, so `core-probe.sh` was not run
+and no `:core` count appears in this entry.**
+
+**No production source was written, in either repo.** The diff is **one relay test file**. **No `:app`
+file, no `:core` file, no Kotlin, no C#, no `generate.mjs` change, no `ci.yml` change.** **No vector
+byte was written and the pin did not move** — `generate.mjs --check` → `OK: 28`, `EXIT=0`, the base
+branch's self-consistent pre-pin state and the same number PR #54's CI printed, so this is **not** a
+cross-repo drift event (**C-82-7**). **`docs/Sync-Protocol.md` was read and never edited.**
+**`$ExpectedOfflineTotal` was not touched**, so this branch adds **no** landing cost to the pin family
+(**B-17**).
+
+**No rung moved**, and none is claimed to have. **B-4**, **B-5**, **B-7**, **B-9**, **B-14**,
+**B-15**, **B-16**, **B-19**, **B-22**, **B-23** were neither acted on nor re-attempted. **Nothing was
+merged, closed, undrafted, force-pushed or deleted in either repository**; `claude/s2-seq-bound` and
+`claude/s2-latest-since-invariant` are both **unmoved**; no history was rewritten; **no deploy of any
+kind**; the production relay was **not contacted at all**, not even `GET /v1/health`; no Play, Google
+or OAuth console; no accounts, no purchases, no Gmail, no secrets read or printed, no `.appdata`.
+**No scheduled task was enumerated, created, modified or deleted** — and, unlike run 81, **no
+notification was sent**, because the only fact that would justify one was already delivered.
+**Terra's worktrees and `Documents\CareerSeeker` were read-only and never written.**
+
+**Every path in this run's record appends is absolute**, per **C-79-16**. The cwd hazard announced
+itself on almost every command — the shell reset to `/home/user` after each `cd` — and cost nothing,
+because no command relied on a relative path outliving its `cd`.

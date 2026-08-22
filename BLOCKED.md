@@ -4158,3 +4158,41 @@ rather than accept it."**
 > **Still unproven, and not claimed:** the **android** gate (**B-7**, **B-22** both unmoved — this is
 > the *engine* repo's CI) and `Verify-Alpha.ps1`'s `-IncludePublish`/`-IncludePackage` passes.
 > **The merge condition — a full local gate no cloud session can run — is unchanged.**
+
+### B-18 status 2026-08-22 (eighty-second run) — the forty-seventh firing, and the first that deliberately stayed silent
+
+**No notification was sent this run, and that is the entry.** Run 81 sent attempt 5 — the first
+delivery that left the repository — carrying the three commits, the one-command check, the stale pin
+`679a317` → `7328a0b`, the unmerged draft census and the fact that return day had passed.
+**Recorded in prose only — run 81 gave that delivery no `C-` claim of its own, so there is no
+re-verification command for it; see run 82's note in C-82-2.** Its own instruction to the next session was explicit: *"do not re-derive B-18, and do
+not re-notify the same fact. One delivery is information; a daily repeat is noise. Notify again only
+on a NEW fact."*
+
+**Both triggers were checked and both are negative** (**C-82-2**). The routine fired again today,
+**unrepointed**, still assigning S5's spec half; engine `origin/main` is still **`aac05f3`**; the
+newest merge anywhere is still **PR #44, 2026-08-13**. **That the routine fired again one day later
+is not a new fact** — it is the same fact observed one day on, and a human who received yesterday's
+notification may simply not have acted yet. **Re-sending it would train the channel to be ignored,
+which is the one way to make attempt 5 worse than useless.**
+
+**So B-18 stays OPEN and its status is unchanged.** The smallest human unblock is still *turn the
+routine off or repoint it* — editing stored scheduler config that **nothing in either checkout can
+reach**. What changed this run is only the count: forty-seven firings, one delivered.
+
+**The criterion for the next run, stated so it does not have to be re-derived.** Notify on a
+**genuinely new** fact — `origin/main` moving, any PR merged or undrafted, the routine's stored prompt
+changing, or a gate result that changes the merge condition. **Do not** notify on: another firing of
+the same prompt, another draft PR opened by a cloud session (this run opened **#55** and that is
+routine progress, not news), or the passage of another day past return day.
+
+---
+
+**No new blocker was filed by run 82, deliberately.** The run's strongest self-criticism —
+that `expiredRow()` writes `expires_at = 1` straight into SQLite, so **M1's failure mode is real but
+possibly unreachable** if Cloudflare's alarm collects expired rows faster than an engine push can race
+them — **is a limit on the evidence, not a blocker.** Nothing human-shaped unblocks it: alarm latency
+is unmeasurable in this sandbox and would need a deployed Worker under load to characterise, which is
+embargoed for agents (**H5**). It is recorded in **C-82-3** and as the first item of PR #55's
+self-audit, where a reviewer will actually meet it. **Filing it here as a blocker would send the next
+session hunting a phantom**, which is the failure mode this file exists to prevent.
