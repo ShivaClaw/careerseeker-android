@@ -15043,3 +15043,29 @@ pushing over a re-run whose verdict you still need.
 
 **On `5170aff`, steps 1–10 are `success`; 11–14 were not observed to conclude, and no job
 conclusion is claimed.**
+
+## Final entry — the android gate CONCLUDED green, all 14 steps, on this run's build input
+
+**This upgrades every earlier CI note in run 79, each of which says "no job conclusion is
+claimed."** True when written; no longer true. Run `32555286491`, job `96988392550`, head
+**`5170aff`**, attempt 1: **`conclusion: success`**, **all 14 steps green** (**C-79-21**) —
+citation guard, `:core` android-free, vendored-vector drift check, **`:core` 59s**, **`:app`
+Robolectric 91s**, **Assemble debug APK 109s**, **Lint 49s**, the analytics/tracking assertion,
+and the APK upload.
+
+**It covers the final head's build input exactly.** `4dfdfac` differs from `5170aff` by 116 added
+lines of markdown; `app` and `core` are **equal tree objects** on both (`460e581b…`,
+`e8947995…`), with **0** differing paths across `app/`, `core/`, `gradle/`, the build scripts,
+`.github/` and `scripts/`. **So the android gate ran and passed on this run's code** — the claim
+**B-7** normally prevents a cloud session from making. It is CI's, not this session's.
+
+**Three qualifications, all still binding.** It is **not a local gate** — no Gradle task ran here
+beyond `:core:test` via `core-probe.sh`, and **B-7 is unmoved**. It is **one sample**, and this
+run produced its own counterexample: `73238fc` carries the **identical** `app` tree and its
+`:app` step **failed**, so **B-22 is not narrowed** — the pair is the cleanest statement of that
+blocker on record. And **CI prints no totals**, so **346/0/0 stays a `core-probe.sh`
+measurement**; this adds a conclusion, not a count.
+
+**No conclusion is claimed for `4dfdfac` itself.** Its run was in flight when this session
+stopped, and by the rule in **C-79-20** recording it would have superseded it. The tree equality
+is what makes that a closed gap rather than an open one.

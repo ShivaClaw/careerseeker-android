@@ -14737,3 +14737,46 @@ records push supersedes the run it records (`878a203`); this run found the sharp
 distinguish a flake from a defect. The correct order is **observe, then write, then push** — and
 accept that the final push's own run is unobservable, which is structural and already recorded
 (**C-79-18**).
+
+### C-79-21 — the android gate CONCLUDED green, all 14 steps, on this run's build input
+
+**This upgrades C-79-17/-18/-20, which all say "no job conclusion is claimed for any head."** That
+was true when each was written. It is no longer true: run **`32555286491`**, job
+**`96988392550`**, head **`5170aff`**, attempt 1 — **`conclusion: success`**, completed
+**05:55:48**, **all 14 steps green**.
+
+```bash
+#   actions_get(get_workflow_job, ShivaClaw/careerseeker-android, 96988392550)
+git -C <android> rev-parse 5170aff:app 4dfdfac:app
+git -C <android> rev-parse 5170aff:core 4dfdfac:core
+git -C <android> diff --name-only 5170aff 4dfdfac -- app/ core/ gradle/ build.gradle.kts settings.gradle.kts .github/ scripts/ | wc -l
+```
+
+*Expected, and **observed**:* every step `success` — citation guard 1s, `:core` android-free 97s,
+vendored-vector drift check 5s, **`:core` tests 59s**, **`:app` Robolectric 91s**, **Assemble
+debug APK 109s**, **Lint 49s**, **the analytics/tracking assertion 2s**, and the APK upload.
+
+**It covers the final head's build input exactly.** `4dfdfac` differs from `5170aff` by **116
+added lines across three markdown files**, and the trees are equal:
+`app` = `460e581b927cd36845001d9d33e72273d66e376d` on both, `core` =
+`e89479950c8c0b184f5fd02c6014ddc9f1316339` on both, with **0** differing paths across `app/`,
+`core/`, `gradle/`, the build scripts, `.github/` and `scripts/`.
+
+**So the android gate — `checkCoreIsAndroidFree`, `:core:test`, `:app:test`, `:app:assembleDebug`,
+`:app:lintDebug` — ran and passed on this run's code.** That is the claim **B-7** normally
+prevents a cloud session from making, and it is CI's, not this session's.
+
+**Read it with three qualifications, all of which still bind.**
+
+1. **It is not a local gate.** No Gradle task ran in this sandbox beyond `:core:test` via
+   `scripts/core-probe.sh`. **B-7 is unmoved**; observing a gate is not running one.
+2. **It is ONE sample, and this run produced its own counterexample.** `73238fc` carries the
+   **identical** `app` tree object and its `:app` step **failed** (**C-79-19**, **C-79-20**).
+   **B-22 is not narrowed by this green** — if anything the pair is the cleanest statement of the
+   blocker there is: same tree, one red, one green, one full pass.
+3. **CI prints no totals**, so **346/0/0 remains a `scripts/core-probe.sh` measurement**
+   (**C-79-11**). This entry adds a *conclusion*, not a count.
+
+**No conclusion is claimed for `4dfdfac` itself** — its run was in flight when this session
+stopped, and by the rule in **C-79-20** recording it would have superseded it. The tree equality
+above is what makes that acceptable rather than a gap.

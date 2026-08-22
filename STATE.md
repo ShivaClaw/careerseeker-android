@@ -59,6 +59,15 @@
 > cited, 0 dangling** (**C-79-15**) — but green because the repair worked, **not** because the
 > guard would have caught it.
 >
+> **THE ANDROID GATE CONCLUDED GREEN on this run's build input** (**C-79-21**): run `32555286491`,
+> head `5170aff`, **`conclusion: success`, all 14 steps** — `:core` 59s, `:app` Robolectric 91s,
+> Assemble 109s, Lint 49s, the analytics assertion and the APK upload. `4dfdfac` differs by
+> **markdown only** and carries **equal `app`/`core` tree objects**, so the gate covers the final
+> head's code. **Read it with three limits:** it is **CI's gate, not a local one** (**B-7**
+> unmoved); it is **ONE sample** and this run produced the counterexample — `73238fc` has the
+> **identical** `app` tree and its `:app` step **FAILED** (**C-79-19**/**C-79-20**), so **B-22 is
+> not narrowed**; and CI prints no totals, so **346/0/0 stays a `core-probe.sh` measurement**.
+>
 > **SCOPE: no rung moved.** No `:app` file, no vector byte, no pin move, `docs/Sync-Protocol.md`
 > read and never edited, no gate run (**B-7** reproduced: no `dotnet`, no `pwsh`, `ANDROID_HOME`
 > unset), **no offline assertion total claimed**. `:core:test` is reported throughout as
