@@ -14250,3 +14250,273 @@ So **both** gates were impossible here, for reasons that are structural and not 
 of record needs the Android SDK. **B-7** is unmoved. **No suite count, no assertion total and no
 gate result is claimed anywhere in run 78**, and the two numbers quoted in **C-78-6** are Brandon's
 from PR #42, attributed.
+
+---
+
+## Run 79 — 2026-08-22. §3.1's size cap: the unit was guarded by nothing
+
+Every command below was executed in this session on Linux. Where a claim could not be
+executed here, it says so and says why. `<engine>` is a checkout of `ShivaClaw/careerseeker`,
+`<android>` a checkout of this repository; both were `git fetch --all --prune`'d first, and
+every count is taken after that fetch.
+
+### C-79-1 — the state that decides B-18's notify criterion, re-measured not inherited
+
+```bash
+git -C <engine> fetch --all --prune && git -C <android> fetch --all --prune
+git -C <engine> log -1 --format='%H %an %ci' origin/main
+git -C <engine> log -12 --format='%h | %an | %ci | %s' origin/main
+# live, via the GitHub API rather than local refs:
+#   list_pull_requests(ShivaClaw/careerseeker,        state=all)
+#   list_pull_requests(ShivaClaw/careerseeker-android, state=all)
+```
+
+*Expected, and **observed**:* engine `main` **`aac05f3`**, `Portable G & Shiva's Claw`,
+**2026-08-12 20:28 −0600** — unmoved since run 74. **18 engine drafts** (#26, #32–#39, #45–#53)
+and **6 android drafts** (#1–#6) read live: **all 24 open, all `draft: true`**, none merged,
+closed or undrafted. Newest merge anywhere in either repo: **PR #44, 2026-08-13T02:28Z**.
+
+**Both B-18 triggers read negative**, which is the finding this entry exists to support, not a
+formality — see the run 79 status in `BLOCKED.md`.
+
+### C-79-2 — the assigned slice, verified in the spec blob rather than rebuilt
+
+```bash
+PIN=7328a0bc043335491cd96a67d634e8eea2a13af9
+git -C <engine> show $PIN:docs/Sync-Protocol.md > /tmp/spec-at-pin.md
+grep -n "product_id\|acknowledged_at\|order_id" /tmp/spec-at-pin.md | head
+grep -n "decoded ciphertext\|1 MiB"            /tmp/spec-at-pin.md | head
+grep -n "decrypt_failed"                       /tmp/spec-at-pin.md | head
+ls <android>/core/src/test/resources/sync-vectors/v1/invalid-unknown-field.json
+```
+
+*Expected, and **observed**:* the `{product_id, acknowledged_at, order_id?}` body at
+**§4.3.3 lines 318–320** (gate **PQ-A6-1**, default-proceed, recorded in §10's change table at
+line 658); the cap on the **decoded ciphertext** at **§3.1 lines 111–112** with the S5
+amendment note at line 132 (**PQ-A2-1**); `decrypt_failed` for **every structural rejection**
+at **§7.2 line 601** (**PQ-A2-2**); and `invalid-unknown-field.json` present (**PQ-A2-3**).
+
+**All four are closed, and were closed before this run was scheduled.** The prompt assigning
+them is stale; this is its **forty-fourth** firing.
+
+### C-79-3 — the check the prompt asks for by name, at the actual pin
+
+```bash
+PIN=7328a0bc043335491cd96a67d634e8eea2a13af9
+mkdir -p /tmp/pin && git -C <engine> archive $PIN docs/sync-vectors | tar -x -C /tmp/pin
+cd /tmp/pin && node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* **`OK: 29 vector files match the generator.`**, **`EXIT=0`**.
+
+It passes **because the work is already done**, not because this run did it. Note the pin: the
+prompt names `679a317`, which has been stale since 2026-08-12.
+
+### C-79-4 — the vendored corpus is byte-identical to the pin, before and after this run's diff
+
+```bash
+diff -r /tmp/pin/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1
+echo "DIFF_EXIT=$?"
+git -C <android> diff --name-only origin/claude/android-a0-probe -- core/src/test/resources/sync-vectors | wc -l
+```
+
+*Expected, and **observed**:* **29 files each side, `DIFF_EXIT=0`**, and **0** vector paths in
+this run's diff. Re-run after the two code commits and still `0`. **No vector byte moved and
+the pin did not move**, so this run is not a cross-repo drift event.
+
+### C-79-5 — the toolchain inventory, and the one thing that changed it
+
+```bash
+which dotnet; which pwsh; echo "${ANDROID_HOME:-unset}"; node --version; java -version
+ls /usr/lib/jvm/
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+ls /usr/lib/jvm/
+```
+
+*Expected, and **observed**:* `dotnet` **not found**, `pwsh` **not found**, `ANDROID_HOME`
+**unset**, Node **v22.22.2**, OpenJDK **21.0.10**. `/usr/lib/jvm` initially carried **21 only**,
+so `scripts/core-probe.sh` exited **1** with its "no JDK 17 found" message. The apt install
+**succeeded** (`openjdk-17-jdk-headless 17.0.19+10-1~24.04.2`) and `java-17-openjdk-amd64`
+appeared.
+
+**Both gates remain structurally impossible here** and **B-7** is unmoved: `Verify-Alpha.ps1`
+needs .NET, PowerShell and Windows DPAPI; the android gate needs the Android SDK. What became
+possible is exactly one of the gate's five commands, `:core:test`, via `core-probe.sh` — and it
+is reported as that, never as a gate.
+
+### C-79-6 — the baseline, established before anything was changed
+
+```bash
+cd <android> && scripts/core-probe.sh; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* **`346 tests, 0 failed, 0 skipped, across 22 classes`, `EXIT=0`**
+on this run's final head; **343/0/0** on the head it started from (run 76's number, reproduced
+here rather than inherited). Use `git stash` or check out `d781183` to reproduce the 343.
+
+### C-79-7 — the finding: every oversized case in either repo is `MAX + 1` in all three units
+
+```bash
+grep -rn "MAX_ENVELOPE_BYTES" <android>/core/src
+python3 -c "
+import json; d=json.load(open('<android>/core/src/test/resources/sync-vectors/v1/invalid-oversized.json'))
+print(d['synth_ciphertext_len'], d['expect_error'], d['envelope_json'])"
+```
+
+*Expected, and **observed**:* the only fixture is
+`oversized() = Base64Url.encode(ByteArray(Protocol.MAX_ENVELOPE_BYTES + 1))`, and the corpus's
+`invalid-oversized` carries `synth_ciphertext_len` **1048577** — both **`MAX + 1` decoded**.
+
+**A value one byte over the cap in decoded bytes is also over it in base64url characters
+(~1.4 MB) and in JSON envelope length.** All three candidate readings of §3.1 reject it
+identically, so **no assertion in the suite or the corpus could tell them apart.** §3.1 forbids
+two of those three readings by name.
+
+### C-79-8 / C-79-9 / C-79-10 — the gap, measured by mutation on the pre-fix tree
+
+```bash
+cd <android> && git checkout d781183          # the head this run started from
+# M1 — measure the base64url TEXT, the unit 3.1 forbids by name
+sed -i 's|ciphertext.size > Protocol.MAX_ENVELOPE_BYTES|env.ciphertext.length > Protocol.MAX_ENVELOPE_BYTES|' \
+  core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt
+scripts/core-probe.sh --rerun
+# M2 — cap at MAX * 3/4 = 786,432, the number 3.1 records the relay having shipped
+# M3 — delete the check entirely (negative control)
+```
+
+*Expected, and **observed**:*
+
+| | mutation of `EnvelopeReceiver.kt:70` | pre-fix result |
+| --- | --- | --- |
+| **C-79-8** | `env.ciphertext.length` — the base64url text | **GREEN, 343/0/0** |
+| **C-79-9** | cap at `MAX_ENVELOPE_BYTES * 3 / 4` = 786,432 | **GREEN, 343/0/0** |
+| **C-79-10** | size check removed (negative control) | **RED, 3 failures** |
+
+**C-79-10 is the entry that makes the other two mean something.** The gate was not untested —
+deleting it reddens `size is checked before signature placement`, `no rejection advances the
+sequence tracker` and `the receiver classifies every envelope vector exactly as the engine
+does`. It was tested for **existence**, and for neither **unit** nor **number**.
+
+**C-79-9 is not a hypothetical.** §3.1 records that exact value as a bug that shipped on the
+relay: its guard *"compared a character count to a byte budget, which capped the decoded payload
+at 786,432 bytes and left the top 256 KiB of the declared range untransmittable"*.
+
+### C-79-11 — the fix, and both mutations dying on it
+
+```bash
+cd <android> && scripts/core-probe.sh --rerun          # clean tree
+# then re-apply M1, M2, M3 above against THIS head
+```
+
+*Expected, and **observed**:* clean **`346 tests, 0 failed, 0 skipped, 22 classes`, `EXIT=0`**
+(343 → 346). **M1 RED** and **M2 RED**, each failing on
+`EnvelopeReceiverTest > a ciphertext of exactly the cap is legal and is accepted` and on nothing
+else. **M3 now reddens four tests instead of three**, the fourth being
+`a ciphertext one byte past the cap is too_large` — so both new behavioural cases have teeth,
+rather than one carrying the other.
+
+### C-79-12 — the base64url derivation is §3.1's own normative number
+
+```bash
+python3 -c "n=1048576; print((n//3)*4 + (0 if n%3==0 else n%3+1), -(-4*n//3))"
+grep -n "1,398,102" /tmp/spec-at-pin.md
+```
+
+*Expected, and **observed**:* both print **1398102**, and §3.1 line 119 declares
+`ceil(4/3 × 1 MiB) = 1,398,102` as the relay's `MAX_CIPHERTEXT_B64U_CHARS`, calling the
+conversion *"normative, not incidental: **the relay MUST carry every envelope this section
+declares legal.**"* The new test pins the fixture at that character count, which ties the phone
+to the relay's constant **without the phone importing a relay constant**.
+
+### C-79-13 — the blast radius, stated so an auditor can check it cheaply
+
+```bash
+git -C <android> diff --stat d781183..HEAD
+git -C <android> diff --name-only d781183..HEAD -- core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt
+git -C <android> diff --name-only d781183..HEAD -- app/ core/src/test/resources/
+```
+
+*Expected, and **observed**:* three files — `Protocol.kt` (**KDoc only**), `EnvelopeReceiverTest.kt`
+(+127), `ProtocolTest.kt` (a test rename and a note). **`EnvelopeReceiver.kt` is UNMODIFIED**;
+**0** `:app` files; **0** vector paths.
+
+**The implementation was already correct.** It has always measured the decoded ciphertext —
+which is precisely why §3.1's amendment moved the prose to the code rather than the reverse.
+This run changed **no production behaviour**; it added the assertion that keeps the behaviour
+from changing unnoticed, and corrected the one sentence in `:core` that still described the
+retired rule.
+
+### C-79-14 — what this run did NOT verify, and cannot
+
+```bash
+which pwsh; which dotnet; echo "${ANDROID_HOME:-unset}"
+```
+
+*Expected, and **observed**:* all absent/unset (**C-79-5**). Therefore, and stated plainly:
+
+- **No android gate result is claimed.** `./gradlew checkCoreIsAndroidFree :core:test
+  :app:assembleDebug :app:lintDebug` was **not run**; four of its five commands need the SDK.
+  `:core:test` is reported as `scripts/core-probe.sh`, which is one command of the five.
+- **No engine gate result is claimed.** `scripts\Verify-Alpha.ps1` was **not run**, and no
+  offline assertion total appears anywhere in run 79.
+- **The engine twin was not touched or re-run**, and it has the same gap. Measured by reading
+  the blobs at the pin, not by executing anything:
+
+  ```bash
+  PIN=7328a0bc043335491cd96a67d634e8eea2a13af9
+  git -C <engine> show $PIN:src/Sync/EnvelopeReceiver.cs | sed -n '41,47p'
+  git -C <engine> show $PIN:tests/SyncHarness/Program.cs | grep -n -i "oversiz\|max_envelope"
+  ```
+
+  *Observed:* `EnvelopeReceiver.cs:45` reads `if (ciphertext.Length > Protocol.MaxEnvelopeBytes)`
+  where `ciphertext` is the output of `Base64Url.TryDecode` — **the same correct rule as the
+  phone's**, measured in decoded bytes. And `SyncHarness` exercises it at **`invalid-oversized`'s
+  `synth_ciphertext_len` only** (`Program.cs:224`), plus a value pin of `index.json`'s
+  `max_envelope_bytes` (`Program.cs:47`) — so, exactly as on the phone before this run,
+  **`MAX + 1` and nothing at `MAX`.** §3.1's *"relay/test/relay.test.ts pins ... the maximum
+  legal envelope"* covers the **relay**, which is a different component from the engine's
+  **receiver**; the receiver's boundary is unpinned on that side still.
+
+  Not fixed here: it is a second-repo change whose merge condition is a full local
+  `Verify-Alpha.ps1` this environment cannot run, and adding a C# harness assertion moves
+  `$ExpectedOfflineTotal`, which `CLAUDE.md`'s drift trap requires be changed together with
+  every doc that reports it. Filed in `BLOCKED.md` under run 79 rather than pushed blind.
+- **B-22 was neither observed nor sampled** — no `:app` test ran — and was not worked around.
+
+### C-79-15 — the citation guard, run on this run's own records
+
+```bash
+cd <android> && bash scripts/check-citations.sh; echo "GUARD_EXIT=$?"
+```
+
+*Expected, and **observed**:* **`definitions: 732   cited: 733   documented-absent: 1`**,
+`OK: every cited C-/B- id resolves to an entry that exists.`, **`GUARD_EXIT=0`**. Every
+`C-79-*` id and `B-23` cited in prose this run resolves to a heading. Run 77 built this guard
+(`C-75-13`) and its value was recorded as **prospective**; this is the second run to be checked
+by it and it is still prospective — it found nothing, which is the correct outcome.
+
+### C-79-16 — the cwd hazard recurred, and it is recorded rather than tidied away
+
+```bash
+git -C <engine> status --short          # must be empty
+git -C <android> log --oneline -1 -- LOG.md BLOCKED.md
+```
+
+*Expected, and **observed**:* engine `git status` **empty**. During this run the shell's working
+directory reset **mid-session** from `<android>` to `<engine>`, and two `cat >> LOG.md` /
+`cat >> BLOCKED.md` appends therefore landed **in the engine repository as untracked new files**
+rather than in this one. Detected by a `wc -c` sanity check on the file that was supposed to have
+grown — `LOG.md` read **9,362 bytes** where it should have read ~988,000.
+
+**Nothing was corrupted**: both strays were **untracked** (`?? LOG.md`, `?? BLOCKED.md` — the
+engine repo carries neither file), so no engine content was overwritten. The content was
+appended to the correct files with absolute paths and the strays deleted; the engine checkout is
+clean.
+
+**This is the identical hazard run 75 hit** — a bare relative path outliving its `cd` — which is
+what `C-75-13` filed and run 77 built `scripts/check-citations.sh` against, and what `C-77-9`
+recorded as *"load-bearing, since ... this run's shell cwd reset to `/home/user` mid-run"*.
+**It has now recurred with a different destination** (`<engine>`, not `/home/user`), which is
+worth knowing: the guard catches the *consequence* an unwritten record has for citations, and
+catches nothing when the write lands somewhere real and silent. **Every path in run 79's record
+appends after the incident is absolute.**

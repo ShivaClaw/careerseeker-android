@@ -3768,3 +3768,135 @@ proving the citation guard's failure path on a runner means pushing a knowingly-
 and proving the vector step's means pushing a knowingly-wrong vector byte — the cross-repo drift
 event the mission forbids outright. **B-2 narrowed for the record but not by this run** — C-78-6
 records that its `/pair` half landed on 2026-08-13 by Brandon's merge, not by anything done here.
+
+---
+
+## Run 79 — 2026-08-22. One new blocker; B-18's forty-fourth firing, and the sixteenth attempt is silence
+
+## B-23 — the engine's receiver has the same §3.1 boundary gap, and closing it needs a Windows gate (seventy-ninth run, 2026-08-22)
+
+### Symptom
+
+Run 79 found that `:core`'s §3.1 size cap was guarded against **deletion** and against neither
+its **unit** nor its **number**: every oversized fixture in the phone suite and in the shared
+corpus is `MAX_ENVELOPE_BYTES + 1` **decoded** bytes, which is over the cap in all three
+candidate units at once, so no assertion could distinguish the rule §3.1 mandates from the two
+it forbids by name. Two mutations proved it — measuring the base64url text, and capping at
+`MAX * 3 / 4` — both **green at 343/0** (**C-79-8**, **C-79-9**), with deletion of the check as
+the negative control going **red** (**C-79-10**). Fixed on the phone; **346/0/0**, both
+mutations now red (**C-79-11**).
+
+**The engine has the identical gap, and it was measured rather than assumed** (**C-79-14**).
+`src/Sync/EnvelopeReceiver.cs:45` applies the same correct rule — `ciphertext.Length >
+Protocol.MaxEnvelopeBytes` on the output of `Base64Url.TryDecode`, so decoded bytes, matching
+the phone. Its guard is `tests/SyncHarness/Program.cs`, which exercises the cap at
+`invalid-oversized`'s `synth_ciphertext_len` only (line 224) plus a value pin of `index.json`'s
+`max_envelope_bytes` (line 47). That is `MAX + 1` and nothing at `MAX` — the state the phone was
+in until this run.
+
+Note what does **not** cover it: §3.1 says *"`relay/test/relay.test.ts` pins the derivation, the
+maximum legal envelope surviving a push/pull round trip, and the first character beyond it."*
+That is the **relay**, and the relay is not the engine's receiver. The boundary is pinned for the
+transport and unpinned for the party that decrypts.
+
+### Why it matters
+
+`MUST NOT exceed` makes exactly 1 MiB the largest **legal** ciphertext. An engine receiver that
+drifted to the wrong unit would refuse a payload the protocol declares legal, and the sender
+could not discover why — §3.1 records precisely this failure having shipped once already, on the
+relay, where a character count compared to a byte budget *"left the top 256 KiB of the declared
+range untransmittable"*. §4.4 then instructs a future chunker to size against exactly this
+number. The phone is now guarded; the engine is not, and the two are supposed to move together.
+
+### Attempts
+
+1. **Fix it in this session.** Rejected, not attempted. `dotnet` and `pwsh` are absent
+   (**C-79-5**, **B-7**), so a C# change could not be compiled, let alone gated.
+2. **Push it unverified to an engine branch anyway.** Rejected on the mission's own terms: the
+   engine repo's merge condition is a full local `Verify-Alpha.ps1`, and this program's standing
+   rule is that a claim needing a gate this environment cannot run is written down as unverified
+   rather than pushed as done.
+3. **Write the assertion and leave it uncompiled**, as **B-22** does for its `:app` patch.
+   Rejected here, and the reason is specific rather than general: adding a `SyncHarness`
+   assertion moves the offline total, and `CLAUDE.md` pins that total in
+   `$ExpectedOfflineTotal` **and** in every doc that reports it, all of which must change in one
+   commit. A written-but-uncompiled patch that is guaranteed to fail the pinned-total check is a
+   worse artifact than a precise description of what to write.
+
+### Smallest human unblock
+
+On a Windows machine with the engine checkout, add to `tests/SyncHarness/Program.cs` the twin of
+the three cases this run added to `EnvelopeReceiverTest`: a **real sealed** envelope whose
+decoded ciphertext is exactly `Protocol.MaxEnvelopeBytes` must be **accepted**; one byte more
+must be `too_large`; and the maximum legal ciphertext must encode to **1,398,102** base64url
+characters, which is §3.1's own `ceil(4/3 × 1 MiB)` (**C-79-12**). Then bump
+`$ExpectedOfflineTotal` by the number of assertions added **and** every doc that reports the
+total, in the same commit, and run `scripts\Verify-Alpha.ps1`.
+
+The phone-side change is `f78edaf` on `claude/android-a0-probe` and is a direct template,
+including the padding arithmetic (`plaintext = target − TAG_BYTES`, body padded with ASCII so
+character count equals byte count).
+
+### B-18 status 2026-08-22 (seventy-ninth run) — the forty-fourth firing, and the sixteenth attempt is silence
+
+**Unchanged as a blocker.** The scheduled prompt again assigned S5's spec half — §4.3's
+`entitlement_ack` body, the generated vector, PQ-A2-1/-2/-3. It has been built since
+**2026-08-09**, and this run re-verified it **in the spec blob rather than assuming it**
+(**C-79-2**): the body at §4.3.3 lines 318–320, the ciphertext cap at §3.1 lines 111–112,
+`decrypt_failed` at §7.2 line 601, and `invalid-unknown-field.json` present at the pin.
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the generator.`,
+`EXIT=0`** (**C-79-3**) — the command the prompt asks for by name, passing because the work is
+done. The prompt's pin `679a317` is still stale (**`7328a0b`**, corpus **29/29** byte-identical,
+**C-79-4**), its "S5 is NOT STARTED" is still wrong, and run 78's fourth stale premise — that
+B-2 is open because the desktop `/pair` page does not exist — is unchanged: that page has been
+on `main` since 2026-08-13.
+
+**The criterion was re-measured this run, not inherited** (**C-79-1**), and both triggers read
+negative:
+
+| trigger | measured this run | fires? |
+| --- | --- | --- |
+| **movement in the blocking state** — a merge, close, undraft, or human commit in either repo | engine `main` still **`aac05f3`** (2026-08-12); **18 engine + 6 android** drafts read live via the API, all open, all draft; newest merge anywhere **PR #44, 2026-08-13** | **no** |
+| **something genuinely needing an action** | this run's output is a `:core` test change that is **already green and already pushed**; the one thing it could not do is filed above as **B-23**, and B-23 waits on the same Windows gate that eight other items already wait on | **no** |
+
+**So: nothing sent, for the sixth consecutive run.** Attempt 10 (run 73) reached Brandon's phone
+and inbox carrying the state, the landing plan and step 0, and remains unanswered. **B-23 is a
+new finding but not a new *fact about the blocking state*** — it joins a queue that is already
+blocked on exactly the action the unanswered message asks for, and a notification saying "there
+is now a ninth thing waiting on the Windows gate" tells him nothing the eighth did not.
+
+**The criterion still inverts on a new fact**, unchanged and restated so the next session can
+apply it without re-deriving it: **movement in the blocking state, or something genuinely
+needing an action, goes out immediately.** **B-18 stays open** — whether the routine stops is
+Brandon's action, and a sent notification is still not a read one.
+
+**Unchanged from run 78, and worth keeping written down:** this session can enumerate and delete
+scheduled tasks. **It did neither, and did not look.** Silently deleting the owner's automation
+would destroy the one signal still reliably reaching him — that a run happened at all — on an
+agent's judgment, five days into a silence whose cause is unknown. **A stalled routine is not
+consent to dismantle it.**
+
+### B-7 status 2026-08-22 (seventy-ninth run) — reproduced, and it bounded this run's claims more narrowly than usual
+
+Measured as an inventory (**C-79-5**): `dotnet` **not found**, `pwsh` **not found**,
+`ANDROID_HOME` **unset**; Node **v22.22.2**, OpenJDK **21.0.10**, Gradle present.
+
+**One thing was different, and it is a cost rather than a change to B-7.** `/usr/lib/jvm` carried
+**21 only**, so `scripts/core-probe.sh` exited 1 with its "no JDK 17 found" message; the apt
+install the script itself prescribes **succeeded**, and `:core:test` then ran. This is the
+recurring provisioning cost the twentieth run first logged, paid again — **not** a narrowing of
+B-7, which is about `dl.google.com` and the Android SDK. **Both gates remain structurally
+impossible here**, and `:core:test` is reported throughout run 79 as `scripts/core-probe.sh` —
+**one of the android gate's five commands** — never as a gate result.
+
+**No android gate result and no engine gate result is claimed anywhere in run 79**, and no
+offline assertion total appears in it.
+
+### B-1, B-2, B-4, B-5, B-6, B-8, B-9, B-12, B-13, B-14, B-15, B-16, B-17, B-19, B-20, B-21, B-22 — untouched this run
+
+None was acted on, narrowed, re-attempted or worked around. **B-22 was neither observed nor
+sampled** — no `:app` test ran and no `:app` file was touched, so its ~8% nondeterminism was not
+exercised — and it was **not** worked around by skipping or `@Ignore`-ing a test. **B-15's
+remaining half was again declined**, for the reason it has been declined every run: proving the
+vector step's failure path means pushing a knowingly-wrong vector byte, which is the cross-repo
+drift event the mission forbids outright.

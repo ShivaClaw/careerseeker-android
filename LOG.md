@@ -14755,3 +14755,168 @@ not contacted at all this run, not even `/v1/health`.** No Play/Google/OAuth con
 no purchases, no Play Billing code, no email or Gmail, no secrets read or printed, no `.appdata`.
 Terra's territory is untouched: `scripts/Verify-Alpha.ps1`, `$ExpectedOfflineTotal` and every
 count-reporting doc are **unmodified on every pushed branch**.
+
+---
+
+# Run 79 — 2026-08-22 (Linux cloud sandbox)
+
+## The one-line version
+
+**§3.1's size cap was guarded against being deleted and against nothing else.** Every oversized
+fixture in the phone suite and in the shared corpus sits one byte over the cap in *all three*
+candidate units at once, so no assertion could tell the rule §3.1 mandates from the two it
+forbids by name. Two mutations proved it green; the fix is three tests and a corrected KDoc;
+`EnvelopeReceiver.kt` was already right and is unmodified.
+
+## Milestone 0 — rule one, and the state it decides
+
+`git fetch --all --prune` in both checkouts, first action, before reading anything
+(**C-79-1**). It mattered: the android checkout arrived **detached at `main`**, which is **10
+commits** deep and **292 behind** the work branch — at that ref `RETURN-DAY.md`, the mission
+banner and every B-18 entry **do not exist**, which is the failure mode `C-FETCH-1` has been
+recording since run 50.
+
+Measured after the fetch, not carried forward: engine `main` **`aac05f3`**
+(`Portable G & Shiva's Claw`, 2026-08-12 20:28 −0600), unmoved since run 74. **18 engine + 6
+android drafts** read **live via the API** rather than from local refs — **all 24 open, all
+`draft: true`**, none merged, closed or undrafted. Newest merge anywhere: **PR #44,
+2026-08-13**. Return day (2026-08-18) is **four days past**.
+
+## Milestone 1 — the assigned slice, declined for the forty-fourth time and verified instead
+
+Verified **in the spec blob**, not in a commit subject (**C-79-2**): the
+`{product_id, acknowledged_at, order_id?}` body at **§4.3.3 lines 318–320** (PQ-A6-1), the 1 MiB
+cap on the **decoded ciphertext** at **§3.1 lines 111–112** (PQ-A2-1), `decrypt_failed` for every
+structural rejection at **§7.2 line 601** (PQ-A2-2), and `invalid-unknown-field.json` present
+(PQ-A2-3). All four closed, and closed **before this run was scheduled**.
+
+`node docs/sync-vectors/generate.mjs --check` at the pin → **`OK: 29 vector files match the
+generator.`, `EXIT=0`** (**C-79-3**). The command the prompt asks for by name **passes because
+the work is already done**. The prompt's pin `679a317` is stale; it is **`7328a0b`**, and the
+vendored corpus is **29/29 byte-identical** to it, `diff -r` exit 0 (**C-79-4**).
+
+## Milestone 2 — a gate this environment could actually run, and what it cost
+
+`scripts/core-probe.sh` exited **1**: `/usr/lib/jvm` carried **21 only**, and `:core` pins
+`jvmToolchain(17)`. The apt install the script itself prescribes **succeeded**, and the probe
+then ran (**C-79-5**). This is the recurring provisioning cost the twentieth run first logged,
+paid again — **not** a narrowing of **B-7**, which is about `dl.google.com` and the Android SDK.
+
+Baseline established **before anything was changed**: **`343 tests, 0 failed, 0 skipped, across
+22 classes`, `EXIT=0`** (**C-79-6**) — run 76's number, reproduced here rather than inherited.
+
+## Milestone 3 — the finding
+
+`EnvelopeReceiver.kt:70` reads `if (ciphertext.size > Protocol.MAX_ENVELOPE_BYTES)`, where
+`ciphertext` is the output of `Base64Url.decodeOrNull`. That is **exactly** what §3.1 requires:
+*"the decoded ciphertext ... A receiver measures those decoded bytes, not the length of the JSON
+envelope and not the length of the base64url text."* The code was right.
+
+**Nothing asserted that it was right.** The only oversized fixture in the suite is
+`oversized() = Base64Url.encode(ByteArray(MAX_ENVELOPE_BYTES + 1))`, and the corpus's
+`invalid-oversized` carries `synth_ciphertext_len` **1048577** — both `MAX + 1` **decoded**
+(**C-79-7**). A value one byte over the cap in decoded bytes is *also* over it in base64url
+characters (~1.4 MB) and in JSON envelope length. **All three readings reject it identically.**
+
+The gap is the same shape run 76 found one file over — an assertion that is true for any value
+of the thing it claims to pin — but wider: here it is true for any *unit* and any *number below
+the cap*.
+
+## Milestone 4 — measured, not argued
+
+| | mutation of `EnvelopeReceiver.kt:70` | pre-fix | post-fix |
+| --- | --- | --- | --- |
+| **M1** (**C-79-8**) | `env.ciphertext.length` — the base64url text, the unit §3.1 forbids by name | **GREEN 343/0** | **RED** |
+| **M2** (**C-79-9**) | cap at `MAX * 3 / 4` = **786,432** | **GREEN 343/0** | **RED** |
+| **M3** (**C-79-10**) | size check deleted — **negative control** | **RED, 3 failures** | **RED, 4 failures** |
+
+**M3 is what makes M1 and M2 mean something.** The gate was not untested; deleting it reddens
+three tests. It was tested for **existence**, and for neither **unit** nor **number**.
+
+**M2 is not hypothetical.** §3.1 records that exact value as a bug that shipped on the relay:
+its guard *"compared a character count to a byte budget, which capped the decoded payload at
+786,432 bytes and left the top 256 KiB of the declared range untransmittable."* The phone would
+have accepted the same defect silently.
+
+## Milestone 5 — the fix, and the boundary it places
+
+Three tests in `EnvelopeReceiverTest`, all reading §3.1 at pin `7328a0b`:
+
+- **a ciphertext of exactly the cap is legal and is accepted.** `MUST NOT exceed` makes 1 MiB
+  the largest **legal** ciphertext, not the first illegal one. Sealed for real, so it reaches
+  the crypto it would otherwise be refused before. **This is the discriminating case**: both
+  mutations die here and on nothing else.
+- **one byte past the cap is `too_large`** — by a genuine sealed envelope rather than noise that
+  could never have decrypted. The pair places the boundary **between two adjacent values**,
+  which is the only construction that pins *where* it is rather than *that it exists*.
+- **the maximum legal ciphertext encodes to 1,398,102 base64url characters** — §3.1's own
+  `ceil(4/3 × 1 MiB)`, declared *"normative, not incidental: the relay MUST carry every envelope
+  this section declares legal"* (**C-79-12**). This ties the phone's fixture to the relay's
+  `MAX_CIPHERTEXT_B64U_CHARS` **without the phone importing a relay constant**, and it is the
+  inequality that gives the acceptance case its power.
+
+Plus one KDoc: `MAX_ENVELOPE_BYTES` still read *"Envelope hard limit"* — the P0 wording **S5
+retired**, §3.1 recording that it *"described something neither implementation ever measured."*
+The **name** stays (it is the corpus's: `index.json` carries `max_envelope_bytes`); the KDoc now
+carries the distinction the name cannot. That mattered because **§4.4 instructs a future chunker
+to size against exactly this number**, and a chunker sized against the envelope is wrong by ~33%.
+
+**`:core:test` 343 → 346, 0 failed, 0 skipped, 22 classes, `exit=0`** (**C-79-11**).
+
+## Milestone 6 — the same gap on the engine side, filed rather than fixed
+
+Measured by reading the blobs at the pin (**C-79-14**): `src/Sync/EnvelopeReceiver.cs:45` applies
+the **same correct rule** on decoded bytes, and `SyncHarness` exercises it at
+`invalid-oversized` only (`Program.cs:224`) plus a value pin at line 47 — **`MAX + 1` and
+nothing at `MAX`**, the state the phone was in until this run. §3.1's *"relay/test/relay.test.ts
+pins ... the maximum legal envelope"* covers the **relay**, which is not the engine's receiver.
+
+**Not fixed here, and the reason is specific.** `dotnet` and `pwsh` are absent, so it could not
+be compiled; and adding a `SyncHarness` assertion moves the offline total, which `CLAUDE.md`
+pins in `$ExpectedOfflineTotal` **and** in every doc that reports it, all of which must change
+in one commit. A written-but-uncompiled patch guaranteed to fail the pinned-total check is a
+worse artifact than a precise description of what to write. Filed as **B-23** with the phone-side
+commit named as a template.
+
+## What this run did NOT do
+
+**No android gate ran.** `./gradlew checkCoreIsAndroidFree :core:test :app:assembleDebug
+:app:lintDebug` was **not executed**; four of its five commands need the Android SDK
+(**B-7**, **C-79-5**). `:core:test` is reported throughout as `scripts/core-probe.sh` — **one
+command of the five** — never as a gate result. **No engine gate ran**; `scripts\Verify-Alpha.ps1`
+needs .NET, PowerShell and Windows DPAPI, all absent, and **no offline assertion total appears
+anywhere in run 79**.
+
+**No production behaviour changed.** `EnvelopeReceiver.kt` is **unmodified** (**C-79-13**) — the
+implementation was already correct, which is precisely why §3.1's amendment moved the prose to
+the code rather than the reverse. The diff is one KDoc and two test files.
+
+**No vector byte was written and the pin did not move.** The vendored corpus is byte-identical
+to `7328a0b` after this run's commits as before them (**C-79-4**), so this is **not** a
+cross-repo drift event. **`docs/Sync-Protocol.md` was read, never edited** — the §3.1 rule is
+correct as written and the defect was entirely phone-side test coverage. **No `:app` file was
+written**, so **B-22** was neither observed nor sampled, and it was **not** worked around by
+skipping or `@Ignore`-ing a test. **No rung moved**, and none is claimed to have. **B-19
+unmoved.** **Nothing was merged in either repository**, no branch was deleted, no history was
+rewritten, nothing was force-pushed, no deploy of any kind was made, the production relay was
+not contacted at all, and no scheduled task was enumerated, created, modified or deleted.
+
+## Postscript — the cwd hazard recurred, mid-run, and it is written down rather than tidied away
+
+The shell's working directory reset **from this repository to the engine checkout** partway
+through the records phase, so two appends written as `cat >> LOG.md` and `cat >> BLOCKED.md`
+landed **in `ShivaClaw/careerseeker` as untracked new files** (**C-79-16**). Caught by a `wc -c`
+on the file that was supposed to have grown: `LOG.md` read **9,362 bytes** where it should have
+read ~988,000.
+
+Nothing was corrupted — the engine repo carries neither filename, so both strays were untracked
+and overwrote nothing. Content moved to the correct files with absolute paths, strays deleted,
+engine `git status` clean.
+
+**This is the same hazard run 75 hit, and the one `C-77-9` explicitly flagged as load-bearing.**
+It recurred with a *different destination*, which is the part worth passing on: run 77's citation
+guard catches a citation whose referent was never written, and catches **nothing** when the write
+lands somewhere real and silent. `scripts/check-citations.sh` was run on the repaired records and
+is green — **732 definitions, 733 cited, 0 dangling** (**C-79-15**) — but it is green because the
+repair worked, not because it would have caught the mistake. **Every path in this run's record
+appends after the incident is absolute.**
