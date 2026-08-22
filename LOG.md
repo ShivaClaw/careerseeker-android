@@ -14944,3 +14944,32 @@ step 10 as `in_progress` for what looked like 20+ minutes — the shape of the d
 CI hang (`f49290e`, *"93s baseline vs 25+ min"*). **It was not a hang**: the step had finished in
 92 seconds and the API's `steps` array was stale. **Compare `started_at`/`completed_at`; do not
 trust a polled `status` on a running job.**
+
+## Correction to the addendum — the run on `8264275` was cancelled, and this session cancelled it
+
+**C-79-17 said step 11 had not reported and claimed no conclusion. Both were true when read and
+are now superseded** (**C-79-18**). The completed record for `8264275` shows **step 11 Assemble
+`success`** (finished 05:31:10), **step 12 Lint `cancelled`**, 13/14 `skipped`, **job
+`cancelled`** at 05:31:33.
+
+**Nothing failed.** Pushing `c5bcf83` — the commit that recorded C-79-17 — superseded the
+in-flight run under the workflow's concurrency group, and replacement run `32554560261` started
+on `c5bcf83` at 05:31:36. **The cancelled Lint step is an artifact of that push, not a lint
+failure**, and reading it as a red gate would be wrong.
+
+**On `c5bcf83`, steps 1–10 are `success`** — citation guard, `:core` android-free, vendored-vector
+drift check, **`:core` in 57s**, **`:app` Robolectric in 113s**. Steps 11–14 had not reported when
+this session stopped polling; **no conclusion is claimed for that head either**.
+
+**The standing fact worth keeping:** this lane has now self-cancelled three times (`944d199`,
+`0ffe3b5`, here). **A records commit pushed after a code commit cancels the code commit's own CI
+run**, so **the conclusion on this branch's final head is unobserved by this session by
+construction** — any push recording it would supersede the run being recorded. Run 56 already
+settled how to write about this (`878a203`: *"name the PR, not a run ID — each push supersedes
+the last CI run"*), which is why these entries cite head SHAs and reported steps rather than
+promising a verdict.
+
+**And a second-order lesson that cost this run real time:** the job API served a **stale `steps`
+array for many minutes** on both runs, once long enough to resemble the documented CI hang
+(`f49290e`). **Compare step `started_at`/`completed_at`; treat a polled `status` as a lower bound
+on progress, never as current.**

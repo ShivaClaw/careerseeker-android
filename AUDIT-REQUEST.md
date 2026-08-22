@@ -14567,3 +14567,44 @@ minutes, which matches the shape of the documented android CI hang (`f49290e`, *
 array was serving stale data. **The step timestamps are the reliable field; the live `status` on
 a polled job is not.** Anyone re-running the command above should compare
 `started_at`/`completed_at` rather than trusting a polled `in_progress`.
+
+### C-79-18 — correcting C-79-17: the run on `8264275` was CANCELLED, and this session cancelled it
+
+```bash
+#   actions_get(get_workflow_job, ShivaClaw/careerseeker-android, 96985875445)  # head 8264275
+#   actions_get(get_workflow_job, ShivaClaw/careerseeker-android, 96986622332)  # head c5bcf83
+```
+
+**C-79-17 recorded step 11 as "in_progress at close of slice" and no job conclusion. Both
+statements were true when read and are now superseded.** The completed job record for
+`8264275` shows:
+
+- **step 11 Assemble debug APK — `success`**, 05:29:39 → **05:31:10**. It had in fact finished.
+- **step 12 Lint — `cancelled`**, 05:31:10 → 05:31:28; steps 13/14 **`skipped`**.
+- **job conclusion: `cancelled`** at 05:31:33.
+
+**Nothing failed.** The cancellation is **this session's own doing**: pushing `c5bcf83` (the
+C-79-17 records commit) at 05:31 superseded the in-flight run under the workflow's concurrency
+group, and the replacement run **`32554560261`** started at **05:31:36** on `c5bcf83`. So the
+cancelled Lint step is an artifact of the push, **not a lint failure**, and reading that
+`cancelled` as a red gate would be wrong.
+
+**On the replacement head `c5bcf83`, steps 1–10 are `success`** — citation guard (step 6),
+`:core` android-free (7), vendored-vector drift check (8), **`:core` unit tests in 57s** (9), and
+**`:app` Robolectric in 113s** (10). **Steps 11–14 had not reported when this session stopped
+polling, and no job conclusion is claimed for that head either.**
+
+**The standing fact, which is the part worth keeping.** This lane has now hit self-cancellation
+three times (`944d199`, `0ffe3b5`, and here). **A records commit pushed after a code commit
+cancels the code commit's own CI run.** Run 56 already resolved how to write about it —
+`878a203`, *"name the PR, not a run ID: each push supersedes the last CI run"* — and that rule
+is why this entry cites **head SHAs and reported steps** rather than promising a conclusion.
+**The conclusion on this branch's final head is unobserved by this session by construction**:
+any push that recorded it would supersede the run it was recording.
+
+**Second-order note on the API, since it cost this session real time.** The job endpoint served
+a **stale `steps` array for many minutes** on both runs — reporting `in_progress` for steps that
+had already completed, once for long enough to resemble the documented android CI hang
+(`f49290e`). `updated_at` on the run object was likewise frozen. **Compare
+`started_at`/`completed_at` on individual steps, and treat a polled `status` as a lower bound on
+progress, never as current.**
