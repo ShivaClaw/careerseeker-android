@@ -14780,3 +14780,263 @@ prevents a cloud session from making, and it is CI's, not this session's.
 **No conclusion is claimed for `4dfdfac` itself** — its run was in flight when this session
 stopped, and by the rule in **C-79-20** recording it would have superseded it. The tree equality
 above is what makes that acceptable rather than a gap.
+
+---
+
+## Run 80 — 2026-08-22 (Linux cloud sandbox). B-22's cause, corrected and fixed
+
+### C-80-1 — rule one, and every count below taken after it
+
+```bash
+cd <android> && git fetch --all --prune
+cd <engine>  && git fetch --all --prune
+```
+
+*Observed:* the android checkout arrived **detached at the docs-only `main` `ebfaf81`**, not on the
+work branch — the same start state runs 76 and 79 recorded, so it is the image, not an accident.
+`origin/claude/android-a0-probe` fetched to **`cd915ca`** (run 79's final head), **300 commits ahead
+of `main`**. Engine fetched clean. Nothing in this run was branched, compared or counted before
+these two commands.
+
+### C-80-2 — B-18's two triggers, measured live rather than carried forward
+
+```bash
+cd <engine> && git rev-parse --short origin/main
+git log --format='%h|%an|%ad|%s' --date=short -40 origin/main | grep -vi claude | head -3
+# then, live, not from a local ref:
+#   list_pull_requests ShivaClaw/careerseeker        state=all
+#   list_pull_requests ShivaClaw/careerseeker-android state=all
+```
+
+*Expected, and **observed**:*
+
+| trigger | measured | fires? |
+| --- | --- | --- |
+| **movement in the blocking state** — a merge, close, undraft, or human commit in either repo | engine `main` **`aac05f3`**, unmoved since **2026-08-12**; last non-Claude commit **2026-08-12**; **18 engine + 6 android** PRs open, **all 24 `draft: true`**; newest merge anywhere **PR #44, 2026-08-13** | **no** |
+| **something needing an action before return day** | return day (**2026-08-18**) is **four days** past; this run's output is a corrected diagnosis and a test-only fix | **no** |
+
+**So: nothing sent, for the seventh consecutive run.** Attempt 10 (run 73) reached Brandon's phone
+and inbox and is unanswered; nothing in the world state has changed since. **The criterion still
+inverts on a new fact, immediately.** **B-18 stays open.**
+
+### C-80-3 — the assigned slice, re-verified in the blobs. Forty-fifth firing
+
+The stored prompt again assigns S5's spec half and again states the pin as `679a317` and S5 as
+"NOT STARTED". Both are wrong, and this is the check the prompt itself asks for by name:
+
+```bash
+cd <engine> && git worktree add --detach /tmp/pinwt 7328a0bc043335491cd96a67d634e8eea2a13af9
+cd /tmp/pinwt && node docs/sync-vectors/generate.mjs --check
+diff -r docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1
+grep -n product_id docs/Sync-Protocol.md | head -2
+grep -n decrypt_failed docs/Sync-Protocol.md | head -3
+ls docs/sync-vectors/v1/ | grep unknown-field
+```
+
+*Expected, and **observed**:*
+
+- `OK: 29 vector files match the generator.` **`EXIT=0`** — passing **because the work is already
+  done**.
+- `diff -r` **exit 0**, **29/29** byte-identical. Pin is **`7328a0b`**, per `VECTORS.lock`.
+- **PQ-A6-1** closed: the `{product_id, acknowledged_at, order_id?}` body at **§4.3.3, line 318**,
+  and named in the change table at line 658.
+- **PQ-A2-1** closed: the cap on the **decoded ciphertext**, line 656 (and the §3.1 discussion at
+  line 146).
+- **PQ-A2-2** closed: *"**Also every structural rejection**"* under `decrypt_failed` at **line 601**.
+- **PQ-A2-3** closed: `invalid-unknown-field.json` present at the pin.
+
+### C-80-4 — the mechanism: every initial `collectAsState` value renders a DIFFERENT tree
+
+```bash
+cd <android>
+sed -n '47,52p' app/src/main/kotlin/app/careerseeker/dashboard/ui/DashboardApp.kt
+sed -n '70,74p' app/src/main/kotlin/app/careerseeker/dashboard/ui/HomeScreen.kt
+sed -n '44,46p' app/src/main/kotlin/app/careerseeker/dashboard/ui/ApplicationsScreen.kt
+sed -n '42,43p' app/src/main/kotlin/app/careerseeker/dashboard/ui/ApplicationDetailScreen.kt
+```
+
+*Expected, and **observed**:* `DashboardApp.kt:47-51` reads all five replica queries with
+`collectAsState`, four of them `initial = null` or `emptyList()`. And each initial value renders a
+tree **without** the node the tests look for:
+
+| seam | first-frame text | the node the test wants |
+| --- | --- | --- |
+| `StatusBanner(syncState = null)` — `HomeScreen.kt:72` | **"Not paired — no data yet"** | `"Demo data — not a live engine"` |
+| `ApplicationsScreen(applications = emptyList())` — `:44` | **"No applications in the replica yet."** | `"Senior Platform Engineer"` |
+| `ApplicationDetailScreen(application = null)` — `:42` | early return | `"Documents (read-only)"` |
+
+The demo label is not a slow-arriving version of the first frame — **it is a different string**, and
+it exists only after Room's query executor has delivered a row and a recomposition has landed.
+
+### C-80-5 — B-22's stated cause is wrong: the line that failed most recently has no click before it
+
+```bash
+cd <android> && git show cd915ca:app/src/test/kotlin/app/careerseeker/dashboard/ui/ScreensFromFixtureTest.kt | sed -n '60,75p'
+```
+
+*Expected, and **observed**:* line **69** — `compose.onNodeWithText(label).assertIsDisplayed()` — is
+the **first statement after `setContent`**, above the `for` loop, with **no `performClick()` anywhere
+before it**. B-22 says *"Both failing assertions are `assertIsDisplayed()` called **immediately after**
+a `performClick()` that navigates."* That is true of line 87 and **false of line 69**, and line 69 is
+the line that failed in **two of the three** recorded occurrences (`0c4ca8f`, `73238fc`).
+
+### C-80-6 — the failures partition exactly along the Flow seam: 2 tests carry all of them, 6 carry none
+
+```bash
+cd <android> && grep -n "    fun " app/src/test/kotlin/app/careerseeker/dashboard/ui/ScreensFromFixtureTest.kt
+```
+
+*Expected, and **observed**:* **8 `@Test` methods**, and exactly **two** of them render the shell.
+
+| test | how it gets its data | recorded failures |
+| --- | --- | --- |
+| `theProvenanceBannerIsShownOnEveryTab` | `DashboardApp(db)` → Room `Flow`s | **2** (`0c4ca8f` line 69, `73238fc` line 69) |
+| `theBannerFollowsIntoTheApplicationDetailOverlay` | `DashboardApp(db)` → Room `Flow`s | **1** (`592afa4` line 87) |
+| `homeRendersCounters` | `countersNow()` / `syncStateNow()`, passed in | 0 |
+| `applicationsRendersRowsAndStateBadges` | `applicationsNow()`, passed in | 0 |
+| `applicationDetailRendersAllThreeDocumentsReadOnly` | `applicationsNow()` / `documentsNow()` | 0 |
+| `jobsRendersHonestyBadges` | `jobsNow()`, passed in | 0 |
+| `evidenceRendersTrailAndEngineVerifiedBadge` | `evidenceEventsNow()`, passed in | 0 |
+| `evidenceSaysUnknownWhenNoVerdictReported` | literal `emptyList()` / `null`, no DB at all | 0 |
+
+**All three failures are in the two tests that render `DashboardApp`; none of the six that pass a
+value straight into a screen has ever failed.** The six are `suspend` `*Now()` reads inside
+`runBlocking` (or, in the last case, no read at all), so their data is complete **before**
+`setContent` is called — they never cross the seam. That is the partition the Flow hypothesis
+predicts; the click hypothesis predicts nothing about it, and cannot explain line 69 at all.
+
+### C-80-7 — why B-22's prescribed `waitForIdle()` patch would not have fixed either failure
+
+*Expected, and **observed** — this one is an argument from the API contract plus the recorded data,
+and it was **not executed**, because `:app` cannot run here (**C-80-9**):*
+
+Compose UI test synchronizes with the compose clock **automatically, before every node interaction**
+— `assertIsDisplayed()` fetches its semantics node through the test owner, which idles first. So an
+explicit `compose.waitForIdle()` placed immediately before one of these assertions is the same
+synchronization, called twice.
+
+**The tests flake in spite of that synchronization already being in force.** Therefore the
+unsynchronized source is *outside* the compose clock. In this test the only asynchronous source is
+Room's query executor delivering the first row of a `Flow` — which Compose's idling registry does not
+observe. **A second `waitForIdle()` cannot cover it.** That is why the fix polls the condition
+(`waitUntil` on the node's arrival) rather than the clock.
+
+### C-80-8 — the fix, and what was actually verified about it locally
+
+```bash
+cd <android> && git diff cd915ca..30908de --stat
+SP=/tmp/scratch
+for a in kotlin-compiler-embeddable kotlin-stdlib kotlin-script-runtime kotlin-reflect; do
+  curl -sSLo "$SP/v24-$a.jar" "https://repo1.maven.org/maven2/org/jetbrains/kotlin/$a/2.4.10/$a-2.4.10.jar"; done
+CP="$SP/v24-kotlin-compiler-embeddable.jar:$SP/v24-kotlin-stdlib.jar:$SP/v24-kotlin-script-runtime.jar:$SP/v24-kotlin-reflect.jar:$SP/annotations.jar:$SP/coroutines.jar:$SP/trove.jar"
+java -cp "$CP" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -nowarn -no-stdlib -d "$SP/out" \
+  app/src/test/kotlin/app/careerseeker/dashboard/ui/ScreensFromFixtureTest.kt
+# and the control, on the unmodified file:
+git show cd915ca:app/src/test/kotlin/.../ScreensFromFixtureTest.kt > "$SP/Baseline.kt" && <same command>
+```
+
+*Expected, and **observed**:* **one file changed, test-only**; six `awaitText(...)` call sites, one
+private helper, one import. Diagnostics under the repo's **own pinned Kotlin 2.4.10**:
+
+| | unresolved refs | built-in access | for-loop | annotation | **parse errors** |
+| --- | --- | --- | --- | --- | --- |
+| baseline (`cd915ca`) | 71 | 3 | 1 | 1 | **0** |
+| modified (`30908de`) | 72 | 11 | 1 | 1 | **0** |
+
+**Zero parse errors on both**, and `grep -in "expecting\|syntax\|unexpected token"` returns nothing.
+Every remaining diagnostic is the missing classpath: no androidx, no JUnit, and `-no-stdlib`.
+
+**What this does NOT establish, stated because it is easy to overclaim.** A `comm` of the two
+unresolved-symbol sets is empty, which looks like *"the change introduces no new unresolved
+symbol"*. **It is not evidence of that.** `compose` is itself unresolved at baseline, so the
+compiler suppresses cascading diagnostics on `compose.onAllNodesWithText(...)`,
+`compose.waitUntil(...)` and `.fetchSemanticsNodes()` — they are never independently reported. **The
+three androidx calls are unverified locally.** `waitUntil(timeoutMillis, condition)`,
+`onAllNodesWithText` and `fetchSemanticsNodes()` are long-stable `ui-test` API, but that is a
+reading, not a measurement. **Their resolution is CI's** (**C-80-10**).
+
+### C-80-9 — B-7 reproduced, and the one new fact about its shape
+
+```bash
+curl -sS -o /dev/null -m 20 -w "%{http_code}\n" https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-test-junit4/maven-metadata.xml
+curl -sS -o /dev/null -w "%{http_code}\n" https://repo1.maven.org/maven2/androidx/compose/ui/ui-test-junit4/maven-metadata.xml
+which dotnet pwsh; echo "ANDROID_HOME=$ANDROID_HOME"
+```
+
+*Expected, and **observed**:* `dl.google.com` **`000`** (denied, unchanged), `repo1.maven.org`
+**`404`**. `dotnet`, `pwsh` absent; `ANDROID_HOME` empty. **The new detail:** androidx is not
+mirrored to Maven Central, so the `core-probe.sh` trick — build the Central-only subset — has **no
+analogue for `:app`**. `:app` is not blocked by a missing SDK alone; its test dependencies are
+unreachable from this network at all. **CI is not a convenience for `:app`, it is the only gate that
+exists.**
+
+### C-80-10 — CI on this run's code head: CONCLUDED green, all 14 steps, attempt 1
+
+```
+get_workflow_job ShivaClaw/careerseeker-android 97010096375
+# or: https://github.com/ShivaClaw/careerseeker-android/actions/runs/32564115588
+```
+
+*Expected, and **observed**:* run **[32564115588](https://github.com/ShivaClaw/careerseeker-android/actions/runs/32564115588)**,
+job **97010096375**, head **`30908de`**, **attempt 1**, **`conclusion: success`**, **all 14 steps
+`success`**:
+
+| # | step | |
+| --- | --- | --- |
+| 6 | citation guard | success |
+| 7 | `:core` has no Android dependency | 88s |
+| 8 | vendored vectors match the pinned commit | 9s |
+| 9 | Unit tests (`:core`) | 56s |
+| **10** | **Unit tests (`:app`, Robolectric)** | **93s** |
+| 11 | Assemble debug APK | 95s |
+| 12 | Lint | 44s |
+| 13 | no analytics or tracking SDKs ship | 2s |
+| 14 | Upload debug APK | 4s |
+
+**Step 10 is what this run needed and the only thing it proves is the pair of facts it states:** the
+three androidx calls **resolve**, and the suite **passes on this tree**. **No re-run was triggered**
+— this is attempt 1, and the single permitted re-run remains unspent.
+
+**What it does NOT prove, and the entry says so in the same breath.** B-22 is a *frequency* claim,
+and **one green run cannot refute one** — that is the blocker's own central argument, and it applies
+to its fix exactly as it applies to every other green in these records. **B-22 stays OPEN and
+NARROWED.** CI also prints no totals, so no test count is claimed here. The closing evidence is
+B-22's own: `:app:testDebugUnitTest --rerun-tasks` twenty times, 20/20, on a machine with the SDK.
+
+**Read against the right baseline:** `cd915ca`, the tree this run started from, is itself a **green**
+sample (**C-80-11**). So step 10 going green is *consistent with* the fix working and *equally
+consistent with* the ~89% of runs that were always going to be green. The argument for the fix is
+structural (**C-80-4**/**C-80-7**), not statistical, and it should be attacked there.
+
+### C-80-11 — a fifth `:app` sample, from run 79's own final head
+
+```
+list_workflow_runs ci.yml branch=claude/android-a0-probe
+```
+
+*Expected, and **observed**:* run **220** (`32555907567`), head **`cd915ca`**, **`conclusion:
+success`** — a head run 79 pushed and, by its own rule, could not observe. So B-22's tally across the
+heads this lane has produced is now **3 failures in 28 completed runs**, not 3 in 27. The rate did
+not move materially; the point of recording it is that **`cd915ca` is a green sample on the tree this
+run started from**, which is the correct baseline for reading C-80-10.
+
+### C-80-12 — the citation guard on this run's records
+
+```bash
+cd <android> && scripts/check-citations.sh
+```
+
+*Expected, and **observed**:* **`definitions: 751   cited: 752   documented-absent: 1`**,
+`OK: every cited C-/B- id resolves to an entry that exists.`, **`EXIT=0`** — run **after** this
+run's four record appends, not before. CI re-runs it as step 6 and it passed there too
+(**C-80-10**).
+
+**Read it for what it checks.** It proves every `C-`/`B-` id this run cites has an entry. It does
+**not** prove the appends landed in the right repository — the hazard of **C-79-16**, where a
+record write went to the engine checkout and both the claim and its definition travelled together,
+leaving the guard consistent and wrong. This run defended against that differently: every append
+used an **absolute** path, and `wc -c` was taken on all three files before and after
+(`AUDIT-REQUEST.md` 769,468 → 783,328; `LOG.md` 999,534 → 1,010,687; `BLOCKED.md` 264,358 →
+272,015). The hazard did announce itself twice — the shell's working directory reset to
+`/home/user` after two commands — and cost nothing, because nothing relied on a relative path
+outliving its `cd`.

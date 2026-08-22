@@ -15069,3 +15069,168 @@ measurement**; this adds a conclusion, not a count.
 **No conclusion is claimed for `4dfdfac` itself.** Its run was in flight when this session
 stopped, and by the rule in **C-79-20** recording it would have superseded it. The tree equality
 is what makes that a closed gap rather than an open one.
+
+---
+
+# Run 80 — 2026-08-22 (Linux cloud sandbox)
+
+## B-22's diagnosis named the wrong seam, and the patch it prescribed would not have worked
+
+**The slice: the top row of the open-blocker table, taken because four runs had declined it for a
+reason that turned out to be half wrong.**
+
+B-22 is the blocker that costs the most per run without anyone touching it. Under **B-7** no cloud
+session can run the android gate locally, so **every** `:app` claim in these records — `assembleDebug`,
+`lintDebug`, `:app:test`, `checkCoreIsAndroidFree` — is read out of a CI runner log. A
+nondeterministic `:app:test` makes each of those one sample. Runs 76, 77, 78 and 79 each re-read
+B-22 and each declined it with the same sentence: the fix is an `:app` file and `:app` needs the
+SDK.
+
+**That reason is true about compiling and false about verifying.** `:app`'s gate of record in this
+program *is* CI — B-7 says so in its own text, *"CI remains the gate, not a checkbox"* — and CI
+compiles `:app` on every push. B-22's "smallest human unblock" says *"on the Windows box (or any
+machine with the SDK)"* and overlooked that the program already has one, running on every commit.
+**So the blocker did not need a human. It needed a push.**
+
+## Milestone 1 — rule one, and the state re-derived rather than carried forward
+
+`git fetch --all --prune` in **both** checkouts first (**C-80-1**). The android tree again arrived
+**detached at the docs-only `main` `ebfaf81`**, three runs running — the image, not an accident.
+Every count below is post-fetch.
+
+**Nothing has moved** (**C-80-2**): engine `origin/main` **`aac05f3`**, unmoved since **2026-08-12**;
+last non-Claude commit **2026-08-12**; **18 engine + 6 android** PRs read **live**, all **24 open and
+`draft: true`**; newest merge anywhere **PR #44, 2026-08-13** — nine days, four of them past return
+day. Terra's `autonomy/codex-state` reports **COMPLETE, files claimed: none** — no collision.
+
+**The assigned slice fired for the forty-fifth time and was verified, not rebuilt** (**C-80-3**).
+`node docs/sync-vectors/generate.mjs --check` at the pin → **`OK: 29 vector files match the
+generator.`, `EXIT=0`** — the command the prompt asks for by name, passing because the work landed on
+**2026-08-09**. PQ-A6-1's body is at **§4.3.3 line 318**, PQ-A2-1's ciphertext cap at **line 656**,
+PQ-A2-2's *"also every structural rejection"* at **line 601**, PQ-A2-3's `invalid-unknown-field.json`
+present. Pin is **`7328a0b`**, not the prompt's `679a317`; corpus **29/29**, `diff -r` **exit 0**.
+
+## Milestone 2 — the mechanism, and it is not the one B-22 wrote down
+
+`DashboardApp` reads all five replica queries with `collectAsState`, and **each initial value renders
+a different tree than the one the tests look for** (**C-80-4**):
+
+| seam | first frame | what the test wants |
+| --- | --- | --- |
+| `StatusBanner(null)` — `HomeScreen.kt:72` | **"Not paired — no data yet"** | `"Demo data — not a live engine"` |
+| `ApplicationsScreen(emptyList())` — `:44` | **"No applications in the replica yet."** | `"Senior Platform Engineer"` |
+| `ApplicationDetailScreen(null)` — `:42` | early return | `"Documents (read-only)"` |
+
+The demo label is not a late-arriving version of the first frame. **It is a different string**, and
+it exists only after Room's query executor has delivered a row and a recomposition has landed.
+
+**Three checks that the click hypothesis fails and this one passes.**
+
+**One — line 69 has no click before it** (**C-80-5**). B-22 states *"Both failing assertions are
+`assertIsDisplayed()` called **immediately after** a `performClick()` that navigates."* Line 69 is
+the **first statement after `setContent`**, above the loop. It is also the line that failed in **two
+of the three** recorded occurrences. The stated cause cannot account for the majority of the data it
+was written from.
+
+**Two — the failures partition exactly along the seam** (**C-80-6**). The class has **8** tests.
+**Two** render `DashboardApp` and carry **all three** failures; the other **six** pass a `suspend`
+`*Now()` read straight into a screen, complete before `setContent`, and have **never** failed. The
+click hypothesis predicts nothing about this split.
+
+**Three — the prescribed patch is a no-op in those positions** (**C-80-7**). Compose UI test
+synchronizes with the compose clock automatically before **every** node interaction, so an explicit
+`waitForIdle()` immediately before one of these assertions is that same synchronization called
+twice. **The tests flake in spite of it already being in force** — therefore the unsynchronized
+source is outside the compose clock, and Room's query executor is the only asynchronous source in
+the test. `waitForIdle()` cannot cover it. **B-22's own fix, applied as written, would have left all
+three failures reachable.**
+
+## Milestone 3 — the fix: wait on the condition, not on the clock
+
+`awaitText(text)` polls for the node's arrival with `waitUntil(timeoutMillis = 5_000)`, at the **six**
+sites in the two `DashboardApp` tests where an interaction depends on Room-delivered content — the
+three that have failed and the three that have not yet (**C-80-8**). Test-only diff, one file.
+
+**Nothing was weakened.** Every existing `assertIsDisplayed()` still runs, unchanged; `awaitText`
+gates on presence and the assertion still decides. **No test was skipped, `@Ignore`d, quarantined or
+retried** — the provenance banner is the honest-UI rule and is the last assertion this program should
+let go quiet. **No production file was touched**, and none needed to be: rendering
+*"Not paired — no data yet"* on the first frame is honest; the defect was entirely in the test's
+synchronization.
+
+**A second effect worth naming:** a `waitUntil` that never satisfies fails with a
+`ComposeTimeoutException` naming the string it waited for, where the old code fails with
+`AssertionError` on a node that "isn't displayed". **The next occurrence, if there is one, will say
+what it was waiting for.**
+
+## Milestone 4 — what was verified here, and what was not
+
+**Verified locally** (**C-80-8**): **zero parse errors** under the repo's own pinned **Kotlin
+2.4.10**, with the unmodified file as a control — baseline 71/3/1/1 diagnostics and **0** parse
+errors, modified 72/11/1/1 and **0** parse errors, every remaining one attributable to the absent
+classpath.
+
+**Not verified locally, and stated because it would be easy to overclaim.** An empty `comm` of the
+two unresolved-symbol sets looks like proof that the change adds no new unresolved symbol. **It is
+not.** `compose` is unresolved at baseline, so cascading diagnostics on `compose.waitUntil(...)`,
+`compose.onAllNodesWithText(...)` and `.fetchSemanticsNodes()` are **suppressed** — those three calls
+are never independently reported. They are long-stable `ui-test` API, but that is a reading.
+
+**B-7 reproduced, with one new fact about its shape** (**C-80-9**): `dl.google.com` **`000`**,
+`dotnet`/`pwsh` absent, `ANDROID_HOME` empty — and **androidx is not mirrored to Maven Central**
+(`repo1.maven.org` → **404**). So `core-probe.sh`'s trick, building the Central-only subset, **has no
+analogue for `:app`**: its test dependencies are unreachable from this network at all, not merely
+un-SDK'd. That is the precise reason CI is not a convenience for `:app` but the only gate that exists.
+
+## Milestone 5 — CI, read as one sample and labelled as one
+
+**The android gate CONCLUDED green on this run's code** (**C-80-10**): run
+[32564115588](https://github.com/ShivaClaw/careerseeker-android/actions/runs/32564115588), job
+`97010096375`, head **`30908de`**, **attempt 1**, **`conclusion: success`, all 14 steps** — citation
+guard, `:core` android-free 88s, vendored-vector drift 9s, **`:core` 56s**, **`:app` Robolectric
+93s**, Assemble 95s, Lint 44s, the analytics assertion and the APK upload. **No re-run was
+triggered**; the single permitted re-run is unspent.
+
+**Step 10 proves exactly two things:** the three androidx calls **resolve**, and the suite **passes
+on this tree**. That is what a cloud session needed and could not get any other way.
+
+**It proves nothing about the flake rate, and this entry will not pretend otherwise.** B-22 is *3
+failures in 28 completed runs*; **a frequency claim is not refuted by one green run**. It is also the
+wrong baseline to read triumphantly: `cd915ca`, the tree this run started from, is itself a **green**
+sample (**C-80-11**, run 220, a head run 79 pushed and by its own rule could not observe). A green
+here is consistent with the fix working **and** with the ~89% of runs that were always going to be
+green. **The argument for the fix is structural, and it should be attacked there** — at C-80-4 and
+C-80-7, not at this run number.
+
+**This run also obeyed C-79-20's rule and it cost nothing:** observe, then write, then push. CI was
+polled to conclusion **before** a single record byte was appended, so no records push superseded the
+run being recorded. The API served a stale `steps` array twice — steps reported `in_progress` after
+their own `completed_at` had passed — exactly as **C-79-18** warned; comparing timestamps rather than
+trusting `status` is what made the wait short instead of alarming.
+
+## What this run did NOT do
+
+**No android gate ran here.** `./gradlew checkCoreIsAndroidFree :core:test :app:assembleDebug
+:app:lintDebug` was **not executed** in this session; every `:app` result in this entry is CI's
+(**C-80-9**). **No engine gate ran** — `scripts\Verify-Alpha.ps1` needs .NET, PowerShell and Windows
+DPAPI, all absent — and **no offline assertion total appears anywhere in run 80**;
+`$ExpectedOfflineTotal` was not touched, so this run adds **no** landing cost to the pin family
+(**B-17**).
+
+**No production file was written, in either repo.** The diff is one `:app` **test** file. **No
+`:core` file**, so no `core-probe.sh` measurement is reported and none is claimed. **No vector byte
+was written and the pin did not move** — the corpus is byte-identical to `7328a0b` before and after
+(**C-80-3**), so this is **not** a cross-repo drift event. **`docs/Sync-Protocol.md` was read at the
+pin and never edited.** **No C#, no `generate.mjs` change, no `ci.yml` change.**
+
+**No rung moved**, and none is claimed to have. **B-19**, **B-4**, **B-5**, **B-14**, **B-15**,
+**B-16**, **B-23** were neither acted on nor re-attempted. **Nothing was merged, closed, undrafted,
+force-pushed or deleted in either repository**; no history was rewritten; **no deploy of any kind**;
+the production relay was **not contacted at all**, not even `GET /v1/health`; no Play, Google or
+OAuth console; no accounts, no purchases, no Gmail, no secrets read or printed, no `.appdata`; no
+scheduled task was enumerated, created, modified or deleted. **Terra's worktrees and
+`Documents\CareerSeeker` were never touched.**
+
+**Every path in this run's record appends is absolute**, per **C-79-16**. The hazard announced itself
+twice this run — the shell's working directory reset to `/home/user` after two commands — and was
+survived both times because nothing relied on a relative path outliving its `cd`.

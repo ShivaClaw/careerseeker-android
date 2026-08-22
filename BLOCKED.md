@@ -3992,3 +3992,110 @@ experiment destroyed the experiment.**
 between the navigating `performClick()` and the assertion on line 69, with the sibling
 provenance-banner test audited for the same shape. **B-22 stays OPEN**; this run neither narrowed
 nor worked around it, wrote no `:app` file, and skipped, `@Ignore`d and quarantined nothing.
+
+---
+
+## Run 80 — 2026-08-22. B-22 CORRECTED and fixed; B-18's forty-fifth firing
+
+### B-22 DIAGNOSIS CORRECTED and FIX PUSHED — 2026-08-22 (eightieth run)
+
+**The blocker's facts were right. Its cause and its prescribed patch were both wrong, and its
+"smallest human unblock" asked for a machine the program already has.**
+
+**What was wrong — three things, each measured.**
+
+1. **The stated cause does not fit the data** (**C-80-5**). B-22 says *"Both failing assertions are
+   `assertIsDisplayed()` called **immediately after** a `performClick()` that navigates."*
+   `ScreensFromFixtureTest.kt:69` is the **first statement after `setContent`**, with no click
+   anywhere before it — and it is the line that failed in **two of the three** recorded occurrences.
+
+2. **The prescribed patch would not have fixed either failure** (**C-80-7**). Compose UI test
+   synchronizes with the compose clock automatically before **every** node interaction, so an
+   explicit `waitForIdle()` in those positions is the same synchronization called twice. **The tests
+   flake in spite of it already being in force**, which is precisely the proof that the
+   unsynchronized source lies outside the compose clock.
+
+3. **The unblock did not need a human.** B-22 asked for *"the Windows box (or any machine with the
+   SDK)"*. CI **is** such a machine and runs on every push; **B-7**'s own text names CI as `:app`'s
+   gate of record. Four runs declined this blocker on the strength of "the fix is an `:app` file",
+   which is a statement about compiling, not about verifying.
+
+**The actual cause.** `DashboardApp` reads all five replica queries with `collectAsState`, and each
+initial value renders a **different tree** than the one the tests look for (**C-80-4**):
+`StatusBanner(null)` prints *"Not paired — no data yet"* rather than the demo label
+(`HomeScreen.kt:72`); `ApplicationsScreen` prints *"No applications in the replica yet."* while its
+list is empty (`:44`); `ApplicationDetailScreen` returns early while its application is null
+(`:42`). The nodes exist only after Room's **query executor** — which Compose's idling registry does
+not observe — has delivered a row and a recomposition has landed.
+
+**The partition confirms it** (**C-80-6**): of the class's **8** tests, the **2** that render
+`DashboardApp` carry **all three** failures; the **6** that pass a `suspend` `*Now()` read straight
+into a screen, complete before `setContent`, have **never** failed.
+
+**The fix** (**C-80-8**), pushed as `30908de`: `awaitText(text)` polls the node's arrival with
+`waitUntil(timeoutMillis = 5_000)` at the **six** sites in those two tests that depend on
+Room-delivered content — the three that have failed and the three that have not yet. Test-only diff,
+one file, **no production file touched**. **No assertion was weakened, skipped, `@Ignore`d,
+quarantined or retried**, per this entry's own standing prohibition; every `assertIsDisplayed()`
+still runs and still decides.
+
+**Why this stays OPEN rather than CLOSED, and what would close it.** The change removes the race
+**by construction**, and that argument does not depend on a sample. But B-22 is a *frequency* claim
+(3 in 28 completed runs, ~11%), and **a frequency claim is not refuted by one green run** — that is
+the blocker's own central point, and it applies to its fix. **Status: NARROWED — cause corrected,
+fix landed and CI-verified once.** The closing evidence is the one B-22 already names and no cloud
+session can produce: `./gradlew :app:testDebugUnitTest --rerun-tasks` **twenty times, 20/20**, on a
+machine with the SDK. Until then every `:app` green in these records stays one sample.
+
+**Two qualifications on the fix itself.**
+
+- The three androidx calls (`waitUntil`, `onAllNodesWithText`, `fetchSemanticsNodes`) were **not
+  resolved locally**. The local check is a **parse** at the repo's pinned Kotlin 2.4.10 — 0 parse
+  errors against a 0-parse-error control — and an empty `comm` of unresolved-symbol sets is **not**
+  evidence of anything, because cascading diagnostics on an already-unresolved receiver are
+  suppressed (**C-80-8**). Their resolution is CI's.
+- `waitUntil` changes the failure mode as well as the frequency: a future occurrence fails with
+  `ComposeTimeoutException` naming the string it waited for, instead of `AssertionError` on a node
+  that "isn't displayed". **If B-22 recurs, the next log will say what it was waiting for.**
+
+**One thing this run could not narrow.** The migration to
+`androidx.compose.ui.test.junit4.v2.createComposeRule`, which the build's own deprecation warning
+asks for, is untouched and remains the larger separate decision B-22 describes. The v2 dispatcher
+**queues** rather than executing immediately, so it would likely require synchronization in more
+places than the six fixed here — and `awaitText` is the shape those would take.
+
+### B-18 status 2026-08-22 (eightieth run) — the forty-fifth firing, and the seventeenth attempt is silence
+
+**Unchanged as a blocker.** The scheduled prompt again assigned S5's spec half, built since
+**2026-08-09** and re-verified in the blobs rather than assumed (**C-80-3**): `generate.mjs --check`
+→ `OK: 29 vector files match the generator.`, `EXIT=0`. The prompt's pin `679a317` is still stale
+(**`7328a0b`**, corpus 29/29, `diff -r` exit 0), and its *"S5 is NOT STARTED"* is still wrong.
+
+**Both triggers measured, not carried forward** (**C-80-2**):
+
+| trigger | measured this run | fires? |
+| --- | --- | --- |
+| **movement in the blocking state** — a merge, close, undraft, or human commit in either repo | engine `main` still **`aac05f3`**; last non-Claude commit **2026-08-12**; **18 engine + 6 android** drafts read live, **all 24 open and draft**; newest merge anywhere **PR #44, 2026-08-13** | **no** |
+| **something needing an action before return day** | return day (**2026-08-18**) is **four days** past; this run's output is a corrected diagnosis and a test-only fix, both already in the records a reader must open anyway | **no** |
+
+**So: nothing sent, for the seventh consecutive run.** Attempt 10 (run 73) reached Brandon's phone
+and inbox with the state, the landing plan, step 0 and the re-pin command, and remains unanswered.
+Nothing in the world state has changed since.
+
+**This run is exactly the case the criterion was amended for, and the amendment holds.** Run 75
+narrowed the trigger from *"a genuine new blocker"* to *"movement, or something needing action"*
+after filing B-22 and not sending. This run **corrected** B-22 and fixed it — a larger movement in
+the *records* than filing it was — and it is still **not movement in the blocking state** and still
+requires nothing of Brandon today. It changes what an auditor reads, not what anyone must do. **The
+criterion inverts on a new fact, immediately.** **B-18 stays open**: whether the routine stops is
+Brandon's action, and a sent notification is still not a read one.
+
+### Nothing else moved
+
+**B-23** was filed by run 79 and is **untouched**: fixing it means a `SyncHarness` assertion, which
+moves `$ExpectedOfflineTotal` and every doc reporting it in one commit, and there is no `dotnet` or
+`pwsh` here to measure the new total with. **This run added no landing cost to the pin family**
+(**B-17**) — `Verify-Alpha.ps1` was not opened. **B-1**, **B-2**, **B-4**, **B-5**, **B-8**, **B-9**,
+**B-10**, **B-12**, **B-13**, **B-14**, **B-15**, **B-16**, **B-19** were neither acted on, narrowed
+nor re-attempted. **B-7** was reproduced and gained one detail (**C-80-9**): androidx is not on Maven
+Central either, so `:app` has no `core-probe.sh` analogue and never will on this network.
