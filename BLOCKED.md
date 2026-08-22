@@ -3963,3 +3963,32 @@ Then run `./gradlew :app:testDebugUnitTest` repeatedly — B-22's rate means a s
 nothing, which is the property that has kept this open.
 
 **B-22 stays OPEN**, and this run neither narrowed nor worked around it.
+
+### B-22 status 2026-08-22 (seventy-ninth run, second entry) — demonstrated on a byte-identical `:app` tree
+
+**The strongest sample this blocker has.** The `:app` module is **the same git tree object** —
+`460e581b927cd36845001d9d33e72273d66e376d` — on `73238fc` and on `5170aff`, which differ only by
+175 added lines across three markdown files. Step 10 was **`failure`** on the first and
+**`success` in 91s** on the second (**C-79-20**).
+
+**That is better evidence than the same-commit re-run it replaces**, and the reason is worth
+stating: a re-run repeats a *commit*, whereas an equal tree hash proves the *compiled input was
+the same object*. B-22's prior sample was a same-commit re-run (`96726656919` → `96728744410`);
+this one shows the same thing at the level of the artifact.
+
+**`:core` passed on all four of this run's heads** — 64s, 57s, 58s, 59s, on four different
+runners — while `:app` failed once in four, on a **markdown-only** diff. **Three of the four
+heads carried records-only diffs**, which is what makes the point: **the nondeterminism is
+independent of what the commit changes.**
+
+**A correction to this run's own previous B-22 entry.** It says attempt 2's outcome *"was not
+observed by this session"* and blames API caching. **The real cause was my own push**: attempt 2
+was `cancelled` at 05:48:22 with step 10 killed at 05:48:19, and the push of `5170aff` — the
+commit recording the B-22 finding — started the replacement run at 05:48:24. **The record of the
+experiment destroyed the experiment.**
+
+**Smallest human unblock — unchanged**, and the target is now a specific line:
+`ScreensFromFixtureTest.kt:68` needs a `waitForIdle()` (or a `waitUntil` on the banner node)
+between the navigating `performClick()` and the assertion on line 69, with the sibling
+provenance-banner test audited for the same shape. **B-22 stays OPEN**; this run neither narrowed
+nor worked around it, wrote no `:app` file, and skipped, `@Ignore`d and quarantined nothing.

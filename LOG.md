@@ -15014,3 +15014,32 @@ and **no `:app` file was written** — the fix needs the SDK (**B-7**).
 **Stated plainly because it will happen again:** pushing this correction starts another CI run,
 which at B-22's rate has roughly a one-in-twelve chance of reddening on a markdown-only diff.
 That is a property of the blocker, not of this change.
+
+## Third correction — B-22 proved on a byte-identical tree, and I killed the experiment that was meant to prove it
+
+**The `:app` module is the same git tree object on the red head and the green one:**
+`460e581b927cd36845001d9d33e72273d66e376d` on both `73238fc` and `5170aff`, which differ by 175
+added lines of markdown and nothing else. Step 10 **failed** on the first and **passed in 91s**
+on the second (**C-79-20**). B-22 is demonstrated at the level of the compiled artifact rather
+than at the level of a repeated commit — **stronger than the same-commit re-run it replaces**.
+
+**Correcting the previous entry:** it said attempt 2's outcome *"was not observed"* and blamed
+API caching. **The cause was my own push.** Attempt 2 was `cancelled` at 05:48:22, step 10 killed
+at 05:48:19, and the push of `5170aff` — the commit recording the B-22 finding — started the
+replacement run at 05:48:24. **The record of the experiment destroyed the experiment**, and the
+result it would have shown was recovered only by accident, in a better form.
+
+**Four heads, four `:core` passes** (64s, 57s, 58s, 59s) on four different runners; **one `:app`
+failure in four**, on a markdown-only diff. Three of the four heads carried records-only diffs.
+**The nondeterminism is independent of what the commit changes** — which is the whole of why
+B-22 is a gate hazard.
+
+**The procedural rule this run learned the expensive way, stated for whoever is next:**
+**observe, then write, then push.** Run 56 established that a records push supersedes the run it
+records (`878a203`); the corollary found here is that **a records push supersedes the *re-run* it
+records**, destroying the one experiment that distinguishes a flake from a defect. The final
+push's own run is unobservable by construction, and that is fine — what must not happen is
+pushing over a re-run whose verdict you still need.
+
+**On `5170aff`, steps 1–10 are `success`; 11–14 were not observed to conclude, and no job
+conclusion is claimed.**

@@ -14679,3 +14679,61 @@ blocker, not of the change, and it is stated here rather than discovered later.
 **B-22's sample count moves from 2-in-24 to 3**, and the newly load-bearing detail is that
 **two of the three are records-only commits** — so the nondeterminism is not correlated with
 touching `:app` at all, which is what makes it a gate hazard rather than a code smell.
+
+### C-79-20 — B-22 demonstrated on a byte-identical `:app` tree, and the re-run that should have shown it was killed by my own push
+
+**This corrects C-79-19's account of attempt 2.** C-79-19 says its outcome *"was NOT observed by
+this session"* and attributes that to API caching. **The real reason is sharper and is my own
+doing:** attempt 2 was **`cancelled`**, at **05:48:22**, with **step 10 killed mid-run at
+05:48:19** — and the push of `5170aff` (the commit recording C-79-19) started the next run at
+**05:48:24**. **I cancelled my own confirming re-run by pushing the record of it.**
+
+```bash
+#   actions_get(get_workflow_job, ShivaClaw/careerseeker-android, 96987953926)  # attempt 2
+#   actions_get(get_workflow_job, ShivaClaw/careerseeker-android, 96988392550)  # head 5170aff
+git -C <android> rev-parse 73238fc:app 5170aff:app
+git -C <android> diff --name-only 73238fc 5170aff -- app/ core/ | wc -l
+```
+
+*Expected, and **observed**:*
+
+| head | `:app` tree object | step 10 (`:app` Robolectric) |
+| --- | --- | --- |
+| **`73238fc`** | `460e581b927cd36845001d9d33e72273d66e376d` | **`failure`** — `ScreensFromFixtureTest.kt:69` |
+| **`5170aff`** | `460e581b927cd36845001d9d33e72273d66e376d` | **`success`, 91s** |
+
+**The two tree hashes are equal, and `git diff --name-only … -- app/ core/` returns 0 paths.**
+The `:app` module is **the same git object** on both commits — the only difference between them
+is 175 added lines across three markdown files.
+
+**So B-22 is demonstrated on byte-identical code, red then green.** This is *stronger* evidence
+than the same-commit re-run it replaces: a re-run repeats a commit, whereas a tree hash proves
+the compiled input was the same object regardless of which commit carried it. **The experiment I
+destroyed was recovered by accident, in a better form.**
+
+**Full picture across this run's four heads** — `:core` (the only module run 79 changed) passed
+on **every** one:
+
+| head | diff from previous | `:core` | `:app` step 10 |
+| --- | --- | --- | --- |
+| `8264275` | the code slice | **64s** | **success** 92s |
+| `c5bcf83` | records only | **57s** | **success** 113s |
+| `73238fc` | records only | **58s** | **FAILURE** |
+| `5170aff` | records only | **59s** | **success** 91s |
+
+**Four `:core` passes, four different runners. One `:app` failure out of four, on a markdown-only
+diff.** B-22's rate stands, and this run contributes **three** of its samples' worth of context
+rather than one.
+
+**On `5170aff`, steps 1–10 are `success`; steps 11–14 had not been observed to conclude when this
+session stopped polling, and no job conclusion is claimed for that head.** The job endpoint froze
+at `step 11 in_progress` and `get_job_logs` returned **HTTP 404** (its pre-completion behaviour),
+consistent with the caching recorded in **C-79-18**.
+
+**THE PROCEDURAL RULE THIS BUYS, and it is the part worth carrying forward.** **Never push while
+a confirming re-run is in flight — the push cancels it.** Run 56 already established that a
+records push supersedes the run it records (`878a203`); this run found the sharper corollary:
+**a records push supersedes the *re-run* it records**, destroying the one experiment that can
+distinguish a flake from a defect. The correct order is **observe, then write, then push** — and
+accept that the final push's own run is unobservable, which is structural and already recorded
+(**C-79-18**).
