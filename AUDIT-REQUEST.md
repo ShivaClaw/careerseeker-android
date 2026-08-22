@@ -14520,3 +14520,50 @@ recorded as *"load-bearing, since ... this run's shell cwd reset to `/home/user`
 worth knowing: the guard catches the *consequence* an unwritten record has for citations, and
 catches nothing when the write lands somewhere real and silent. **Every path in run 79's record
 appends after the incident is absolute.**
+
+### C-79-17 — CI on this run's head, recorded as what reported rather than as a conclusion
+
+```bash
+# job 96985875445 of run 32554264969, head 8264275
+#   actions_get(get_workflow_job, ShivaClaw/careerseeker-android, 96985875445)
+```
+
+*Expected, and **observed**, on head **`8264275`**, attempt **1**, `ubuntu-latest`:
+
+| # | step | conclusion | duration |
+| --- | --- | --- | --- |
+| 6 | Assert every cited C-/B- id resolves | **success** | 1s |
+| 7 | Assert `:core` has no Android dependency | **success** | 88s |
+| 8 | Assert vendored sync vectors match the pinned main-repo commit | **success** | 9s |
+| 9 | Unit tests (`:core`) | **success** | **64s** |
+| 10 | Unit tests (`:app`, Robolectric) | **success** | 92s |
+| 11 | Assemble debug APK | **in_progress at close of slice** | — |
+| 12–14 | Lint, analytics assertion, APK upload | **pending** | — |
+
+**No full-job conclusion is claimed**, and this run does not report "CI green". What is claimed
+is exactly the six steps above, read from the job's own `steps` array.
+
+**Three of them are the ones that matter for this diff, and all three passed on a runner:**
+
+- **Step 9** is the runner's own execution of the suite this run changed. **64 seconds** answers
+  the cost question the PR's self-audit raised about the new 1 MiB fixture: it is not a CI cost.
+  CI prints no totals, so **346/0/0 stays a `core-probe.sh` measurement** (**C-79-11**) and step 9
+  is corroboration, not the source of the number.
+- **Step 8** is the vendored-vector drift check, and it re-derives **C-79-4** independently — CI
+  re-fetches the pin's files from the API and diffs them, so the "no drift event" claim is not
+  resting on this session's local `diff -r` alone.
+- **Step 6** is run 77's citation guard, **runner-verified again** on this run's own records —
+  the fourth head on which its pass path has executed. Its **failure** path stays stub-only,
+  exactly the qualification **B-15** carries.
+
+**B-22 did not fire on this head.** Step 10 completed **success in 92 seconds**. That is **one
+sample** and narrows nothing: B-22's ~8% `:app` nondeterminism is unchanged and stays open, and
+this run touched no `:app` file, so the sample is not evidence about the fix either.
+
+**One reading correction, recorded because it was nearly written down as a finding.** Midway
+through this run the job API reported step 10 as `in_progress` for what appeared to be 20+
+minutes, which matches the shape of the documented android CI hang (`f49290e`, *"93s baseline vs
+25+ min"*). **It was not a hang** — the step had completed in 92 seconds and the API's `steps`
+array was serving stale data. **The step timestamps are the reliable field; the live `status` on
+a polled job is not.** Anyone re-running the command above should compare
+`started_at`/`completed_at` rather than trusting a polled `in_progress`.

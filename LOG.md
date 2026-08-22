@@ -14920,3 +14920,27 @@ lands somewhere real and silent. `scripts/check-citations.sh` was run on the rep
 is green — **732 definitions, 733 cited, 0 dangling** (**C-79-15**) — but it is green because the
 repair worked, not because it would have caught the mistake. **Every path in this run's record
 appends after the incident is absolute.**
+
+## Addendum — CI on this run's head, recorded as what reported
+
+Run [32554264969](https://github.com/ShivaClaw/careerseeker-android/actions/runs/32554264969),
+job `96985875445`, head **`8264275`**, attempt 1 (**C-79-17**). **Steps 1–10 all `success`**,
+including the citation guard (step 6), the vendored-vector drift check (step 8), **`:core` unit
+tests in 64s** (step 9) and **`:app` Robolectric in 92s** (step 10). **Assemble / Lint / analytics
+/ upload had not reported at close of slice**, so **no full-job conclusion is claimed and this run
+does not say "CI green."**
+
+**Step 9 is the runner executing the suite this slice changed**, and its 64 seconds answers the
+cost question the PR's self-audit raised about the new 1 MiB fixture. CI prints no totals, so
+**346/0/0 remains a `core-probe.sh` measurement**. **Step 8 re-derives C-79-4 independently** —
+CI re-fetches the pin's files and diffs them — so "no drift event" does not rest on this
+session's local `diff -r` alone.
+
+**B-22 did not fire on this head** (step 10 green, 92s). **One sample; it narrows nothing**, and
+this run touched no `:app` file, so it is not evidence about the fix either.
+
+**A reading correction, kept because it was nearly recorded as a finding.** The job API reported
+step 10 as `in_progress` for what looked like 20+ minutes — the shape of the documented android
+CI hang (`f49290e`, *"93s baseline vs 25+ min"*). **It was not a hang**: the step had finished in
+92 seconds and the API's `steps` array was stale. **Compare `started_at`/`completed_at`; do not
+trust a polled `status` on a running job.**
