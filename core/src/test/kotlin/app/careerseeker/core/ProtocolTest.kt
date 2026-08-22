@@ -169,6 +169,62 @@ class ProtocolTest {
         assertEquals(16, Protocol.TAG_BYTES)
     }
 
+    /**
+     * **The two §5.2 suite names, pinned against literals transcribed by hand** — run 76's
+     * test for the seven domain-separation strings, applied to the two constants that sweep
+     * left out.
+     *
+     * **`SUITE_HYBRID_RESERVED` was guarded by nothing, and it is the last constant in
+     * `Protocol.kt` that was.** Measured, one mutation at a time, `scripts/core-probe.sh
+     * --rerun` from a **346/0** baseline (C-83-3):
+     *
+     *  - `VERSION = 1 -> 2` — **RED**.
+     *  - `SUITE -> "p256-hkdf-sha512"` — **RED**, two tests: `PairingDerivationTest >
+     *    completionAad is the pinned four-field format` and `ProtocolVectorsTest > index
+     *    agrees with the shipping constants`.
+     *  - `SUITE_HYBRID_RESERVED -> "p256+mlkem1024-hkdf-sha256"` — **GREEN, 346 passed, 0
+     *    failed.** Caught by nothing.
+     *
+     * **Why nothing caught it.** Both of its references move with it. `PairingSessionTest >
+     * an unrecognised suite refuses to pair` builds its invite *from* the constant and asserts
+     * the parse is rejected — but every unsupported string is rejected identically, so the
+     * assertion holds for any value; and `SUITE_HYBRID_RESERVED !in SUPPORTED_SUITES` is
+     * satisfied by any wrong string too, more easily than by the right one. That is the
+     * seventy-fourth run's trap exactly: a derivation compared against itself agrees with
+     * itself and disagrees with the document.
+     *
+     * **This is not a live drift.** The value here is correct — it matches
+     * `docs/Sync-Protocol.md` §5.2 line 306 and the engine's `src/Sync/Protocol.cs:21`, and
+     * all 64 occurrences across every ref in both repositories agree (C-83-4). The defect is
+     * that nothing keeps it correct.
+     *
+     * **The string is not a label; it names a parameter set, and a sizing decision rests on
+     * it.** §5.2 records that under this suite the QR additionally carries the ML-KEM
+     * encapsulation key and `ikm` becomes a concatenation of both shared secrets, and that
+     * *"QR payload budget is checked against the hybrid suite's sizes now: ML-KEM-768's
+     * 1184-byte key fits comfortably in a version-40 QR"*. The mutation above names
+     * ML-KEM-1024, whose key is 1568 bytes — so a slip of two characters silently invalidates
+     * the budget the spec says was already checked.
+     *
+     * **v1 behaviour is unaffected either way, which is the point.** Both sides reject the
+     * reserved suite today, and reject a corrupted one identically, so the failure is
+     * invisible until the hybrid migration ships — the one moment the two implementations
+     * must agree on this string, and the moment no test has ever compared them.
+     *
+     * **The engine's guard accepts the same wrong value** (read, not executed — no `dotnet`
+     * or `pwsh` here, C-ENV-1). `tests/SyncHarness/Program.cs` asserts
+     * `Protocol.SuiteHybridReserved.Contains("mlkem") && Protocol.SuiteHybridReserved !=
+     * Protocol.Suite`; `"p256+mlkem1024-hkdf-sha256"` satisfies both conjuncts, so the same
+     * mutation is green on that side too (C-83-5). Fixing that half needs a gate this sandbox
+     * cannot run; it is filed in STATE.md's ordered intent with the mutation that proves it.
+     */
+    @Test
+    fun `the suite names are the ones section 5_2 prints`() {
+        assertEquals("p256-hkdf-sha256", Protocol.SUITE)
+        assertEquals("p256+mlkem768-hkdf-sha256", Protocol.SUITE_HYBRID_RESERVED)
+        assertTrue(Protocol.SUITE != Protocol.SUITE_HYBRID_RESERVED)
+    }
+
     @Test
     fun `directional key derivation uses distinct info strings`() {
         // Identical info strings would derive one key for both directions, letting a
