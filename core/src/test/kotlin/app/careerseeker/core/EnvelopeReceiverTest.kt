@@ -407,4 +407,131 @@ class EnvelopeReceiverTest {
         assertEquals(ErrorCode.DECRYPT_FAILED, r.receiveWire("""{"v":1}""") { keyFor(it) }.error)
         assertEquals(3L, r.highestAccepted(Direction.ENGINE_TO_PHONE))
     }
+
+    // ------------------------------------------------------------------ §3.1's size boundary
+
+    /**
+     * A real, sealed envelope whose **decoded** ciphertext is exactly [ciphertextBytes] long.
+     *
+     * GCM output is the plaintext plus [Protocol.TAG_BYTES], so the body is padded to land on
+     * the target exactly. The padding is ASCII, so its character count is its byte count, and
+     * `kind` stays readable because [EnvelopeReceiver] reads that one field and ignores the
+     * rest of the body.
+     *
+     * Unlike [oversized], this is a genuine envelope: it decrypts. That is the whole point —
+     * the case below has to reach the crypto it would be refused before.
+     */
+    private fun sealedWithCiphertextOf(ciphertextBytes: Int, seq: Long = 1L): ReceivedEnvelope {
+        val prefix = "{\"kind\":\"heartbeat\",\"pad\":\""
+        val suffix = "\"}"
+        val padLen = (ciphertextBytes - Protocol.TAG_BYTES) - (prefix.length + suffix.length)
+        require(padLen >= 0) { "target ciphertext too small to carry a kind" }
+
+        val body = (prefix + "A".repeat(padLen) + suffix).toByteArray(Charsets.UTF_8)
+        val n = nonce()
+        val ct = SyncCrypto.seal(kE2p, n, aadOf(dir = "e2p", seq = seq), body)
+        return ReceivedEnvelope(
+            Protocol.VERSION, pairing, "e2p", seq, ts, keyId,
+            Base64Url.encode(n), Base64Url.encode(ct), null,
+        )
+    }
+
+    /**
+     * **An envelope at exactly the cap is legal, and until this test nothing said so.**
+     *
+     * §3.1: *"The **decoded ciphertext** — the AEAD output including its 16-byte tag, after
+     * base64url decoding — MUST NOT exceed 1 MiB. A receiver measures those decoded bytes, not
+     * the length of the JSON envelope and not the length of the base64url text."* `MUST NOT
+     * exceed` makes exactly 1 MiB the largest **legal** ciphertext, not the first illegal one.
+     *
+     * ## Why the existing cases could not pin this
+     *
+     * Every oversized case in the suite and in the shared corpus is `MAX_ENVELOPE_BYTES + 1`
+     * **decoded** — [oversized] here, and `invalid-oversized`'s `synth_ciphertext_len` of
+     * 1048577 upstream. A value one byte over the cap in decoded bytes is also over it in
+     * base64url characters (~1.4 MB) and in JSON envelope length, so **all three candidate
+     * readings reject it** and no assertion can tell them apart. Measured, not argued: two
+     * mutations of the size check left `:core:test` green at **343/0** — measuring
+     * `env.ciphertext.length` (the base64url text, the unit §3.1 forbids by name), and capping
+     * at `MAX_ENVELOPE_BYTES * 3 / 4`. Removing the check outright reddens three tests, so the
+     * gate was tested for *existence* and never for *unit* or *number*.
+     *
+     * ## Why the distinction is load-bearing rather than pedantic
+     *
+     * §3.1 records this exact bug on the relay: its guard *"compared a character count to a
+     * byte budget, which capped the decoded payload at 786,432 bytes and left the top 256 KiB
+     * of the declared range untransmittable"*. That is `MAX * 3 / 4` — mutation M2 above, green
+     * on the phone. The engine side pins the boundary (`relay/test/relay.test.ts` covers *"the
+     * maximum legal envelope surviving a push/pull round trip, and the first character beyond
+     * it"*); the phone did not, and §4.4 instructs a future chunker to size against exactly
+     * this number.
+     *
+     * A `too_large` here would refuse a payload the protocol declares legal, and the sender
+     * could not discover why — the failure it produces is the silent one §3.1 calls out.
+     */
+    @Test
+    fun `a ciphertext of exactly the cap is legal and is accepted`() {
+        val env = sealedWithCiphertextOf(Protocol.MAX_ENVELOPE_BYTES)
+
+        // The fixture is what it claims to be, asserted before it is relied on.
+        assertEquals(
+            Protocol.MAX_ENVELOPE_BYTES,
+            Base64Url.decodeOrNull(env.ciphertext)!!.size,
+            "fixture does not decode to exactly the cap, so the case below proves nothing",
+        )
+
+        val r = receiver().receive(env, ::keyFor)
+        assertTrue(
+            r.accepted,
+            "a ciphertext of exactly MAX_ENVELOPE_BYTES decoded bytes is legal under §3.1 " +
+                "(`MUST NOT exceed`), and was rejected as ${r.error}. A receiver measuring the " +
+                "base64url text or the JSON envelope instead of the decoded bytes fails here " +
+                "and passes every other size case in this suite.",
+        )
+        assertEquals("heartbeat", r.kind)
+    }
+
+    /**
+     * One byte past the cap is `too_large` — the same verdict [oversized] gets, reached by a
+     * genuinely sealed envelope rather than by noise that could never have decrypted.
+     *
+     * Paired with the case above on purpose: together they place the boundary between two
+     * adjacent values, which is the only construction that pins *where* it is rather than
+     * merely that it exists.
+     */
+    @Test
+    fun `a ciphertext one byte past the cap is too_large`() {
+        val env = sealedWithCiphertextOf(Protocol.MAX_ENVELOPE_BYTES + 1)
+        assertEquals(
+            Protocol.MAX_ENVELOPE_BYTES + 1,
+            Base64Url.decodeOrNull(env.ciphertext)!!.size,
+        )
+        assertEquals(ErrorCode.TOO_LARGE, receiver().receive(env, ::keyFor).error)
+    }
+
+    /**
+     * The maximum legal ciphertext is **longer than the cap** once base64url-encoded, and that
+     * inequality is what gives the acceptance case above its discriminating power.
+     *
+     * 1,398,102 is not an incidental number: §3.1 declares the relay's character cap as
+     * `ceil(4/3 × 1 MiB) = 1,398,102` and calls the conversion *"normative, not incidental:
+     * **the relay MUST carry every envelope this section declares legal.**"* Pinning it here
+     * ties the phone's fixture to the relay's `MAX_CIPHERTEXT_B64U_CHARS` without the phone
+     * importing a relay constant, so a change to either side has to answer for the other.
+     */
+    @Test
+    fun `the maximum legal ciphertext exceeds the cap when measured as base64url text`() {
+        val env = sealedWithCiphertextOf(Protocol.MAX_ENVELOPE_BYTES)
+
+        assertEquals(
+            1_398_102, env.ciphertext.length,
+            "§3.1 derives the relay's character cap as ceil(4/3 x 1 MiB) = 1,398,102; the " +
+                "maximum legal envelope must encode to exactly that many base64url characters",
+        )
+        assertTrue(
+            env.ciphertext.length > Protocol.MAX_ENVELOPE_BYTES,
+            "if the encoded text were NOT longer than the cap, measuring the wrong unit would " +
+                "be undetectable and the acceptance case above would prove nothing",
+        )
+    }
 }
