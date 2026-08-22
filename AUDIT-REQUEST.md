@@ -14117,3 +14117,136 @@ always at the `:app` step and always after step 6 had already passed.
    times over; the **failure** path is still stub-only, because proving it on a runner means pushing
    a knowingly-dangling citation. A green check proves it does not false-alarm, never that it still
    fires.
+
+---
+
+## Run 78 — 2026-08-22. The forty-third firing of a slice finished on 2026-08-09.
+
+### C-78-1 — no movement in the blocking state, measured live rather than carried forward
+
+```bash
+# engine main, and its last non-Claude commit
+git -C <engine> fetch --all --prune
+git -C <engine> log --oneline -1 origin/main
+git -C <engine> log -1 --format='%H %ad %an' --date=short origin/main
+# live PR census, both repos
+mcp__github__list_pull_requests owner=ShivaClaw repo=careerseeker         state=open perPage=100
+mcp__github__list_pull_requests owner=ShivaClaw repo=careerseeker-android state=open perPage=100
+mcp__github__list_commits       owner=ShivaClaw repo=careerseeker since=2026-08-12T00:00:00Z
+```
+
+*Expected, and **observed**:* `origin/main` = **`aac05f3`**, authored **2026-08-12**. **18 engine +
+6 android** pull requests open, **every one `draft: true`**; none merged, closed or undrafted. The
+newest human activity anywhere in either repo is **2026-08-13** (PRs #40/#42/#43/#44). **Nine days
+of no owner action, four of them after return day.** This is the trigger table's first row and it
+reads **negative**, exactly as it did at runs 74–77.
+
+### C-78-2 — the assigned slice is built, and the check reads the spec rather than the commit message
+
+```bash
+for c in 8575539 22b028e 7328a0b; do git -C <engine> show --stat --format='%h %ad %s' --date=short $c; done
+git -C <engine> show 7328a0b:docs/Sync-Protocol.md | grep -n "entitlement_ack\|product_id\|acknowledged_at\|order_id"
+git -C <engine> show 7328a0b:docs/Sync-Protocol.md | grep -n -i "ciphertext"
+git -C <engine> show 7328a0b:docs/Sync-Protocol.md | grep -n "decrypt_failed"
+```
+
+*Expected, and **observed**:* all three commits exist, dated **2026-08-09 / 2026-08-09 /
+2026-08-12**. `8575539` touches `docs/Sync-Protocol.md` **only**, **+114/−3**. The four things this
+run was assigned read **in the file**, not in a commit subject:
+
+| assigned | where it already is |
+| --- | --- |
+| §4.3 `entitlement_ack` body `{product_id, acknowledged_at, order_id?}` (PQ-A6-1) | §4.3.3, line 307 — with `order_id` marked OPTIONAL and the failure rule (a failure is a named reason, never an ack with a flag inside it) |
+| PQ-A2-1 — the 1 MiB cap measures the **ciphertext** | §3.1, line 111 — plus the relay's own units, `MAX_CIPHERTEXT_B64U_CHARS` |
+| PQ-A2-2 — structural rejection reports `decrypt_failed` | §7.2 table line 601, and §3 line 103 — *"no separate `malformed` code"* |
+| PQ-A2-3 — the `invalid-unknown-field` vector | `7328a0b`, generated not hand-written |
+
+**Attack this first** by checking the *specificity*: a reader could believe a spec section exists
+because a commit says so. These line numbers are in the blob at the pin.
+
+### C-78-3 — the one verification this environment can genuinely run, run
+
+```bash
+git -C <engine> worktree add /tmp/s5check 7328a0b
+cd /tmp/s5check && node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* **`OK: 29 vector files match the generator.`**, **`EXIT=0`**. Node
+**v22.22.2**. This is the check the recurring prompt asks for by name, and it passes **because the
+work is already done** — it is not evidence that this run produced anything.
+
+### C-78-4 — the cross-repo pin holds; no drift event
+
+```bash
+diff -r /tmp/s5check/docs/sync-vectors/v1 \
+        <android>/core/src/test/resources/sync-vectors/v1; echo "DIFF_EXIT=$?"
+```
+
+*Expected, and **observed**:* **`DIFF_EXIT=0`**, **29 files each side**, no output. The vendored
+corpus is byte-identical to pin **`7328a0b`**. **No existing vector byte was altered this run** —
+the drift event the mission forbids outright did not occur, and this run added no vector either.
+
+*Note the path.* The corpus is nested at `sync-vectors/v1/`, not `sync-vectors/`. This run's first
+attempt diffed one level too high and produced a 29-line false "only in" listing that reads exactly
+like catastrophic drift. Recorded because the *shape of the false alarm* is indistinguishable from
+the real emergency at a glance, and the next session will run this command.
+
+### C-78-5 — RETURN-DAY.md §3's landing plan still matches the live PR heads
+
+```bash
+# for each landing branch: local fetched ref vs the head SHA the live API reports
+git -C <engine> rev-parse origin/claude/s8-harness-linux-reach        # vs PR #48
+git -C <engine> rev-parse origin/claude/s2-seq-bound                  # vs PR #35
+git -C <engine> rev-parse origin/claude/s2-transport-vocabulary       # vs PR #36
+git -C <engine> rev-parse origin/claude/s3-pairing-confirm-consumer   # vs PR #51
+git -C <engine> rev-parse origin/claude/s6-outcome-disposition        # vs PR #52
+git -C <engine> rev-parse origin/claude/s6-counter-reconciliation     # vs PR #46
+git -C <engine> rev-parse origin/claude/s6-resume-reconciliation      # vs PR #53
+git -C <engine> rev-parse origin/claude/s5-entitlement-ack-spec       # vs PR #32
+```
+
+*Expected, and **observed**:* **8 branches, 8 matches, 0 drift** —
+`c93e88d 2be00fc b0b6c77 edee32b 94fd979 9394ca1 8177353 9c05ef7`. The plan Brandon is meant to act
+on is **still actionable against today's refs**, and step 0 (decide #53) is still the first move.
+This is the check worth keeping in a run that builds nothing: a landing branch that had drifted from
+its PR head would send him to merge the wrong commits, and nothing else in the record set would
+notice.
+
+### C-78-6 — the prompt's B-2 premise is stale: the sync track, and `/pair`, are on `main`
+
+```bash
+for p in relay src/Sync docs/Sync-Protocol.md docs/sync-vectors tests/SyncHarness; do
+  echo "$p : $(git -C <engine> ls-tree -r --name-only origin/main -- "$p" | wc -l)"; done
+git -C <engine> grep -l "/pair" origin/main -- src/
+```
+
+*Expected, and **observed**:* `relay` **10**, `src/Sync` **14**, `Sync-Protocol.md` **1**,
+`sync-vectors` **27**, `tests/SyncHarness` **2**; `/pair` present in **`src/Engine/Host.cs`**,
+**`src/Engine/Program.cs`**, **`src/Sync/PairingManager.cs`**, **`src/Sync/Protocol.cs`**.
+
+The recurring prompt states *"BLOCKED B-2 stays open because the desktop /pair page does not
+exist."* **It exists and it is on `main`** — merged as PR #42 on **2026-08-13**, with a
+`Verify-Alpha.ps1 -IncludePublish -IncludePackage` run recorded in its commit body (`PS_EXIT=0`,
+offline total **609**, EngineHarness **217 → 228**). That is a gate **Brandon** ran on Windows; this
+run neither ran nor re-ran it, and cites it as *his* evidence, not as its own. **S1 landed.** The
+prompt's summary of the ladder is stale in a **fourth** way, alongside "S5 NOT STARTED", pin
+`679a317`, and the S2 framing.
+
+**What is NOT claimed:** that B-2 is closed. Its remaining half is the **phone-facing** pair flow,
+and PR #42's own body records QR rendering as deliberately unimplemented (no scanner, no emulator —
+**B-4**). B-2 **narrows**; it does not close, and this run did not narrow it either.
+
+### C-78-7 — why no gate ran, stated as an inventory rather than an excuse
+
+```bash
+dotnet --version; node --version; java -version; which gradle; echo "${ANDROID_HOME:-unset}"; which pwsh
+```
+
+*Expected, and **observed**:* `dotnet` **not found**; `pwsh` **not found**; `ANDROID_HOME`
+**unset**; Node **v22.22.2**, OpenJDK **21.0.10**, Gradle present at `/opt/gradle/bin/gradle`.
+
+So **both** gates were impossible here, for reasons that are structural and not a matter of effort:
+`scripts\Verify-Alpha.ps1` needs .NET **and** PowerShell **and** Windows DPAPI; the android command
+of record needs the Android SDK. **B-7** is unmoved. **No suite count, no assertion total and no
+gate result is claimed anywhere in run 78**, and the two numbers quoted in **C-78-6** are Brandon's
+from PR #42, attributed.

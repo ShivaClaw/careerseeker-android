@@ -14620,3 +14620,138 @@ run, not even `/v1/health`.** No Play/Google/OAuth console, no accounts, no purc
 Billing code, no email or Gmail, no secrets read or printed, no `.appdata`. Terra's territory is
 untouched: `scripts/Verify-Alpha.ps1`, `$ExpectedOfflineTotal` and every count-reporting doc are
 **unmodified on every pushed branch**, and no nineteenth engine PR was opened.
+
+---
+
+## Run 78 — 2026-08-22. The assigned slice was finished thirteen days ago; this run verified that instead of rebuilding it, and built nothing.
+
+**Rung: none moved.** This is a verification-and-records iteration, and saying so in the first line
+is the point rather than an apology. The recurring prompt assigned S5's spec half for the
+**forty-third** time. It was built on **2026-08-09**. The mission's own stop condition (§7, *45
+iterations logged*) has been met for **33 runs**. The honest options were to re-verify and record, or
+to invent a seventy-eighth marginal artifact to have something to show; this run took the first and
+this entry argues it was correct.
+
+### Milestone 1 — rule one, and the counts that follow it
+
+`git fetch --all --prune` in **both** checkouts before anything was read. Engine `origin/main` =
+**`aac05f3`**, authored **2026-08-12**; android work branch `claude/android-a0-probe` at
+**`2505131`**. Every number below was taken after that fetch (**C-78-1**).
+
+**Live census, read from the API rather than from local refs:** **18 engine + 6 android** pull
+requests open, **all 24 `draft: true`**, none merged, closed or undrafted. The newest human activity
+anywhere in either repository is **2026-08-13** — PRs #40, #42, #43, #44. **Nine days of no owner
+action; four of them after return day.**
+
+### Milestone 2 — the assigned slice, verified in the blob and not in a commit subject
+
+The three commits exist and do exactly what this run was told to do (**C-78-2**): `8575539`
+(**2026-08-09**, `docs/Sync-Protocol.md` only, **+114/−3**), `22b028e` (**2026-08-09**, the two ack
+vectors *generated*, not hand-written), `7328a0b` (**2026-08-12**, `invalid-unknown-field`).
+
+**The check deliberately did not stop at the commit messages**, because a commit subject claiming a
+spec section is precisely the kind of evidence these records exist to distrust. Each of the four
+assigned items was read **in the file at the pin**: the `{product_id, acknowledged_at, order_id?}`
+body at **§4.3.3 line 307** — with `order_id` optional *because it is Play correspondence data, not
+authorisation*, and with the rule that a failure is a **named reason, never an ack carrying a
+failure flag**; the 1 MiB cap **on the ciphertext** at **§3.1 line 111**; `decrypt_failed` as the
+code for **every structural rejection** in the **§7.2 table, line 601**, with *"no separate
+`malformed` code"* stated so the observable set does not grow; and the `invalid-unknown-field`
+vector present at the pin. **PQ-A6-1, PQ-A2-1, PQ-A2-2 and PQ-A2-3 are all closed, and were closed
+before this run was scheduled.**
+
+### Milestone 3 — the one check this environment can genuinely run, run
+
+```
+OK: 29 vector files match the generator.     EXIT=0
+```
+
+`node docs/sync-vectors/generate.mjs --check` at `7328a0b`, Node **v22.22.2** (**C-78-3**). This is
+the verification the prompt asks for **by name**, and it is the only one it asks for that this
+sandbox can perform. **It passes because the work is already done.** It is evidence about the
+repository, not about this run, and this entry does not let it read as an accomplishment.
+
+### Milestone 4 — the cross-repo pin holds, and the false alarm is worth more than the result
+
+`diff -r` between the corpus at pin `7328a0b` and the vendored copy: **29 files each side, exit 0,
+no output** (**C-78-4**). **No existing vector byte was altered and none was added.** The drift
+event the mission forbids outright did not occur.
+
+**The first attempt at this command was wrong, and its wrongness is the useful part.** The vendored
+corpus is nested at `sync-vectors/v1/`; diffing one level too high produced a **29-line "Only in…"
+listing** — which is, at a glance, **indistinguishable from total corpus loss**. A session that ran
+it, saw that, and reacted would have "found" the exact catastrophe the mission tells it to stop
+for. Recorded in **C-78-4** with the correct path, because the next session will run this command
+and the failure mode is a mis-read, not a mis-type.
+
+### Milestone 5 — the landing plan still matches the live PR heads
+
+The check worth keeping in a run that builds nothing. **8 landing branches, 8 exact matches against
+the head SHAs the live API reports, 0 drift** (**C-78-5**). `RETURN-DAY.md` §3 is **still actionable
+against today's refs**, and **step 0 — decide PR #53 — is still the first move**.
+
+This is not ceremony: a landing branch that had drifted from its PR head would send Brandon to merge
+commits the plan never costed, and **nothing else in the record set would notice**. It is cheap, it
+is real, and it is the one thing here that protects an action he has not taken yet.
+
+### Milestone 6 — a fourth stale premise in the recurring prompt, and this one had landed
+
+The prompt states B-2 remains open *"because the desktop `/pair` page does not exist."* **It exists,
+and it is on `main`** (**C-78-6**): `/pair` in `Host.cs`, `Program.cs`, `PairingManager.cs`,
+`Protocol.cs`, merged as **PR #42 on 2026-08-13**. The whole sync track is on `main` — `relay/`
+**10** files, `src/Sync/` **14**, `Sync-Protocol.md`, **27** under `sync-vectors/`, `SyncHarness`
+**2**. **S1 landed.**
+
+PR #42's commit body carries a full Windows gate — `PS_EXIT=0`, offline total **609**, EngineHarness
+**217 → 228**. **That is Brandon's evidence, not this run's**, and it is attributed as his
+everywhere it appears. **B-2 is not thereby closed:** its remaining half is the phone-facing flow,
+and #42 itself records QR rendering as deliberately unimplemented because there is no scanner and no
+emulator (**B-4**). B-2 **narrows** — and it narrowed on 2026-08-13, by a human merge, not by
+anything done here.
+
+So the prompt's ladder summary is now stale in **four** measurable ways: "S5 NOT STARTED", pin
+`679a317`, the S2/B-2 framing, and S1's status. **Re-derive from the repository, never from the
+summary** — which is what the prompt itself instructs, and this is the fourth consecutive run to
+find the instruction load-bearing.
+
+### Milestone 7 — B-18's forty-third firing, and the fifteenth attempt is silence
+
+The criterion was **re-measured, not carried forward** (**C-78-1**). Movement in the blocking state:
+**no** — nothing merged, closed or undrafted; `main` unmoved since 2026-08-12. Something needing an
+action: **no** — this run built nothing and moved no rung. **So nothing was sent, for the fifth
+consecutive run.**
+
+Attempt 10 (run 73) reached Brandon's phone and inbox with the state, the landing plan and step 0,
+and is **unanswered**. **Every fact a fifteenth message could carry is already inside that
+unanswered one.** Return day being four days past rather than three is not a new fact; it is the
+same fact one day older. A fifth repetition would train its recipient to ignore the one escalation
+path this program has that does not require opening a **~1.4 MB** `LOG.md` — and the moment that
+path is needed is precisely the moment a real trigger fires. **The criterion inverts on a new fact,
+immediately.**
+
+**And the loop was not silently switched off.** This session can enumerate and delete scheduled
+tasks; it did neither and did not look. Deleting the owner's automation would remove the last signal
+still reliably reaching him — that a run happened — on an agent's judgment, four days into a silence
+whose cause is unknown. **A stalled routine is not consent to dismantle it.**
+
+### What this run did not touch
+
+**No rung moved and no rung's status changed. The diff is these records and nothing else** — no
+Kotlin, no C#, no TypeScript, no Gradle file, no CI YAML, no script, no production source of any
+kind, and no test anywhere was added, removed, skipped or `@Ignore`d. **No vector byte, no
+`index.json`, no `VECTORS.lock`; the cross-repo pin did not move and no existing vector's content
+was altered** — the drift event the mission forbids did not occur, and nothing new was generated
+into the corpus either. `docs/Sync-Protocol.md` and `generate.mjs` were **read at pin `7328a0b` and
+never edited**. **No gate ran and none is claimed**: no `dotnet`, no `pwsh`, no `ANDROID_HOME`
+(**C-78-7**), so `Verify-Alpha.ps1` and the android command of record were both structurally
+impossible (**B-7**); **no suite count, assertion total or gate result appears in this entry** and
+the two engine numbers quoted are Brandon's, attributed. **B-22 was not fixed and was not worked
+around by skipping a test**; **B-4**, **B-5**, **B-15**, **B-16**, **B-19**, **B-20**, **B-21** were
+neither acted on nor re-attempted. **Nothing was merged, closed or undrafted in either repo; no
+branch was force-pushed, rewritten or deleted; no nineteenth engine PR was opened, and no engine
+file was written except `autonomy/claude-state`'s `STATE.md`.** **No scheduled task was created,
+modified or deleted, and none was enumerated.** **No deploy of any kind; the production relay was
+not contacted at all this run, not even `/v1/health`.** No Play/Google/OAuth console, no accounts,
+no purchases, no Play Billing code, no email or Gmail, no secrets read or printed, no `.appdata`.
+Terra's territory is untouched: `scripts/Verify-Alpha.ps1`, `$ExpectedOfflineTotal` and every
+count-reporting doc are **unmodified on every pushed branch**.

@@ -3710,3 +3710,61 @@ outright. **B-4**, **B-5**, **B-16**, **B-19**, **B-20**, **B-21** were neither 
 nor re-attempted. Every `C-`/`B-` id cited in this run's records and PR body resolves — checked by
 this run's own new guard, which is the first iteration where that claim is machine-checked rather
 than asserted (**C-77-5**).
+
+### B-18 status 2026-08-22 (seventy-eighth run) — the forty-third firing, and the fifteenth attempt is silence
+
+**Unchanged as a blocker.** The scheduled prompt again assigned S5's spec half — the §4.3
+`entitlement_ack` body, the generated vector, PQ-A2-1/-2/-3. It has been built since **2026-08-09**,
+and this run **re-verified it in the spec blob rather than assuming it** (**C-78-2**): the body at
+§4.3.3, the ciphertext cap at §3.1, `decrypt_failed` in the §7.2 table, and the
+`invalid-unknown-field` vector at `7328a0b`. The prompt's pin `679a317` is still stale
+(**`7328a0b`**; corpus **29/29** byte-identical, **C-78-4**), its "S5 is NOT STARTED" is still
+wrong, and this run found a **fourth** stale premise: the prompt says B-2 is open *because the
+desktop `/pair` page does not exist*, and that page has been **on `main` since 2026-08-13**
+(**C-78-6**).
+
+**The criterion was re-measured this run, not inherited** (**C-78-1**), and both triggers read
+negative:
+
+| trigger | measured this run | fires? |
+| --- | --- | --- |
+| **movement in the blocking state** — a merge, close, undraft, or human commit in either repo | engine `main` still **`aac05f3`** (2026-08-12); **18 engine + 6 android** drafts read live, all open, all draft; newest human activity anywhere **2026-08-13** | **no** |
+| **something needing an action** | this run built nothing, changed no vector byte and moved no rung; its output is a verification and these records | **no** |
+
+**So: nothing sent, for the fifth consecutive run.** Attempt 10 (run 73) reached Brandon's phone and
+inbox carrying the state, the landing plan and step 0, and remains unanswered. **Every fact a
+fifteenth message could carry is already in that unanswered one.** Return day being four days past
+rather than three is not a new fact; it is the same fact one day older, and runs 74–77 declined on
+exactly that reasoning. **The one escalation path this program has that does not require opening a
+~1.4 MB `LOG.md` is worth more held than spent restating an unread message.**
+
+**The criterion still inverts on a new fact**, unchanged and stated so the next session can apply it
+without re-deriving it: **movement in the blocking state, or something genuinely needing an action,
+goes out immediately.** **B-18 stays open** — whether the routine stops is Brandon's action, and a
+sent notification is still not a read one.
+
+**One thing this run will not do, and the reason is worth writing down.** The obvious "fix" for a
+loop firing on finished work is to stop the loop. This session can enumerate and delete scheduled
+tasks. **It did neither, and did not look.** The schedule is the owner's automation; silently
+deleting it would destroy the one signal that is still reliably reaching him — that a run happened
+at all — and would do it on an agent's judgment, four days into a silence whose cause is unknown.
+A stalled routine is not consent to dismantle it.
+
+### B-7 status 2026-08-22 (seventy-eighth run) — reproduced, and it bounded every claim in this run
+
+Measured as an inventory rather than asserted (**C-78-7**): `dotnet` **not found**, `pwsh` **not
+found**, `ANDROID_HOME` **unset**; Node **v22.22.2**, OpenJDK **21.0.10**, Gradle present. Both
+gates structurally impossible here. **No Gradle task ran, no suite count is claimed, no assertion
+total is claimed, and no gate result is claimed** anywhere in run 78. The two engine numbers that
+appear in these records (offline **609**, EngineHarness **217 → 228**) are **Brandon's**, from PR
+#42's commit body, and are attributed there rather than absorbed.
+
+### B-1, B-2, B-4, B-5, B-6, B-8, B-9, B-12, B-13, B-14, B-15, B-16, B-17, B-19, B-20, B-21, B-22 — untouched this run
+
+None was acted on, narrowed, re-attempted or worked around. **B-22 was not fixed and was not worked
+around by skipping or `@Ignore`-ing a test** — no `:app` file was touched and no Gradle task ran, so
+its nondeterminism was neither observed nor sampled. **B-15's remaining half was again declined:**
+proving the citation guard's failure path on a runner means pushing a knowingly-dangling citation,
+and proving the vector step's means pushing a knowingly-wrong vector byte — the cross-repo drift
+event the mission forbids outright. **B-2 narrowed for the record but not by this run** — C-78-6
+records that its `/pair` half landed on 2026-08-13 by Brandon's merge, not by anything done here.
