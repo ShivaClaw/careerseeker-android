@@ -15486,3 +15486,22 @@ notification was sent**, because the only fact that would justify one was alread
 **Every path in this run's record appends is absolute**, per **C-79-16**. The cwd hazard announced
 itself on almost every command — the shell reset to `/home/user` after each `cd` — and cost nothing,
 because no command relied on a relative path outliving its `cd`.
+
+> **UPDATE, same run, on a `check_suite.completed` wake — CI RAN PR #55 AND BOTH UNVERIFIED CLAIMS
+> HOLD** (**C-82-11**). Run **`32586767792`** (#475), head **`c4ad6b0`**, **attempt 1**,
+> **`conclusion: success`**, **no re-run**. **Relay job (`ubuntu-latest`): `✓ test/relay.test.ts
+> (55 tests)`, `Tests  55 passed (55)`** — C-82-6's clean row reproduced **off this machine**, so the
+> 52 → 55 step is CI's and not only this sandbox's — plus typecheck green. **Offline job
+> (`windows-latest`): `=== Offline total: 598 passed, 0 failed ===`** — **598 is the base branch's
+> number and PR #54's**, so this branch moves the pin by **ZERO**, confirming **B-17** by measurement
+> rather than assertion. The vector step printed **`OK: 28`**, exactly as **C-82-7** predicted — the
+> base branch's pre-pin state, **NOT a drift event**.
+>
+> **The "CI has not run PR #55" wording above was true when written and is superseded**; kept as a
+> correction, not edited away. **Still unproven:** the **android** gate (**B-7**, **B-22** unmoved —
+> this is the *engine* repo's CI) and `Verify-Alpha.ps1`'s `-IncludePublish`/`-IncludePackage`.
+> **The merge condition is unchanged and nothing was merged, closed or undrafted in response.**
+>
+> **And it does not touch the run's own strongest caveat:** CI runs the same `expiredRow()` fixture
+> this sandbox does, so a green suite on a runner says **nothing** about whether the alarm collects
+> expired rows faster than a push can race them. **C-82-3's reachability attack survives this result.**

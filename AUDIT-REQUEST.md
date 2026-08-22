@@ -15537,3 +15537,52 @@ Sizes taken before and after with **absolute** paths, per **C-79-16**: `AUDIT-RE
 not the pre-repair ones an earlier draft of this line carried.) All four grew, all four in `<android>`, and `git status` in
 `<engine>` and in the engine worktree shows **no untracked record file** — the specific failure
 **C-79-16** describes, where an append lands in the wrong checkout.
+
+### C-82-11 — CI ran PR #55, and it closes C-82-9 by measurement
+
+**Added after the run-82 records were pushed**, on a `check_suite.completed` wake. **C-82-9** says
+*"CI has not run PR #55 and no CI result is claimed for it"* — that was true when written and is
+**superseded by this entry**. Recorded as a correction rather than edited away, per the same practice
+as **C-81-14**.
+
+```bash
+list_workflow_runs ci.yml branch=claude/s2-latest-retention-skew
+list_workflow_jobs <run_id>
+```
+
+*Expected, and **observed**:* **one** run, **`32586767792`**, run number **475**, **`run_attempt: 1`**,
+head **`c4ad6b0`**, **`conclusion: success`**, `pull_requests: [55]`. **No re-run was triggered**;
+the permitted one is unspent. Two jobs, both `success`:
+
+| job | runner | the steps that matter |
+| --- | --- | --- |
+| **Blind relay (Worker)** | `ubuntu-latest` | Typecheck ✓, **Test ✓**, dry-run ✓, blind-relay assert ✓, vector assert ✓ |
+| **Build and offline harnesses** | `windows-latest` | Build warnings-as-errors ✓, **offline alpha verification ✓** |
+
+**The three tests, on a runner, read out of the log rather than inferred from the conclusion:**
+`✓ test/relay.test.ts (55 tests)`, **`Tests  55 passed (55)`** — **C-82-6**'s clean row reproduced
+**off this machine**, and the 52 → 55 step is CI's, not this sandbox's. `wrangler types` then
+`tsc --noEmit` both green, reproducing the typecheck half of C-82-6.
+
+**The B-17 claim, now measured instead of asserted:**
+**`=== Offline total: 598 passed, 0 failed ===`**, `CareerSeeker alpha verification complete.` — on
+**Windows**, the gate this sandbox cannot reach. **598 is the base branch's number and PR #54's
+number**, so this branch moves `$ExpectedOfflineTotal` by **zero** and adds **no** landing cost to
+the pin family. The PR's self-audit did not ask a reviewer to take that on trust; this is the check.
+
+**The vector number reproduced on a runner, and it is still not drift:**
+**`OK: 28 vector files match the generator.`** — exactly what **C-82-7** predicted and what PR #54's
+CI printed. **28 here and 29 at `7328a0b` are two different trees.** `OK: no decryption path in
+relay/src.` also green, so the blind-relay invariant is untouched by this diff.
+
+**What this still does not prove, and the merge condition it does not move.** This is the **engine**
+repo's CI, so it says nothing about the **android** gate (**B-7**, **B-22** both unmoved), and
+`Verify-Alpha.ps1`'s **`-IncludePublish`/`-IncludePackage`** passes did **not** run — only the
+offline portion CI runs on every push. **The merge condition remains a full local gate that no cloud
+session can run**, so this changes **nothing** about the landing policy, and **nothing was merged,
+closed or undrafted in response to it.**
+
+**One thing it cannot touch, restated because a green run invites the error:** it does **not** bear on
+**C-82-3**'s reachability caveat. CI runs the same `expiredRow()` fixture this sandbox does, so a
+green suite on a runner is silent about whether Cloudflare's alarm collects expired rows faster than
+a push can race them. **That attack survives this result untouched.**

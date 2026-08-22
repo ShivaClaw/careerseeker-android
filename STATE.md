@@ -65,6 +65,18 @@
 > channel to be ignored.** **Next run: notify on `main` moving, a PR merged or undrafted, the stored
 > prompt changing, or a gate result — not on another firing and not on another draft PR.**
 >
+> > **UPDATE, same run, on a `check_suite.completed` wake — CI RAN PR #55 AND BOTH UNVERIFIED
+> > CLAIMS HOLD** (**C-82-11**). Run **`32586767792`** (#475), head **`c4ad6b0`**, **attempt 1**,
+> > **`conclusion: success`**, no re-run. **Relay job (`ubuntu-latest`): `Tests  55 passed (55)`** —
+> > C-82-6 reproduced **off this machine** — plus typecheck green. **Offline job
+> > (`windows-latest`): `=== Offline total: 598 passed, 0 failed ===`** — **598 is the base branch's
+> > number, so this branch moves the pin by ZERO**, confirming **B-17** by measurement. Vector step
+> > **`OK: 28`**, exactly as **C-82-7** predicted — **NOT drift**. **The "CI has not run PR #55"
+> > wording below was true when written and is superseded**; kept as a correction. **Still unproven:
+> > the android gate (B-7, B-22 unmoved) and `-IncludePublish`/`-IncludePackage`. The merge
+> > condition is unchanged.** **It does NOT touch C-82-3's reachability caveat** — CI runs the same
+> > `expiredRow()` fixture, so a green runner is silent on alarm latency.
+>
 > **SCOPE: no rung moved.** **No `:app` file, no `:core` file, no Kotlin, no C#** — so **no
 > `core-probe.sh` measurement is reported and no `:core` count appears in run 82**. No vector byte,
 > pin unmoved at **`7328a0b`**; `generate.mjs --check` → **`OK: 28`, `EXIT=0`**, the base branch's
