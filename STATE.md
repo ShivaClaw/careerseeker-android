@@ -60,8 +60,21 @@
 > Kotlin, no C#, no vector byte** (corpus **29/29** byte-identical, pin unmoved at `7328a0b`),
 > `docs/Sync-Protocol.md` read at the pin and never edited, no `generate.mjs`, no `ci.yml`;
 > **`$ExpectedOfflineTotal` untouched, so no landing cost added to the pin family** (**B-17**).
-> **CI has NOT run PR #54 and no CI result is claimed for it**; no engine gate ran (no `dotnet`, no
-> `pwsh`). The production relay was **not contacted at all**, not even `/v1/health`.
+> No engine gate ran **in this sandbox** (no `dotnet`, no `pwsh`). The production relay was **not
+> contacted at all**, not even `/v1/health`.
+>
+> > **UPDATE, same run, on a `check_suite.completed` wake — CI RAN PR #54 AND BOTH UNVERIFIED CLAIMS
+> > HOLD** (**C-81-14**). Run **`32574969239`** (#474), head **`f95b66e`**, **attempt 1**,
+> > **`conclusion: success`**, no re-run. **Relay job (`ubuntu-latest`): `✓ test/relay.test.ts
+> > (52 tests)`, `Tests  52 passed (52)`** — C-81-10's clean row reproduced **off this machine** —
+> > plus typecheck green. **Offline job (`windows-latest`): `=== Offline total: 598 passed, 0
+> > failed ===`** — **598 is the base branch's number, so this branch moves the pin by ZERO**,
+> > confirming **B-17** by measurement rather than assertion. **The "CI has not run PR #54" wording
+> > above was true when written and is superseded**; kept as a correction, not edited away.
+> > **Read one number correctly:** the vector step prints **`OK: 28`**, not 29 — that is
+> > `s2-seq-bound`'s pre-pin state, self-consistent on that tree. **No vector was added and no pin
+> > moved; NOT a drift event.** Still unproven: the **android** gate (**B-7**, **B-22** unmoved) and
+> > `Verify-Alpha.ps1`'s `-IncludePublish`/`-IncludePackage`. **The merge condition is unchanged.**
 >
 > ## ▶ RUN 80 — 2026-08-22. **B-22's diagnosis named the wrong seam, and the patch it prescribed would not have worked.**
 >
@@ -1512,11 +1525,13 @@ the branch the landing plan closes (**C-81-8**), while the dependency survives o
 (**C-81-9**). **Draft PR #54** carries it onto a branch that survives either answer. **Not a blocker
 and not gated on the #53 decision** — see BLOCKED.md's run-81 note.
 
-**NEW ITEM 1 — read CI on PR #54.** The cheapest item on this list and the only unverified part of
-this run's work: the evidence is `npm test` in a Linux sandbox, which is the relay's **real** suite
-but **not** this repo's Windows gate. Expect the relay job green at **52 passed**. **No local
-toolchain needed — readable from the Actions tab.** If it errors, the cause is environmental
-(`npm ci` on the runner), not the assertion, which is proven by mutation here (**C-81-10**).
+**~~NEW ITEM 1 — read CI on PR #54.~~ DONE IN-RUN — do not re-take it.** The wake arrived before run
+81 ended and it was read (**C-81-14**): run `32574969239`, head `f95b66e`, attempt 1,
+**`conclusion: success`**, no re-run. **Relay job `Tests  52 passed (52)`** and typecheck green on
+`ubuntu-latest`; **offline job `=== Offline total: 598 passed, 0 failed ===`** on `windows-latest`,
+**598 being the base branch's number — the branch moves the pin by zero** (**B-17** verified, not
+asserted). **Both of run 81's stated-unverified claims now hold.** What is still unproven is the
+**android** gate and `-IncludePublish`/`-IncludePackage`; **the merge condition is unchanged.**
 
 **NEW ITEM 2 — the `latest` **value** skew, derived this run but NOT measured, and deliberately not
 taken.** Distinct from the closed item above: `since`-independence is invariant, but the *value* is

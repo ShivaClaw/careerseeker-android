@@ -15254,3 +15254,45 @@ because the claim and its definition travel together.
 **Read the guard for what it checks.** It proves every `C-`/`B-` id cited here has an entry. It does
 **not** prove any command in this file was actually run — that is what the *"Expected, and observed"*
 wording is for, and it is only as good as the run that wrote it.
+
+### C-81-14 — CI ran PR #54, and it verifies the two claims run 81 filed as unverified
+
+**Added after the run-81 records were pushed**, on a `check_suite.completed` wake. The rows above that
+say *"CI has not run PR #54"* are **superseded by this one**; they were true when written and are not
+now. Recorded as a correction rather than edited away.
+
+```bash
+list_workflow_runs ci.yml branch=claude/s2-latest-since-invariant
+list_workflow_jobs <run_id>
+```
+
+*Expected, and **observed**:* **one** run, **`32574969239`**, run number **474**, **`run_attempt: 1`**,
+head **`f95b66e`**, **`conclusion: success`**, `pull_requests: [54]`. **No re-run was triggered.**
+Two jobs, both `success`:
+
+| job | runner | the steps that matter |
+| --- | --- | --- |
+| **Blind relay (Worker)** | `ubuntu-latest` | Typecheck ✓, **Test ✓**, dry-run ✓, blind-relay assert ✓, vector assert ✓ |
+| **Build and offline harnesses** | `windows-latest` | Build warnings-as-errors ✓, **offline alpha verification ✓** |
+
+**The relay assertion, on a runner:** `✓ test/relay.test.ts (52 tests)`, **`Tests  52 passed (52)`**.
+This is **C-81-10**'s clean-tree row reproduced off this machine — the guard is real on CI, not only in
+the sandbox. `npx wrangler types` then `npx tsc --noEmit` both green, reproducing **C-81-11**.
+
+**The `$ExpectedOfflineTotal` claim, now measured instead of asserted:**
+**`=== Offline total: 598 passed, 0 failed ===`**, `CareerSeeker alpha verification complete.` — run on
+**Windows**, which is the gate this sandbox cannot reach. **598 is the base branch's number**, so this
+branch moves the pin by **zero** and adds **no** landing cost to the pin family (**B-17**). The PR's
+self-audit item 4 asked a reviewer to *"verify that claim rather than accept it"*; this is that
+verification, and it holds.
+
+**One number to read correctly, not as drift:** the vector step prints
+**`OK: 28 vector files match the generator.`**, not the 29 of **C-81-3**. That is the **base branch's**
+pre-pin state — `claude/s2-seq-bound` predates the third vector — and the check is self-consistent on
+that tree. **This run added no vector and moved no pin**; 28 here and 29 at `7328a0b` are two different
+trees, not a disagreement. **Not a cross-repo drift event.**
+
+**What this still does not prove.** It is the **engine** repo's CI, so it says nothing about the
+android gate (**B-7**, **B-22** unmoved), and `Verify-Alpha.ps1`'s **`-IncludePublish`/`-IncludePackage`
+passes did not run — only the offline portion CI runs on every push. **The merge condition remains a
+full local gate**, which no cloud session can run, so this changes **nothing** about the landing policy.

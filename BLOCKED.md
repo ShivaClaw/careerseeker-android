@@ -4143,8 +4143,18 @@ asks whether #53 is closed. This run **takes no position on that** and does not 
 now lives on a branch that survives either answer. **The one thing a future session should not do is
 file this as blocked on the #53 decision.** It is not.
 
-**The genuinely unverified part, stated plainly:** **CI has not run PR #54**, and this run claims no CI
-result for it. The evidence is `npm test` in a Linux sandbox — the relay's real suite, not a stub, but
-**not this repo's Windows gate** (`Verify-Alpha.ps1` did not run; no .NET, no PowerShell). The branch
-touches no C#, no vector and no `$ExpectedOfflineTotal`, so it should add nothing to the pin family
-(**B-17**) — **verify that rather than accept it.**
+**The genuinely unverified part, stated plainly — and then resolved before the run ended.** As
+written, this read: *"CI has not run PR #54, and this run claims no CI result for it"*, the evidence
+being `npm test` in a Linux sandbox, with the pin-family claim (**B-17**) flagged **"verify that
+rather than accept it."**
+
+> **RESOLVED in-run on a `check_suite.completed` wake** (**C-81-14**). Run `32574969239`, head
+> `f95b66e`, **attempt 1**, **`conclusion: success`**, no re-run. **Relay job on `ubuntu-latest`:
+> `✓ test/relay.test.ts (52 tests)`, `Tests  52 passed (52)`**, typecheck green — the sandbox result
+> reproduced **off this machine**. **Offline job on `windows-latest`: `=== Offline total: 598 passed,
+> 0 failed ===`** — **598 is the base branch's number, so the branch moves the pin by zero.** The
+> B-17 claim is now **measured, not asserted**, which is what the PR's self-audit asked for.
+>
+> **Still unproven, and not claimed:** the **android** gate (**B-7**, **B-22** both unmoved — this is
+> the *engine* repo's CI) and `Verify-Alpha.ps1`'s `-IncludePublish`/`-IncludePackage` passes.
+> **The merge condition — a full local gate no cloud session can run — is unchanged.**
