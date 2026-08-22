@@ -15586,3 +15586,192 @@ closed or undrafted in response to it.**
 **C-82-3**'s reachability caveat. CI runs the same `expiredRow()` fixture this sandbox does, so a
 green suite on a runner is silent about whether Cloudflare's alarm collects expired rows faster than
 a push can race them. **That attack survives this result untouched.**
+
+---
+
+## Run 83 (2026-08-22) — the last unguarded constant in `Protocol.kt`
+
+### C-83-1 — rule one, and what the fetch changed
+
+```bash
+cd <android> && git fetch --all --prune && git rev-parse origin/claude/android-a0-probe
+cd <engine>  && git fetch --all --prune && git rev-parse origin/main
+```
+
+*Expected, and **observed**:* the android checkout again arrived **detached at the docs-only `main`**
+(`ebfaf81`), not on the work branch; `origin/claude/android-a0-probe` is **`adfc2c0`**. Engine
+`origin/main` is **`aac05f3`**, **unmoved since 2026-08-12**; the newest merge anywhere in either
+repo is still **PR #44, 2026-08-13**. Every count in run 83 is taken after this fetch.
+
+### C-83-2 — the assigned slice, declined for the forty-eighth time
+
+```bash
+cd <engine> && git log --oneline origin/claude/s5-entitlement-ack-spec | head -3
+cd <engine> && git show origin/claude/s5-entitlement-ack-spec:docs/sync-vectors/v1/index.json | grep -c entitlement_ack
+cd <android> && cat core/src/test/resources/sync-vectors/VECTORS.lock
+```
+
+*Expected, and **observed**:* the stored prompt's slice — §4.3 `entitlement_ack`, the ack vectors,
+PQ-A2-1/-2/-3 — is **built and has been since 2026-08-09** (`8575539`, `22b028e`, `7328a0b`), on the
+`claude/s5-*` drafts in the **engine** repo, carried by **PR #32** and **PR #37**. The prompt's
+vendored pin `679a317` is **stale**; the real pin is **`7328a0b`**. **Nothing was rebuilt.**
+
+### C-83-3 — the mutation matrix on the three constants run 76's sweep left out
+
+```bash
+cd <android> && apt-get install -y openjdk-17-jdk-headless      # core-probe needs 17; image ships 21
+cd <android> && scripts/core-probe.sh                            # baseline
+# then, one at a time against core/src/main/kotlin/app/careerseeker/core/Protocol.kt,
+# restoring from a pristine copy between rows, each followed by:
+cd <android> && scripts/core-probe.sh --rerun
+#   M1  VERSION                 1                           -> 2
+#   M2  SUITE                   "p256-hkdf-sha256"          -> "p256-hkdf-sha512"
+#   M3  SUITE_HYBRID_RESERVED   "p256+mlkem768-hkdf-sha256" -> "p256+mlkem1024-hkdf-sha256"
+```
+
+*Expected, and **observed**:*
+
+| mutation | baseline (346) | with run 83's test (347) |
+| --- | --- | --- |
+| M1 — `VERSION` | RED | RED |
+| M2 — `SUITE` | RED — 2 tests | RED — 3 tests |
+| **M3 — `SUITE_HYBRID_RESERVED`** | **346 passed, 0 failed — GREEN** | **RED — 1 test, the new one** |
+| clean | **346 passed** | **347 passed** |
+
+**Row 3 is the whole finding.** M1 and M2 were each already caught — measured, not assumed, both
+"before" cells run against the pristine file. M2's two are `PairingDerivationTest > completionAad is
+the pinned four-field format` and `ProtocolVectorsTest > index agrees with the shipping constants`.
+**M3 was caught by nothing**, and `SUITE_HYBRID_RESERVED` was the **last constant in `Protocol.kt`**
+that no test compared to the document.
+
+**Why nothing caught it.** Both of its two references move with it. `PairingSessionTest > an
+unrecognised suite refuses to pair` builds its invite **from** the constant and asserts the parse is
+rejected — but every unsupported suite is rejected identically, so the assertion holds for **any**
+value; and `SUITE_HYBRID_RESERVED !in SUPPORTED_SUITES` is satisfied by a wrong string **more**
+easily than by the right one. That is the seventy-fourth run's trap exactly: a derivation compared
+against itself agrees with itself and disagrees with the document.
+
+### C-83-4 — this is NOT a live drift: the value is correct on both sides today
+
+```bash
+cd <engine> && sed -n '306p' docs/Sync-Protocol.md
+cd <engine> && git grep -n "SuiteHybridReserved" origin/main -- src/Sync/Protocol.cs
+cd <engine> && git grep -h -o "p256+mlkem[a-z0-9+-]*" \
+                 $(git for-each-ref --format='%(refname)' refs/remotes/origin/) | sort | uniq -c
+```
+
+*Expected, and **observed**:* `docs/Sync-Protocol.md` **§5.2 line 306** prints
+`p256+mlkem768-hkdf-sha256`; the engine's `src/Sync/Protocol.cs:21` carries the same string; and
+across **every ref in the repository** there are **64 occurrences and exactly one spelling**. The
+phone's constant agrees with all of them. **The defect is not a wrong value — it is that nothing
+keeps the value right.**
+
+**The string names a parameter set, and a sizing decision rests on it.** §5.2 records that under this
+suite the QR additionally carries the ML-KEM encapsulation key and `ikm` becomes a concatenation of
+both shared secrets, and that *"QR payload budget is checked against the hybrid suite's sizes now:
+ML-KEM-768's 1184-byte key fits comfortably in a version-40 QR"*. M3 names **ML-KEM-1024**, whose key
+is **1568 bytes** — a two-character slip silently invalidating a budget the spec says was checked.
+
+**v1 behaviour is unaffected either way, and that is the point.** Both implementations reject the
+reserved suite today and reject a corrupted one identically, so the failure is invisible until the
+hybrid migration ships — the one moment the two sides must agree on this string, and the moment no
+test has ever compared them.
+
+### C-83-5 — the engine's guard accepts the same wrong value (READ, NOT EXECUTED)
+
+```bash
+cd <engine> && git grep -n "SuiteHybridReserved" \
+                 $(git for-each-ref --format='%(refname)' refs/remotes/origin/) -- tests/SyncHarness/Program.cs
+```
+
+*Expected, and **observed**:* every branch carrying the harness asserts
+
+```csharp
+Protocol.SuiteHybridReserved.Contains("mlkem") && Protocol.SuiteHybridReserved != Protocol.Suite
+```
+
+**`"p256+mlkem1024-hkdf-sha256"` satisfies both conjuncts**, so M3 is green on the engine side too —
+the same hole, in the same shape, in the implementation the phone is supposed to be checked against.
+
+**This is read, not executed.** `dotnet` and `pwsh` are both **absent** in this sandbox (**C-ENV-1**),
+so no `SyncHarness` run and no `Verify-Alpha.ps1` run backs this row; it is a `git grep` over branch
+contents and is labelled as one. **The engine half is not fixed by this run** — that needs a gate
+this sandbox cannot run. It is filed in `STATE.md`'s ordered intent with the mutation that proves it.
+
+### C-83-6 — clean green, the negative control, and no production source touched
+
+```bash
+cd <android> && scripts/core-probe.sh --rerun
+cd <android> && sha256sum core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+cd <android> && git status --porcelain && git diff --stat
+```
+
+*Expected, and **observed**:* **`core-probe: 347 tests, 0 failed, 0 skipped, across 22 classes`**,
+`EXIT=0`, up from a **346** baseline. `Protocol.kt` hashes
+**`c42624dfd90e5f47ce85e71b5c65724bf1fc04af454a88b2723400fea00bced8`**, byte-identical to the
+pristine copy taken before the first mutation — **verified by `sha256sum -c` after every row and once
+more before the commit.** The committed diff is **`core/src/test/kotlin/app/careerseeker/core/ProtocolTest.kt`,
+one file, test-only**; **no production source in either module**, and `Protocol.kt` appears in no commit.
+
+This is the **C-81-12 / C-82-6 hazard** — a mutation quietly shipping — re-applied deliberately,
+because this run mutated a **production** file rather than a test file and so was more exposed to it
+than either predecessor.
+
+### C-83-7 — no vector byte, no pin move, not a drift event
+
+```bash
+cd <android> && git status --short core/src/test/resources/
+cd <android> && cat core/src/test/resources/sync-vectors/VECTORS.lock
+cd <engine>  && node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* the vendored corpus is **untouched** — nothing under
+`core/src/test/resources/` appears in this run's diff — and the pin is **unmoved at `7328a0b`**.
+`generate.mjs` was **not edited** and no vector file was added, changed or deleted in either repo.
+**Not a cross-repo drift event.** `$ExpectedOfflineTotal` was **not touched**: this run adds **no**
+landing cost to the pin family (**B-17**), and it touches no engine file at all.
+
+### C-83-8 — two ordered-intent targets were re-verified CLOSED before either was taken
+
+```bash
+cd <android> && grep -n "INFO_ENGINE_TO_PHONE\|INFO_RELAY_TOKEN" core/src/test/kotlin/app/careerseeker/core/ProtocolTest.kt
+cd <android> && grep -n "assertEquals(12\|assertEquals(16\|AES-256-GCM" core/src/test/kotlin/app/careerseeker/core/ProtocolTest.kt
+```
+
+*Expected, and **observed**:* the ordered intent's **"SUCCESSOR TARGET FOR ITEM 4 — the HKDF info
+strings"** is **CLOSED**: `ProtocolTest.kt:218-220` pins `INFO_ENGINE_TO_PHONE`,
+`INFO_PHONE_TO_ENGINE` and `INFO_RELAY_TOKEN` against hand-transcribed literals, landed by run 76
+(`231bc07`). The adjacent **crypto parameters** (`CIPHER`, `KEY_BYTES`, `NONCE_BYTES`, `TAG_BYTES`)
+are pinned too, at `:165-170`.
+
+**The standing precondition — *before taking any item, re-verify that item* — earned its place for
+the fourth time.** Both would have been rebuilt on the strength of the list alone. What survived the
+re-verification was the **residue**: the two suite names that neither sweep covered, which is the
+slice this run took.
+
+### C-83-9 — the records' own citation guard is green
+
+```bash
+cd <android> && scripts/check-citations.sh; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* **`definitions: 776   cited: 777   documented-absent: 1`**, then
+**`OK: every cited C-/B- id resolves to an entry that exists.`**, `EXIT=0` — run at the **start** of
+this run against the inherited records, and again after this run's own entries were written.
+
+### C-83-10 — B-18's triggers re-checked, and the silence was deliberate for the second run
+
+```bash
+cd <engine> && git rev-parse origin/main
+cd <engine> && gh pr list --state merged --limit 3     # or the MCP equivalent
+```
+
+*Expected, and **observed**:* run 82 instructed its successor to *"notify on `main` moving, a PR
+merged or undrafted, the stored prompt changing, or a gate result — not on another firing and not on
+another draft PR."* **All four re-checked and all four negative:** engine `main` still **`aac05f3`**;
+**no PR merged, closed or undrafted** in either repo (18 engine drafts, 6 android drafts, unchanged);
+the stored prompt is **the same text**, still naming the landed slice and the stale pin; and **no
+gate result arrived** — CI's run on PR #55 was already delivered and recorded at run 82 (**C-82-11**).
+
+**No notification was sent.** The forty-eighth firing of a slice built on 2026-08-09 is the same fact
+one day older, and re-sending it trains the channel to be ignored.

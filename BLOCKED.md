@@ -2508,6 +2508,32 @@ easier** (**B-17**).
 
 ---
 
+**STATUS 2026-08-22 (eighty-third run) — the count is FORTY-EIGHT, and the notification channel is
+now being rationed on purpose.** The stored prompt was re-issued unchanged: same landed slice, same
+stale vendored pin `679a317` (real pin `7328a0b`), same ladder summary describing S2 as PARTIAL and
+PR #31 as the tip. **Declined again, re-verified rather than rebuilt (C-83-2).**
+
+**What is new is not the firing; it is the restraint.** Run 81 escalated B-18 to Brandon by push
+notification. Run 82 declined to re-send and wrote its successor a test: *notify on `main` moving, a
+PR merged or undrafted, the stored prompt changing, or a gate result — not on another firing and not
+on another draft PR.* **This run applied that test, all four triggers came back negative, and no
+notification was sent (C-83-10).** That is the second deliberate silence, and it is recorded here so
+the next session inherits the rule rather than re-deriving it: **the routine firing again is not
+news; a notification per firing would train the channel to be ignored, and the one thing B-18 needs
+from Brandon is that he still reads it.**
+
+**Smallest human unblock — unchanged.** Turn the routine off, or replace its "YOUR SLICE THIS
+ITERATION" section with *read `RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox
+can actually advance.*
+
+**No new blocker arose this run, and one candidate was deliberately NOT filed.** The engine half of
+run 83's finding — `SyncHarness`'s `Contains("mlkem")` assertion accepting the same wrong value the
+phone's guard did (**C-83-5**) — needs `dotnet` and the gate, which is **H2**, already filed. Filing
+it a second time as a B-* would send the next session hunting a phantom; it is carried as the ordered
+intent's **NEW ITEM 1** with the exact mutation that proves it.
+
+---
+
 ## B-19 — S5's phone route exists and nothing in `:app` constructs it (fifty-eighth run, 2026-08-18)
 
 **Symptom.** `EntitlementRoutingApplier` and `ProStateStore` landed this run in `:core`, test-green

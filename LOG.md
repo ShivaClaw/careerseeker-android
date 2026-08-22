@@ -15505,3 +15505,120 @@ because no command relied on a relative path outliving its `cd`.
 > **And it does not touch the run's own strongest caveat:** CI runs the same `expiredRow()` fixture
 > this sandbox does, so a green suite on a runner says **nothing** about whether the alarm collects
 > expired rows faster than a push can race them. **C-82-3's reachability attack survives this result.**
+
+---
+
+# RUN 83 — 2026-08-22 (Linux sandbox). The last constant in `Protocol.kt` that no test compared to the document.
+
+**Slice:** the `:core` constants lane — the one lane besides the relay's that this sandbox can
+actually execute. **Not** the assigned slice, which is landed (**C-83-2**, forty-eighth firing).
+
+## Milestone 0 — rule one, and two list items that were already closed
+
+`git fetch --all --prune` in both checkouts **before** any count. The android tree again arrived
+**detached at the docs-only `main`** (`ebfaf81`), not on the work branch; engine `origin/main` is
+**`aac05f3`**, unmoved since 2026-08-12 (**C-83-1**).
+
+The ordered intent's live target was **"SUCCESSOR FOR ITEM 4 — the HKDF info strings"**. The standing
+precondition says *re-verify the item before taking it*, and it earned its place for the fourth time:
+the target is **CLOSED**, pinned by run 76 at `ProtocolTest.kt:218-220`, and the adjacent crypto
+parameters are pinned at `:165-170` (**C-83-8**). Both would have been rebuilt on the strength of the
+list alone.
+
+**What survived that re-verification was the residue** — `VERSION`, `SUITE` and
+`SUITE_HYBRID_RESERVED`, the three constants in `Protocol.kt` that neither sweep covered. That is the
+slice.
+
+## Milestone 1 — the lane was re-opened, because the image regressed
+
+`scripts/core-probe.sh` needs **JDK 17** (`:core` pins `jvmToolchain(17)`); this image ships **21**,
+and `apt-get install openjdk-17-jdk-headless` **failed 404 against a stale index** before
+`apt-get update` fixed it. Recorded because run 56 installed the same JDK and the next sandbox will
+find 21 again. **Baseline: `core-probe: 346 tests, 0 failed, 0 skipped, across 22 classes`.**
+
+## Milestone 2 — the matrix, one mutation at a time, every row executed
+
+| mutation | baseline (346) | with run 83's test (347) |
+| --- | --- | --- |
+| M1 — `VERSION` `1 -> 2` | RED | RED |
+| M2 — `SUITE -> "p256-hkdf-sha512"` | RED — 2 tests | RED — 3 tests |
+| **M3 — `SUITE_HYBRID_RESERVED -> "p256+mlkem1024-hkdf-sha256"`** | **346 passed, 0 failed — GREEN** | **RED — the new test** |
+| clean | **346 passed** | **347 passed** |
+
+**M3 was caught by nothing** (**C-83-3**). Both "before" cells for M1/M2 were run against the
+pristine file rather than inferred — M2's catchers are `PairingDerivationTest > completionAad is the
+pinned four-field format` and `ProtocolVectorsTest > index agrees with the shipping constants`.
+
+**Why nothing caught M3:** both references to the constant move with it. `PairingSessionTest > an
+unrecognised suite refuses to pair` builds its invite **from** the constant and asserts rejection —
+but every unsupported suite is rejected identically, so it holds for **any** value; and
+`SUITE_HYBRID_RESERVED !in SUPPORTED_SUITES` is satisfied by a wrong string **more** easily than by
+the right one. The seventy-fourth run's trap, one constant over from the seven run 76 closed.
+
+## Milestone 3 — what the finding is NOT, stated before what it is
+
+**It is not a live drift.** The phone's value is **correct**: it matches `docs/Sync-Protocol.md`
+§5.2 line 306 and the engine's `src/Sync/Protocol.cs:21`, and across **every ref in the engine repo**
+there are **64 occurrences and exactly one spelling** (**C-83-4**). Nothing is broken today.
+**The defect is that nothing keeps it right.**
+
+**And the string is not a label.** §5.2 records that under this suite the QR additionally carries the
+ML-KEM encapsulation key, and that *"QR payload budget is checked against the hybrid suite's sizes
+now: ML-KEM-768's 1184-byte key fits comfortably in a version-40 QR"*. M3 names **ML-KEM-1024**,
+whose key is **1568 bytes** — a two-character slip invalidating a budget the spec says was already
+checked. **v1 behaviour is unaffected either way, and that is exactly why it is invisible:** both
+sides reject the reserved suite today and reject a corrupted one identically, so the failure surfaces
+only when the hybrid migration ships — the one moment the two implementations must agree on this
+string, and the moment no test has ever compared them.
+
+## Milestone 4 — the engine has the same hole, and this run did not fix it
+
+`tests/SyncHarness/Program.cs`, on every branch carrying it, asserts
+`Protocol.SuiteHybridReserved.Contains("mlkem") && Protocol.SuiteHybridReserved != Protocol.Suite`.
+**`"p256+mlkem1024-hkdf-sha256"` satisfies both conjuncts** (**C-83-5**), so M3 is green on the engine
+side too — the same hole in the implementation the phone is meant to be checked against.
+
+**Read, not executed.** `dotnet` and `pwsh` are both absent here, so no harness run backs that row;
+it is a `git grep` over branch contents and is labelled one. **The engine half is deliberately not
+patched** — it needs a gate this sandbox cannot run, and a C# edit I cannot compile is exactly what
+this program's rules forbid. Filed in the ordered intent with the mutation that proves it.
+
+## Milestone 5 — the fix, and the negative control that earns it
+
+One test added to `ProtocolTest.kt`, in the shape run 76 established and for the reason that test
+gives: the existing guards all run **through the corpus**, and `VECTORS.lock` states the corpus's
+guarantee precisely — *"the phone matches the pin"*, never *"the phone matches the engine"*. The new
+test reads no file.
+
+Clean: **347 passed, 0 failed, `EXIT=0`**. Replayed under M3: **RED**, one test, the new one. Replayed
+under M2: **RED**, three tests, the new one joining the two that already caught it (**C-83-6**).
+
+## Milestone 6 — the discipline that mattered more this run than last
+
+This run mutated a **production** file, where runs 81 and 82 mutated test files — so the
+ship-a-mutation hazard (**C-81-12**, **C-82-6**) was live in a way it had not been. `Protocol.kt` was
+copied pristine before the first row, restored between **every** row, and `sha256sum -c` re-checked
+after each and once more before the commit: **`c42624df…bced8`**, byte-identical. The committed diff
+is **one test file**. `Protocol.kt` appears in **no commit** (**C-83-6**).
+
+## What this run did NOT do
+
+**No gate ran and none is claimed.** `scripts/core-probe.sh` is **one** of the android gate's five
+tasks; `:app:assembleDebug` and `:app:lintDebug` have no SDK here (**ANDROID_HOME** unset, **B-7**),
+`checkCoreIsAndroidFree` was not run, and **the fused android tree has still never been built**.
+`Verify-Alpha.ps1` did not run — no `dotnet`, no `pwsh` (**C-ENV-1**). **No CI result is claimed for
+this run's push.**
+
+**No vector byte, no pin move, no generator edit** — the vendored corpus is untouched and the pin is
+unmoved at **`7328a0b`** (**C-83-7**). **`$ExpectedOfflineTotal` untouched**; this run adds no landing
+cost to the pin family (**B-17**) and touches **no engine file at all**. **No production source in
+either module** — the diff is test-only. **No `:app` file, no C#, no Kotlin production code.**
+
+**Nothing merged, closed, undrafted, force-pushed or deleted** in either repo; **no history
+rewritten**; **no branch created or deleted in the engine repo**. **No deploy of any kind.** **The
+production relay was not contacted at all**, not even `GET /v1/health`. No Play, Google or OAuth
+console; no account, purchase, Gmail, keystore or emulator. **No secret read, printed or echoed.**
+No scheduled task enumerated, created, modified or deleted. Terra's territory
+(`autonomy/codex-state`) was **read, never written** — Terra reports **COMPLETE, next intent: none**,
+so there is no collision. **No notification was sent** (**C-83-10**): all four of run 82's stated
+triggers re-checked and all four negative.
