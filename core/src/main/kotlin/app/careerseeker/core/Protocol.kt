@@ -17,7 +17,29 @@ package app.careerseeker.core
 object Protocol {
     const val VERSION = 1
 
-    /** Envelope hard limit. Larger is rejected before any crypto work. */
+    /**
+     * The §3.1 size cap, measured on the **decoded ciphertext** — the AEAD output including
+     * its 16-byte tag, after base64url decoding. Larger is rejected before any crypto work.
+     *
+     * **Not the envelope, despite the name.** §3.1 is explicit that a receiver measures those
+     * decoded bytes, *"not the length of the JSON envelope and not the length of the base64url
+     * text"*, and `MUST NOT exceed` makes exactly this value the largest **legal** ciphertext
+     * rather than the first illegal one. The name is kept because it is the shared corpus's:
+     * `index.json` carries `max_envelope_bytes`, `invalid-oversized` is specified as *"a
+     * ciphertext of `max_envelope_bytes + 1` **decoded** bytes"*, and renaming it here would
+     * split the phone from the manifest it is pinned against for no wire-visible gain.
+     *
+     * The KDoc that stood here until the seventy-ninth run read *"Envelope hard limit"* — the
+     * P0 wording S5 retired. §3.1 records why: that sentence *"described something neither
+     * implementation ever measured"*, both having always tested the decoded ciphertext, so the
+     * prose moved to the code rather than the reverse. The stale copy mattered because §4.4
+     * instructs a future chunker to size against exactly this number, and a chunker sized
+     * against the envelope would be sized against the wrong quantity by ~33%.
+     *
+     * The boundary itself is pinned in `EnvelopeReceiverTest` — a ciphertext of exactly this
+     * many decoded bytes is accepted, one more is `too_large`, and the acceptance case is what
+     * distinguishes this unit from the two §3.1 forbids.
+     */
     const val MAX_ENVELOPE_BYTES = 1024 * 1024
 
     /** AES-256-GCM, decided at gate P0-CIPHER. See Sync-Protocol.md section 5.1. */

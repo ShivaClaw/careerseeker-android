@@ -275,8 +275,14 @@ class ProtocolTest {
         assertEquals(5, tracker.highestAccepted(Direction.PHONE_TO_ENGINE))
     }
 
+    /**
+     * The §3.1 cap is 1 MiB. This pins the **number**; `EnvelopeReceiverTest` pins the **unit**
+     * it is measured in and the boundary it sits on, which this assertion cannot see — a
+     * receiver comparing this value against base64url characters satisfies it exactly as well
+     * as one comparing it against decoded ciphertext bytes.
+     */
     @Test
-    fun `envelope size limit matches the spec`() {
+    fun `the section 3-1 cap is 1 MiB`() {
         assertEquals(1024 * 1024, Protocol.MAX_ENVELOPE_BYTES)
     }
 }
