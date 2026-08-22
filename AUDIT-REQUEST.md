@@ -15040,3 +15040,217 @@ used an **absolute** path, and `wc -c` was taken on all three files before and a
 272,015). The hazard did announce itself twice — the shell's working directory reset to
 `/home/user` after two commands — and cost nothing, because nothing relied on a relative path
 outliving its `cd`.
+
+## Run 81 — 2026-08-22 (Linux cloud sandbox). `latest`'s `since`-independence: the guard was on the branch the plan closes
+
+Every command below was **executed this run**, after `git fetch --all --prune` in both trees.
+`<android>` = `/home/user/careerseeker-android`, `<engine>` = `/home/user/careerseeker`.
+
+### C-81-1 — rule one, and both checkouts were stale detached HEADs
+
+```bash
+cd <android> && git fetch --all --prune && git rev-list --left-right --count origin/main...origin/claude/android-a0-probe
+cd <engine>  && git fetch --all --prune && git rev-parse origin/main
+```
+
+*Expected, and **observed**:* both trees arrived **detached** at stale refs — the android checkout at
+the docs-only `main` (`ebfaf81`), the engine at `aac05f3`. Post-fetch, `claude/android-a0-probe` is
+`8610253` and is **302 ahead / 10 behind** `origin/main`. Engine `origin/main` is still **`aac05f3`**,
+unmoved since 2026-08-12. Every count in this run is post-fetch.
+
+### C-81-2 — the assigned slice is built: the forty-sixth firing
+
+```bash
+cd <engine> && for c in 8575539 22b028e 7328a0b; do git log -1 --format='%ad  %s' $c; done
+cd <engine> && git worktree add -f --detach /tmp/pin 7328a0b && (cd /tmp/pin && node docs/sync-vectors/generate.mjs --check)
+```
+
+*Expected, and **observed**:* `8575539` **Sun Aug 9 2026** *"S5: define the entitlement_ack body, and
+say what the size cap actually measures"* (`docs/Sync-Protocol.md` only, **+114/−3**); `22b028e`
+**Sun Aug 9 2026** (both ack vectors **and** `generate.mjs`); `7328a0b` **Wed Aug 12 2026**
+(`invalid-unknown-field`, PQ-A2-3). `--check` prints **`OK: 29 vector files match the generator.`**,
+**`exit=0`**. This is the command the stored prompt names as *"a real, runnable verification here"* —
+it runs, and it passes on work finished **thirteen days ago**. **Declined and re-verified, not
+rebuilt** (**B-18**).
+
+### C-81-3 — the pin, and zero cross-repo drift
+
+```bash
+cd <android> && grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1
+cd <engine>  && git merge-base --is-ancestor 7328a0b origin/main && echo "on main" || echo "NOT on main"
+diff -rq /tmp/pin/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+```
+
+*Expected, and **observed**:* pin is **`7328a0bc043335491cd96a67d634e8eea2a13af9`**, **not** the
+prompt's `679a317`; **NOT on main** (`git ls-tree origin/main docs/sync-vectors/v1/ | wc -l` = **26**,
+against **29** vendored); `diff -rq` prints **nothing**, **`exit=0`**, **29 files**. **No vector byte
+was written by this run in either repo.**
+
+> **Note the first ancestor check was run in the wrong repository** and printed
+> `fatal: Not a valid commit name 7328a0b…` → `NOT on main`. The right answer by the wrong route.
+> Re-run in `<engine>`, it is genuinely `NOT on main`. Recorded because the failure mode is
+> **C-79-16**'s (a command that outlives the tree it assumes) and it produced a *plausible* result.
+
+### C-81-4 — the `:core` lane, and JDK 17 again
+
+```bash
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+cd <android> && bash scripts/core-probe.sh
+```
+
+*Expected, and **observed**:* the sandbox ships **JDK 21 only**, and `core-probe.sh` refuses to start
+with its own prescribed remedy. After the install: **`core-probe: 346 tests, 0 failed, 0 skipped,
+across 22 classes`**, `BUILD SUCCESSFUL`. **346 reproduces run 79 exactly.** This is **B-7**'s
+per-session cost recurring for the *n*th run, not a new blocker.
+
+**No `:core` file was written this run, so 346 is a baseline measurement only** — no `:core` claim is
+made and no delta is reported.
+
+### C-81-5 — the relay suite runs here, and the baseline reproduces
+
+```bash
+cd <engine> && git worktree add -f --detach /tmp/relaywt origin/claude/s2-seq-bound
+cd /tmp/relaywt/relay && npm ci && npm test
+```
+
+*Expected, and **observed**:* **`Tests  51 passed (51)`**, 1 file. This **reproduces C-S2Q-4**
+(*"the relay suite is 42 → 51 and green"*) exactly — it is a **known** lane, not a new capability, and
+it is the one gate in this repo a Linux sandbox genuinely owns besides `generate.mjs --check`.
+
+### C-81-6 — item 1's stated axis, REFUTED: `since`-independence holds in every relay version
+
+The ordered intent's top item asks whether a deployed relay older than #53 is covered. Its stated
+property is *"`latest` is `MAX(seq)` per direction independent of `since`"*.
+
+```bash
+cd <engine> && for r in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin); do
+  h=$(git rev-parse "$r:relay/src/channel.ts" 2>/dev/null) && echo "$h  $r"; done | sort | uniq -c -w40
+cd <engine> && for h in 3c8a843b 69f6309e 9c8998d1 d961dccb 4ef847e8; do git cat-file blob $h | grep -n "MAX(seq)"; done
+```
+
+*Expected, and **observed**:* **five distinct blobs** of `relay/src/channel.ts` across all refs. In
+**every** one that has the field, the `latest` query is `MAX(seq) … WHERE dir = ?` (± a retention
+predicate) — **`since` appears in no version's `latest` query.** The property has held since the P1
+relay `bea78cb`, which is the deployed phase. **So the skew as item 1 describes it is not real**, and
+the item can be closed on its stated axis.
+
+### C-81-7 — the version-dependence that IS real, and is deliberate
+
+```bash
+cd <engine> && git log --oneline --all -S"MAX(seq) AS m FROM envelopes WHERE dir = ? AND expires_at" -- relay/src/channel.ts
+cd <engine> && git cat-file blob 4ef847e8 | sed -n '174,190p'
+```
+
+*Expected, and **observed**:* **`90ae2a1`** (*"the relay's read path forgot retention"*, PR #34) is the
+sole commit that changed it: the **pull** `latest` became retention-filtered while the **push** replay
+guard did not. So `latest`'s *value* is version-dependent even though its `since`-independence is not.
+**This is deliberate and documented in situ** — the comment reads *"This deliberately counts
+expired-but-uncollected rows, unlike `pull` below. The two want opposite things from the same rows."*
+**Not a defect, and recorded so it is not re-investigated as one.**
+
+### C-81-8 — the guard exists on exactly one ref, and it is the one the plan closes
+
+```bash
+cd <engine> && for r in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin); do
+  git show "$r:relay/test/relay.test.ts" 2>/dev/null | grep -q "independent of since" && echo "HIT $r"; done
+```
+
+*Expected, and **observed**:* exactly one line — **`HIT origin/claude/s6-resume-reconciliation`**
+(**PR #53**), the branch `RETURN-DAY.md` §3 **step 0 recommends closing**. `claude/s2-seq-bound`'s
+`latest` assertions cover ranges, retention and the 409 body; **none pins `since`-independence.**
+
+> `scripts/fleet-probe.sh` lives in the **android** repo, not the engine, so the house probe could not
+> be used from the engine checkout; the loop above does the equivalent job across every engine ref.
+
+### C-81-9 — the dependency SURVIVES the closure, on #46
+
+```bash
+cd <engine> && git grep -n "PullAsync(" origin/claude/s6-counter-reconciliation -- src/
+cd <engine> && git grep -n "Latest" origin/claude/s6-counter-reconciliation -- src/Sync/InboundPump.cs
+```
+
+*Expected, and **observed**:* on **#46** (which survives per §11.4), `InboundPump.cs:225` computes
+**`MoreAvailable: _cursor < page.Latest`** — `latest` is the pump's **pagination loop bound** — and
+`Program.cs:409` calls `PullAsync(…, since, ct)` with a **moving, non-zero** `since` resumed from
+`paired.LastP2eSeq`. **So the dependency outlives #53 while its only guard does not.**
+
+**Stated against the weaker half too, deliberately:** `Program.cs:286`'s reconcile read passes
+**`since: 0`** on #46, so the *reconcile* half of the justification is #53's own and would leave with
+it. **The pump half is what carries the argument**, and it is the half quoted in the PR.
+
+### C-81-10 — the mutation proof: the property is unguarded today
+
+Mutation = the exact refactor the property is exposed to (`… AND seq > ?`, `since`), applied to
+`relay/src/channel.ts`'s **pull** `latest` only.
+
+```bash
+cd /tmp/relaywt/relay
+# 1. baseline, no guard, mutation applied
+npm test
+# 2. add the guard (this run's commit), mutation still applied
+npm test
+# 3. restore channel.ts, guard present
+npm test
+```
+
+*Expected, and **observed**:*
+
+| tree | mutation | result |
+| --- | --- | --- |
+| `s2-seq-bound` baseline, **no guard** | applied | **`Tests  51 passed (51)`** — **GREEN** |
+| **+ guard** | applied | **`Tests  1 failed \| 51 passed (52)`** — **RED** |
+| **+ guard** | clean | **`Tests  52 passed (52)`** — **GREEN** |
+
+Row 1 is the finding: **the property the pump depends on is currently guarded by nothing.** Under
+mutation the guard fails at `expect(none.latest).toBe(3)` with **received `0`** — exactly the value
+that makes `_cursor < page.Latest` false and **ends the drain early and silently**.
+
+`git diff --name-only` after restore: **`relay/test/relay.test.ts`** alone. **No production source was
+committed** — `channel.ts` was mutated only in the scratch worktree and restored from a pre-mutation
+copy before the commit.
+
+### C-81-11 — typecheck
+
+```bash
+cd /tmp/relaywt/relay && npx wrangler types && npx tsc --noEmit -p tsconfig.json
+```
+
+*Expected, and **observed**:* **0 errors.** `wrangler types` runs **offline** here. Run without it
+first, `tsc` reports ~15 `Cannot find name 'Response'/'Request'/'Env'` errors **all in `src/`** — the
+generated `worker-configuration.d.ts` missing, not a defect and **not caused by this run's file**
+(`grep -c 'test/relay.test.ts'` = **0** both times). `relay/worker-configuration.d.ts` is gitignored
+(`.gitignore:27`) and was not committed.
+
+### C-81-12 — what was pushed, and what was deliberately NOT touched
+
+```bash
+cd <engine> && git log --oneline -1 origin/claude/s2-latest-since-invariant
+cd <engine> && git rev-parse origin/claude/s2-seq-bound
+```
+
+*Expected, and **observed**:* new branch `claude/s2-latest-since-invariant` at **`f95b66e`**, **draft
+PR #54** into base `claude/s2-seq-bound`, diff **one test file, +35 lines, no production source**.
+**`claude/s2-seq-bound` is unmoved at `2be00fc`** — amending #35 in place would have invalidated
+**C-RD-3**, which verified all seven landing branches against their PR heads the day before the plan
+is used. **Nothing was merged, closed, undrafted or force-pushed.**
+
+### C-81-13 — the citation guard on this run's records
+
+```bash
+cd <android> && scripts/check-citations.sh
+```
+
+*Expected, and **observed***, run **after** this run's record appends:
+**`definitions: 764   cited: 765   documented-absent: 1`**,
+`OK: every cited C-/B- id resolves to an entry that exists.`, **`EXIT=0`**.
+
+Sizes taken before and after with **absolute** paths, per **C-79-16**: `AUDIT-REQUEST.md`
+784,362 → **795,042**; `LOG.md` 1,010,687 → **1,018,810**; `BLOCKED.md` 272,015 → **275,459**;
+`STATE.md` 574,250 → **582,440**. All four grew, all four in `<android>`, and
+`git status` in `<engine>` shows **no untracked record file** — which is the specific failure
+**C-79-16** describes, where an append lands in the wrong checkout and the guard stays consistent
+because the claim and its definition travel together.
+
+**Read the guard for what it checks.** It proves every `C-`/`B-` id cited here has an entry. It does
+**not** prove any command in this file was actually run — that is what the *"Expected, and observed"*
+wording is for, and it is only as good as the run that wrote it.

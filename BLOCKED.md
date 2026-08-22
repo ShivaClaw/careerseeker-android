@@ -4099,3 +4099,52 @@ moves `$ExpectedOfflineTotal` and every doc reporting it in one commit, and ther
 **B-10**, **B-12**, **B-13**, **B-14**, **B-15**, **B-16**, **B-19** were neither acted on, narrowed
 nor re-attempted. **B-7** was reproduced and gained one detail (**C-80-9**): androidx is not on Maven
 Central either, so `:app` has no `core-probe.sh` analogue and never will on this network.
+
+### B-18 status 2026-08-22 (eighty-first run) — the forty-sixth firing, and the first one that reached Brandon
+
+**Unchanged as a blocker. One thing about it changed, and it is the only thing that ever could from
+here: the message left the repository.**
+
+Forty-five previous runs recorded *"turn the routine off, or repoint it"* into `BLOCKED.md`,
+`STATE.md` and `RETURN-DAY.md` — **documents whose whole problem is that the person who can act on
+them is not reading them.** Run 48's banner made the firing *cheap*; it could not make it *stop*, and
+said so. **This run had a channel those runs did not: a push notification to the owner.** It was sent,
+carrying the three commits (`8575539`, `22b028e`, `7328a0b`), the one-command check
+(`generate.mjs --check` → `OK: 29 vector files match the generator.`), the stale pin
+(`679a317` → `7328a0b`), the 18 open engine drafts with nothing merged since **PR #44, 2026-08-13**,
+and the fact that **return day is four days past**.
+
+**Why that is a status change and not a fix.** The unblock has always been an action only Brandon can
+take — editing stored scheduler configuration that **nothing in either checkout can reach**
+(attempt 2, unchanged). Notifying him does not perform it. **If the routine fires again, this entry
+should be read as: the message was delivered, and the schedule still stands.** The next run should
+**not** re-derive B-18 from scratch, and should **not** send a second notification for the same fact —
+one delivery is information, a daily repeat is noise. **Notify again only on a genuinely new fact**
+(the schedule changes, a PR merges, `main` moves, or something breaks).
+
+**The slice itself was declined and verified, per attempt 1's standing judgement** (**C-81-2**):
+rebuilding it would produce a duplicate §4.3 amendment competing with `8575539`, and re-running the
+generator to "add" existing vectors risks the corpus the android repo vendors at `7328a0b` — which the
+prompt's own text classes as a **cross-repo drift event**. **Corpus verified 29/29 byte-identical
+before and after this run** (**C-81-3**).
+
+---
+
+### Not blocked, and recorded here so it is not mistaken for a blocker — run 81's finding
+
+**`latest`'s `since`-independence had exactly one guard, on the branch the landing plan closes**
+(**C-81-8**). This is **not** a BLOCKED item: it needed no human, no gate and no decision, and it was
+**fixed this run** — draft **PR #54**, `claude/s2-latest-since-invariant`, one test file, proven by
+mutation (**C-81-10**: unguarded tree **51 GREEN** under the mutation; with the guard, **RED**; clean,
+**52 GREEN**).
+
+**What remains of it is a decision that already existed**, not a new one: `RETURN-DAY.md` §3 step 0
+asks whether #53 is closed. This run **takes no position on that** and does not need one — the guard
+now lives on a branch that survives either answer. **The one thing a future session should not do is
+file this as blocked on the #53 decision.** It is not.
+
+**The genuinely unverified part, stated plainly:** **CI has not run PR #54**, and this run claims no CI
+result for it. The evidence is `npm test` in a Linux sandbox — the relay's real suite, not a stub, but
+**not this repo's Windows gate** (`Verify-Alpha.ps1` did not run; no .NET, no PowerShell). The branch
+touches no C#, no vector and no `$ExpectedOfflineTotal`, so it should add nothing to the pin family
+(**B-17**) — **verify that rather than accept it.**

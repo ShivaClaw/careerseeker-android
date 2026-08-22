@@ -15234,3 +15234,123 @@ scheduled task was enumerated, created, modified or deleted. **Terra's worktrees
 **Every path in this run's record appends is absolute**, per **C-79-16**. The hazard announced itself
 twice this run — the shell's working directory reset to `/home/user` after two commands — and was
 survived both times because nothing relied on a relative path outliving its `cd`.
+
+## Run 81 — 2026-08-22 (Linux cloud sandbox). The guard for a property two consumers depend on was sitting on the branch the landing plan closes.
+
+**The slice: the ordered intent's top item, taken because it is the one the list itself calls
+"genuinely measurable in a sandbox" — and measuring it refuted its stated axis and found a live one
+next to it.** Item 1 asks whether a deployed relay older than #53 breaks the engine's `latest` read.
+It does not: `since` appears in **no** relay version's `latest` query (**C-81-6**, five distinct
+`channel.ts` blobs across every ref). **But the assertion that keeps it that way exists on exactly one
+branch — `claude/s6-resume-reconciliation`, PR #53 — which `RETURN-DAY.md` §3 step 0 recommends
+closing** (**C-81-8**).
+
+## Milestone 1 — rule one, and the state re-derived rather than carried forward
+
+Both checkouts arrived **detached at stale refs** (**C-81-1**): the android tree at the docs-only
+`main` `ebfaf81`, **302 commits behind** the work branch. Every count here is post-fetch. Engine
+`origin/main` is still **`aac05f3`**, unmoved since 2026-08-12.
+
+## Milestone 2 — the assigned slice, declined for the forty-sixth time
+
+The stored prompt assigns S5's spec half. **It has been built since 2026-08-09.** Verified rather than
+inherited (**C-81-2**): `8575539` (Aug 9, §4.3.3 body + PQ-A2-1 + PQ-A2-2), `22b028e` (Aug 9, both ack
+vectors, generator-written), `7328a0b` (Aug 12, `invalid-unknown-field`, PQ-A2-3);
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the generator.`**,
+`exit=0`. That is the command the prompt itself nominates as *"a real, runnable verification here"* —
+it runs, and it passes on work thirteen days old. The prompt's pin `679a317` is stale too; it is
+**`7328a0b`**, and the vendored corpus is **29/29 byte-identical** to it (**C-81-3**).
+
+**This run notified Brandon** — the first run able to. B-18's smallest human unblock has always been
+*turn the routine off or repoint it*, and forty-five previous runs could only write that into records
+he is not reading. **A push notification was sent** with the three commits, the one-command check, the
+stale pin, and the fact that return day is **four days** past.
+
+## Milestone 3 — the lanes this environment actually owns, both re-established
+
+`:core` via `scripts/core-probe.sh` after the recurring JDK-17 install (**C-81-4**, **B-7**):
+**346 tests, 0 failed, 0 skipped, 22 classes** — **reproducing run 79 exactly**. No `:core` file was
+written, so 346 is a **baseline only** and no `:core` claim is made.
+
+The relay suite via `npm test` in `relay/` (**C-81-5**): **51 passed**, **reproducing C-S2Q-4**. This
+is a **known** lane, not a discovery; recording the reproduction is the point.
+
+## Milestone 4 — the finding, and the two things it is not
+
+`latest` is `MAX(seq)` per direction, independent of `since`. **Two consumers depend on that**
+(**C-81-9**), and on **#46** — the branch that *survives* §11.4's recommendation — the load-bearing one
+is `InboundPump.cs:225`: **`MoreAvailable: _cursor < page.Latest`**, the **pagination loop bound**,
+read while pulling with a **moving, non-zero** `since` from `Program.cs:409`. A `since`-relative
+`latest` collapses that comparison the moment a page returns empty, so **the pump stops draining
+mid-backlog and reports a clean drain.** Silent, not loud.
+
+**It is not the retention divergence** (**C-81-7**). `90ae2a1` (PR #34) did make the pull `latest`
+retention-filtered while the push replay guard stayed unfiltered — but that is **deliberate and
+documented in situ**, and the comment says so in as many words. Recorded so a later run does not
+re-open it as a defect.
+
+**It is not an argument about #53.** Whether #53 is closed is Brandon's decision and this run takes no
+position on it. §11.4 says #53 should be *"closed or reduced to whatever #45/#46 lack"* — **this test
+is one concrete item on that list, which was previously unenumerated.**
+
+**The weaker half is stated too:** `Program.cs:286`'s reconcile passes `since: 0` on #46, so the
+*reconcile* justification is #53's own and leaves with it. **The pump half carries the argument**, and
+it is the half quoted in the PR.
+
+## Milestone 5 — measured, not argued
+
+Mutation = the exact refactor the property is exposed to (`… AND seq > ?`, `since`) on the **pull**
+`latest` only (**C-81-10**):
+
+| tree | mutation | result |
+| --- | --- | --- |
+| `s2-seq-bound` baseline, **no guard** | applied | **51 passed — GREEN** |
+| **+ guard** | applied | **1 failed / 51 passed (52) — RED** |
+| **+ guard** | clean | **52 passed — GREEN** |
+
+**Row 1 is the finding.** Under mutation the guard fails at `expect(none.latest).toBe(3)` with
+**received `0`** — precisely the value that ends the drain. `npx wrangler types && npx tsc --noEmit`
+→ **0 errors** (**C-81-11**).
+
+## Milestone 6 — what was pushed
+
+Branch `claude/s2-latest-since-invariant` at **`f95b66e`**, **draft PR #54** into base
+`claude/s2-seq-bound`, **one test file, +35 lines** (**C-81-12**). **#35's head is unmoved at
+`2be00fc`** — amending it in place would have invalidated **C-RD-3**, which checked all seven landing
+branches against their PR heads the day before the plan is used. The PR carries its self-audit
+section, whose first item is the attack this run considers strongest: **the claim that the dependency
+survives #53 rests on two citations into #46, and a restack that reshapes the pump makes the test's
+justification stale while the test still passes.**
+
+## What this run did NOT do
+
+**No gate ran here.** `./gradlew checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug`
+was **not executed** — no Android SDK, `ANDROID_HOME` empty. **No engine gate** —
+`scripts\Verify-Alpha.ps1` needs .NET, PowerShell and Windows DPAPI, **all absent** (`dotnet` not
+found). **CI has not run PR #54**, and no CI result is claimed for it. The relay evidence is `npm test`
+in a Linux sandbox: the relay's **real** suite, not a stub, but **not this repo's Windows gate**.
+
+**No production source was written, in either repo.** The engine diff is one **test** file;
+`channel.ts` was mutated only in a scratch worktree and **restored from a pre-mutation copy before the
+commit** — `git diff --name-only` showed `relay/test/relay.test.ts` alone. **No `:app` file, no `:core`
+file, no Kotlin, no C#.** **No vector byte was written and the pin did not move** — corpus
+byte-identical to `7328a0b` before and after (**C-81-3**), so this is **not** a cross-repo drift event.
+**`docs/Sync-Protocol.md` was read at the pin and never edited.** No `generate.mjs` change, no
+`ci.yml` change. **`$ExpectedOfflineTotal` was not touched**, so this run adds **no** landing cost to
+the pin family (**B-17**).
+
+**No rung moved**, and none is claimed to have. **B-4**, **B-5**, **B-9**, **B-14**, **B-15**,
+**B-16**, **B-19**, **B-22**, **B-23** were neither acted on nor re-attempted. **Nothing was merged,
+closed, undrafted, force-pushed or deleted in either repository**; **`claude/s2-seq-bound` and every
+other landing branch is unmoved**; no history was rewritten; **no deploy of any kind**; the production
+relay was **not contacted at all**, not even `GET /v1/health`; no Play, Google or OAuth console; no
+accounts, no purchases, no Gmail, no secrets read or printed, no `.appdata`. **No scheduled task was
+enumerated, created, modified or deleted** — the routine that fired this run was **reported to its
+owner, not touched.** Terra's worktrees and `Documents\CareerSeeker` were never touched; Terra's state
+reads **COMPLETE, files claimed: none**, so there was no collision.
+
+**Every path in this run's record appends is absolute**, per **C-79-16**. The cwd hazard announced
+itself repeatedly — the shell reset to `/home/user` after most `cd` commands — and cost nothing. It
+did land one *substantive* near-miss, recorded rather than hidden: the pin's ancestor check was first
+run in the **android** checkout, where the SHA does not exist, and printed the **right answer by the
+wrong route** (**C-81-3**). Re-run in the engine, it holds.

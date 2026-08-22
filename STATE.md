@@ -11,6 +11,58 @@
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
 >
+> ## ▶ RUN 81 — 2026-08-22. **The guard for a property two consumers depend on was sitting on the branch the landing plan closes. And B-18 finally reached Brandon.**
+>
+> **The slice: the ordered intent's top item, taken because the list itself calls it "the one item
+> genuinely measurable in a sandbox" — and measuring it refuted its stated axis while finding a live
+> one beside it.** Item 1 asks whether a relay older than #53 breaks the engine's `latest` read.
+> **It does not:** `since` appears in **no** relay version's `latest` query — five distinct
+> `channel.ts` blobs across every ref, the property holding since the deployed P1 relay `bea78cb`
+> (**C-81-6**). **Close item 1 on its stated axis.**
+>
+> **WHAT IS REAL: the assertion keeping it that way exists on exactly ONE branch** —
+> `claude/s6-resume-reconciliation` (**PR #53**), the branch `RETURN-DAY.md` §3 **step 0 recommends
+> closing** (**C-81-8**, a loop over every `refs/remotes/origin/*`). **And the dependency outlives the
+> closure while the guard does not** (**C-81-9**): on **#46**, which survives §11.4,
+> `InboundPump.cs:225` is **`MoreAvailable: _cursor < page.Latest`** — the **pagination loop bound** —
+> read with a **moving, non-zero** `since` from `Program.cs:409`. A `since`-relative `latest` collapses
+> it the moment a page returns empty, so **the pump stops draining mid-backlog and reports a clean
+> drain.** Silent, not loud.
+>
+> **MEASURED, NOT ARGUED (C-81-10).** Mutation = the exact refactor the property is exposed to:
+> **baseline without the guard → `51 passed`, GREEN** (the property is guarded by nothing today);
+> **+ guard → `1 failed | 51 passed (52)`, RED**; **+ guard, clean → `52 passed`, GREEN.** Under
+> mutation it fails at `expect(none.latest).toBe(3)` with **received `0`** — exactly the value that
+> ends the drain. `wrangler types && tsc --noEmit` → **0 errors** (**C-81-11**).
+>
+> **Draft PR #54** (`claude/s2-latest-since-invariant`, `f95b66e`), base `claude/s2-seq-bound`, **one
+> test file, +35 lines, no production source.** **#35's head is deliberately unmoved at `2be00fc`** —
+> amending it would have invalidated **C-RD-3**, taken the day before the plan is used (**C-81-12**).
+> **This takes NO position on the #53 decision**; §11.4 says #53 should be *"closed or reduced to
+> whatever #45/#46 lack"*, and this is **one concrete item on that previously unenumerated list**.
+>
+> **TWO THINGS IT IS NOT.** Not the **retention** divergence (**C-81-7**): `90ae2a1` (PR #34) did make
+> the pull `latest` retention-filtered while the push replay guard stayed unfiltered, but that is
+> **deliberate and documented in situ** — *"The two want opposite things from the same rows."*
+> **Do not re-open it as a defect.** And not a blocker: it needed no human, no gate, no decision.
+>
+> **B-18's FORTY-SIXTH firing — and the first that left the repository.** Forty-five runs wrote *"turn
+> the routine off or repoint it"* into documents the one person who can act on it is not reading.
+> **This run sent a push notification** with the three commits, the one-command check, the stale pin,
+> the 18 drafts unmerged since **PR #44 (2026-08-13)**, and **return day four days past**. That is a
+> status change, **not a fix** — the unblock is still editing stored scheduler config nothing in
+> either checkout can reach. **Next run: do not re-derive B-18, and do not re-notify the same fact.**
+> One delivery is information; a daily repeat is noise. **Notify again only on a NEW fact.**
+>
+> **SCOPE: no rung moved.** `:core` **346/0/0, 22 classes**, reproducing run 79 — **baseline only, no
+> `:core` file written, no `:core` claim** (**C-81-4**). Relay suite **51 passed** baseline,
+> reproducing **C-S2Q-4** — a **known** lane, not a discovery (**C-81-5**). **No `:app` file, no
+> Kotlin, no C#, no vector byte** (corpus **29/29** byte-identical, pin unmoved at `7328a0b`),
+> `docs/Sync-Protocol.md` read at the pin and never edited, no `generate.mjs`, no `ci.yml`;
+> **`$ExpectedOfflineTotal` untouched, so no landing cost added to the pin family** (**B-17**).
+> **CI has NOT run PR #54 and no CI result is claimed for it**; no engine gate ran (no `dotnet`, no
+> `pwsh`). The production relay was **not contacted at all**, not even `/v1/health`.
+>
 > ## ▶ RUN 80 — 2026-08-22. **B-22's diagnosis named the wrong seam, and the patch it prescribed would not have worked.**
 >
 > **The slice: the top row of the open-blocker table, taken because four runs had declined it for a
@@ -1444,6 +1496,59 @@ respectively and they can be done today.
 | **B-14** phone-side confirm assertion | **new 2026-08-15** (forty-first run). `:core` cannot assert `pairing-high-bit-confirm` because the vendored corpus is pinned at `679a317`, which **predates the vector** — the file is not in this repo. **Not B-7:** `:core` is Android-free and its tests run on the JVM here; the blocker is the **pin**, not the toolchain, which is why it has a human unblock and B-7 does not. Hand-vendoring was considered and **refused** (that is the drift event the mission forbids). Smallest unblock: merge PR #50, re-pin, re-run the drift check — both steps Brandon's. **PR #51's engine-side assertion does not depend on it** and is CI-green at 617/0 |
 
 ## Next intent (in order)
+
+**ORDERED INTENT REVISED 2026-08-22 (eighty-first run) — THE `since:` SKEW IS CLOSED ON ITS STATED
+AXIS, AND MEASURING IT PRODUCED THE NEXT ITEM.**
+
+**CLOSED — the `since:` version skew** (carried as ITEM 1/ITEM 2 through four revisions, and named
+each time as "the one item genuinely measurable in a sandbox"). **It was measured this run and its
+premise does not hold** (**C-81-6**): `latest` is computed independently of `since` in **every**
+version of `relay/src/channel.ts` in the repository — five distinct blobs across all refs — and has
+been since the deployed P1 relay `bea78cb`. **A relay older than #53 does not break the engine's
+read. Do not re-open this; re-verify with C-81-6's one-line loop if you doubt it.**
+
+**What the measurement found instead is fixed, not filed:** the property's only guard was on **#53**,
+the branch the landing plan closes (**C-81-8**), while the dependency survives on **#46**
+(**C-81-9**). **Draft PR #54** carries it onto a branch that survives either answer. **Not a blocker
+and not gated on the #53 decision** — see BLOCKED.md's run-81 note.
+
+**NEW ITEM 1 — read CI on PR #54.** The cheapest item on this list and the only unverified part of
+this run's work: the evidence is `npm test` in a Linux sandbox, which is the relay's **real** suite
+but **not** this repo's Windows gate. Expect the relay job green at **52 passed**. **No local
+toolchain needed — readable from the Actions tab.** If it errors, the cause is environmental
+(`npm ci` on the runner), not the assertion, which is proven by mutation here (**C-81-10**).
+
+**NEW ITEM 2 — the `latest` **value** skew, derived this run but NOT measured, and deliberately not
+taken.** Distinct from the closed item above: `since`-independence is invariant, but the *value* is
+**not** — `90ae2a1` (PR #34) made the **pull** `latest` retention-filtered while the **push** replay
+guard stayed unfiltered (**C-81-7**). That divergence is **deliberate and documented in situ**, so it
+is **not a defect** — but the engine reads the pull `latest` as a loop bound and the push `latest`
+from a 409 body, and **nothing has checked what a consumer does when the same direction reports two
+different high-water marks** (post-purge, they can differ). **This is a hypothesis, not a finding.**
+Measure it before believing it: a relay test parking rows past their TTL, then reading both numbers.
+**If they cannot disagree in practice, say so and cross it off** — the last several runs each
+produced one target that survived measurement and one that did not.
+
+**ITEM 3 — the soft-failure choice in #53's startup consult.** Unchanged, and still **a question, not
+a task**: an unreachable relay falls back to the vault alone with one printed line, so §6.1's
+catastrophe is reachable when the relay is down **and** the vault is stale. **A decision is not a
+slice.**
+
+**ITEM 4 onward — unchanged, and every one still needs a gate this sandbox lacks:** the restack, the
+two decided-but-unbuilt type changes, the halt-policy WINDOW, mutation M8 on Windows, B-9's licence
+key, and the phone-side items (**B-7**).
+
+**Standing precondition, unchanged and vindicated again this run:** before taking any item, re-verify
+that item. Two of this list's item 1s have historically been closed work, and **this run closed a
+third by measuring it.** `origin/main` is not the state of the program — 18 engine drafts are open and
+none is merged, so deriving "what is missing" from `main` shows solved-but-unmerged work as open.
+
+**A note for whoever writes the next prompt — and this run did something about it.** The stored
+prompt's assigned slice has been landed since the twenty-second run; this was the **forty-sixth**
+firing. **A push notification was sent to Brandon this run** (see BLOCKED.md B-18, run-81 status).
+**Do not send another for the same fact** — notify only on a genuinely new one.
+
+---
 
 **ORDERED INTENT — RUN 75 NOTE (2026-08-21). ITEM 4's `:core` lane produced a target by measurement
 again, and it names its own successor.** The lane "holds no named Kotlin gap" was true of *code*;
