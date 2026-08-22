@@ -3900,3 +3900,66 @@ exercised — and it was **not** worked around by skipping or `@Ignore`-ing a te
 remaining half was again declined**, for the reason it has been declined every run: proving the
 vector step's failure path means pushing a knowingly-wrong vector byte, which is the cross-repo
 drift event the mission forbids outright.
+
+### B-22 status 2026-08-22 (seventy-ninth run) — it FIRED, third occurrence, and the failing line is now pinned
+
+**Correcting this run's own earlier records.** Run 79's records commit and **C-79-17** both say
+B-22 was "neither observed nor sampled" / "did not fire on this head". True of `8264275` and
+`c5bcf83`; **false of the final head `73238fc`**, where it fired (**C-79-19**).
+
+**The sample.** Run `32554847042` attempt 1, job `96987312857`, head `73238fc`:
+`ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab FAILED`,
+`java.lang.AssertionError at ScreensFromFixtureTest.kt:69`, `35 tests completed, 1 failed, 3
+skipped`. Steps 1–9 green including **`:core` in 58s**; step 10 red; 11–14 skipped.
+
+**It is B-22 and not this PR's defect, for five measured reasons** (**C-79-19**): the diff that
+produced it is **records-only** (two markdown files, zero source — the same shape as the `0c4ca8f`
+precedent); the identical `:app` tree **passed twice the same day** (92s, 113s); the class and the
+assertion family are the ones B-22 already names; and the build's own `UnconfinedTestDispatcher`
+deprecation warning names the mechanism 25 lines above the failure in the same log.
+
+**What is genuinely new, and it is why this entry exists rather than a one-line tally.** B-22
+described the hazard as a *pattern* — *"missing any `waitForIdle`/`waitUntil` after a navigating
+`performClick()`"*. **This run pins it to a line.** `ScreensFromFixtureTest.kt:68-69`, inside the
+tab loop:
+
+```
+for (tab in listOf("Applications", "Jobs", "Evidence", "Home")) {
+    compose.onNodeWithText(tab).performClick()
+    compose.onNodeWithText(label).assertIsDisplayed()
+}
+```
+
+The click navigates; the assertion runs with nothing between them. **Four tabs, so the loop gives
+the hazard four chances per test run** — which is a plausible reason this class dominates the
+sample set rather than the failure being spread across the suite.
+
+**And the count now says something the earlier framing did not.** Sample moves from **2-in-24** to
+**3**, and **two of the three are records-only commits**. So the nondeterminism is **not
+correlated with touching `:app` at all**. That is what makes B-22 a *gate* hazard rather than a
+code smell: any commit in this repository, including a pure documentation commit, carries the
+risk, and therefore **every "CI green" in these records remains one sample** — the retroactive
+qualification B-22 already carried, now with a third data point behind it.
+
+**Attempts this run.**
+1. **Re-run the failed job, once.** Executed: `rerun_failed_jobs` on `32554847042` produced
+   attempt 2 (job `96987953926`) **on the identical commit with no push between** — the only
+   construction that demonstrates nondeterminism, and the one the prior sample used
+   (`96726656919` → `96728744410`). **Its outcome was not observed by this session** — the job
+   and check-run endpoints served cached `in_progress`, and `get_job_logs` returned **HTTP 404**,
+   which is what that endpoint does before a job completes. **No verdict is claimed for attempt
+   2**; the next reader should open the run and look.
+2. **Fix it.** Not attempted, and correctly so: the fix is an `:app` file and needs the Android
+   SDK to compile (**B-7**). B-22 already carries a written-but-uncompiled patch, labelled
+   unverified, and adding a second unverified patch would not improve it.
+3. **Skip, `@Ignore`, quarantine or in-suite retry.** **Refused**, as B-22 and the mission both
+   require. A green obtained by not running the assertion is worth less than a red that is
+   understood.
+
+**Smallest human unblock — unchanged, and now cheaper to act on.** On a machine with the Android
+SDK, add a `waitForIdle()` (or a `waitUntil` on the banner node) after the `performClick()` at
+`ScreensFromFixtureTest.kt:68`, and audit the other provenance-banner test for the same shape.
+Then run `./gradlew :app:testDebugUnitTest` repeatedly — B-22's rate means a single green proves
+nothing, which is the property that has kept this open.
+
+**B-22 stays OPEN**, and this run neither narrowed nor worked around it.

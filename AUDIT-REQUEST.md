@@ -14608,3 +14608,74 @@ had already completed, once for long enough to resemble the documented android C
 (`f49290e`). `updated_at` on the run object was likewise frozen. **Compare
 `started_at`/`completed_at` on individual steps, and treat a polled `status` as a lower bound on
 progress, never as current.**
+
+### C-79-19 — B-22 FIRED on this run's final head, and it is the third occurrence
+
+**This corrects two earlier statements in run 79's records.** The heartbeat and the run-79
+records commit both say *"B-22 neither observed nor sampled"*, and **C-79-17** says *"B-22 did
+not fire on this head."* Both were true when written — of `8264275` and `c5bcf83` — and **both
+are wrong about the final head `73238fc`**, where B-22 fired.
+
+```bash
+#   pull_request_read(get_check_runs, ShivaClaw/careerseeker-android, 6)
+#   actions_get(get_workflow_job, ShivaClaw/careerseeker-android, 96987312857)
+#   get_job_logs(ShivaClaw/careerseeker-android, job_id=96987312857, return_content=true)
+git -C <android> diff --stat c5bcf83 73238fc
+sed -n '60,72p' <android>/app/src/test/kotlin/app/careerseeker/dashboard/ui/ScreensFromFixtureTest.kt
+```
+
+*Expected, and **observed**, on head **`73238fc`**, run `32554847042`, attempt 1, job
+`96987312857` — **`conclusion: failure`**:
+
+```
+ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab FAILED
+    java.lang.AssertionError at ScreensFromFixtureTest.kt:69
+35 tests completed, 1 failed, 3 skipped
+```
+
+Steps 1–9 **`success`** (including **`:core` in 58s**); **step 10 `:app` Robolectric `failure`**;
+steps 11–14 `skipped`.
+
+**Five independent reasons this is B-22 and not this PR's defect**, each measurable:
+
+1. **The diff that produced it is records-only.** `git diff --stat c5bcf83 73238fc` →
+   `AUDIT-REQUEST.md +41`, `LOG.md +29`. **Two markdown files, zero source files.** The
+   precedent is exact: `0c4ca8f` was also a records-only commit failing this same class.
+2. **The identical `:app` tree passed twice earlier the same day** — `8264275` at 92s and
+   `c5bcf83` at 113s (**C-79-17**, **C-79-18**).
+3. **The class and the assertion family are the ones B-22 names**: `ScreensFromFixtureTest`, a
+   **provenance-banner** assertion. B-22's two prior samples were both provenance-banner
+   assertions.
+4. **The failing line is the hazard B-22 describes, and this run pins it to a line number**
+   rather than a pattern. `ScreensFromFixtureTest.kt:68-69` is
+   `compose.onNodeWithText(tab).performClick()` immediately followed by
+   `compose.onNodeWithText(label).assertIsDisplayed()`, inside the tab loop — **a navigating
+   click with no `waitForIdle()`/`waitUntil()` between it and the assertion**.
+5. **The build's own compiler warning names the mechanism, in the same log, 25 lines above the
+   failure:** `createComposeRule` is deprecated because *"The v2 APIs use StandardTestDispatcher
+   instead of UnconfinedTestDispatcher ... **Tests relying on immediate execution may require
+   explicit synchronization.**"*
+
+**`:core` — the only module this run touched — passed on all three heads** (64s, 57s, 58s). No
+`:core` test failed at any point.
+
+**What was done about it: one re-run, and nothing else.** `rerun_failed_jobs` was triggered on
+run `32554847042`, producing attempt 2 (job `96987953926`) **on the identical commit, with no
+push between** — the only construction that can demonstrate nondeterminism, and the same one the
+prior B-22 sample used (`96726656919` failure → `96728744410` success). **Its outcome was NOT
+observed by this session**: the job and check-run endpoints served cached `in_progress` for the
+remainder of the run, and `get_job_logs` returned **HTTP 404** (logs are not published until a
+job completes). **No verdict is claimed for attempt 2.** Whoever reads this next should open the
+run and look; if attempt 2 is green, B-22 has a third same-commit demonstration.
+
+**What was deliberately NOT done.** The test was **not** skipped, `@Ignore`d, quarantined or
+retried in-suite — B-22 forbids that explicitly and so does the mission. **No `:app` file was
+written**, because the fix (a `waitForIdle()`/`waitUntil` after each navigating click) needs the
+Android SDK to compile (**B-7**) and B-22 already carries a written-but-uncompiled patch labelled
+unverified. **Pushing this correction starts another CI run**, which at B-22's rate has roughly a
+one-in-twelve chance of reddening again on a markdown-only diff; that is a property of the
+blocker, not of the change, and it is stated here rather than discovered later.
+
+**B-22's sample count moves from 2-in-24 to 3**, and the newly load-bearing detail is that
+**two of the three are records-only commits** — so the nondeterminism is not correlated with
+touching `:app` at all, which is what makes it a gate hazard rather than a code smell.

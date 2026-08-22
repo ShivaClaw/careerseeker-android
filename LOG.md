@@ -14973,3 +14973,44 @@ promising a verdict.
 array for many minutes** on both runs, once long enough to resemble the documented CI hang
 (`f49290e`). **Compare step `started_at`/`completed_at`; treat a polled `status` as a lower bound
 on progress, never as current.**
+
+## Second correction — B-22 fired on the final head, and this run's earlier records said it had not
+
+**Two statements in this run's own records are now wrong and are corrected here** (**C-79-19**).
+The heartbeat and the records commit say *"B-22 neither observed nor sampled"*; **C-79-17** says
+*"B-22 did not fire on this head."* Both were true of `8264275` and `c5bcf83`. **Neither is true
+of the final head `73238fc`.**
+
+Run `32554847042` attempt 1, head `73238fc`, **`conclusion: failure`**:
+`ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab FAILED`,
+`AssertionError at ScreensFromFixtureTest.kt:69`, `35 tests completed, 1 failed, 3 skipped`.
+Steps 1–9 green — **`:core` in 58s** — step 10 red, 11–14 skipped.
+
+**It is not this slice's defect, and the reasons are measured rather than asserted.** The diff
+that produced it is **records-only** — `AUDIT-REQUEST.md +41`, `LOG.md +29`, **zero source
+files** — the same shape as the `0c4ca8f` precedent. The identical `:app` tree **passed twice
+earlier the same day**, at 92s and 113s. The class and the assertion family are the ones B-22
+already names. **`:core`, the only module this run touched, passed on all three heads** (64s,
+57s, 58s).
+
+**The new thing is a line number.** B-22 described a *pattern*; `ScreensFromFixtureTest.kt:68-69`
+is the instance — `performClick()` on a tab, then `assertIsDisplayed()`, nothing between, inside
+a **four-tab loop** that gives the hazard four chances per run. The build's own
+`UnconfinedTestDispatcher` deprecation warning names the mechanism 25 lines above the failure in
+the same log.
+
+**And the count now says something the old framing did not:** 2-in-24 becomes **3**, and **two of
+the three are records-only commits**. The nondeterminism is **not correlated with touching
+`:app`**. That is what makes it a gate hazard rather than a code smell, and it is why **every "CI
+green" in these records stays one sample**.
+
+**One re-run was triggered and nothing else.** `rerun_failed_jobs` produced attempt 2 on the
+**identical commit with no push between** — the construction that demonstrates nondeterminism.
+**Its outcome was not observed by this session**: the API served cached `in_progress` and
+`get_job_logs` returned **HTTP 404**, which is what that endpoint does before a job completes.
+**No verdict is claimed for attempt 2.** The test was **not** skipped, `@Ignore`d or quarantined,
+and **no `:app` file was written** — the fix needs the SDK (**B-7**).
+
+**Stated plainly because it will happen again:** pushing this correction starts another CI run,
+which at B-22's rate has roughly a one-in-twelve chance of reddening on a markdown-only diff.
+That is a property of the blocker, not of this change.
