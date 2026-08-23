@@ -4222,3 +4222,45 @@ is unmeasurable in this sandbox and would need a deployed Worker under load to c
 embargoed for agents (**H5**). It is recorded in **C-82-3** and as the first item of PR #55's
 self-audit, where a reviewer will actually meet it. **Filing it here as a blocker would send the next
 session hunting a phantom**, which is the failure mode this file exists to prevent.
+
+---
+
+## Run 84 (2026-08-23) — no new blocker, and three deliberate non-blockers
+
+**Nothing new is blocked.** This run's slice was chosen *because* it is executable here, and it
+completed: the relay lane needs only `node`, which this image has.
+
+**Deliberate non-blocker 1 — the engine half of run 83's suite-name hole (ordered intent NEW ITEM 1)
+is still not takeable here, and it is still NOT a blocker.** `dotnet` and `pwsh` are absent
+(**C-84-2**, verified with `which`), so the mutation run 83 specified cannot be executed and a C#
+edit that cannot be compiled is what this program's rules forbid. Nothing *human-shaped* is missing
+except the gate itself, which is already **H2** — filing it as a `B-` would send the next session
+hunting a phantom. It stays in the ordered intent with the exact mutation that proves it.
+
+**Deliberate non-blocker 2 — `core-probe.sh` needs JDK 17 and this image ships 21.** Run 83 hit the
+same wall and cleared it with `apt-get update && apt-get install` (its install 404'd against a stale
+apt index first). This run did not need the `:core` lane, so the JDK was **not installed** and the
+lane was **not opened**. That is a choice, not an obstacle: the next session that wants `:core`
+should expect JDK 21 again and budget one `apt-get update` for it.
+
+**Deliberate non-blocker 3 — the retention finding's evidence has a ceiling, and it is stated in
+PR #56's self-audit first.** These tests read `DEFAULT_TTL_SECONDS` and `MAX_TTL_SECONDS` as
+constants; **nothing here demonstrates that Cloudflare's alarm actually purges on schedule.** Alarm
+latency is unmeasurable in this sandbox and would need a deployed Worker under load (**H5**,
+embargoed) — the same limit PR #55's self-audit names for its own `expires_at = 1` writes. **It is a
+limit on the evidence, not a blocker**, and filing it as one would cost the next session a hunt for
+something no local change can fix.
+
+**B-1, B-2, B-4, B-5, B-7, B-8 untouched and not re-tested** — nothing in this slice bears on the
+pairing UI, the live end-to-end, the emulator lane, Room under Robolectric, the egress policy or the
+p2e counter's owner. **B-7 was not re-measured**; its unset `ANDROID_HOME` was observed in passing
+(**C-84-2**) and is consistent with every prior reading. **B-15 and B-16 unchanged** — no vector byte
+moved and the vendored pin is unmoved at `7328a0b` (**C-84-9**), so neither the CI drift check nor
+the pin-staleness decision was exercised.
+
+**One in-run error is recorded in the log and the audit rather than here, because it was recovered
+and blocks nothing** (**C-84-8**): a `git checkout --theirs .` after a `git stash pop` discarded two
+of three hunks during the commit split. Caught by grepping for the test names, restored from the
+saved patch, suite re-run to 57 before committing. **The reason it is worth a line at all** is that
+the failure is silent — `stash pop` reports `Auto-merging`, the subsequent `checkout` leaves a
+**clean tree**, and a clean tree reads as *finished* rather than as *reverted*.

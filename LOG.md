@@ -15622,3 +15622,114 @@ No scheduled task enumerated, created, modified or deleted. Terra's territory
 (`autonomy/codex-state`) was **read, never written** — Terra reports **COMPLETE, next intent: none**,
 so there is no collision. **No notification was sent** (**C-83-10**): all four of run 82's stated
 triggers re-checked and all four negative.
+
+---
+
+# RUN 84 — 2026-08-23 (Linux cloud sandbox). The sweep that exhausted `Protocol.kt` was carried to the third implementation, and the blind relay's retention default was guarded only by its own ceiling.
+
+**The assigned slice was, for the forty-ninth firing, already built.** The stored prompt names S5's
+spec half — §4.3's `entitlement_ack` body, the ack vectors, PQ-A2-1/-2/-3 — and STATE.md's standing
+banner answers it directly: those landed on 2026-08-09 as `8575539`, `22b028e` and `7328a0b`, in the
+**engine** repo. Verified before anything else was done (**C-84-1**), not taken on the banner's word.
+The prompt's vendored pin `679a317` is still stale; it is `7328a0b`.
+
+## Milestone 1 — what this environment can actually execute, measured rather than assumed
+
+`dotnet` and `pwsh` are **absent** (**C-84-2**), so `Verify-Alpha.ps1` cannot run and the ordered
+intent's **NEW ITEM 1** — the engine half of run 83's suite-name hole — remains untakeable here for
+exactly the reason run 83 gave: a C# edit that cannot be compiled is what this program's rules
+forbid. `ANDROID_HOME` is unset and the image ships **JDK 21** where `core-probe.sh` needs **17**.
+
+That leaves the two lanes the records name. Run 83's note says the `:core` constants lane is
+**exhausted** — `Protocol.kt` now has no constant a mutation leaves green — and instructs the next
+sweep to *"pick a different axis, or say plainly that the lane is done."* This run did neither to
+`:core`: it took the **same axis to a different implementation**. `relay/src/protocol.ts` is the
+**third** transcription of `docs/Sync-Protocol.md`, and no run had ever swept it.
+
+## Milestone 2 — the matrix, and the half of it that refuted itself
+
+Baseline reproduced off-machine first: **`55 passed (55)`, `EXIT=0`** (**C-84-3**), the number run 82
+left. Every row below was executed; no cell is inferred.
+
+The first two candidates went green and **are not defects** — the mutation that went green was the
+harmless direction, and probing the direction that would actually hurt found both guarded
+(**C-84-5**):
+
+| mutation | result | reading |
+| --- | --- | --- |
+| `PULL_PAGE_SIZE` 100 → 7 | **55 passed — green** | benign tuning knob |
+| **`PULL_PAGE_SIZE` 100 → 0** | **8 failed / 47** | client-loop liveness **is** guarded |
+| `MAX_PUSH_BODY_CHARS` +4096 → +65536 | **55 passed — green** | benign slack |
+| **`MAX_PUSH_BODY_CHARS` +4096 → +0** | **2 failed / 53** | the "413 on a legal envelope" §3.1 forbids **is** guarded |
+
+**Both crossed off. Do not re-open them.** The page size is relay-internal and not a wire contract;
+the 4 KiB headroom errs in the safe direction.
+
+## Milestone 3 — what survived measurement
+
+| mutation | baseline (55) | with run 84's tests (57) |
+| --- | --- | --- |
+| **M1 — `DEFAULT_TTL_SECONDS` 7d → 30d** | **55 passed — GREEN** | **RED — 1 failed / 56** |
+| **M3 — `PAIRING_ID` `{16}` → `{16,32}`** | **55 passed — GREEN** | **RED — 1 failed / 56** |
+| **M3c — `PAIRING_ID` charset admits `.`** | **55 passed — GREEN** | **RED — 1 failed / 56** |
+| C1 — `PROTOCOL_VERSION` 1 → 2 | 1 failed / 54 | *(negative control)* |
+| C2 — `MAX_TTL_SECONDS` 30d → 60d | 1 failed / 54 | *(negative control)* |
+| C3 — `MAX_ENVELOPE_BYTES` 1 → 2 MiB | 3 failed / 52 | *(negative control)* |
+| clean | **55 passed** | **57 passed** |
+
+**M1 is the finding** (**C-84-4**). `DEFAULT_TTL_SECONDS` was asserted only as
+`<= MAX_TTL_SECONDS` — a bound the ceiling itself satisfies. Raising the default from 7 days to 30
+changes no status code, no response body and no stored row shape: **nothing any test can observe
+moves.** The only effect is that the blind relay holds every user's ciphertext **four times longer**,
+which is the single property this component exists to minimise. It is invisible *because* it is not
+a behaviour change — the same shape as run 82's M1 and run 83's M3.
+
+**It is not a live drift, and that is said first.** The deployed value is 7 days and is correct; the
+defect is that **nothing keeps it right**. §3 bounds the *ceiling* ("MUST NOT exceed 30 days") and
+says nothing about the default, and `7 * 24 * 60 * 60` appears **nowhere in either spec** — so the
+sole statement of intent is `protocol.ts`'s own *"shorter than the ceiling on purpose: keep less, for
+less time."* That is what is now pinned.
+
+**M3/M3c** (**C-84-6**): `isValidPairingId` is a hand-transcription of the `pairing` row of §3's
+field table — "`p_` + 16 base64url chars", `docs/Sync-Protocol.md:79` — and nothing compared the
+regex to the document. The prefix turned out **incidentally** covered (`p_` → `q_` fails **46** of
+55, because every other test uses a `p_` id); **length and charset were covered by nothing.**
+
+## Milestone 4 — the fix, and the discipline the mutation rows required
+
+Two commits, **one test file, +40 lines, no production source** (**C-84-7**). Clean **`57 passed
+(57)`, `EXIT=0`**; `wrangler types && tsc --noEmit` **0 errors, `EXIT=0`**. All three green mutations
+replayed against the new tests: **each RED, each caught by exactly one test — the new one.**
+
+This run mutated a **production** file, so the ship-a-mutation hazard was live as it was at run 83.
+`relay/src/protocol.ts` was copied pristine before the first row, restored between **every** row, and
+`sha256sum -c` re-checked after each and once more before each commit — **`7d7b37bb…73201`**,
+byte-identical, **in neither commit**. The harness refused to report a row whose mutation failed to
+apply, and did so once, on a mislabelled clean run — the refusal is why that row produced no number
+instead of a false green.
+
+**One self-inflicted error is recorded rather than smoothed over** (**C-84-8**). Splitting the diff
+into two commits, a `git checkout --theirs .` after a `git stash pop` discarded the unstaged merge
+result and silently lost two of the three hunks. It was caught by grepping for the test names rather
+than by the commit succeeding, restored from the saved patch, and the full suite re-run to **57**
+before the second commit. **No wrong content reached a commit**; the cost was one restore.
+
+## What this run did NOT do
+
+**No gate ran and none is claimed.** `Verify-Alpha.ps1` did not run — `dotnet` and `pwsh` are absent
+(**C-84-2**), verified with `which` rather than assumed. The android gate did not run: `core-probe.sh`
+needs JDK 17 against this image's 21, `ANDROID_HOME` is unset (**B-7**), and **the fused android tree
+has still never been built**. **No CI result is claimed for this run's push.**
+
+**No engine file outside `relay/test/` was touched.** No C#, no `src/`, no harness — so
+**`$ExpectedOfflineTotal` is untouched** and this branch adds **zero** landing cost to the pin family
+(**B-17**). **No vector byte, no pin move, no `generate.mjs` edit** — the vendored corpus is untouched
+and the pin is unmoved at **`7328a0b`** (**C-84-9**). **No android file changed but the records**; no
+`:app` file, no Kotlin, no `:core` test.
+
+**Nothing merged, closed, undrafted, force-pushed or deleted** in either repo; **no history
+rewritten**; **no branch deleted**. **No deploy of any kind.** **The production relay was not
+contacted at all**, not even `GET /v1/health`. No Play, Google or OAuth console; no account,
+purchase, Gmail, keystore or emulator. **No secret read, printed or echoed.** No scheduled task
+enumerated, created, modified or deleted. Terra's territory (`autonomy/codex-state`) was **read,
+never written** — Terra reports **COMPLETE, files claimed: none** — no collision.

@@ -15775,3 +15775,170 @@ gate result arrived** — CI's run on PR #55 was already delivered and recorded 
 
 **No notification was sent.** The forty-eighth firing of a slice built on 2026-08-09 is the same fact
 one day older, and re-sending it trains the channel to be ignored.
+
+---
+
+## Run 84 (2026-08-23) — the relay constants sweep
+
+### C-84-1 — the assigned slice was already built, for the forty-ninth firing
+
+```bash
+cd <engine> && git log --oneline origin/claude/s5-entitlement-ack-spec | head -4
+cd <engine> && git show 7328a0b --stat | head -20
+```
+
+*Expected, and **observed**:* `8575539` ("define the entitlement_ack body, and say what the size cap
+actually measures"), `22b028e` (two `entitlement_ack` vectors), `9c05ef7`, with `7328a0b`
+(`invalid-unknown-field`, PQ-A2-3/B-6) on `claude/s5-engine-wire-parser`. **The stored prompt's
+slice — §4.3's ack body, the ack vectors, PQ-A2-1/-2/-3 — is landed on the S5 drafts and has been
+since 2026-08-09.** The prompt's vendored pin `679a317` is stale; it is `7328a0b`.
+
+### C-84-2 — this image cannot run either gate, verified rather than assumed
+
+```bash
+which dotnet pwsh; echo "EXIT=$?"
+java -version 2>&1 | head -1
+echo "[$ANDROID_HOME]"
+```
+
+*Expected, and **observed**:* `dotnet` **absent**, `pwsh` **absent** — so `Verify-Alpha.ps1` cannot
+run and the ordered intent's **NEW ITEM 1** (the engine half of run 83's suite-name hole) stays
+untakeable here. `openjdk version "21.0.10"` where `scripts/core-probe.sh` needs **17**.
+`ANDROID_HOME` **empty** (**B-7**).
+
+### C-84-3 — the relay baseline, reproduced off-machine before anything was changed
+
+```bash
+cd <engine> && git checkout claude/s2-latest-retention-skew && cd relay && npm ci && npm test
+```
+
+*Expected, and **observed**:* **`Test Files 1 passed (1)`, `Tests 55 passed (55)`, `EXIT=0`** — the
+number run 82 left at `c4ad6b0` (**C-82-6**), reproduced independently here.
+
+### C-84-4 — the retention default was guarded only by its own ceiling
+
+```bash
+cd <engine> && git checkout claude/s2-latest-retention-skew
+perl -0pi -e 's/const DEFAULT_TTL_SECONDS = 7 \* 24/const DEFAULT_TTL_SECONDS = 30 * 24/' relay/src/protocol.ts
+cd relay && npm test          # baseline: expect 55 passed, GREEN -- the defect
+cd .. && git checkout relay/src/protocol.ts
+git checkout claude/s2-relay-constant-pins
+perl -0pi -e 's/const DEFAULT_TTL_SECONDS = 7 \* 24/const DEFAULT_TTL_SECONDS = 30 * 24/' relay/src/protocol.ts
+cd relay && npm test          # expect RED, 1 failed / 56 -- the new test
+cd .. && git checkout relay/src/protocol.ts
+```
+
+*Expected, and **observed**:* **baseline `55 passed (55)` — GREEN**, and **`1 failed | 56 passed
+(57)`** after the pin. The pre-existing assertion is `DEFAULT_TTL_SECONDS <= MAX_TTL_SECONDS`, which
+**the ceiling itself satisfies**. Raising the default from 7 days to 30 changes no status code, no
+response body and no stored row shape; the only effect is that the blind relay holds ciphertext
+**four times longer**. **Not a live drift** — the deployed value is 7 days and is correct; the defect
+is the absent guard.
+
+### C-84-5 — two candidates went green and are NOT defects; the hurtful direction is guarded
+
+```bash
+cd <engine> && git checkout claude/s2-latest-retention-skew
+# harmless direction -> green
+perl -0pi -e 's/const PULL_PAGE_SIZE = 100;/const PULL_PAGE_SIZE = 7;/' relay/src/protocol.ts
+cd relay && npm test; cd .. && git checkout relay/src/protocol.ts
+# hurtful direction -> red
+perl -0pi -e 's/const PULL_PAGE_SIZE = 100;/const PULL_PAGE_SIZE = 0;/' relay/src/protocol.ts
+cd relay && npm test; cd .. && git checkout relay/src/protocol.ts
+perl -0pi -e 's/MAX_CIPHERTEXT_B64U_CHARS \+ 4096/MAX_CIPHERTEXT_B64U_CHARS + 0/' relay/src/protocol.ts
+cd relay && npm test; cd .. && git checkout relay/src/protocol.ts
+```
+
+*Expected, and **observed**:* page size 100→7 **`55 passed` GREEN**, but 100→**0** **`8 failed / 47`**
+— client-loop liveness **is** guarded. Headroom +4096→+65536 **`55 passed` GREEN**, but →**+0**
+**`2 failed / 53`** — the "413 on a legal envelope" failure §3.1 forbids **is** guarded. **Both
+crossed off: the page size is relay-internal and not a wire contract, and the 4 KiB headroom errs in
+the safe direction. Do not re-open either as a defect.**
+
+### C-84-6 — the pairing-id regex's length and charset were compared to nothing
+
+```bash
+cd <engine> && grep -n 'pairing.*p_.*16 base64url' docs/Sync-Protocol.md      # the normative row
+cd <engine> && git checkout claude/s2-latest-retention-skew
+perl -0pi -e 's/\{16\}\$/{16,32}\$/' relay/src/protocol.ts
+cd relay && npm test; cd .. && git checkout relay/src/protocol.ts             # expect 55 GREEN
+perl -0pi -e 's/\[A-Za-z0-9_-\]\{16\}/[A-Za-z0-9_.-]{16}/' relay/src/protocol.ts
+cd relay && npm test; cd .. && git checkout relay/src/protocol.ts             # expect 55 GREEN
+perl -0pi -e 's/\^p_\[A-Za-z0-9_-\]/^q_[A-Za-z0-9_-]/' relay/src/protocol.ts
+cd relay && npm test; cd .. && git checkout relay/src/protocol.ts             # expect 46 failed
+```
+
+*Expected, and **observed**:* `docs/Sync-Protocol.md:79` — *"`pairing` | string | Pairing id, `p_` +
+16 base64url chars"* — is normative, and `isValidPairingId` is its hand-transcription. Widening
+`{16}`→`{16,32}` and admitting `.` into the charset both left **`55 passed` GREEN**. The **prefix**
+was covered only **incidentally**: `p_`→`q_` fails **46 of 55**, because every other test happens to
+use a `p_` id. **Length and charset were covered by nothing.** Both now RED at 1 failed / 56.
+
+### C-84-7 — the diff is test-only and the mutated production file is in neither commit
+
+```bash
+cd <engine> && git diff --stat c4ad6b0 claude/s2-relay-constant-pins
+cd <engine> && git log --name-only --format='%h' c4ad6b0..claude/s2-relay-constant-pins | sort -u
+cd <engine> && git checkout claude/s2-relay-constant-pins && cd relay && npm test && npm run typecheck
+```
+
+*Expected, and **observed**:* **`relay/test/relay.test.ts | 40 ++++`, 1 file changed, 40 insertions**
+— `relay/src/protocol.ts` appears in **neither** commit. Clean **`57 passed (57)`, `EXIT=0`**;
+`wrangler types && tsc --noEmit` **0 errors, `EXIT=0`**. Pristine hash re-checked after every
+mutation row and before each commit: **`7d7b37bbd687a022fba949e08056ab10bc20a499b18f1243a924850d67b73201`**.
+
+### C-84-8 — a self-inflicted loss during the commit split, recorded not smoothed over
+
+```bash
+cd <engine> && git show 0181f55 --stat && git show b11e47b --stat
+cd <engine> && git checkout claude/s2-relay-constant-pins && cd relay && npm test
+```
+
+*Expected, and **observed**:* a `git checkout --theirs .` issued after a `git stash pop` discarded the
+unstaged merge result and **silently lost two of the three hunks**. It was caught by grepping for the
+test names — **not** by the commit succeeding, which it did — restored from the saved patch, and the
+suite re-run to **`57 passed`** before the second commit. **No wrong content reached a commit**; both
+commits contain only `relay/test/relay.test.ts`. Recorded because the failure mode is silent: a
+`stash pop` that reports `Auto-merging` followed by a `checkout` leaves a **clean tree** that looks
+finished.
+
+### C-84-9 — no vector byte moved and no landing cost was added
+
+```bash
+cd <engine> && git diff --stat c4ad6b0 claude/s2-relay-constant-pins -- docs/sync-vectors/ scripts/ src/
+cd <android> && git diff --stat origin/claude/android-a0-probe -- core/ app/
+```
+
+*Expected, and **observed**:* **empty on both** — no vector, no `generate.mjs`, no
+`$ExpectedOfflineTotal`, no `src/`, no `:core`, no `:app`. The vendored pin is unmoved at
+**`7328a0b`**, and this branch adds **zero** landing cost to the pin family (**B-17**).
+
+### C-84-10 — B-18's triggers re-checked, and the silence is deliberate for the third run
+
+```bash
+cd <engine> && git rev-parse origin/main      # expect aac05f3...
+cd <android> && git rev-parse origin/main     # expect ebfaf81...
+# plus: any PR merged/undrafted in either repo; whether the stored prompt changed
+```
+
+*Expected, and **observed**:* run 83 instructed its successor to notify on *"`main` moving, a PR
+merged or undrafted, the stored prompt changing, or a gate result."* **All four re-checked, all four
+negative:** engine `main` still **`aac05f3`**, android `main` still **`ebfaf81`**; **nothing merged,
+closed or undrafted** in either repo (android's 6 PRs all open drafts, unchanged); the stored prompt
+is **the same text**, still naming the landed slice and the stale pin `679a317`; and **no gate result
+arrived** — no `dotnet`/`pwsh` here, and PR #56's CI had not reported when this entry was written.
+
+**No notification was sent.** This run's finding is **new but not live**: the deployed retention
+value is correct, the defect is an absent guard, and the fix is already in a draft PR that cannot be
+merged from here. Waking Brandon for a correct-value-missing-guard would spend the channel on
+something that needs no decision from him.
+
+### C-84-11 — the records' own citation guard is green
+
+```bash
+cd <android> && scripts/check-citations.sh; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* run at the **start** of this run against the inherited records —
+**`definitions: 786   cited: 787   documented-absent: 1`**, `OK`, `EXIT=0` — and again after this
+run's entries were written.
