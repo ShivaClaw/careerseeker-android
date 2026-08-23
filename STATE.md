@@ -6,10 +6,67 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **forty-five** runs
-> have now been assigned it. **The prompt's vendored pin `679a317` is stale too: it is
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **fifty-four** runs
+> have now been assigned it (count refreshed at run 89; it read "forty-five" for nine runs).
+> **The prompt's vendored pin `679a317` is stale too: it is
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
+>
+> ## ▶ RUN 89 — 2026-08-23. **`B-19` named two different blockers for two runs. And run 88's deferred half is now measured: two checks green, and the obvious way to build the third reports every merged PR as unmerged.**
+>
+> **The slice: the half of B-24 run 88 could not reach.** Run 88 wrote the boundary down exactly —
+> *"Those need the PR list, and that is the half B-19 still owns"* — and this session's GitHub
+> tooling reaches **both** repos, so the boundary was **checkable rather than inherited**. Needs
+> `git`, `node` and a PR read. **The assigned S5 slice was declined for the fifty-fourth time**, on
+> evidence re-derived this run (**C-STOP-1**: `OK: 29 vector files match the generator.`, exit 0;
+> corpus 29/29 byte-identical, `diff -r` exit 0); `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`,
+> `emulator`, `adb` **and `gh`** all **ABSENT**, `ANDROID_HOME` **unset** (**C-89-7**).
+>
+> **FIRST — AN ID THAT RESOLVED TO TWO BLOCKERS.** `BLOCKED.md` carried **two** filings numbered
+> **B-19**: run 58's *"S5's phone route exists and nothing in `:app` constructs it"* and run 87's
+> *"the landing plan has no guard against its own leaf set moving"*. **B-20…B-23 all exist**, so the
+> free ID was **B-24** (**C-89-1**). **Not cosmetic:** run 88's headline *"B-19 is NARROWED"* reads,
+> against the register, as a claim that **the S5 phone-route blocker was narrowed** — it was not, and
+> run 88's own prohibition paragraph says no `:app` file was written. Five earlier *"B-19 —
+> untouched"* lines were retro-poisoned the same way. **Renumbered to B-24 in the register**, pointer
+> note added under the original; **run 87's and run 88's LOG entries left unedited** — those are
+> evidence of what those sessions wrote, and the register is what an ID resolves against.
+>
+> **AND THE CHECK FOR THE NEXT ONE WAS WRONG FIRST.** `grep -oE '^## B-[0-9]+'` also flags
+> `B-2 B-4 B-6 B-7` — *status* headings, not second filings. Anchoring on the trailing em-dash gives
+> **exactly one** duplicate before the fix and **none** after. *A command that over-reports is
+> evidence for a different, false claim.* Honest limit recorded: a `##`-only scan still returns
+> **B-23** as the max, so `B-20`/`B-21` being filed at `###` (and **B-11** deliberately never filed)
+> **does not explain** run 87's choice. Facts recorded; cause not claimed.
+>
+> **SECOND — THE DEFERRED HALF, MEASURED.** Guard green on ancestry (**6 rows, all `leaf`, ROT 0,
+> UNPLANNED 2, exit 0**). Its three blind spots, against **22 open PRs / 8 leaves**: **(1) no named
+> PR closed or merged behind the plan's back** — all six §3 branches map to **open, draft** PRs
+> **#48/#57/#36/#51/#52/#49** (**C-89-3**), so §3 is green on the PR-state axis too; **(2) one leaf
+> of eight has no open PR** — `claude/p4-entitlement` → **#8, closed and genuinely unmerged**, its
+> content re-landed on *different* branches as **#27–#30** while the branch itself is **not an
+> ancestor of `main` and carries 199 commits that will never land** (**C-89-4**) — **"leaf" is not
+> "landable"**; the other unplanned leaf **#53** is **open and deliberately excluded** (§3 step 0
+> recommends closing it, **C-89-5**); **(3) semantic** — unchanged, unguardable.
+>
+> **THE FINDING: the one-call version of check 1 is a trap.** Reading each PR-list row's `merged`
+> field returns **`false` on every row, including for demonstrably merged PRs** (**C-89-2**): **#31**
+> and **#44** are `merged: false` in a list and `merged: true` with a real `merged_at` on a per-PR
+> read; **#8** is correctly `false` both ways. **#44's merge commit is `main`'s current HEAD**, so
+> the row contradicts the branch it describes. Built the obvious way, the guard would answer
+> *"nothing merged behind the plan's back"* **unconditionally** — run 88's zero-row false-negative
+> class through a different door. **Key on `merged_at`, or read PRs singly.**
+>
+> **B-24 IS NOT CLOSED.** All three checks need the PR list **at CI time**, not session time; these
+> credentials are session-scoped and the android repo's CI has none — **still Brandon's**. What
+> changed: the deferred half is **known-green with one documented exception and one documented
+> trap** instead of unknown. **Scope note:** `fleet()` filters `codex/`/`autonomy/`, so **`#26`
+> can never appear** in the guard's output and `RETURN-DAY.md` names it **0** times (**C-89-6**) —
+> `ROT: 0  UNPLANNED: 2` **is not** an inventory of unlanded work.
+>
+> **No rung moved. No gate ran and none is claimed. `fleet-probe.sh` was run, never edited. No
+> vector byte, no pin move; pin stays `7328a0b`. Nothing merged, closed, undrafted, force-pushed or
+> deleted; the production relay was not contacted at all.**
 >
 > ## ▶ RUN 88 — 2026-08-23. **B-19 was filed this morning as needing a cross-repo token. It needed a branch name. The guard is built, it fires, and it reproduces run 87's whole finding in one command.**
 >
