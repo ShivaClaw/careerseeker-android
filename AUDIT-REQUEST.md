@@ -16895,3 +16895,27 @@ not run; the android gate did not run; **no gate result is claimed anywhere in t
 `node docs/sync-vectors/generate.mjs --check` on `origin/claude/s5-entitlement-ack-emitter` →
 **`OK: 29 vector files match the generator.`**, exit 0 (**C-STOP-1**, re-run this run). The vendored
 corpus vs. pin `7328a0b`: `git archive` + `diff -r` → **no output, exit 0, 29 files** both sides.
+
+### C-89-8 — the renumber did not rewrite history, only the register
+
+The riskiest edit this run is the one that changes an identifier other documents point at. This is
+the check that it stayed inside the register.
+
+```bash
+cd <android>
+git show <run-89 LOG commit> --numstat -- LOG.md          # e677150
+git show HEAD:LOG.md | sed '/^# RUN 89 —/,$d' | grep -c 'B-24'
+diff <(git show 6ee92b8:LOG.md) <(git show HEAD:LOG.md | head -n $(git show 6ee92b8:LOG.md | wc -l))
+```
+
+*Expected, and **observed**:* **`102  0  LOG.md`** (102 insertions, **0 deletions**); **`0`**
+occurrences of `B-24` anywhere before the run-89 entry — so every `B-19` in runs 87 and 88 still
+reads `B-19`, as written; and the `diff` produces **no output**, i.e. the whole of `LOG.md` above
+run 89 is **byte-identical** to `6ee92b8` (the pre-run-89 tip). **The run-89 text is strictly
+appended.**
+
+**Note the earlier form of this check, which is why it is written out here.** The PR body first
+offered `git show HEAD:LOG.md | grep -c 'B-24'` and predicted **0**. That command returns **4** —
+run 89's own entry names B-24 four times — so it would have "failed" while nothing was wrong. The
+claim is about the text *above* run 89, and the command has to say so. *Same defect as C-89-1's
+first form: a command that does not measure the claim it is attached to.*
