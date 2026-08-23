@@ -16033,3 +16033,31 @@ throughout the records and in the PR body. This is the second self-correction of
 found the same way as the first — by running the command the claim itself prescribes. **The
 substantive claims are unaffected**: one test file, no production source, `relay/src/` byte-identical
 to the base branch (`git diff --quiet origin/claude/s2-relay-constant-pins -- relay/src/` exits 0).
+
+## Run 86 second addendum — CI reported on this run's own head, and it supersedes the scope paragraph's CI line
+
+**Written after the milestones and the first addendum.** CI run **`32630375783`** completed on head
+**`f00feb2`** — this run's head — and **both jobs passed** (**C-86-10**), read from the job logs in
+this session.
+
+- `windows-latest` — **`=== Offline total: 598 passed, 0 failed ===`**, `SyncHarness` **130/0**.
+  **598 is the base branch's number**, so this branch moves **`$ExpectedOfflineTotal` by zero,
+  measured on this head** rather than argued from the diff being test-only (**B-17**).
+- `ubuntu-latest` — **`Tests 63 passed (63)`**, reproducing this sandbox's clean number on a fresh
+  runner; `tsc --noEmit` clean; `wrangler deploy --dry-run` OK; **`OK: no decryption path in
+  relay/src.`**; **`OK: 28 vector files match the generator.`**
+
+**Correction, stated plainly rather than edited away.** The scope paragraph above says *"No CI result
+is claimed for this run's push"*, and **C-86-8** calls the pin claim *"asserted from the diff, not
+measured"*. Both were true when written and are now **superseded**. Both remain true in their own
+moment: **I ran no gate in this session** — `dotnet` and `pwsh` are absent (**C-86-2**) — **and** CI
+has now run the offline gate on this head and it passed.
+
+**What this does NOT change: the merge condition.** CI runs the **offline** portion only, and **the
+fused android tree has still never been built**. PR #57 is still **draft and unmergeable from here**.
+A green CI means this branch is *neutral*, not that the landing plan is safe.
+
+**PR state at the same moment:** **zero review threads, zero comments**, `mergeable_state: clean`,
+`additions: 75`, `changed_files: 1`, `commits: 1`. Nothing required a fix, so nothing was pushed in
+response to the wake — the subscription's drive-to-green posture is satisfied by a green head, not by
+a change for its own sake.

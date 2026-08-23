@@ -16408,3 +16408,39 @@ one comment line and moves no assertion count, but `dotnet` and `pwsh` are absen
 after every change. Folding an unverifiable C# edit into a test-only relay PR would also cost that
 PR its single-claim shape. **This is the strongest engine-side item for the next gated session**,
 and it is one line.
+
+### C-86-10 — CI ran on THIS run's head and passed; the pin claim moves from asserted to measured
+
+```bash
+gh run list --commit f00feb2fea42a1af8398570e63380a1be69ec79f
+gh run view 32630375783 --log | grep -E "Offline total|SyncHarness|Tests +[0-9]+ passed|OK: [0-9]+ vector|no decryption path"
+```
+
+*Expected, and **observed**:* run **`32630375783`**, head **`f00feb2`** — **this run's head** — attempt 1,
+**both jobs `conclusion: success`**, every step green. Read from the job logs in this session, not
+inherited.
+
+- **`windows-latest`** — **`=== Offline total: 598 passed, 0 failed ===`**, with `SyncHarness`
+  **`=== 130 passed, 0 failed ===`**. **598 is the base branch's number** (run 85 measured the same
+  598 on `8126a8e`), so **this branch moves `$ExpectedOfflineTotal` by zero — MEASURED on this head**
+  rather than argued from the diff being test-only (**B-17**).
+- **`ubuntu-latest`** — **`Tests 63 passed (63)`**, `Test Files 1 passed (1)`, reproducing this
+  sandbox's clean number on a fresh runner; `tsc --noEmit` clean; `wrangler deploy --dry-run` OK;
+  **`OK: no decryption path in relay/src.`**; **`OK: 28 vector files match the generator.`**
+
+**This supersedes two lines written earlier in this run.** **C-86-8** says the `$ExpectedOfflineTotal`
+claim is *"asserted from the diff, not measured, since no gate ran here"*, and the run-86 LOG scope
+paragraph says *"No CI result is claimed for this run's push."* Both were true when written and are
+now **superseded**. Both halves remain true in their own moment: **I ran no gate in this session** —
+`dotnet` and `pwsh` are absent (**C-86-2**) — **and** CI has now run the offline gate on this head
+and it passed. The second is the one a reader wants.
+
+**What this does NOT change: the merge condition.** CI runs the **offline** portion only — no
+`-IncludePackage`, no `-IncludePublish`, no `-IncludeLive`, and no android gate. **The fused android
+tree has still never been built.** PR #57 remains **draft and unmergeable from here**. A green CI
+means this branch is *neutral*, not that the landing plan is safe.
+
+**Also verified on the PR at the same time:** **zero review threads and zero comments**
+(`pull_request_read` `get_review_comments` → `totalCount: 0`; `get_comments` → `[]`), and
+`mergeable_state: clean`, `additions: 75`, `changed_files: 1`, `commits: 1` — the last three
+independently confirming C-86-8's diff shape and the corrected line count.
