@@ -37,6 +37,11 @@
 #   scripts/fleet-probe.sh matrix <engine-checkout> <branch>
 #   scripts/fleet-probe.sh leaves <engine-checkout>
 #   scripts/fleet-probe.sh land   <engine-checkout> <branch> [<branch> ...]
+#   scripts/fleet-probe.sh plan   <engine-checkout> <plan-file>
+#
+#   # Does RETURN-DAY.md's landing plan still name the leaves of the graph?
+#   # Exit 1 means the plan rotted -- re-derive it before merging anything.
+#   scripts/fleet-probe.sh plan ../careerseeker RETURN-DAY.md
 #
 #   # Is the mechanism already built anywhere in the fleet?
 #   scripts/fleet-probe.sh symbol ../careerseeker ReconcileTo
@@ -78,6 +83,39 @@ fleet() {
     | grep -vE '/(codex|autonomy)/'
 }
 
+# A leaf is a fleet branch contained in no OTHER fleet branch. Factored out of
+# the 'leaves' mode so 'plan' can ask the same question without shelling out to
+# a second copy of this script -- two implementations of "leaf" is exactly the
+# drift this file exists to catch.
+leaves_list() {
+  while read -r b; do
+    covered=0
+    while read -r other; do
+      [ "$other" = "$b" ] && continue
+      if git -C "$repo" merge-base --is-ancestor "$b" "$other" 2>/dev/null; then covered=1; break; fi
+    done < <(fleet)
+    [ "$covered" -eq 0 ] && echo "${b#origin/}"
+  done < <(fleet)
+  true
+}
+
+# Pull the landing table's BRANCH column out of RETURN-DAY.md section 3.
+#
+# Keyed on the branch name, NOT the PR number, and that is the whole point of
+# B-19: "PR numbers are not stable descriptions of a merge graph". A branch name
+# is a ref that `git` can check against ancestry with no credential at all. The
+# PR number is metadata on a server, and it is the thing that went stale.
+#
+# The table rows look like:
+#   | 1 | **#48** | `s8-harness-linux-reach` | itself | clean |
+#   | 2 | **~~#35~~ -> #57** | `s2-relay-header-pairing` | ... | ... |
+# so the branch is the first backticked token of a row whose first cell is a
+# bare number. Rows are read in file order; that order is the merge order, and
+# 'land' consumes it directly.
+plan_branches() {
+  sed -n 's/^| *[0-9][0-9]* *|[^|]*| *`\([^`]*\)`.*/\1/p' "$1"
+}
+
 case "$mode" in
   self-test|--self-test)
     # Guards the one bug that makes this tool WORSE than no tool: a fleet that
@@ -101,6 +139,60 @@ case "$mode" in
     else
       echo "PASS  fleet() excludes main, HEAD, codex/* and autonomy/*"
     fi
+    # --- plan-mode guard, added run 88 (B-19) ---------------------------------
+    #
+    # A guard is only worth having if it has been seen to FAIL. All three rows
+    # below are executed against the real fleet, using synthetic plan files, so
+    # the pass row and the fail row are measured rather than argued.
+    tmp=$(mktemp -d) || { echo "FAIL  cannot mktemp"; exit 1; }
+    trap 'rm -rf "$tmp"' EXIT
+
+    a_leaf=$(leaves_list | head -1); a_leaf="${a_leaf#claude/}"
+    if [ -z "$a_leaf" ]; then
+      echo "FAIL  leaves_list() returned nothing; cannot self-test plan mode"; fail=1
+    else
+      printf '| 1 | **#00** | `%s` | itself | clean |\n' "$a_leaf" > "$tmp/green.md"
+      if "$0" plan "$repo" "$tmp/green.md" >/dev/null 2>&1; then
+        echo "PASS  plan() accepts a table naming a real leaf ($a_leaf)"
+      else
+        echo "FAIL  plan() rejected a table naming a real leaf ($a_leaf)"; fail=1
+      fi
+    fi
+
+    # The rot row. Any non-leaf fleet branch proves it; prefer the branch that
+    # actually rotted (claude/s2-seq-bound, PR #35) so this row stays tied to
+    # the incident, and fall back to any other non-leaf if it is ever deleted.
+    rotted=""
+    if git -C "$repo" rev-parse --verify -q origin/claude/s2-seq-bound >/dev/null \
+       && ! leaves_list | grep -qxF 'claude/s2-seq-bound'; then
+      rotted="s2-seq-bound"
+    else
+      rotted=$(comm -23 <(fleet | sed 's|^origin/claude/||' | sort) \
+                        <(leaves_list | sed 's|^claude/||' | sort) | head -1)
+    fi
+    if [ -z "$rotted" ]; then
+      echo "SKIP  no non-leaf branch in the fleet; the rot row cannot be measured here"
+    else
+      printf '| 1 | **#00** | `%s` | itself | clean |\n' "$rotted" > "$tmp/rotted.md"
+      if "$0" plan "$repo" "$tmp/rotted.md" >/dev/null 2>&1; then
+        echo "FAIL  plan() PASSED a table naming the non-leaf '$rotted' -- the guard does not fire"
+        fail=1
+      else
+        echo "PASS  plan() fires on a table naming the non-leaf '$rotted'"
+      fi
+    fi
+
+    # A parse that matches nothing must REFUSE, not pass. This is fleet()'s '**'
+    # bug one level up: a guard that silently reads zero rows reports "no rot"
+    # forever, which is worse than having no guard at all.
+    echo 'the landing table used to be here, and its format moved' > "$tmp/empty.md"
+    "$0" plan "$repo" "$tmp/empty.md" >/dev/null 2>&1
+    if [ "$?" -eq 2 ]; then
+      echo "PASS  plan() refuses (exit 2) when it parses zero rows"
+    else
+      echo "FAIL  plan() did not refuse on a zero-row parse -- it would always pass"; fail=1
+    fi
+
     [ "$fail" -eq 0 ] && echo "self-test: OK" || echo "self-test: FAILED"
     exit "$fail"
     ;;
@@ -162,19 +254,100 @@ case "$mode" in
     # A leaf is a fleet branch contained in no OTHER fleet branch. Merging the
     # leaves lands every PR beneath them, so the leaf set -- not the PR count --
     # is the number of merges a human actually performs.
-    while read -r b; do
-      covered=0
-      while read -r other; do
-        [ "$other" = "$b" ] && continue
-        if git -C "$repo" merge-base --is-ancestor "$b" "$other" 2>/dev/null; then covered=1; break; fi
-      done < <(fleet)
-      [ "$covered" -eq 0 ] && echo "${b#origin/}"
-    done < <(fleet)
+    leaves_list
     # A leaf is not the same thing as an OPEN PR: a superseded branch nobody
     # closed is a leaf too (claude/p4-entitlement is one -- its successors
     # landed as PRs #27-#30). Cross-check the list against the open-PR set
     # before treating it as a landing plan.
-    true
+    ;;
+
+  plan)
+    # B-19's guard: does the written landing plan still describe THIS graph?
+    #
+    # The failure it exists to catch happened on 2026-08-23 and nothing
+    # detected it. RETURN-DAY.md section 3 named `#35` as a merge. Between
+    # 2026-08-19 and 2026-08-23, PRs #54/#55/#56/#57 stacked on #35's head, so
+    # #35 stopped being a leaf. Following the plan verbatim would have landed
+    # an interior node and stranded seven commits across four open PRs whose
+    # base branch had just been merged. Run 87 found it BY HAND.
+    #
+    # WHAT THIS COSTS: a `git fetch` in the engine checkout. Nothing more.
+    #
+    # B-19's third attempt recorded this guard as needing `gh pr list` and
+    # therefore a cross-repo token, which made it Brandon's decision rather
+    # than a session's. That is true of PR STATE (open/closed/merged) and false
+    # of the rot that actually fired: a branch stops being a leaf when other
+    # REFS contain it, and refs are what a fetch already brings down. The rot
+    # signal is in ancestry, not in PR metadata. See BLOCKED.md B-19.
+    #
+    # WHAT THIS DOES NOT CATCH, stated here so the output is not over-read:
+    #   - a named PR being closed or merged behind the plan's back;
+    #   - a leaf branch that has no open PR at all (claude/p4-entitlement is
+    #     exactly that, and it is why UNPLANNED below is informational);
+    #   - anything semantic. A green plan is a plan that still points at leaves,
+    #     not a plan that is still a good idea.
+    # Those need the PR list, and that is the half B-19 still owns.
+    planfile="${3:-}"
+    [ -n "$planfile" ] || { echo "fleet-probe plan: need a plan file (RETURN-DAY.md)" >&2; exit 2; }
+    [ -r "$planfile" ] || { echo "fleet-probe plan: cannot read '$planfile'" >&2; exit 2; }
+
+    named=$(plan_branches "$planfile")
+    nnamed=$(printf '%s' "$named" | grep -c .)
+    # A parse that silently returns nothing would print "no rot" for a rotted
+    # plan -- the false negative that makes a guard worse than no guard. This
+    # is fleet()'s '**' bug one level up, and it is refused, not reported.
+    if [ "$nnamed" -eq 0 ]; then
+      echo "fleet-probe plan: parsed 0 branches from '$planfile' -- the table format moved." >&2
+      echo "REFUSING to report a result: a guard that parses nothing always passes." >&2
+      exit 2
+    fi
+
+    current=$(leaves_list)
+    echo "Landing-plan guard: does '$planfile' still name the leaves of this graph?"
+    echo "Plan rows are read in file order, which is merge order."
+    echo
+    rot=0
+    while read -r b; do
+      [ -n "$b" ] || continue
+      ref="origin/claude/${b#claude/}"
+      if ! git -C "$repo" rev-parse --verify -q "$ref" >/dev/null; then
+        printf '  %-40s GONE  no such ref (branch deleted or renamed)\n' "$b"
+        rot=$((rot+1)); continue
+      fi
+      if printf '%s\n' "$current" | grep -qxF "claude/${b#claude/}"; then
+        printf '  %-40s leaf\n' "$b"
+      else
+        # Name the successors, because "not a leaf" alone does not tell a human
+        # which PR to merge instead. These are the branches that now contain it.
+        by=$(while read -r other; do
+               [ "$other" = "$ref" ] && continue
+               git -C "$repo" merge-base --is-ancestor "$ref" "$other" 2>/dev/null \
+                 && echo "${other#origin/claude/}"
+             done < <(fleet) | tr '\n' ' ')
+        printf '  %-40s ROT   no longer a leaf; contained by: %s\n' "$b" "${by:-(unknown)}"
+        rot=$((rot+1))
+      fi
+    done <<< "$named"
+
+    echo
+    unplanned=0
+    while read -r l; do
+      [ -n "$l" ] || continue
+      if ! printf '%s\n' "$named" | grep -qxF "${l#claude/}"; then
+        printf '  %-40s UNPLANNED  a leaf the plan does not name\n' "${l#claude/}"
+        unplanned=$((unplanned+1))
+      fi
+    done <<< "$current"
+    [ "$unplanned" -eq 0 ] && echo "  (every leaf is named by the plan)"
+
+    echo
+    echo "plan rows: $nnamed   leaves now: $(printf '%s' "$current" | grep -c .)   ROT: $rot   UNPLANNED: $unplanned"
+    if [ "$rot" -gt 0 ]; then
+      echo "PLAN IS STALE -- $rot row(s) name a branch that is no longer a leaf. Re-derive before merging."
+      exit 1
+    fi
+    echo "PLAN STILL NAMES LEAVES. (UNPLANNED rows are informational -- a leaf with no open PR,"
+    echo "or one the plan deliberately excludes, is expected. Check them against the open-PR set.)"
     ;;
 
   land)
