@@ -27,8 +27,9 @@
 > *"the landing plan has no guard against its own leaf set moving"*. **B-20…B-23 all exist**, so the
 > free ID was **B-24** (**C-89-1**). **Not cosmetic:** run 88's headline *"B-19 is NARROWED"* reads,
 > against the register, as a claim that **the S5 phone-route blocker was narrowed** — it was not, and
-> run 88's own prohibition paragraph says no `:app` file was written. Five earlier *"B-19 —
-> untouched"* lines were retro-poisoned the same way. **Renumbered to B-24 in the register**, pointer
+> run 88's own prohibition paragraph says no `:app` file was written. **Ten** earlier *"B-19 —
+> untouched this run"* headings were retro-poisoned the same way — nine explicit, one range form,
+> of 14 in the file (**C-89-9**; the count was first written as "five" and measured afterwards). **Renumbered to B-24 in the register**, pointer
 > note added under the original; **run 87's and run 88's LOG entries left unedited** — those are
 > evidence of what those sessions wrote, and the register is what an ID resolves against.
 >

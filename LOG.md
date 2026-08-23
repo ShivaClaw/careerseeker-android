@@ -16288,8 +16288,11 @@ and B-23 all exist** (runs 65, 66, 75, 79), so the free ID was **B-24** (**C-89-
 **This was not cosmetic.** For two runs the token `B-19` was ambiguous, and run 88's headline —
 *"B-19 is NARROWED, not closed"* — reads against the register as a claim that **the S5 phone-route
 blocker was narrowed.** It was not; run 88 wrote no Kotlin and no `:app` file and said so itself. The
-collision also retro-poisoned five earlier *"B-19 — untouched this run"* lines, each of which meant
-run 58's blocker. **Renumbered to B-24 in the register, with a pointer note under the original
+collision also retro-poisoned **ten** earlier *"B-19 — untouched this run"* headings — nine explicit
+and one range form (`B-12–B-20`), of 14 in the file — each of which meant run 58's blocker
+(**C-89-9**). **That count was first written as "five" and the correction is this run's fourth
+instance of the same defect:** the number was estimated from a partial grep and not measured. It is
+measured now. **Renumbered to B-24 in the register, with a pointer note under the original
 B-19. Run 87's and run 88's LOG entries were left unedited** — they are evidence of what those
 sessions wrote, and the register is what an ID resolves against.
 

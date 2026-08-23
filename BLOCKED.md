@@ -4397,8 +4397,9 @@ on 2026-08-22 instead of 2026-08-23.
 > different blockers, and run 88's headline — *"**B-19** is NARROWED, not closed"* — reads, against
 > the register, as a claim that **the S5 phone-route blocker was narrowed.** It was not: run 88
 > wrote no Kotlin and no `:app` file, and said so in its own prohibition paragraph. The collision
-> also retro-poisons every earlier *"B-19 — untouched this run"* line (BLOCKED.md lines ~2974,
-> ~3244, ~3317, ~3352, ~3420), each of which meant the run-58 blocker and now reads ambiguously.
+> also retro-poisons every earlier *"B-19 — untouched this run"* heading — **ten** of them, nine
+> naming `B-19` explicitly and one covering it as the range `B-12–B-20` (line 3317), out of 14 such
+> headings in the file. Each meant the run-58 blocker and now reads ambiguously (**C-89-9**).
 >
 > **Run 87's and run 88's LOG entries are evidence and were left unedited** — they still say
 > `B-19`, and that is correct for what those sessions wrote. This heading is the register, and the

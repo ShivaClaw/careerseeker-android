@@ -16919,3 +16919,26 @@ offered `git show HEAD:LOG.md | grep -c 'B-24'` and predicted **0**. That comman
 run 89's own entry names B-24 four times — so it would have "failed" while nothing was wrong. The
 claim is about the text *above* run 89, and the command has to say so. *Same defect as C-89-1's
 first form: a command that does not measure the claim it is attached to.*
+
+### C-89-9 — how many headings the `B-19` collision made ambiguous
+
+```bash
+cd <android>
+git show 6ee92b8:BLOCKED.md | grep -cE '^### .*\bB-19\b.*untouched'        # explicit
+git show 6ee92b8:BLOCKED.md | grep -nE '^### .*untouched' | grep -E 'B-1[0-8][^,]*[–-]\s*B-(19|2[0-9])'  # range forms
+git show 6ee92b8:BLOCKED.md | grep -cE '^### .*untouched this run'          # denominator
+```
+
+*Expected, and **observed**:* **`9`** explicit; **one** range form — line **3317**,
+`### B-1, B-2, B-4, B-5, B-6, B-8, B-9, B-12–B-20 — untouched this run`; denominator **`14`**. So
+**10 of 14** *"untouched this run"* headings asserted something about `B-19`, and after run 87 filed
+a second blocker under that ID every one of them was ambiguous. All ten meant **run 58's** blocker.
+
+**This entry exists because the number was wrong first.** BLOCKED.md, LOG.md, STATE.md and the draft
+PR body each said **"five"** — an estimate taken from a partial grep hit-list rather than a count,
+written into four documents before it was measured. The range form (`B-12–B-20`) is exactly what a
+hit-list of explicit matches cannot see. **Fourth instance this run of one defect class** — C-88-5's
+comment-matching grep, C-89-1's over-reporting regex, C-89-8's wrong-scope grep, and this. In every
+case the *substance* was right and the *measurement* was absent, which is the failure mode this file
+exists to make expensive: **a number that appears in four documents and in no command output is a
+description, not evidence.**
