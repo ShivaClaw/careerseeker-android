@@ -16684,10 +16684,22 @@ that `#57`'s branch is what replaces it.
 ### C-88-5 — the guard reads refs only; no `gh`, no token, no network
 
 ```bash
-grep -nE 'gh |curl|wget|api\.github' scripts/fleet-probe.sh
+# non-comment lines only -- the first draft of this claim omitted that and FAILED
+grep -nE '^[[:space:]]*[^#[:space:]].*(\bgh\b|curl|wget|api\.github)' scripts/fleet-probe.sh
+grep -oE '\b(git|sed|grep|printf|echo|mktemp|comm|head|tr|rm|wc)\b' scripts/fleet-probe.sh | sort -u
 ```
 
-*Expected, and observed:* **no match.** Every question the script asks is answered by
+*Expected, and observed:* **no match** (exit 1), and the external commands are exactly
+`comm echo git grep head mktemp printf rm sed tr wc` — **no network client of any kind**.
+
+> **Self-correction, recorded because the house rule is what caught it.** This claim was first
+> written with the command `grep -nE 'gh |curl|wget|api\.github'` and the words *"no match"*.
+> Running it returned **line 276** — the comment in `plan` that quotes B-19's `gh pr list`. The
+> claim's substance was right and its command did not measure it. Fixed before the commit stood.
+> *A claim whose command you did not run is a description, not evidence* — and the discipline of
+> writing the command next to the claim is the only reason this was caught rather than published.
+
+Every question the script asks is answered by
 `git for-each-ref`, `git merge-base --is-ancestor`, `git rev-parse` and `git merge-tree` against the
 local object store. This is what makes B-19's attempt-3 premise wrong for the ancestry class:
 **a fetch is the whole cost.**
