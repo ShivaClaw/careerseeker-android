@@ -1762,7 +1762,27 @@ suite-name hole.** Re-verified this run per the standing precondition and **stil
 Linux sandbox**: `dotnet` and `pwsh` are absent (**C-84-2**, `which`, not assumed). The mutation that
 proves it is recorded verbatim in run 83's block below — take it on a machine with the gate.
 
-**NEW ITEM 2 — the relay constants lane is now MOSTLY, BUT NOT FULLY, swept.** `DIRECTIONS` and
+> **CLOSED BY RUN 85 ON THIS SAME BRANCH — 2026-08-23, appended by run 84 after the fact.
+> Do not re-take it.** Two commits landed on `claude/s2-relay-constant-pins` as a **fast-forward**
+> above run 84's head (`4dbf5f9`, `8126a8e`; run 84's commits intact, no history rewritten), and
+> PR #56's description was rewritten by that run to report both constants measured (**C-84-13**).
+> **`ENVELOPE_TABLE_DDL` was the genuine hole** — dropping `IF NOT EXISTS` reportedly left all 57
+> tests green, because every existing case instantiates a *fresh* DO while production re-runs the
+> DDL on **every** wake. **`DIRECTIONS` was already guarded** (incidentally, via `depth()`), and run
+> 85 reports it as such rather than as a find. A third candidate, the `PRIMARY KEY (dir, seq)`, was
+> **refuted** and deliberately not pinned.
+>
+> **ATTRIBUTION, AND THE LIMIT ON THIS NOTE: run 85's mutation rows are ITS evidence, not mine.** I
+> did not run T3/T4/D1 and I do not restate their numbers as measurements of my own. What run 84
+> verified first-hand is only this: the two commits exist and are a fast-forward (`git log`), the PR
+> body says what is summarised above, and **CI on `8126a8e` is green** — `Offline total: 598 passed,
+> 0 failed` (still the base's number, so the pin moves by zero across all four commits),
+> `SyncHarness` 130/0, relay **59 passed (59)**, `OK: 28 vector files match the generator`
+> (**C-84-13**). **If run 85 has since written its own LOG/AUDIT entries, they supersede this note** —
+> it exists only so that a run reading this list does not re-take a closed item, which has already
+> happened four times in this program.
+>
+**~~NEW ITEM 2~~ — SUPERSEDED, see the box directly above. Its original text follows.** **NEW ITEM 2 — the relay constants lane is now MOSTLY, BUT NOT FULLY, swept.** `DIRECTIONS` and
 `ENVELOPE_TABLE_DDL` were **not** mutated this run — the DDL is pinned by an exact-column assertion
 in `blindness invariants`, `DIRECTIONS` I did not reach — and no claim of coverage is made for them.
 `PROTOCOL_VERSION`, `MAX_TTL_SECONDS`, `MAX_ENVELOPE_BYTES`, `MAX_CIPHERTEXT_B64U_CHARS` and

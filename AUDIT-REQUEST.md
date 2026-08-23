@@ -15974,3 +15974,49 @@ landing plan is safe.
 notification.** The result is green, expected, concerns a draft PR that cannot be merged from here,
 and asks Brandon for no decision. Waking him for it would spend the channel on good news he can read
 whenever he returns.
+
+### C-84-13 — run 85 closed run 84's NEW ITEM 2 on the same branch; CI on its head is green
+
+```bash
+cd <engine> && git fetch --all --prune
+cd <engine> && git log --format='%h %an %s' b11e47b..origin/claude/s2-relay-constant-pins
+cd <engine> && git merge-base --is-ancestor b11e47b origin/claude/s2-relay-constant-pins && echo "fast-forward, run 84's commits intact"
+# and read PR #56's description + the checks on head 8126a8e
+```
+
+*Expected, and **observed**:* two commits — `4dbf5f9` *"pin that the schema DDL survives the second
+DO instantiation"* and `8126a8e` *"compare the direction set to §3 rather than to `depth()`'s key
+shape"* — authored by a **later run of this same program**, landing as a **fast-forward** above run
+84's `b11e47b`. **Run 84's two commits are intact and no history was rewritten.** PR #56's
+description was rewritten by that run to report `ENVELOPE_TABLE_DDL` as a genuine hole (dropping
+`IF NOT EXISTS` left all 57 tests green, because every existing case instantiates a *fresh* DO while
+production re-runs the DDL on every wake), `DIRECTIONS` as already-guarded-incidentally, and the
+`PRIMARY KEY (dir, seq)` as **refuted and deliberately not pinned**.
+
+**Those mutation rows are run 85's evidence, not run 84's.** T3/T4/D1 were not executed in this
+session and their numbers are **not** restated here as measurements of mine.
+
+**What run 84 did verify first-hand**, and the command for it:
+
+```bash
+# via the GitHub MCP tools, or:
+#   gh run view 32619516958 --log | grep -E 'Offline total|vector files match|Tests .* passed|no decryption path'
+```
+
+*Expected, and **observed**:* run **`32619516958`**, head **`8126a8e`**, **both jobs `success`**.
+`windows-latest` **`=== Offline total: 598 passed, 0 failed ===`** with `SyncHarness`
+**`=== 130 passed, 0 failed ===`** — **598 is still the base branch's number**, unchanged from run
+84's head, so **`$ExpectedOfflineTotal` moves by zero across all four commits** (**B-17**).
+`ubuntu-latest` **`Tests 59 passed (59)`**, `wrangler deploy --dry-run` OK, `OK: no decryption path
+in relay/src.`, **`OK: 28 vector files match the generator.`**
+
+**Why this entry exists at all.** Run 85 had not written LOG/AUDIT/STATE entries when run 84 read the
+records (android head still `e5557a3`), while run 84's ordered intent still told the next session
+that `DIRECTIONS` and `ENVELOPE_TABLE_DDL` were unmeasured. **A closed item read as open is this
+program's most-repeated failure — it has cost four runs already.** This note is insurance against a
+fifth, and it **defers to run 85's own entries if they exist.**
+
+**A settling comment was posted to PR #56** giving the CI numbers above, rather than editing run 85's
+description — so the prediction its body records ("CI has not yet run on `8126a8e`… that is a
+prediction, not a measurement") and its resolution both remain on the record, and no concurrent
+rewrite of that description could be clobbered.
