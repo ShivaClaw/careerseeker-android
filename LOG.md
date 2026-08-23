@@ -15888,3 +15888,140 @@ being written, another session pushed `377fe30` to this branch recording the sam
 theirs** — **no force-push, no history rewrite, nothing discarded**; the `AUDIT-REQUEST.md` conflict
 was resolved by **keeping both sides**, theirs first. **Rule one caught it a second time**, which is
 the argument for rule one.
+
+---
+
+# RUN 86 — 2026-08-23. The three transcriptions were compared to each other for the first time, and the relay turned out never to read the one header field it routes on.
+
+**The slice, and why this one.** Run 85 closed the relay constants lane and named its own
+successors: *"Candidate axes nobody has swept: error-path coverage, the `:core` ↔ relay ↔ engine
+disagreement surface (three transcriptions of one document; runs 83–85 compared each to the
+document, nobody compared them to each other), and the vector corpus's own completeness. Pick one
+and measure it; do not invent a fourth constants sweep."* This run took the **disagreement
+surface**. It needs only `node` and `grep`, which this image has.
+
+**Milestone 0 — the assigned slice was declined for the fifty-first time, on evidence** (**C-86-1**).
+The stored prompt again assigns S5's spec half and again calls S5 "NOT STARTED". It was built on
+2026-08-09 (`8575539`, `22b028e`, `7328a0b`); the prompt's vendored pin `679a317` is stale, the real
+pin being `7328a0b`. Both facts were re-derived from the repo after `git fetch --all --prune` in
+both trees, not inherited from the banner that asserts them.
+
+**Milestone 1 — the gates were checked, not assumed** (**C-86-2**). `dotnet` **ABSENT**, `pwsh`
+**ABSENT**, `ANDROID_HOME` **UNSET**, `java` present but **21** against a pinned 17. So neither gate
+ran, and **no gate result is claimed anywhere in this run.**
+
+**Milestone 2 — the comparison, and it found one field.** All three transcriptions of
+`docs/Sync-Protocol.md` were read side by side. On the vocabulary axis they **agree completely**,
+which is worth stating because it is the good news: payload kinds (12), reserved-for-L2 kinds (7),
+state-changing kinds (3), the ten §7.2 error codes and their wire strings, the seven HKDF
+info/salt/prefix constants, the suite names, and 32/12/16 for key/nonce/tag are **identical across
+C# and Kotlin**, and the §4.1 AAD template is byte-identical in all three including the document.
+The disagreement is not in a *value*. It is in **who enforces a rule** — and the field is `pairing`.
+
+**Milestone 3 — `pairing` is the one declared header field the relay never reads** (**C-86-4**).
+`EnvelopeHeader` in `relay/src/protocol.ts` declares six fields. The push validator at
+`channel.ts:150-166` checks five of them, plus `ciphertext`, `nonce` and the optional `sig` — and
+never `pairing`. **`env.pairing` has no occurrences anywhere in `relay/src/`.** `isValidPairingId`
+is called at `index.ts:55` only, against the URL *path* segment, so the shape the relay exports is
+enforced on the path and never on the body.
+
+**Milestone 4 — three of the four cases were already known, and this run says so before its own
+finding.** PQ-S2-1 measured the foreign, malformed and absent cases at the **eleventh** run and
+recorded all three 201s. This run re-measured them green and **claims no novelty for them**. What
+was new is that they lived **only as prose**: nothing in the suite asserted any of it, so the
+behaviour could have changed in either direction silently — a fix looking like a passing build, a
+regression like nothing at all. Four cases now pin it (**C-86-5**).
+
+**Milestone 5 — the fourth case is new, and it is the consequence half.** Nobody had measured what
+the **receiver** gets. Measured: an envelope pushed to channel A carrying
+`pairing: p_AAAABBBBCCCCDDDD` is served back by `GET /pull` **verbatim**, foreign id intact. So the
+relay is not merely failing to check a field — it is **forwarding a false routing claim to a party
+that authenticates it**. `pairing` sits in the §4.1 AAD, so the receiver's AEAD fails and the code
+it reports is **`decrypt_failed`** (§7.2), the one meaning *corrupt or tampered*, for what is really
+a misroute. PQ-S2-1 reasoned correctly that "an envelope sealed for X does not decrypt at Y"; the
+measured detail is the **error attribution**, and the relay is the only party positioned to tell the
+two apart.
+
+**Milestone 6 — the mutation table, and the honest correction inside it** (**C-86-6**). Measured one
+mutation at a time from a reproduced **`59 passed (59)`** baseline:
+
+| mutation | untouched suite (59) | with this run's 4 tests (63) |
+| --- | --- | --- |
+| clean | **59 passed** | **63 passed** |
+| **M1** — validator checks `env.pairing` shape | **18 failed / 41 passed** | 20 failed / 43 passed |
+| **M2** — M1 + equality with the path segment | — | 22 failed / 41 passed (**all 4 bind**) |
+| **M1 + both relay fixtures fixed** | — | **2 failed** — exactly the 2 cases M1 changes |
+
+**The first number would have been a misleading finding if it had been reported alone.** "Enforcing
+the shape breaks 18 tests" reads as a large, risky change. It is not: the 18 collapse to **two
+fixture lines** hard-coding the same malformed `p_x` — `envelope()` at `:37` and a second helper
+`rawEnvelope()` at `:268-270`. Fix both and only the two characterization cases that exist to say
+the behaviour changed still fail. **The extra measurement that produced that collapse was run
+specifically because the raw number looked alarming**, and the lesson generalises the one run 84
+recorded about mutation direction: *a mutation's failure count is a symptom, not a cost — count the
+distinct causes before reporting it as a price.*
+
+**Milestone 7 — that measurement also corrected PQ-S2-1.** The entry's "to close" says *"fix the two
+non-conforming ids above"*. The real count is **four sites**: `p_x` **twice** in the relay suite
+(the second helper was unknown to the entry), plus `p_bridge_test` (`EngineHarness:2291`) and
+`p_harness` (`:2496`) in the engine, which the entry named as one. `docs/protocol-questions.md` now
+carries the update, the four-row mutation table, and the three-way table.
+
+**Milestone 8 — one self-correction, and it is the same shape this program keeps finding.** The
+malformed case first inherited `p_x` from `envelope()`'s default instead of passing it explicitly.
+That was caught by the M1+fixture-fix row: with the fixture repaired the test **passed**, while
+still being named *"accepts a header whose pairing id is malformed"* — it would have silently
+stopped testing anything on the very day the fixture was fixed, which is the day it matters most.
+This is exactly `depth()`'s coverage-by-accident, one file along. The id is now passed explicitly
+and the test binds under both mutations. **A second self-correction, smaller:** the first pairing-id
+sweep matched only double-quoted literals and therefore missed the relay's own single-quoted
+`'p_x'` — the most important row in its own table. Re-run with both quote styles: **13 distinct
+literals, 7 rejected** by the shape the other two implementations enforce.
+
+**Milestone 9 — the three-way picture, with its caveat stated rather than buried** (**C-86-7**).
+`:core` enforces the shape at **five production sites**; the relay enforces it on the **path only**;
+the **engine enforces it nowhere** — `PairingManager.cs:51` mints a conforming id but accepts any
+caller-supplied one unvalidated. The phone is strictest and the engine weakest, which by the
+mission's engine-compatible interpretation rule is the direction that produces field bugs: the phone
+will refuse a pairing the engine is willing to create. **The `:core` and engine rows are `grep` over
+source, not execution** — no Android SDK, no .NET. Only the relay row is measured behaviourally.
+
+**Milestone 10 — what was deliberately NOT done, and the reason is the standing one.** The relay was
+**not tightened**. Tightening what it refuses is the exact shape of the 2026-08-09 size-cap bug, and
+the harnesses that would catch an over-tightening (`SyncLiveSmoke`, `Verify-Alpha.ps1`) need .NET.
+The four tests are a **characterization, not an endorsement**, and their comments say so. What this
+run changes is that the decision now has a **measured price tag** instead of an estimated one.
+
+**Milestone 11 — one branch, one draft PR, test-only.** `claude/s2-relay-header-pairing` off run
+85's `claude/s2-relay-constant-pins`; draft PR
+**[#57](https://github.com/ShivaClaw/careerseeker/pull/57)** with the required self-audit section.
+**One test file, +68 lines, no production source**: `src/channel.ts` was restored between every
+mutation and re-checked with `sha256sum -c` → **OK** (`55b31981…d659`), **in neither commit**.
+Clean **`63 passed (63)`, EXIT=0**; **`tsc --noEmit` 0 errors, EXIT=0**;
+**`OK: 28 vector files match the generator.`, EXIT=0**. This run **pays one branch** of landing
+cost, deliberately: a single-claim PR was judged worth more than folding an unrelated concern into
+#56, and the PR's self-audit names that trade as a thing to disagree with.
+
+**B-18's FIFTY-FIRST firing, and the first NOTIFICATION SENT since the policy began.** The four
+standing triggers were re-checked and, as in the previous four runs, **all four are negative**:
+engine `main` still `aac05f3`, android `main` still `ebfaf81`, nothing merged or undrafted, the
+stored prompt unchanged, no gate result. **The notification this run sends is not one of the four** —
+it reports a *measured protocol finding with a field-visible failure mode* (`decrypt_failed`
+returned for a misroute) together with the fact that the ladder is exhausted and the fifty-first
+stale assignment fired. See BLOCKED.md's run-86 note for why a fifth trigger was added rather than
+the silence being broken ad hoc.
+
+**SCOPE AND PROHIBITION — what this run did NOT touch.** **No rung moved.** **No gate ran and none
+is claimed**: `Verify-Alpha.ps1` did not run (`dotnet`/`pwsh` **absent**, **C-86-2**), the android
+gate did not run (`ANDROID_HOME` **unset**), and **the fused android tree has still never been
+built**. **No CI result is claimed for this run's push.** **No production source in any repo**: no
+C#, no Kotlin, no `:app` file, no `:core` file, no `relay/src/` file — the engine diff is
+`relay/test/relay.test.ts` alone, so **`$ExpectedOfflineTotal` is untouched** (**B-17**). **No
+vector byte, no pin move, no `generate.mjs` edit** — pin unmoved at **`7328a0b`**, `--check` green
+at 28 files (**C-86-8**). The android diff is **records only** (`LOG.md`, `STATE.md`,
+`AUDIT-REQUEST.md`, `BLOCKED.md`, `docs/protocol-questions.md`). **Nothing merged, closed,
+undrafted, force-pushed or deleted** in either repo; **no history rewritten**; no branch deleted.
+**No deploy of any kind.** **The production relay was not contacted at all**, not even
+`GET /v1/health`. No Play, Google or OAuth console; no account, purchase, Gmail, keystore or
+emulator. **No secret read, printed or echoed.** Terra's territory (`autonomy/codex-state`) was
+**read, never written** — Terra reports **COMPLETE, files claimed: none** — no collision.

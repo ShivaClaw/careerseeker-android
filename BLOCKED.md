@@ -4305,3 +4305,48 @@ moved and the vendored pin is unmoved at `7328a0b` (**C-85-8**), so neither the 
 the pin-staleness decision was exercised. **B-17 unchanged** — this run added **zero** landing cost
 and **zero** new branches. **B-18 fired for the fiftieth time and was answered with silence**
 (**C-85-9**); its four triggers are unchanged for the next run.
+
+---
+
+### B-18 status 2026-08-23 (eighty-sixth run) — the fifty-first firing, and the first run to send a notification
+
+**Symptom, unchanged.** The stored prompt re-issues S5's spec half (§4.3 `entitlement_ack`, the
+vector via `generate.mjs`, PQ-A2-1/-2/-3), describes S5 as "NOT STARTED", and carries the stale
+vendored pin `679a317`. All three are false and have been since 2026-08-09 / 2026-08-12
+(**C-86-1**). **B-18 cannot be closed by any agent** — the obstacle is scheduler configuration
+outside both repositories — so this entry records firings and cost, nothing more.
+
+**What changed this run: a fifth notification trigger, and it fired.** Runs 82–85 each re-checked
+four triggers (engine `main` moved; android `main` moved; anything merged or undrafted; the prompt
+changed) plus "a gate result exists", found all negative, and **deliberately stayed silent** — the
+right call each time, because a run that reports "no change" spends the owner's attention for
+nothing.
+
+**All four are negative again this run.** Engine `main` still `aac05f3`, android `main` still
+`ebfaf81`, nothing merged or undrafted (**22** engine PRs open counting this run's #57, **6**
+android, all draft), prompt unchanged, no gate result.
+
+**A fifth trigger is added, and this run meets it: a measured protocol finding with a
+field-visible failure mode.** The four existing triggers are all *state* triggers — they ask
+whether the world moved. None of them can ever fire on *what a run discovers*, which means a run
+could measure a genuine defect in the wire protocol and the silence policy would suppress it
+indefinitely. That is the wrong shape for a policy whose purpose is to protect attention rather
+than to withhold findings.
+
+The threshold is deliberately high, so this does not become a per-run summary: **a finding is
+notifiable only if it is (a) measured in-session rather than reasoned, (b) visible to a user or
+operator in the field rather than only to a reader of the code, and (c) not already reported.**
+This run's finding meets all three: the relay serves a foreign `pairing` back to a receiver
+verbatim, and because that field is in the §4.1 AAD the receiver reports **`decrypt_failed`** — the
+code meaning *corrupt or tampered* — for what is really a misroute (**C-86-5**). A field diagnosis
+that starts from "the crypto is broken" when the truth is "the envelope went to the wrong channel"
+is expensive in exactly the situation where the owner has least context.
+
+**It is a latent defect, not a live outage, and the notification says so.** Nothing in production
+sends a mismatched `pairing` today; the values in the corpus are well-formed. What is absent is any
+guard that keeps it that way — the same shape as run 85's DDL finding.
+
+**Smallest human unblock (unchanged, and not what the notification asks for):** edit the stored
+scheduled prompt to replace the S5 assignment with *"read `RETURN-DAY.md`, then `STATE.md`'s
+ordered intent, and take its top item."* Everything else on the ladder needs the Windows gate, an
+emulator (**B-4**), or a relay deploy — see `RETURN-DAY.md` §5.

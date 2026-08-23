@@ -706,7 +706,66 @@ URL's pairing segment>` to `push`'s header check, fix the two non-conforming ids
 check and is free: the relay already routes by that segment, so a disagreement is malformed by
 construction.
 
-**Re-verify:** `AUDIT-REQUEST.md` **C-S2R-8**.
+### Update 2026-08-23 (eighty-sixth run) — the behaviour is now PINNED, the consequence is measured, and the cost of closing is smaller and differently shaped than this entry said
+
+**The three rows above are unchanged and were re-measured green.** What follows adds to them; it
+does not correct them.
+
+**1. The three cases are now executable, not prose.** Until this run PQ-S2-1's table lived only in
+this document: nothing in the suite asserted any of it, so a change to the behaviour would have
+been silent in both directions — a fix would have looked like a passing build, and a regression
+like nothing at all. Four cases now sit in `relay/test/relay.test.ts` under
+``envelope header `pairing` (characterization — see PQ-S2-1)``. They are a **characterization, not
+an endorsement**: they assert today's 201s so that changing them has to be deliberate.
+
+**2. The fourth case is new, and it is the consequence half.** Nobody had measured what the
+*receiver* gets. Measured: an envelope pushed to channel A carrying `pairing: p_AAAABBBBCCCCDDDD`
+is served back by `GET /pull` **verbatim**, foreign id intact. So the relay is not merely failing
+to check a field — it is **forwarding a false routing claim to a party that authenticates it**.
+This entry reasoned that "an envelope sealed for X does not decrypt at Y"; that is right, and the
+measured detail is what the receiver then reports. `pairing` is in the §4.1 AAD, so the failure
+surfaces as **`decrypt_failed`** (§7.2) — the code that says *corrupt or tampered* — for what is
+really a misroute. The relay is the only party positioned to tell those apart, and today it does
+not look.
+
+**3. The cost of closing is 2 relay fixture lines, not 1, and the "18 failures" it first produces
+are one line each.** Measured one mutation at a time from a `59 passed (59)` baseline:
+
+| mutation | untouched suite (59) | with this run's 4 tests (63) |
+| --- | --- | --- |
+| clean | **59 passed** | **63 passed** |
+| **M1** — validator checks `env.pairing` shape | **18 failed / 41 passed** | 20 failed / 43 passed |
+| **M2** — M1 + `env.pairing === <path segment>` | — | 22 failed / 41 passed (all 4 new bind) |
+| **M1 + both relay fixtures fixed** | — | **2 failed** — exactly the 2 characterization cases M1 changes |
+
+The 18 are **not** 18 problems. They collapse to **two fixture lines**, both hard-coding the same
+malformed `p_x`: `envelope()` at `relay/test/relay.test.ts:37` and a second helper `rawEnvelope()`
+at `:268-270` that this entry did not know about. Fix both and the only remaining failures are the
+two characterization cases that exist to say the behaviour changed. **This entry's "to close" says
+"fix the two non-conforming ids above" — the real count is four sites**: `p_x` twice in the relay
+suite, plus `p_bridge_test` (`tests/EngineHarness/Program.cs:2291`) and `p_harness` (`:2496`) in
+the engine, which this entry named as one.
+
+**4. The three-way picture, which is what makes this a disagreement and not just a gap.** One
+document, three transcriptions, three different answers — and `docs/Sync-Protocol.md` §3 states one
+rule for all of them:
+
+| implementation | enforces the `p_` + 16 shape? |
+| --- | --- |
+| `:core` (Kotlin) | **Yes, 5 production sites** — `EnvelopeJson.kt:73`, `PairingSession.kt:77`, `OutboundEnvelopes.kt:97`, `RelayClient.kt:133`, and `Protocol.kt:326` |
+| relay (TypeScript) | **Path segment only** (`index.ts:55`); `env.pairing` appears **nowhere** in `relay/src/` |
+| engine (C#) | **Nowhere.** No shape check exists in `src/`; `PairingManager.cs:51` mints a conforming id but accepts any caller-supplied one unvalidated |
+
+The phone is strictest, the engine weakest. Per the mission's engine-compatible interpretation
+rule, a phone stricter than the engine is the direction that produces field bugs — the phone will
+refuse a pairing the engine is willing to create.
+
+**Still not fixed here, and the reason is unchanged:** tightening what the relay refuses is the
+size-cap bug's shape, and the harnesses that would catch an over-tightening need .NET. What this
+run changes is that the decision now has a measured price tag instead of an estimated one.
+
+**Re-verify:** `AUDIT-REQUEST.md` **C-S2R-8** (original three rows) and **C-86-1**…**C-86-6**
+(this update).
 
 ---
 

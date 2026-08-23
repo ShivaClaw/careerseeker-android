@@ -16243,3 +16243,168 @@ here.** Green CI is evidence this branch is *neutral*, not that the landing plan
 **Provenance note.** A concurrent session recorded the same run as **C-84-13** while these records
 were being written; its commit says it *"defers to run 85's own entries if they exist."* The numbers
 above were **re-read from the logs in this session** rather than inherited from it — the two agree.
+
+---
+
+## Run 86 (2026-08-23) — the three-way transcription disagreement surface, and the relay's unread `pairing`
+
+### C-86-1 — the assigned slice was already built, for the fifty-first firing
+
+```bash
+cd <engine> && git fetch --all --prune
+git log --oneline --all | grep -E '8575539|22b028e|7328a0b'
+```
+
+*Expected, and **observed**:* the stored prompt again assigns S5's spec half (§4.3
+`entitlement_ack`, the vector via `generate.mjs`, PQ-A2-1/-2/-3) and again describes S5 as "NOT
+STARTED". It has been built since **2026-08-09** — `8575539`, `22b028e`, `7328a0b` — and the
+prompt's vendored pin `679a317` is stale, the real pin being **`7328a0b`** (**C-PIN-1**).
+**Declined and re-routed** to `STATE.md`'s ordered intent, as the last fifty runs did. This run
+took run 85's own named successor axis instead: *"the `:core` ↔ relay ↔ engine disagreement
+surface — three transcriptions of one document; runs 83–85 compared each to the document, nobody
+compared them to each other."*
+
+### C-86-2 — this image still cannot run either gate, verified rather than assumed
+
+```bash
+for t in node npm dotnet pwsh java; do printf '%-8s ' "$t"; which $t || echo ABSENT; done
+echo "ANDROID_HOME=${ANDROID_HOME:-UNSET}"
+```
+
+*Expected, and **observed**:* `node`/`npm` present (**v22.22.2**), **`dotnet` ABSENT**, **`pwsh`
+ABSENT**, `ANDROID_HOME` **UNSET**, `java` present but **21**, not the pinned 17. So
+`scripts\Verify-Alpha.ps1` did not run, the android gate did not run, and **no gate result is
+claimed anywhere in this run.**
+
+### C-86-3 — the relay baseline, reproduced before anything was changed
+
+```bash
+cd <engine> && git checkout claude/s2-relay-constant-pins
+cd relay && npm ci && npm test
+```
+
+*Expected, and **observed**:* **`Tests 59 passed (59)`, `Test Files 1 passed (1)`, EXIT=0** —
+run 85's number, reproduced in a fresh sandbox. Every row below is measured against this baseline.
+
+### C-86-4 — `pairing` is the one declared header field the relay never reads
+
+```bash
+cd <engine>/relay && grep -n "env\.pairing" src/*.ts || echo ">>> NO OCCURRENCES"
+grep -n "isValidPairingId" src/index.ts src/channel.ts
+```
+
+*Expected, and **observed**:* **`env.pairing` has NO OCCURRENCES in `relay/src/`.** `EnvelopeHeader`
+declares six fields (`v`, `pairing`, `dir`, `seq`, `ts`, `key_id`); the push validator at
+`channel.ts:150-166` checks five of them plus `ciphertext`, `nonce` and the optional `sig`, and
+never `pairing`. `isValidPairingId` is called at **`index.ts:55` only** — on the URL path segment,
+never on the body. This is PQ-S2-1's premise, re-verified on the branch head rather than inherited.
+
+### C-86-5 — the four measured cases, and the fourth is new
+
+```bash
+cd <engine>/relay && npm test -- -t 'envelope header'
+```
+
+*Expected, and **observed**:* four cases pass, pinning: a header naming a **different** pairing
+than the path → **201**; a **malformed** header pairing (`p_x`) → **201**; **no `pairing` field at
+all** → **201**; and `GET /pull` serving the foreign id **back to the receiver verbatim**. The
+first three re-confirm PQ-S2-1's eleventh-run table (recorded there as prose, asserted by nothing
+until now). **The fourth was never measured**: because `pairing` is in the §4.1 AAD, the receiver
+authenticates a routing claim the relay never checked and reports **`decrypt_failed`** (§7.2) — the
+code meaning *corrupt or tampered* — for what is really a misroute.
+
+### C-86-6 — the mutation table: enforcing the shape costs two fixture lines, not eighteen failures
+
+```bash
+cd <engine>/relay
+cp src/channel.ts /tmp/channel.orig.ts && sha256sum src/channel.ts
+# M1: add `typeof env.pairing !== 'string' || !isValidPairingId(env.pairing as string)`
+#     to the validator in src/channel.ts, importing isValidPairingId from './protocol'
+npm test                                    # against the UNTOUCHED suite, and again with the 4 new tests
+# M2: M1 plus `|| env.pairing !== pathPairing`, threading segments[1] into push()
+npm test
+# M1 + fix BOTH fixtures: `pairing: 'p_x'` at test/relay.test.ts:37 and
+#     `"pairing":"p_x"` in rawEnvelope() at :268-270
+npm test
+cp /tmp/channel.orig.ts src/channel.ts && sha256sum -c   # restore, and prove it
+```
+
+*Expected, and **observed**:*
+
+| mutation | untouched suite (59) | with this run's 4 tests (63) |
+| --- | --- | --- |
+| clean | **59 passed** | **63 passed** |
+| **M1** — validator checks `env.pairing` shape | **18 failed / 41 passed** | 20 failed / 43 passed |
+| **M2** — M1 + equality with the path segment | — | 22 failed / 41 passed (**all 4 bind**) |
+| **M1 + both relay fixtures fixed** | — | **2 failed** — exactly the 2 cases M1 changes |
+
+**The 18 are not 18 problems.** They collapse to **two fixture lines** hard-coding the same
+malformed `p_x`: `envelope()` at `:37`, and a second helper `rawEnvelope()` at `:268-270` **that
+PQ-S2-1 did not know about**. That refines PQ-S2-1's *"fix the two non-conforming ids"* — the real
+count is **four sites**, two here and two in `tests/EngineHarness/Program.cs` (`p_bridge_test` at
+`:2291`, `p_harness` at `:2496`). M1 alone does **not** bind the "different pairing" case, because
+`p_AAAABBBBCCCCDDDD` is well-formed; that separation is why M2 exists.
+
+### C-86-7 — the three-way table is grep-derived, and says so
+
+```bash
+cd <android> && grep -rn "isValidPairingId" core/src/main/ | wc -l    # :core production sites
+cd <engine>  && grep -rn "isValidPairingId\|IsValidPairingId" src/ || echo ">>> ENGINE: NONE"
+grep -n 'p_' src/Sync/PairingManager.cs
+```
+
+*Expected, and **observed**:* `:core` enforces the shape at **5 production sites**
+(`EnvelopeJson.kt:73`, `PairingSession.kt:77`, `OutboundEnvelopes.kt:97`, `RelayClient.kt:133`,
+`Protocol.kt:326`); the relay enforces it on the **path only**; the **engine enforces it nowhere** —
+`PairingManager.cs:51` mints a conforming id but accepts any caller-supplied one unvalidated. One
+document, three transcriptions, three answers, with the phone strictest and the engine weakest.
+**Caveat, stated rather than buried: the `:core` and engine rows are `grep` over source, not
+execution** — no Android SDK and no .NET here. Only the relay row is measured behaviourally.
+
+### C-86-8 — no production source moved, and the vector corpus did not drift
+
+```bash
+cd <engine> && git status --porcelain          # during the run
+git show --stat claude/s2-relay-header-pairing # the commit
+node docs/sync-vectors/generate.mjs --check
+cd relay && npx tsc --noEmit; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* the only modified path at every point was
+**`relay/test/relay.test.ts`**; `src/channel.ts` was restored between every mutation and re-checked
+with `sha256sum -c` → **OK** (`55b31981…d659`), and it is **in neither commit**. Final clean run
+**`63 passed (63)`**; **`tsc --noEmit` 0 errors, EXIT=0**; **`OK: 28 vector files match the
+generator.`, EXIT=0**. **No vector byte changed and the vendored pin is unmoved at `7328a0b`**
+(`VECTORS.lock:4`). Nothing outside `relay/test/` was touched, so **`$ExpectedOfflineTotal` is
+untouched** (**B-17**) — asserted from the diff, not measured, since no gate ran here.
+
+### C-86-9 — the §3.1 clarification reached two transcriptions of three; the engine still carries the retired wording
+
+```bash
+cd <engine>
+for r in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin); do
+  git show $r:src/Sync/Protocol.cs 2>/dev/null | grep -n "Envelope hard limit"
+done | sort -u
+grep -n "MaxEnvelopeBytes" src/Sync/EnvelopeReceiver.cs
+cd <android> && grep -n "decoded ciphertext" core/src/main/kotlin/app/careerseeker/core/Protocol.kt
+```
+
+*Expected, and **observed**:* `src/Sync/Protocol.cs` reads **`/// <summary>Envelope hard limit;
+larger is rejected before any crypto work.</summary>`** on **every ref in the repository** — main
+and all 21 draft branches. That is the P0 wording §3.1's amendment retired, because it *"described
+something neither implementation ever measured"*. The engine's own code disagrees with its own
+comment: **`EnvelopeReceiver.cs:45` measures `ciphertext.Length`** — decoded ciphertext bytes,
+which is what §3.1 actually caps. `:core` corrected this KDoc at the **seventy-ninth** run and the
+relay's `protocol.ts` carries the derived `MAX_CIPHERTEXT_B64U_CHARS` with the reasoning spelled
+out; **the engine is the one transcription the correction never reached.**
+
+**Why it is not cosmetic, in the words of the Kotlin KDoc that fixed it:** §4.4 instructs a future
+chunker to size against exactly this constant, and *"a chunker sized against the envelope would be
+sized against the wrong quantity by ~33%"*.
+
+**NOT FIXED HERE, and not because it is risky — because it cannot be verified here.** The change is
+one comment line and moves no assertion count, but `dotnet` and `pwsh` are absent (**C-86-2**), so
+`Verify-Alpha.ps1` cannot confirm the 0-warnings/0-errors baseline this repo's `CLAUDE.md` requires
+after every change. Folding an unverifiable C# edit into a test-only relay PR would also cost that
+PR its single-claim shape. **This is the strongest engine-side item for the next gated session**,
+and it is one line.

@@ -11,6 +11,89 @@
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
 >
+> ## ▶ RUN 86 — 2026-08-23. **The three transcriptions were compared to each other for the first time. They agree on every value and disagree on who enforces a rule — and the relay never reads the one header field it routes on.**
+>
+> **The slice: run 85's own named successor axis** — *"the `:core` ↔ relay ↔ engine disagreement
+> surface; runs 83–85 compared each to the document, nobody compared them to each other."* Needs
+> only `node` and `grep`. **The assigned S5 slice was declined for the fifty-first time**, on
+> re-derived evidence (**C-86-1**); `dotnet`/`pwsh` **absent**, `ANDROID_HOME` **unset**, checked
+> with `which` (**C-86-2**).
+>
+> **THE GOOD NEWS FIRST, BECAUSE IT IS THE LARGER HALF.** On the *vocabulary* axis the three
+> transcriptions **agree completely**: 12 payload kinds, 7 reserved-for-L2 kinds, 3 state-changing
+> kinds, all ten §7.2 error codes and their wire strings, the seven HKDF info/salt/prefix constants,
+> both suite names, and 32/12/16 for key/nonce/tag are **identical across C# and Kotlin**, and the
+> §4.1 AAD template is byte-identical in all three *and* in the document. **The disagreement is not
+> in a value. It is in who enforces a rule.**
+>
+> **FINDING 1 — `pairing` is the one declared header field the relay never reads** (**C-86-4**).
+> `EnvelopeHeader` declares six fields; the push validator (`channel.ts:150-166`) checks five plus
+> `ciphertext`/`nonce`/`sig`, and **`env.pairing` has no occurrences anywhere in `relay/src/`**.
+> `isValidPairingId` guards the URL **path** segment at `index.ts:55` and nothing else.
+>
+> **The consequence half is new; the three 201s are not.** PQ-S2-1 measured foreign/malformed/absent
+> at the **eleventh** run — re-measured green, **no novelty claimed**. What nobody had measured is
+> what the **receiver** gets: `GET /pull` serves the foreign `pairing` back **verbatim**, and because
+> that field is in the §4.1 AAD the receiver reports **`decrypt_failed`** — the code meaning *corrupt
+> or tampered* — for what is really a **misroute** (**C-86-5**). The relay is the only party
+> positioned to tell those apart.
+>
+> **MEASURED, ONE MUTATION AT A TIME, from a reproduced `59 passed (59)` baseline** (**C-86-6**):
+>
+> | mutation | untouched suite (59) | with run 86's tests (63) |
+> | --- | --- | --- |
+> | clean | **59 passed** | **63 passed** |
+> | **M1** — validator checks `env.pairing` shape | **18 failed / 41 passed** | 20 failed / 43 passed |
+> | **M2** — M1 + equality with the path segment | — | 22 failed / 41 passed (**all 4 bind**) |
+> | **M1 + both relay fixtures fixed** | — | **2 failed** — exactly the 2 cases M1 changes |
+>
+> **THE 18 ARE NOT 18 PROBLEMS, AND REPORTING THEM AS A COST WOULD HAVE BEEN THE ERROR.** They
+> collapse to **two fixture lines** hard-coding the same malformed `p_x` — `envelope()` at `:37` and
+> a second helper `rawEnvelope()` at `:268-270` **that PQ-S2-1 did not know about**. The extra
+> measurement was run *because the raw number looked alarming*. **Lesson, generalising run 84's:
+> a mutation's failure count is a symptom, not a price — count the distinct causes first.** It also
+> corrects PQ-S2-1's "fix the two non-conforming ids": the real count is **four sites**.
+>
+> **FINDING 2 — the §3.1 clarification reached two transcriptions of three** (**C-86-9**).
+> `src/Sync/Protocol.cs` still reads *"Envelope hard limit"* on **every ref in the repo**, the wording
+> §3.1's amendment retired; `:core` fixed it at run 79 and the relay carries the derived
+> `MAX_CIPHERTEXT_B64U_CHARS`. The engine's code already measures the right thing
+> (`EnvelopeReceiver.cs:45` measures `ciphertext.Length`) — **only its comment is wrong**. It matters
+> because §4.4 sizes a future chunker against this constant, and against the envelope it is wrong by
+> ~33%. **One line, NOT fixed here**: not risky, just unverifiable without the gate.
+>
+> **THREE-WAY ENFORCEMENT TABLE** (**C-86-7**, `grep`-derived for two of three rows and says so):
+> `:core` enforces the pairing shape at **5 production sites**; the relay on the **path only**; the
+> **engine nowhere** (`PairingManager.cs:51` mints a conforming id, accepts any supplied one). Phone
+> strictest, engine weakest — the direction that produces field bugs.
+>
+> **ONE SELF-CORRECTION, AND IT IS `depth()`'s SHAPE ONE FILE ALONG.** The malformed case first
+> inherited `p_x` from `envelope()`'s default; the M1+fixture-fix row caught it **passing** while
+> still named *"malformed"* — it would have stopped testing anything the day the fixture was fixed.
+> Now passed explicitly. (A second, smaller: the first pairing sweep matched only double-quoted
+> literals and missed the relay's own `'p_x'`. Re-run: **13 literals, 7 rejected**.)
+>
+> **THE RELAY WAS NOT TIGHTENED**, deliberately — that is the size-cap bug's shape and the harnesses
+> that catch over-tightening need .NET. The four tests are a **characterization, not an
+> endorsement**. What changed is that the decision now has a **measured price tag**.
+>
+> **ONE BRANCH, ONE DRAFT PR, TEST-ONLY.** `claude/s2-relay-header-pairing` off run 85's branch;
+> draft **[#57](https://github.com/ShivaClaw/careerseeker/pull/57)** with self-audit. **+68 lines,
+> one test file, no production source** — `src/channel.ts` restored between every mutation,
+> `sha256sum -c` **OK** (`55b31981…d659`), **in neither commit**. Clean **`63 passed (63)`**;
+> `tsc --noEmit` **0 errors**; **`OK: 28 vector files match the generator.`** **Pays one branch** of
+> landing cost, deliberately, for a single-claim PR.
+>
+> **B-18's FIFTY-FIRST firing, and the FIRST NOTIFICATION SENT.** The four state triggers are all
+> negative again. A **fifth** trigger was added — *a measured, field-visible, not-yet-reported
+> finding* — and this run meets it: `decrypt_failed` returned for a misroute. See BLOCKED.md's run-86
+> note for why the policy was extended rather than the silence broken ad hoc.
+>
+> **SCOPE: no rung moved.** No C#, no Kotlin, no `:app`, no `:core`, no `relay/src/`. Engine diff is
+> `relay/test/relay.test.ts` alone, so **`$ExpectedOfflineTotal` is untouched** (**B-17**). No vector
+> byte; pin unmoved at **`7328a0b`** (**C-86-8**). **No gate ran and none is claimed.** Production
+> relay **not contacted at all**. Terra: **COMPLETE, files claimed: none** — no collision.
+>
 > ## ▶ RUN 85 — 2026-08-23. **The relay lane's last two constants. One was guarded by accident; the other let the Durable Object die on its second wake, and nothing could see it.**
 >
 > **The slice: the ordered intent's NEW ITEM 2**, taken because the list scoped it itself — *"Two
@@ -1621,6 +1704,7 @@ in [`RETURN-DAY.md`](RETURN-DAY.md)**.
 
 | | |
 | --- | --- |
+| **HEARTBEAT — eighty-sixth run (2026-08-23, Linux cloud sandbox). The three transcriptions of one document were compared to each other for the first time: every value agrees, and the relay never reads the one header field it routes on.** | **Engine branch `claude/s2-relay-header-pairing` at `f00feb2`**, off run 85's `claude/s2-relay-constant-pins` (`8126a8e`); **new draft PR [#57](https://github.com/ShivaClaw/careerseeker/pull/57)** with self-audit, base `claude/s2-relay-constant-pins`. **ONE relay TEST file, +68 lines, test-only, no production source** — `src/channel.ts` restored between every mutation, `sha256sum -c` **OK** (`55b31981…d659`), in neither commit. Android branch `claude/android-a0-probe`, draft PR [#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) refreshed with these records. **Rule one first:** `git fetch --all --prune` in both checkouts; every count post-fetch. Engine `origin/main` **`aac05f3`** and android `main` **`ebfaf81`**, both unmoved; newest merge anywhere still **PR #44, 2026-08-13**. **FIFTY-FIRST firing of a slice built 2026-08-09** — declined (**C-86-1**); prompt pin `679a317` stale, real pin **`7328a0b`**. **GATES RE-VERIFIED ABSENT BEFORE BEING SKIPPED (C-86-2):** `dotnet`/`pwsh` **absent** by `which`, `ANDROID_HOME` unset, `java` 21 not the pinned 17 — **no gate ran and none is claimed.** **THE SLICE: run 85's own named successor axis**, the `:core` ↔ relay ↔ engine disagreement surface. **Baseline `59 passed (59)`, EXIT=0** (**C-86-3**) reproduced before any mutation. **FINDING 1 (C-86-4/5): `env.pairing` has zero occurrences in `relay/src/`** — the one declared header field the push validator never checks; `isValidPairingId` guards the URL path only. Foreign/malformed/absent all **201** (PQ-S2-1's eleventh-run rows, re-measured, **no novelty claimed**); **NEW: `GET /pull` serves the foreign `pairing` back verbatim**, so the receiver authenticates a routing claim the relay never checked and reports **`decrypt_failed`** — *corrupt or tampered* — for a **misroute**. **MATRIX (C-86-6): M1 shape-check → 18 failed/41 passed on the untouched suite; M2 + path equality → 22 failed/41 (all 4 new bind); M1 + both fixtures fixed → only 2 failed.** **The 18 collapse to TWO fixture lines** (`envelope()` :37 and `rawEnvelope()` :268-270, the second unknown to PQ-S2-1) — *a failure count is a symptom, not a price*. **FINDING 2 (C-86-9): `Protocol.cs` still says "Envelope hard limit" on every ref**, the wording §3.1 retired; `:core` fixed it at run 79, the relay carries the derived constant — **one line, not fixed here because it cannot be gate-verified**, and it is NEW ITEM 1. **SELF-CORRECTION:** the malformed case first inherited `p_x` from the helper and would have silently stopped testing on the day that fixture was fixed — `depth()`'s shape one file along; now passed explicitly. **THE RELAY WAS NOT TIGHTENED** — characterization, not endorsement. Clean **`63 passed (63)`**, `tsc --noEmit` **0 errors**, **`OK: 28 vector files match the generator.`** **`$ExpectedOfflineTotal` untouched** (**B-17**); pin unmoved **`7328a0b`** (**C-86-8**). **B-18's fifty-first firing and the FIRST NOTIFICATION SENT** — four state triggers negative, a **fifth** (measured, field-visible, unreported finding) added and met. Production relay **not contacted at all**. Terra **COMPLETE, files claimed: none** — no collision. |
 | **HEARTBEAT — eighty-fifth run (2026-08-23, Linux cloud sandbox). The relay lane's last two constants: one was guarded by accident, the other let the Durable Object die on its second wake.** | **Engine branch `claude/s2-relay-constant-pins` at `8126a8e`** — run 84's branch, **no new branch and no new PR**; draft PR [#56](https://github.com/ShivaClaw/careerseeker/pull/56) **refreshed**, base `claude/s2-latest-retention-skew` (#55). **ONE relay TEST file, +38 lines, test-only, no production source.** Android branch `claude/android-a0-probe`, draft PR [#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) refreshed with these records. **Rule one first:** `git fetch --all --prune` in both checkouts; the android tree again arrived **detached at the docs-only `main`** (`ebfaf81`), **310 commits** behind the work branch, and every count here is post-fetch. Engine `origin/main` **`aac05f3`**, unmoved since 2026-08-12; newest merge anywhere still **PR #44, 2026-08-13**. **FIFTIETH firing of a slice built 2026-08-09** — declined (**C-85-1**); prompt pin `679a317` stale, real pin **`7328a0b`**, re-checked at `VECTORS.lock` (**C-85-8**). **ITEMS 1 AND 3 RE-VERIFIED AS UNTAKEABLE BEFORE BEING SKIPPED (C-85-2):** `dotnet` and `pwsh` **absent**, `which` not assumed, `ANDROID_HOME` unset — a C# edit that cannot be compiled is what this program's rules forbid. **THE SLICE: the ordered intent's NEW ITEM 2**, which the list itself scoped as *"a small, executable, node-only slice."* **Baseline `57 passed (57)`, EXIT=0** (**C-85-3**), reproducing run 84's number in a fresh sandbox before any mutation. **MATRIX, one mutation at a time, every row executed: T3 — drop `IF NOT EXISTS` from `CREATE TABLE` → 57 passed GREEN before / RED 1-of-59 after; T4 — same on `CREATE INDEX` → 57 passed GREEN before / RED after (C-85-4); D1 — `DIRECTIONS` widened → RED 1 before (incidental) / RED 2 after (C-85-5); T2 — drop `PRIMARY KEY (dir, seq)` → GREEN at 57 AND at 59, left green on purpose (C-85-6); clean 57 → 59.** **T4's "before" cell was measured against the RESTORED ORIGINAL test file, not inferred** — which is what makes "unguarded before" a measurement. **THE FINDING IS A DEAD CHANNEL, NOT A WRONG VALUE:** `PairingChannel`'s constructor runs `ENVELOPE_TABLE_DDL` (`relay/src/channel.ts:29`) and Cloudflare calls it on **every** instantiation, including every wake from eviction against storage that already holds the table; **every pre-existing case instantiates a FRESH DO**, so the re-entry path production runs on every wake **was covered by nothing**. Drop it and SQLite raises `table envelopes already exists`, the constructor throws, and that pairing dies **on a wake long after the deploy that caused it**. **NOT A LIVE DRIFT, STATED FIRST:** both statements carry `IF NOT EXISTS` today and are correct; the defect is the absent guard. Pinned **behaviourally**, so the assertion also covers the index and anything later added to the string. **TWO CANDIDATES REFUTED AND CROSSED OFF:** `DIRECTIONS` was **already** RED at baseline — caught only *incidentally* by `depth()`'s key shape inside a case named "creates its schema and starts empty" — so the added §3 assertion is **hardening, not a finding**; and the **primary key is removable and green and deliberately NOT pinned**, because as a constraint it is unreachable behind `channel.ts:190` and as an index it is performance only behind an explicit `ORDER BY seq`. **The honest caveat: the PK argument is a reading of the code, not a measurement.** Clean **`59 passed (59)`, EXIT=0**; `wrangler types && tsc --noEmit` **0 errors, EXIT=0**; `generate.mjs --check` → **`OK: 28 vector files match the generator.`, EXIT=0**. **This run mutated a PRODUCTION file:** `protocol.ts` copied pristine, restored between **every** row, `sha256sum -c` re-checked after each and once more before each commit — **`7d7b37bb…73201`**, byte-identical, **in neither commit** (**C-85-7**). **ONE SELF-CORRECTION CAUGHT BY THE HOUSE RULE ITSELF:** C-85-10's first draft claimed "eight exported value bindings" while listing ten; running the `grep -c` the claim prescribes returned **10** and it was fixed before the commit — **the rule that every claim carries its command is what caught it.** **THE LANE IS NOW CLOSED (C-85-10):** all ten exported value bindings in `relay/src/protocol.ts` have been mutated across runs 84–85, plus the module-private `PAIRING_ID`; what remains is type-only. **With run 83's note that `Protocol.kt` has no constant a mutation leaves green, the constants axis is exhausted in both sandbox-runnable implementations** — the ordered intent now names three unswept axes instead. **B-18's fiftieth firing and a DELIBERATE SILENCE (C-85-9):** all four of run 84's triggers re-checked and negative — engine `main` `aac05f3`, android `main` `ebfaf81`, **21 engine + 6 android PRs open, all draft, nothing merged or undrafted**, prompt unchanged, no gate result. **No notification sent.** *(Bookkeeping note for the next run: run 84's banner calls itself the THIRD deliberate silence while its own heartbeat row says fourth. Counting run 82 as the first, this run is the **fourth**; the discrepancy is in run 84's record, not in the trigger checks, which are recorded identically in both.)* **SCOPE: no rung moved.** **No `:app` file, no C#, no Kotlin, no `:core` test** — the only android change is the records. **No engine file outside `relay/test/`**, so **`$ExpectedOfflineTotal` untouched — zero landing cost to the pin family (B-17)** and **zero new branches**, leaving the S2 relay chain **19 deep** where run 84 paid one. No vector byte; pin unmoved; `generate.mjs` read, never edited. **No gate ran and none is claimed**, and **CI has run on `b11e47b`, NOT on this run's head `8126a8e`** — **the merge condition is unchanged**, and the fused android tree **has still never been built**. **Nothing merged, closed, undrafted, force-pushed or deleted in either repo; no history rewritten; no branch created or deleted; no deploy; the production relay not contacted at all, not even `/v1/health`; no scheduled task enumerated, created, modified or deleted; no secret read, printed or echoed.** Terra: **COMPLETE, next intent none, files claimed: none** — no collision. |
 | **HEARTBEAT — eighty-fourth run (2026-08-23, Linux cloud sandbox). The sweep that exhausted `Protocol.kt` was carried to the third implementation, and the blind relay's retention default was guarded only by its own ceiling.** | **Engine branch `claude/s2-relay-constant-pins`, NEW draft PR [#56](https://github.com/ShivaClaw/careerseeker/pull/56)**, base `claude/s2-latest-retention-skew` (#55) — **ONE relay TEST file, +40 lines, test-only, no production source.** **Rule one first:** `git fetch --all --prune` in both checkouts; every count here is post-fetch. Engine `origin/main` **`aac05f3`**, android `origin/main` **`ebfaf81`**, both unmoved; newest merge anywhere still PR #44 (2026-08-13). **FORTY-NINTH firing of a slice built 2026-08-09** — declined (**C-84-1**); prompt pin `679a317` stale, real pin **`7328a0b`**. **ITEM 1 (the engine suite-name hole) was NOT takeable here:** `dotnet` and `pwsh` are **absent**, verified with `which` (**C-84-2**), and a C# edit that cannot be compiled is what this program's rules forbid. **THE SLICE: the relay constants lane** — `relay/src/protocol.ts` is the **third** transcription of `docs/Sync-Protocol.md` and no run had ever swept it. **Baseline `55 passed (55)`, EXIT=0** (**C-84-3**), reproducing run 82's number off-machine. **MATRIX, one mutation at a time, every row executed: M1 `DEFAULT_TTL_SECONDS 7d→30d` → 55 passed GREEN before / RED 1-of-57 after (C-84-4); M3 `PAIRING_ID {16}→{16,32}` and M3c charset admits `.` → GREEN before / RED after (C-84-6); controls C1 `PROTOCOL_VERSION`, C2 `MAX_TTL_SECONDS`, C3 `MAX_ENVELOPE_BYTES` all RED both ways.** **TWO CANDIDATES REFUTED AND CROSSED OFF (C-84-5):** `PULL_PAGE_SIZE` and the `MAX_PUSH_BODY_CHARS` headroom went green in the *harmless* direction, but the hurtful direction is guarded — page size →0 fails 8, headroom →+0 fails 2. **M1 IS NOT A LIVE DRIFT, AND THAT IS SAID FIRST:** the deployed value is 7 days and correct; the defect is that nothing keeps it right, and §3 bounds only the *ceiling* — `7*24*60*60` appears in **no** spec. Clean **`57 passed (57)`, EXIT=0**; `wrangler types && tsc --noEmit` **0 errors**. `protocol.ts` restored between every row, `sha256sum -c` re-checked after each and before each commit — **`7d7b37bb…73201`**, in **neither** commit (**C-84-7**). **One self-inflicted error recorded, not smoothed over (C-84-8):** a `git checkout --theirs .` after a `git stash pop` silently discarded two of three hunks; caught by grep, restored from the saved patch, suite re-run to 57 before committing. **No vector byte, no pin move, no `generate.mjs` edit, no `$ExpectedOfflineTotal` touch** (**C-84-9**) — zero landing cost to the pin family (**B-17**), though the S2 relay chain is now one branch deeper (18 → 19 engine drafts). **I ran no gate — but CI DID, and it passed** (**C-84-12**): run `32609617177`, both jobs success, **`Offline total: 598 passed, 0 failed`** (the base's number — pin moves by zero, **measured**), `SyncHarness` **130/0**, relay **57 passed (57)**, **`OK: 28 vector files match the generator`**. **The merge condition is unchanged** — CI runs the offline portion only, and the fused android tree has still never been built. Terra: **COMPLETE, files claimed: none** — no collision. **B-18's fourth deliberate silence (C-84-10, C-84-12).** |
 | **HEARTBEAT — eighty-third run (2026-08-22, Linux sandbox). The list's live target was already closed; its residue was the last constant in `Protocol.kt` that no test compared to the document.** | **No engine branch and no new engine PR — this run touched no engine file at all.** Android branch `claude/android-a0-probe`, **draft PR [#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) refreshed** — **ONE `:core` TEST file, +57 lines, test-only, no production source in either module.** **Rule one first:** `git fetch --all --prune` in both checkouts; the android tree again arrived **detached at the docs-only `main`** (`ebfaf81`), and every count here is post-fetch (**C-83-1**). Engine `origin/main` **`aac05f3`**, unmoved since 2026-08-12; newest merge anywhere still **PR #44, 2026-08-13**. **FORTY-EIGHTH firing of a slice built 2026-08-09** — declined (**C-83-2**); prompt pin `679a317` stale, real pin **`7328a0b`**. **THE LIST'S LIVE TARGET WAS CLOSED BEFORE IT WAS TAKEN (C-83-8):** `SUCCESSOR FOR ITEM 4 — the HKDF info strings` is pinned by run 76 at `ProtocolTest.kt:218-220`, crypto parameters at `:165-170`. **The standing precondition earned its place for the FOURTH time.** **THE SLICE was the residue** — `VERSION`, `SUITE`, `SUITE_HYBRID_RESERVED`, the three constants neither sweep covered. **Lane re-opened first:** `core-probe.sh` needs **JDK 17**, the image ships **21**, and the install 404'd against a stale apt index until `apt-get update` — recorded because run 56 installed the same JDK and the next sandbox will find 21 again. **Baseline `346 tests, 0 failed, 0 skipped, 22 classes`.** **MATRIX, one mutation at a time, every row executed (C-83-3): M1 `VERSION 1→2` → RED before and after; M2 `SUITE → "p256-hkdf-sha512"` → RED, 2 tests before / 3 after; M3 `SUITE_HYBRID_RESERVED → "p256+mlkem1024-hkdf-sha256"` → 346 passed, 0 failed, GREEN before / RED after; clean 346 → 347.** **M3 was caught by nothing**, and it was the **last constant in `Protocol.kt`** that no test compared to the document. **Why:** both references move with it — `PairingSessionTest` builds its invite *from* the constant and asserts rejection, but every unsupported suite is rejected identically, and `!in SUPPORTED_SUITES` is satisfied by a wrong string more easily than by the right one. **The seventy-fourth run's trap, one constant over from the seven run 76 closed.** **IT IS NOT A LIVE DRIFT, STATED FIRST (C-83-4):** the value is **correct** — §5.2 line 306, the engine's `Protocol.cs:21`, and **64 occurrences with one spelling across every ref**. **The defect is that nothing keeps it right.** **Nor is the string a label:** §5.2 records the QR budget was *"checked against the hybrid suite's sizes now: ML-KEM-768's 1184-byte key"*, and M3 names **ML-KEM-1024** at **1568 bytes**. **v1 behaviour is unaffected either way, which is why it is invisible** — it surfaces only when the hybrid migration ships, the one moment the two implementations must agree and nothing has ever compared them. **THE ENGINE HAS THE SAME HOLE AND THIS RUN DID NOT FIX IT (C-83-5):** `SyncHarness` asserts `SuiteHybridReserved.Contains("mlkem") && != Suite` and **M3 satisfies both conjuncts**. **Read, not executed** (no `dotnet`, no `pwsh`) and **deliberately not patched** — a C# edit I cannot compile is what this program's rules forbid. **Promoted to the ordered intent's NEW ITEM 1 with the mutation that proves it; NOT filed as a blocker**, because nothing human-shaped is missing except the gate, which is already **H2**. **Clean `core-probe: 347 tests, 0 failed, 0 skipped, across 22 classes`**; M3 replayed → RED, M2 replayed → RED with 3 tests (**C-83-6**). **This run mutated a PRODUCTION file** where 81 and 82 mutated test files: `Protocol.kt` restored between **every** row, `sha256sum -c` re-checked after each and once more before the commit — **`c42624df…bced8`**, byte-identical, **in no commit**. **B-18's forty-eighth firing and the SECOND DELIBERATE SILENCE (C-83-10)** — run 82's four stated triggers (`main` moving, a PR merged or undrafted, the prompt changing, a gate result) **all re-checked and all negative**; PR #55's CI was already delivered at run 82. **No notification sent.** **SCOPE: no rung moved.** **No `:app` file, no C#, no Kotlin production code**; **no engine file at all**, so **`$ExpectedOfflineTotal` untouched — no landing cost added to the pin family (B-17)**. No vector byte, pin unmoved at **`7328a0b`**, `generate.mjs` not edited (**C-83-7**); `docs/Sync-Protocol.md` read, never edited. **No gate ran and none is claimed** — `core-probe.sh` is **one** of the android gate's five tasks, `ANDROID_HOME` unset (**B-7**), `checkCoreIsAndroidFree` not run, and **the fused android tree has still never been built**; **no CI result is claimed for this run's push.** **Nothing merged, closed, undrafted, force-pushed or deleted in either repo; no history rewritten; no branch created or deleted in the engine repo; no deploy; the production relay not contacted at all, not even `/v1/health`; no scheduled task enumerated, created, modified or deleted; no secret read, printed or echoed.** Terra: **COMPLETE, next intent none, files claimed: none** — no collision. |
@@ -1819,6 +1903,52 @@ respectively and they can be done today.
 | **B-14** phone-side confirm assertion | **new 2026-08-15** (forty-first run). `:core` cannot assert `pairing-high-bit-confirm` because the vendored corpus is pinned at `679a317`, which **predates the vector** — the file is not in this repo. **Not B-7:** `:core` is Android-free and its tests run on the JVM here; the blocker is the **pin**, not the toolchain, which is why it has a human unblock and B-7 does not. Hand-vendoring was considered and **refused** (that is the drift event the mission forbids). Smallest unblock: merge PR #50, re-pin, re-run the drift check — both steps Brandon's. **PR #51's engine-side assertion does not depend on it** and is CI-green at 617/0 |
 
 ## Next intent (in order)
+
+**ORDERED INTENT REVISED 2026-08-23 (eighty-sixth run) — THE DISAGREEMENT-SURFACE AXIS PAID OUT ON
+ITS FIRST SWEEP, AND IT IS NOT EXHAUSTED.**
+
+**CLOSED — "nobody compared the three transcriptions to each other."** Swept this run. The result
+worth carrying forward is that **the values all agree** (kinds, error codes, HKDF constants, suite
+names, AAD template — identical in C#, Kotlin, TypeScript and the document), so **do not re-sweep
+the vocabulary axis**. What differs is **enforcement**, and that produced two findings: the relay
+never reads `env.pairing` (**C-86-4**, pinned in draft PR #57), and the §3.1 wording correction
+reached `:core` and the relay but never `Protocol.cs` (**C-86-9**).
+
+**NEW ITEM 1 — one line of C#, and it is the cheapest real item on this list.**
+`src/Sync/Protocol.cs`'s `MaxEnvelopeBytes` summary still reads *"Envelope hard limit"* on **every
+ref in the repository** — the wording §3.1's amendment retired because it described a quantity
+neither implementation measures. The engine's code is already right
+(`EnvelopeReceiver.cs:45` measures `ciphertext.Length`); only the comment is wrong, and §4.4 sizes a
+future chunker against exactly this constant. **Needs the gate only to confirm 0 warnings / 0
+errors**, not to decide anything. Take it in the same sitting as run 84's ITEM 1 and ITEM 3, which
+are the other two `dotnet`-shaped one-liners. **Re-verify it is still open before taking it**
+(**C-86-9**'s loop).
+
+**NEW ITEM 2 — the two remaining unswept axes run 85 named, both still executable here.**
+**(a) error-path coverage** — which of the relay's status codes are asserted by exactly one test?
+**(b) the vector corpus's own completeness** — 28 files; which §3 rejection reasons have **no**
+vector? (b) is the more interesting of the two now, because this run's finding is precisely a §3
+rule with no vector behind it: nothing in the corpus exercises a mismatched `pairing`. **Adding
+vectors is allowed and moves the pin**, so weigh that landing cost before starting — the pin is
+`7328a0b` and the android side vendors it.
+
+**NEW ITEM 3 — do NOT close PQ-S2-1 from a sandbox, and it now has a price tag.** The standing rule
+is unchanged (tightening the relay is the size-cap bug's shape; the harnesses need .NET), but the
+cost is no longer a guess: **two relay fixture lines plus two engine ids**, after which exactly the
+two characterization tests in PR #57 flip (**C-86-6**). Whoever closes it on a gated machine should
+expect to edit those tests, and that is by design.
+
+**A NOTE ON WHAT THIS RUN DID NOT MEASURE.** The `:core` and engine rows of the enforcement table
+are `grep` over source, **not execution** — no Android SDK, no .NET. Only the relay row is
+behavioural. If a later run gains either toolchain, re-derive those two rows before building on
+them.
+
+**Standing precondition, unchanged and vindicated for the seventh time:** before taking any item,
+re-verify that item. This run's assigned slice was landed on 2026-08-09 and this was its
+**fifty-first** firing (**C-86-1**). `origin/main` is not the state of the program — **22** engine
+PRs are open (counting #57) and none is merged.
+
+---
 
 **ORDERED INTENT REVISED 2026-08-23 (eighty-fifth run) — THE RELAY CONSTANTS LANE IS NOW CLOSED, AND
 THE CONSTANTS AXIS IS EXHAUSTED IN EVERY IMPLEMENTATION THIS SANDBOX CAN RUN.**
