@@ -15995,7 +15995,7 @@ run changes is that the decision now has a **measured price tag** instead of an 
 **Milestone 11 — one branch, one draft PR, test-only.** `claude/s2-relay-header-pairing` off run
 85's `claude/s2-relay-constant-pins`; draft PR
 **[#57](https://github.com/ShivaClaw/careerseeker/pull/57)** with the required self-audit section.
-**One test file, +68 lines, no production source**: `src/channel.ts` was restored between every
+**One test file, +75 lines, no production source**: `src/channel.ts` was restored between every
 mutation and re-checked with `sha256sum -c` → **OK** (`55b31981…d659`), **in neither commit**.
 Clean **`63 passed (63)`, EXIT=0**; **`tsc --noEmit` 0 errors, EXIT=0**;
 **`OK: 28 vector files match the generator.`, EXIT=0**. This run **pays one branch** of landing
@@ -16025,3 +16025,11 @@ undrafted, force-pushed or deleted** in either repo; **no history rewritten**; n
 `GET /v1/health`. No Play, Google or OAuth console; no account, purchase, Gmail, keystore or
 emulator. **No secret read, printed or echoed.** Terra's territory (`autonomy/codex-state`) was
 **read, never written** — Terra reports **COMPLETE, files claimed: none** — no collision.
+
+**Run 86 addendum — a measured correction to this entry's own diff size.** The milestones above and
+draft PR #57's first body said **"+68 lines"**. That was an estimate, not a measurement.
+`git show --stat` on `f00feb2` reports **75 insertions, 1 file changed**. Corrected to **+75**
+throughout the records and in the PR body. This is the second self-correction of the run and it was
+found the same way as the first — by running the command the claim itself prescribes. **The
+substantive claims are unaffected**: one test file, no production source, `relay/src/` byte-identical
+to the base branch (`git diff --quiet origin/claude/s2-relay-constant-pins -- relay/src/` exits 0).
