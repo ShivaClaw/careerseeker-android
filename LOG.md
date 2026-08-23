@@ -16141,3 +16141,21 @@ engine diff is **`autonomy/claude-state` STATE.md only**, a docs-only branch tha
 `GET /v1/health`. No Play, Google or OAuth console; no account, purchase, Gmail, keystore or
 emulator. **No secret read, printed or echoed.** Terra's territory (`autonomy/codex-state`) was
 **read, never written** — Terra reports **COMPLETE, files claimed: none** — no collision.
+
+**Run 87 addendum — a self-inflicted truncation on the coordination branch, caught and fixed forward
+within the run.** The first `autonomy/claude-state` commit (`f3dda34`) **replaced** that file's whole
+body instead of prepending to it, dropping the heartbeats for iterations **82–86**. That branch's
+convention is a new heartbeat on top and *"Previous heartbeat (Nth iteration) follows, unchanged."*
+below — I wrote the new entry correctly and destroyed the history under it.
+
+**Found by checking my own diffstat** (`-261` lines on a file I thought I was adding to), which is
+the same habit that caught run 86's two corrections: run the command the claim prescribes rather than
+trusting the description. **Fixed forward in `2e3df50`**, restored verbatim from `f3dda34~1`, with the
+run-87 entry unchanged. **Net effect of this run on that file is now `+44 insertions, 0 deletions`**
+(`git diff f3dda34~1 HEAD --stat -- STATE.md`), and it carries **six** heartbeats.
+
+**No history was rewritten to do it** — no amend, no force-push, no branch deletion; the truncating
+commit remains in the branch's history with its correction on top, which is the honest record. The
+scope paragraph above stands: the engine-side diff is still `autonomy/claude-state`'s STATE.md alone,
+on a docs-only branch that is never merged. **The window where the history was missing was one push
+long, and Terra reports COMPLETE with no active work, so nothing read it in that state.**
