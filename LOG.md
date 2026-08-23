@@ -15733,3 +15733,30 @@ contacted at all**, not even `GET /v1/health`. No Play, Google or OAuth console;
 purchase, Gmail, keystore or emulator. **No secret read, printed or echoed.** No scheduled task
 enumerated, created, modified or deleted. Terra's territory (`autonomy/codex-state`) was **read,
 never written** — Terra reports **COMPLETE, files claimed: none** — no collision.
+
+## Run 84 addendum — CI reported before this run ended, and it corrects two of the claims above
+
+**Written after the milestones above, and it supersedes their "no CI result is claimed" line.** The
+wake arrived while the records were being written; both jobs of run `32609617177` on PR #56 are
+**`conclusion: success`** (**C-84-12**), and reading them **converts two claims from asserted to
+measured**:
+
+- **`=== Offline total: 598 passed, 0 failed ===`** on `windows-latest` — **598 is the base branch's
+  number**, the same one run 81 recorded for PR #54 (**C-81-14**). **The branch moves
+  `$ExpectedOfflineTotal` by zero, verified rather than argued from "no engine file was touched."**
+  `SyncHarness` inside it: **`=== 130 passed, 0 failed ===`**.
+- **`OK: 28 vector files match the generator`** — `node docs/sync-vectors/generate.mjs --check` on
+  the runner. **Vector drift zero, measured**, not inferred from the diff being empty.
+- **`Tests 57 passed (57)`** on `ubuntu-latest`, reproducing this sandbox's number on a clean runner,
+  plus `wrangler deploy --dry-run` OK and the blindness grep **`OK: no decryption path in relay/src`**.
+
+**What this does NOT change: the merge condition.** CI runs the **offline** portion on
+`windows-latest`; it does not run `-IncludePackage`, `-IncludePublish`, `-IncludeLive`, or any part
+of the **android** gate. **The fused android tree still has never been built**, and PR #56 is still
+**draft and unmergeable from here**. A green CI is evidence that this branch is *neutral*, not
+evidence that the landing plan is safe.
+
+**Correction to Milestone-level scope, stated plainly:** the sentence "no gate ran and none is
+claimed" is accurate for *this session* — I ran no gate, and `dotnet`/`pwsh` remain absent
+(**C-84-2**) — but it would be wrong to leave it standing unqualified now that **CI ran the offline
+gate and it passed.** Both facts are true; the second is the one a reader would want.

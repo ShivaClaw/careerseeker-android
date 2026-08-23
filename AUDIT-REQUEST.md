@@ -15942,3 +15942,35 @@ cd <android> && scripts/check-citations.sh; echo "EXIT=$?"
 *Expected, and **observed**:* run at the **start** of this run against the inherited records —
 **`definitions: 786   cited: 787   documented-absent: 1`**, `OK`, `EXIT=0` — and again after this
 run's entries were written.
+
+### C-84-12 — CI ran the offline gate on PR #56 and it passed; two run-84 claims are now measured
+
+```bash
+# via the GitHub MCP tools, or:
+#   gh run view 32609617177 --log | grep -E 'Offline total|vector files match|Tests .* passed|no decryption path'
+```
+
+*Expected, and **observed**:* run **`32609617177`**, head `b11e47b`, **both jobs
+`conclusion: success`**.
+
+- **`Build and offline harnesses`** (`windows-latest`): **`=== Offline total: 598 passed, 0 failed
+  ===`**, with `SyncHarness` reporting **`=== 130 passed, 0 failed ===`** inside it. **598 is the
+  base branch's number** — the same total run 81 recorded for PR #54 (**C-81-14**) — so **this branch
+  moves `$ExpectedOfflineTotal` by zero, measured rather than argued from "no engine file was
+  touched"** (**B-17**).
+- **`Blind relay (Worker)`** (`ubuntu-latest`): **`Tests 57 passed (57)`**, reproducing this
+  sandbox's number on a clean runner; `npx wrangler deploy --dry-run` OK; the blindness grep
+  **`OK: no decryption path in relay/src.`**; and
+  **`OK: 28 vector files match the generator.`** — **vector drift zero, measured**, which is the
+  independent confirmation of **C-84-9**.
+
+**What it does not establish.** CI runs the **offline** portion only. It does **not** run
+`-IncludePackage`, `-IncludePublish`, `-IncludeLive`, or **any** part of the android gate; the fused
+android tree has **still never been built**. **The merge condition is unchanged**, and PR #56 remains
+draft and unmergeable from a cloud session. A green CI shows this branch is **neutral**, not that the
+landing plan is safe.
+
+**This is B-18's fourth trigger firing — "a gate result" — and it still did not earn a
+notification.** The result is green, expected, concerns a draft PR that cannot be merged from here,
+and asks Brandon for no decision. Waking him for it would spend the channel on good news he can read
+whenever he returns.
