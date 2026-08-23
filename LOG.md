@@ -15854,3 +15854,37 @@ force-pushed or deleted** in either repo; **no history rewritten**; **no branch 
 **No secret read, printed or echoed.** No scheduled task enumerated, created, modified or deleted.
 Terra's territory (`autonomy/codex-state`) was **read, never written** — Terra reports **COMPLETE,
 files claimed: none** — no collision.
+
+## Run 85 addendum — CI reported on this run's own head, and it supersedes the scope paragraph's CI line
+
+**Written after the milestones above.** CI run **`32619516958`** completed on head **`8126a8e`** —
+**this run's head**, not run 84's — and **both jobs passed** (**C-85-12**). The numbers were **read
+from the job logs in this session**, not inherited from the concurrent session that recorded the same
+run as **C-84-13**; the two agree.
+
+- `ubuntu-latest` — **`Tests 59 passed (59)`**, reproducing this sandbox's clean number on a fresh
+  runner; `tsc --noEmit` clean; `wrangler deploy --dry-run` OK; **`OK: no decryption path in
+  relay/src.`**; **`OK: 28 vector files match the generator.`**
+- `windows-latest` — **`=== Offline total: 598 passed, 0 failed ===`**, `SyncHarness` **130/0**.
+  **598 is the base branch's number**, so **all four commits on this branch move
+  `$ExpectedOfflineTotal` by zero — measured on this head** rather than argued from the diff being
+  test-only (**B-17**).
+
+**Correction, stated plainly rather than edited away.** The scope paragraph above says *"CI has run on
+`b11e47b`, NOT on this run's head `8126a8e`."* That was true when written and is now **superseded**.
+Both remain true in their own moment: **I ran no gate in this session** — `dotnet` and `pwsh` are
+absent (**C-85-2**) — and **CI has now run the offline gate on this head and it passed.** The second
+is the one a reader wants.
+
+**What this does NOT change: the merge condition.** CI runs the **offline** portion only — no
+`-IncludePackage`, no `-IncludePublish`, no `-IncludeLive`, no android gate. **The fused android tree
+has still never been built**, and PR #56 is still **draft and unmergeable from here**. A green CI
+means this branch is *neutral*, not that the landing plan is safe.
+
+**A note on the concurrent write, because it is the first in this program.** While these records were
+being written, another session pushed `377fe30` to this branch recording the same engine work as
+**C-84-13**. The push was detected by a **rejected non-fast-forward**, re-derived with
+`git fetch --all --prune`, and resolved by **rebasing this run's single unpushed commit on top of
+theirs** — **no force-push, no history rewrite, nothing discarded**; the `AUDIT-REQUEST.md` conflict
+was resolved by **keeping both sides**, theirs first. **Rule one caught it a second time**, which is
+the argument for rule one.

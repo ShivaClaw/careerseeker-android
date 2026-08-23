@@ -16207,3 +16207,39 @@ cited: 810   documented-absent: 1`** — which is what a re-run today will print
 compare against. The inherited count was **786/787** at run 84. *(Run 84's C-84-11 has the same
 self-reference and reports only the pre-entry figure; noted here rather than edited, since its
 observation was correct when made.)*
+
+### C-85-12 — CI ran on THIS run's head and passed; the "no CI on 8126a8e" claim is superseded
+
+```bash
+# via the GitHub MCP tools, or:
+#   gh run view 32619516958 --log | grep -E 'Offline total|vector files match|passed \(|no decryption path'
+#   gh pr view 56 --json headRefOid    # expect 8126a8e…
+```
+
+*Expected, and **observed**, read from the job logs in this session rather than taken from another
+session's summary:* run **`32619516958`**, head **`8126a8eec5f0ca1cf463c52877140489600334bf`**
+(confirmed twice in the checkout step's `git rev-parse` and `git log -1 --format=%H`), **both jobs
+`success`**.
+
+- `ubuntu-latest` — **`Tests 59 passed (59)`**, `Test Files 1 passed (1)`, reproducing this sandbox's
+  number on a clean runner; `npx tsc --noEmit` clean; `wrangler deploy --dry-run` OK;
+  **`OK: no decryption path in relay/src.`**; **`OK: 28 vector files match the generator.`** —
+  **vector drift zero, measured on the runner** as well as locally (**C-85-8**).
+- `windows-latest` — **`=== Offline total: 598 passed, 0 failed ===`**, `SyncHarness`
+  **`=== 130 passed, 0 failed ===`**. **598 is the base branch's number** (the same figure run 81
+  recorded for #54 and run 84 for `b11e47b`), so **all four commits on this branch move
+  `$ExpectedOfflineTotal` by zero — measured on this head, not argued from "no engine file was
+  touched"** (**B-17**).
+
+**This supersedes run 85's earlier line that "CI has run on `b11e47b`, NOT on this run's head."** That
+was accurate when written and is now stale; both facts are recorded rather than the first one
+quietly edited away.
+
+**What it does NOT change: the merge condition.** CI runs the **offline** portion only — no
+`-IncludePackage`, no `-IncludePublish`, no `-IncludeLive`, and no part of the **android** gate. **The
+fused android tree has still never been built** and PR #56 remains **draft and unmergeable from
+here.** Green CI is evidence this branch is *neutral*, not that the landing plan is safe.
+
+**Provenance note.** A concurrent session recorded the same run as **C-84-13** while these records
+were being written; its commit says it *"defers to run 85's own entries if they exist."* The numbers
+above were **re-read from the logs in this session** rather than inherited from it — the two agree.

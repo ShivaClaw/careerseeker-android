@@ -70,9 +70,25 @@
 > **SCOPE: no rung moved.** **No `:app` file, no C#, no Kotlin, no `:core` test** — the only android
 > change is the records. **No engine file outside `relay/test/`**, so **`$ExpectedOfflineTotal` is
 > untouched** (**B-17**). No vector byte; pin unmoved at **`7328a0b`**; `generate.mjs` read, never
-> edited (**C-85-8**). **No gate ran and none is claimed**, and **CI has run on `b11e47b`, NOT on this
-> run's head `8126a8e`.** The production relay was **not contacted at all**. Terra: **COMPLETE, files
-> claimed: none** — no collision.
+> edited (**C-85-8**). **No gate ran in this session and none is claimed.** The production relay was
+> **not contacted at all**. Terra: **COMPLETE, files claimed: none** — no collision.
+>
+> **CI REPORTED ON THIS RUN'S OWN HEAD BEFORE IT ENDED** (**C-85-12**). Run **`32619516958`**, head
+> **`8126a8e`**, **both jobs `success`**, read from the job logs in this session rather than inherited:
+> **`Tests 59 passed (59)`** on `ubuntu-latest`, `wrangler deploy --dry-run` OK, **`OK: no decryption
+> path in relay/src.`**, **`OK: 28 vector files match the generator.`**; and **`=== Offline total: 598
+> passed, 0 failed ===`** on `windows-latest` with `SyncHarness` **130/0** — **598 is the BASE's
+> number, so all four commits move `$ExpectedOfflineTotal` by zero, MEASURED** (**B-17**). **This
+> supersedes an earlier line in this banner** that said CI had run only on `b11e47b`. **It does NOT
+> change the merge condition:** CI runs the **offline** portion only, and the fused android tree **has
+> still never been built.**
+>
+> **FIRST CONCURRENT WRITE IN THIS PROGRAM, AND IT WAS HANDLED WITHOUT A REWRITE.** Another session
+> pushed `377fe30` to this branch mid-run, recording the same engine work as **C-84-13**. Caught by a
+> **rejected non-fast-forward**, re-derived with `git fetch --all --prune`, and resolved by **rebasing
+> this run's single unpushed commit on top of theirs** — **no force-push, nothing discarded**; the
+> `AUDIT-REQUEST.md` conflict kept **both** sides. **Rule one earned its place a second time in one
+> run.**
 >
 > ## ▶ RUN 84 — 2026-08-23. **`Protocol.kt` was exhausted, so the same sweep went to the third implementation. The blind relay's retention default was guarded only by its own ceiling.**
 >
