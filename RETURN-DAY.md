@@ -59,6 +59,30 @@ Full derivation and the commands: [`docs/Merge-Topology.md` §12](docs/Merge-Top
 > are still open and still draft; nothing was merged or closed. **The four stop counts below (3 / 2
 > / 4 / 3) all reproduce** (**C-RD-1**, **C-RD-2**). One row was missing and is added below.
 
+### Step −1 — run the guard before you read the rest (added run 88, 2026-08-23)
+
+**This section rotted once, silently, and was caught by hand.** It now has a one-command check.
+Fetch the engine checkout first, then:
+
+```bash
+scripts/fleet-probe.sh plan ../careerseeker RETURN-DAY.md      # exit 0 = plan still names leaves
+```
+
+**Exit 1 means a row below names a branch that is no longer a leaf — stop and re-derive before
+merging anything.** The output names the successors that now contain it, which is the branch to
+merge instead. Exit 2 means the guard could not parse this table and is refusing to report; fix the
+guard, do not proceed on its silence.
+
+Measured at run 88 (**C-88-3**, **C-88-4**): green on this table today, and **exit 1 on this same
+section as it stood on 2026-08-19** — the version that named `#35` — where it prints the rot, all
+four containing branches, and `s2-relay-header-pairing` as the unnamed leaf. That is the correction
+run 87 spent a run arriving at by hand.
+
+**It costs a `git fetch` and no credential**, because the rot signal is ref ancestry rather than PR
+metadata (**C-88-5**). What it does **not** see: a named PR closed or merged behind the plan's back,
+and whether a leaf has an open PR at all. Those need the PR list, and they are the half of **B-19**
+that is still open.
+
 ### Step 0 — decide PR #53 (`claude/s6-resume-reconciliation`)
 
 #53 and the #45/#46 stack **implement the same defect fix twice, incompatibly** — a typed push
