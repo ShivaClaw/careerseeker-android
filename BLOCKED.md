@@ -4264,3 +4264,44 @@ of three hunks during the commit split. Caught by grepping for the test names, r
 saved patch, suite re-run to 57 before committing. **The reason it is worth a line at all** is that
 the failure is silent — `stash pop` reports `Auto-merging`, the subsequent `checkout` leaves a
 **clean tree**, and a clean tree reads as *finished* rather than as *reverted*.
+
+---
+
+## Run 85 note — nothing new is blocked, and that is the honest answer
+
+**The slice completed.** The ordered intent's NEW ITEM 2 was takeable in this sandbox, was taken, and
+closed on measurement (**C-85-4**, **C-85-5**, **C-85-6**). **No new B-* entry is filed**, because
+nothing human-shaped is missing for anything this run touched.
+
+**What this run could NOT do, and why it is not a blocker.** The ordered intent's **ITEM 1** (the
+engine half of run 83's suite-name hole) and **ITEM 3** (sweeping `src/Sync/Protocol.cs`) were both
+re-verified as untakeable here and skipped: **`dotnet` and `pwsh` are absent**, checked with `which`
+rather than assumed (**C-85-2**). That is the **gate**, which is already **H2** — and run 83's
+reasoning stands unchanged: **filing it as a blocker would send the next session hunting a phantom.**
+Both items stay in the ordered intent with the mutations that prove them, ready for the first
+session that has a Windows machine.
+
+**One limit on this run's own evidence, recorded as a limit rather than a blocker.** The DDL pin
+asserts *"re-executing the DDL against storage that already ran it does not throw"*, which is a
+slightly weaker oracle than *"the Durable Object survives a real second instantiation."*
+`runInDurableObject` hands over the **instance**, not the constructor, so the constructor path itself
+is not directly re-entered by any test. I believe the two coincide — the constructor's only storage
+work *is* this `exec` (`relay/src/channel.ts:29`) — but **I did not prove that**, and it is named
+first in PR #56's self-audit for exactly that reason. **No local change fixes it**; closing it
+properly wants a deployed Worker observed across an eviction (**H5**, embargoed), the same wall PR
+#55's and #56's self-audits already name.
+
+**A second limit, on the refuted row.** The argument that `PRIMARY KEY (dir, seq)` is safely
+removable is **a reading of `relay/src/channel.ts:190`, not a measurement** (**C-85-6**). It holds
+only while that app-level check does: **if `channel.ts:190` is ever weakened, the PK becomes
+load-bearing and unguarded in the same moment.** Recorded here so that a future change to the push
+path finds this note rather than rediscovering it.
+
+**B-1, B-2, B-4, B-5, B-7, B-8 untouched and not re-tested** — nothing in this slice bears on the
+pairing UI, the live end-to-end, the emulator lane, Room under Robolectric, the egress policy or the
+p2e counter's owner. **B-7 was not re-measured**; its unset `ANDROID_HOME` was observed in passing
+(**C-85-2**) and is consistent with every prior reading. **B-15 and B-16 unchanged** — no vector byte
+moved and the vendored pin is unmoved at `7328a0b` (**C-85-8**), so neither the CI drift check nor
+the pin-staleness decision was exercised. **B-17 unchanged** — this run added **zero** landing cost
+and **zero** new branches. **B-18 fired for the fiftieth time and was answered with silence**
+(**C-85-9**); its four triggers are unchanged for the next run.

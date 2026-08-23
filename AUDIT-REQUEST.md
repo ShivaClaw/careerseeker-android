@@ -16020,3 +16020,190 @@ fifth, and it **defers to run 85's own entries if they exist.**
 description — so the prediction its body records ("CI has not yet run on `8126a8e`… that is a
 prediction, not a measurement") and its resolution both remain on the record, and no concurrent
 rewrite of that description could be clobbered.
+### C-85-1 — the assigned slice was already built, for the fiftieth firing
+
+```bash
+cd <engine> && git fetch --all --prune
+git log --oneline --all | grep -E '8575539|22b028e|7328a0b'
+gh pr view 32 --json title,state,isDraft   # S5 first half: the entitlement_ack body, PQ-A2-1/-2
+```
+
+*Expected, and **observed**:* the stored prompt again assigns S5's spec half (§4.3 `entitlement_ack`,
+the vector via `generate.mjs`, PQ-A2-1/-2/-3). It has been built since **2026-08-09** — commits
+`8575539`, `22b028e`, `7328a0b`, carried by draft PRs **#32/#37/#38/#39**. **Declined and re-routed
+to `STATE.md`'s ordered intent**, as the last thirteen runs did. The prompt's vendored pin
+`679a317` is likewise stale; the real pin is **`7328a0b`** (**C-PIN-1**, re-verified this run).
+
+### C-85-2 — this image still cannot run either gate, verified rather than assumed
+
+```bash
+for t in node npm dotnet pwsh java gradle; do printf '%-8s ' "$t"; which $t || echo ABSENT; done
+echo "ANDROID_HOME=${ANDROID_HOME:-UNSET}"
+```
+
+*Expected, and **observed**:* `node`/`npm` present (**v22.22.2**), **`dotnet` ABSENT**, **`pwsh`
+ABSENT**, `ANDROID_HOME` **UNSET**. So `scripts\Verify-Alpha.ps1` did not run and the android gate
+did not run; **ITEM 1 and ITEM 3 of the ordered intent remain untakeable here**, for the same reason
+run 84 recorded. The relay lane needs only `node`, which is why it is the lane this run took.
+
+### C-85-3 — the relay baseline, reproduced off-machine before anything was changed
+
+```bash
+cd <engine> && git checkout claude/s2-relay-constant-pins && git reset --hard b11e47b
+cd relay && npm ci && npm test
+```
+
+*Expected, and **observed**:* **`Tests 57 passed (57)`, `Test Files 1 passed (1)`, EXIT=0** — run
+84's number, reproduced in a fresh sandbox before any mutation. Every row below is measured against
+this baseline, one mutation at a time.
+
+### C-85-4 — the schema DDL's idempotence was guarded by nothing, on both statements
+
+```bash
+cd <engine> && git checkout claude/s2-relay-constant-pins && git reset --hard b11e47b   # baseline
+perl -0pi -e 's/CREATE TABLE IF NOT EXISTS envelopes/CREATE TABLE envelopes/' relay/src/protocol.ts
+cd relay && npm test          # baseline: expect 57 passed, GREEN -- the defect
+cd .. && git checkout relay/src/protocol.ts
+perl -0pi -e 's/CREATE INDEX IF NOT EXISTS envelopes_expiry/CREATE INDEX envelopes_expiry/' relay/src/protocol.ts
+cd relay && npm test          # baseline: expect 57 passed, GREEN -- the same defect, index half
+cd .. && git checkout relay/src/protocol.ts
+
+git checkout claude/s2-relay-constant-pins    # back to the pinned head (8126a8e)
+perl -0pi -e 's/CREATE TABLE IF NOT EXISTS envelopes/CREATE TABLE envelopes/' relay/src/protocol.ts
+cd relay && npm test          # expect RED, 1 failed / 58
+cd .. && git checkout relay/src/protocol.ts
+perl -0pi -e 's/CREATE INDEX IF NOT EXISTS envelopes_expiry/CREATE INDEX envelopes_expiry/' relay/src/protocol.ts
+cd relay && npm test          # expect RED, 1 failed / 58
+cd .. && git checkout relay/src/protocol.ts
+```
+
+*Expected, and **observed**:* **both mutations `57 passed (57)` — GREEN at baseline**, and **both
+`1 failed | 58 passed (59)`** against the new test. `PairingChannel`'s constructor executes
+`ENVELOPE_TABLE_DDL` (`relay/src/channel.ts:29`), and Cloudflare calls that constructor on **every**
+instantiation, including every wake from eviction or hibernation against storage that already holds
+the table. Every pre-existing case instantiates a **fresh** DO, so the re-entry path — the one
+production runs on every wake — **was covered by nothing**. The failure it admits is a **dead
+channel**: SQLite raises `table envelopes already exists`, the constructor throws, and that pairing
+stops working on a wake long after the deploy that caused it. **Not a live drift** — both statements
+carry `IF NOT EXISTS` today and are correct; the defect is the absent guard. The index row's
+baseline was measured against the **restored original** test file (`git checkout relay/test/relay.test.ts`),
+not inferred, which is what makes "unguarded before" a measurement.
+
+### C-85-5 — `DIRECTIONS` was already guarded, incidentally; that is reported, not dressed up
+
+```bash
+cd <engine> && git checkout claude/s2-relay-constant-pins && git reset --hard b11e47b
+perl -0pi -e "s/= \['e2p', 'p2e'\];/= ['e2p', 'p2e', 'x2y' as Direction];/" relay/src/protocol.ts
+cd relay && npm test          # baseline: expect RED, 1 failed / 56 -- ALREADY guarded
+cd .. && git checkout relay/src/protocol.ts && git checkout claude/s2-relay-constant-pins
+perl -0pi -e "s/= \['e2p', 'p2e'\];/= ['e2p', 'p2e', 'x2y' as Direction];/" relay/src/protocol.ts
+cd relay && npm test          # expect RED, 2 failed / 57
+cd .. && git checkout relay/src/protocol.ts
+```
+
+*Expected, and **observed**:* **baseline `1 failed | 56 passed (57)` — already RED, so NOT a
+defect**, and `2 failed | 57 passed (59)` after. The single baseline failure is
+**`creates its schema and starts empty`**, which catches the widening only because `depth()`
+(`relay/src/channel.ts:289`) derives its keys from the array — **incidental coverage inside a test
+about schema creation**, one refactor of `depth()` away from vanishing, and it never names the
+document. The added assertion compares the array to §3 directly
+(`docs/Sync-Protocol.md:80`, and line 102's "a `dir` that is neither `e2p` nor `p2e`"). **A
+hardening, not a finding.**
+
+### C-85-6 — the primary key is removable and is NOT a defect; it was not pinned
+
+```bash
+cd <engine> && git checkout claude/s2-relay-constant-pins
+perl -0pi -e 's/  expires_at INTEGER NOT NULL,(.*)\n  PRIMARY KEY \(dir, seq\)\n/  expires_at INTEGER NOT NULL$1\n/' relay/src/protocol.ts
+cd relay && npm test          # expect 59 passed -- GREEN, and deliberately left green
+cd .. && git checkout relay/src/protocol.ts
+```
+
+*Expected, and **observed**:* **`59 passed (59)` — GREEN at both 57 and 59**, and **deliberately not
+pinned**. Neither of the PK's two roles is load-bearing here: as a **constraint** it is unreachable,
+because the app-level check at `relay/src/channel.ts:190` rejects any `seq <= last` where
+`last = MAX(seq)` over all rows for the direction — if a row `(dir, seq)` exists then `last >= seq`,
+so a duplicate can never reach the `INSERT`; as an **index** it is performance only, because `pull`
+sorts with an explicit `ORDER BY seq` (`channel.ts:234`). Per run 84's lesson, this is the harmless
+direction. **Do not re-open it.** Caveat, stated because it is the weak part: this is a **reading of
+the code, not a measurement** — if the `channel.ts:190` check is ever weakened, the PK becomes
+load-bearing and unguarded in the same moment.
+
+### C-85-7 — the diff is test-only and the mutated production file is in neither commit
+
+```bash
+cd <engine> && git diff --stat b11e47b..8126a8e
+git diff --name-only b11e47b..8126a8e | grep protocol.ts   # expect NO match
+git show 8126a8e:relay/src/protocol.ts | sha256sum
+```
+
+*Expected, and **observed**:* **`relay/test/relay.test.ts | 38 ++++++`, 1 file changed, 38
+insertions**; **no match** for `protocol.ts`; hash
+**`7d7b37bbd687a022fba949e08056ab10bc20a499b18f1243a924850d67b73201`**. This run mutated a
+**production** file, so it was copied pristine before the first row, restored between **every** row,
+and `sha256sum -c` re-checked after each and once more before each commit. **No `src/`, no C#, no
+harness**, so **`$ExpectedOfflineTotal` is untouched** and this run adds **zero** landing cost to the
+pin family (**B-17**) and **zero** new branches and **zero** new PRs to the S2 relay chain — it
+reuses run 84's branch and PR.
+
+### C-85-8 — no vector byte moved and the cross-repo pin is unmoved
+
+```bash
+cd <engine> && node docs/sync-vectors/generate.mjs --check
+git diff --name-only b11e47b..8126a8e | grep -E 'sync-vectors|generate.mjs'   # expect NO match
+cd <android> && head -8 core/src/test/resources/sync-vectors/VECTORS.lock
+```
+
+*Expected, and **observed**:* **`OK: 28 vector files match the generator.`, EXIT=0** — vector drift
+**zero, measured in this session**, not inferred from an empty diff. **No match** for the vector
+paths. `VECTORS.lock` reports **`Pinned commit: 7328a0bc043335491cd96a67d634e8eea2a13af9`** —
+unmoved, and the prompt's `679a317` remains stale.
+
+### C-85-9 — B-18's triggers re-checked, and the silence is deliberate for the fourth run
+
+```bash
+cd <engine> && git fetch --all --prune && git rev-parse origin/main       # expect aac05f3
+cd <android> && git fetch --all --prune && git rev-parse origin/main      # expect ebfaf81
+gh pr list --repo ShivaClaw/careerseeker --state open --json number,isDraft
+gh pr list --repo ShivaClaw/careerseeker-android --state open --json number,isDraft
+```
+
+*Expected, and **observed**:* engine `origin/main` **`aac05f3`**, unmoved since 2026-08-12; android
+`origin/main` **`ebfaf81`**; **21 open PRs in the engine repo (20 mine, all draft; #26 Terra's) and 6
+in the android repo, all draft** — **nothing merged or undrafted**, newest merge anywhere still PR
+**#44** of 2026-08-13. The stored prompt is unchanged and no gate result arrived. All four triggers
+**negative**, so **no notification was sent** — the fourth deliberate silence. This run's finding is
+**new but not live**: correct values deployed, absent guard, fix already sitting in a draft PR that
+cannot be merged from here. **Next run: the same four triggers.**
+
+### C-85-10 — the relay constants lane is claimed COMPLETE; here is how to falsify that
+
+```bash
+cd <engine> && grep -n '^export const' relay/src/protocol.ts
+```
+
+*Expected, and **observed**:* **ten** exported value bindings (`grep -c` reports **10**) —
+`PROTOCOL_VERSION`,
+`MAX_ENVELOPE_BYTES`, `MAX_CIPHERTEXT_B64U_CHARS`, `MAX_PUSH_BODY_CHARS`, `MAX_SEQ`,
+`MAX_TTL_SECONDS`, `DEFAULT_TTL_SECONDS`, `PULL_PAGE_SIZE`, `DIRECTIONS`, `ENVELOPE_TABLE_DDL` —
+**every one of which has now been mutated across runs 84 and 85**, plus the module-private
+`PAIRING_ID` regex. What remains unmutated is **type-only** (`Direction`, `EnvelopeHeader`) and
+carries no runtime value. **If this claim is wrong, this is the command that shows it**, and the
+next `:core`-style sweep of the relay should either name what was missed or record the lane closed.
+
+### C-85-11 — the records' own citation guard is green after this run's entries
+
+```bash
+cd <android> && scripts/check-citations.sh; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* `OK: every cited C-/B- id resolves to an entry that exists.`,
+**`EXIT=0`** — run after run 85's `LOG.md`, `STATE.md`, `BLOCKED.md` and `AUDIT-REQUEST.md` entries
+were written, so every `C-85-*` and `B-*` cited above resolves.
+
+**Two counts, because this entry changes the number it reports.** Before C-85-11 itself was added:
+**`definitions: 808   cited: 809   documented-absent: 1`**. With it: **`definitions: 809
+cited: 810   documented-absent: 1`** — which is what a re-run today will print, and the number to
+compare against. The inherited count was **786/787** at run 84. *(Run 84's C-84-11 has the same
+self-reference and reports only the pre-entry figure; noted here rather than edited, since its
+observation was correct when made.)*

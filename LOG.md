@@ -15760,3 +15760,97 @@ evidence that the landing plan is safe.
 claimed" is accurate for *this session* — I ran no gate, and `dotnet`/`pwsh` remain absent
 (**C-84-2**) — but it would be wrong to leave it standing unqualified now that **CI ran the offline
 gate and it passed.** Both facts are true; the second is the one a reader would want.
+
+## Run 85 — 2026-08-23 (Linux cloud sandbox). The relay lane's last two constants: one was guarded incidentally, and the other let the Durable Object die on its second wake.
+
+**The slice: the ordered intent's NEW ITEM 2**, taken because the list itself scoped it — *"Two
+constants remain unmeasured; that is a small, executable, node-only slice"* — and because it is the
+only named item this image can execute. **ITEM 1 and ITEM 3 were re-verified as untakeable before
+being skipped**, per the standing precondition: `dotnet` and `pwsh` are **absent**, checked with
+`which` rather than assumed (**C-85-2**). Both stay in the ordered intent with the mutations that
+prove them, exactly as runs 83 and 84 left them.
+
+**Milestone 1 — rule one, and the state the prompt describes is not the state of the program.**
+`git fetch --all --prune` in both checkouts before anything else. Both trees arrived **detached**:
+the android tree at the docs-only `main` (`ebfaf81`), the engine at `main` (`aac05f3`). Every count
+here is post-fetch. The android work branch is **310 commits ahead** of the branch the tree arrived
+on, which is the whole reason rule one exists. **FIFTIETH firing of a slice built 2026-08-09** —
+declined and re-routed to this file's ordered intent (**C-85-1**); the prompt's vendored pin
+`679a317` is stale and the real pin is **`7328a0b`** (**C-85-8**).
+
+**Milestone 2 — baseline reproduced before anything was touched.** `npm ci && npm test` in `relay/`
+off run 84's head `b11e47b`: **`Tests 57 passed (57)`, `Test Files 1 passed (1)`, EXIT=0**
+(**C-85-3**). Run 84's number, reproduced in a fresh sandbox, before a single mutation.
+
+**Milestone 3 — MEASURED, ONE MUTATION AT A TIME.** `relay/src/protocol.ts` is a **production** file,
+so it was copied pristine first, restored between **every** row, and `sha256sum -c` re-checked after
+each and once more before each commit — **`7d7b37bb…73201`**, byte-identical, **in neither commit**
+(**C-85-7**).
+
+| mutation | baseline (57) | with run 85's tests (59) |
+| --- | --- | --- |
+| **T3 — drop `IF NOT EXISTS` from `CREATE TABLE`** | **57 passed — GREEN** | **RED — 1 of 59** |
+| **T4 — drop `IF NOT EXISTS` from `CREATE INDEX`** | **57 passed — GREEN** | **RED — 1 of 59** |
+| D1 — `DIRECTIONS` widened to a third direction | RED — 1 *(incidental)* | RED — 2 |
+| T2 — drop `PRIMARY KEY (dir, seq)` | **GREEN** | **GREEN — left green on purpose** |
+| clean | **57 passed** | **59 passed (59)** |
+
+**Milestone 4 — the finding, and what makes it worth a slice.** `PairingChannel`'s constructor
+executes `ENVELOPE_TABLE_DDL` (`relay/src/channel.ts:29`), and Cloudflare calls that constructor on
+**every** instantiation — including every wake from eviction or hibernation, **against storage that
+already holds the table**. Every pre-existing case instantiates a **fresh** DO, so the re-entry path
+— the one production runs on every wake — **was covered by nothing at all**, on both statements
+(**C-85-4**). What it admits is not a wrong value but a **dead channel**: SQLite raises `table
+envelopes already exists`, the constructor throws, and that pairing stops working **on a wake long
+after the deploy that caused it**, one pairing at a time. That delay is the point — a deploy that
+breaks this looks healthy until objects start being evicted. **Not a live drift**: both statements
+carry `IF NOT EXISTS` today and are correct; the defect is that nothing kept them that way. Pinned
+**behaviourally** — re-execute the DDL against storage that already ran it — rather than by grepping
+the DDL text, so the assertion also covers the index and anything later added to the same string.
+
+**Milestone 5 — TWO CANDIDATES DID NOT SURVIVE MEASUREMENT, AND THAT IS REPORTED, NOT BURIED.**
+`DIRECTIONS` widening was **already RED at baseline** (**C-85-5**) — so **not a defect**. It is caught
+only *incidentally*, by `depth()` deriving its keys from the array inside a case named *"creates its
+schema and starts empty"*; one refactor of `depth()` away from vanishing, and it never names the
+document. The added assertion compares it to §3 directly (`docs/Sync-Protocol.md:80`, line 102) and
+is logged as **hardening, not a finding**. Separately, **`PRIMARY KEY (dir, seq)` is removable and
+green, and was deliberately NOT pinned** (**C-85-6**): as a constraint it is unreachable, because
+`channel.ts:190` rejects any `seq <= last` before the `INSERT`; as an index it is performance only,
+because `pull` sorts with an explicit `ORDER BY seq`. Per run 84's lesson, that is the harmless
+direction. **The honest caveat: that is a reading of the code, not a measurement.**
+
+**Milestone 6 — no new branch, no new PR.** Two commits onto run 84's existing branch
+`claude/s2-relay-constant-pins`; **draft PR [#56](https://github.com/ShivaClaw/careerseeker/pull/56)
+refreshed**, not replaced. **One test file, +38 lines, no production source.** Clean **`59 passed
+(59)`, EXIT=0**; `wrangler types && tsc --noEmit` **0 errors, EXIT=0**; `node
+docs/sync-vectors/generate.mjs --check` → **`OK: 28 vector files match the generator.`, EXIT=0**.
+So the S2 relay chain stays **19 branches deep** and this run adds **zero** landing cost — unlike run
+84, which paid one branch.
+
+**Milestone 7 — one self-correction, caught in the records rather than shipped.** The first draft of
+**C-85-10** asserted "eight exported value bindings" while listing ten. Caught by running the `grep
+-c` the claim itself prescribes — which is the argument for the house rule that every claim carries
+its command — and corrected to **10** before the commit. A claim whose own command refutes it is the
+cheapest kind of error to find, and this file only found it because the command was written down.
+
+**B-18's FIFTIETH firing, and the FOURTH deliberate silence** (**C-85-9**). Run 84's four triggers
+re-checked, all four negative: engine `main` still `aac05f3`, android `main` still `ebfaf81`, nothing
+merged or undrafted in either repo (**21** engine PRs open, **6** android, all draft; newest merge
+anywhere still #44 of 2026-08-13), the stored prompt unchanged, no gate result. This run's finding is
+**new but not live** — correct values deployed, absent guard, fix already in a draft PR that cannot
+be merged from here. **No notification sent.** Next run: the same four triggers.
+
+**SCOPE AND PROHIBITION — what this run did NOT touch.** **No rung moved.** **No gate ran and none is
+claimed**: `Verify-Alpha.ps1` did not run (`dotnet` and `pwsh` **absent**, **C-85-2**), the android
+gate did not run (`ANDROID_HOME` **unset**, **B-7**), and **the fused android tree has still never
+been built**. **No CI result is claimed for this run's push** — CI has run on run 84's head
+`b11e47b`, **not** on `8126a8e`. **No engine file outside `relay/test/` was touched**: no C#, no
+`src/`, no harness, so **`$ExpectedOfflineTotal` is untouched** (**B-17**). **No vector byte, no pin
+move, no `generate.mjs` edit** — pin unmoved at **`7328a0b`** (**C-85-8**). **No android file changed
+but the records**; no `:app` file, no Kotlin, no `:core` test. **Nothing merged, closed, undrafted,
+force-pushed or deleted** in either repo; **no history rewritten**; **no branch created or deleted**.
+**No deploy of any kind.** **The production relay was not contacted at all**, not even `GET
+/v1/health`. No Play, Google or OAuth console; no account, purchase, Gmail, keystore or emulator.
+**No secret read, printed or echoed.** No scheduled task enumerated, created, modified or deleted.
+Terra's territory (`autonomy/codex-state`) was **read, never written** — Terra reports **COMPLETE,
+files claimed: none** — no collision.
