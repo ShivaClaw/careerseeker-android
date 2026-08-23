@@ -16615,3 +16615,134 @@ without the SDK. **`Verify-Alpha.ps1` did not run. The android gate did not run.
 tree has still never been built.** The merge condition in `RETURN-DAY.md` §3 is **unchanged by this
 run** — every measurement above is a `git`-level merge cost, **not** a statement that any merge is
 safe to land.
+
+---
+
+## RUN 88 — 2026-08-23. The landing-plan guard: C-88-1…C-88-9
+
+Every claim run 88 makes, with the exact command that re-derives it. Run
+`git fetch --all --prune` in **both** checkouts first; every count below is post-fetch. Paths assume
+the android checkout is the working directory and the engine checkout is `../careerseeker`.
+
+### C-88-1 — the assigned S5 slice is built, for the fifty-third consecutive run
+
+The recurring prompt assigns §4.3's `entitlement_ack` body, the ack vector, and PQ-A2-1/-2/-3. All
+three landed **2026-08-09/2026-08-12** on the `claude/s5-*` drafts.
+
+```bash
+git -C ../careerseeker show --stat 8575539 | head -12    # §4.3 body + PQ-A2-1 + PQ-A2-2
+git -C ../careerseeker show --stat 22b028e | head -12    # the two entitlement_ack vectors
+git -C ../careerseeker show --stat 7328a0b | head -12    # invalid-unknown-field, PQ-A2-3
+git -C ../careerseeker branch -r --contains 8575539
+```
+
+*Expected, and observed:* `8575539` dated **Sun Aug 9 2026**, `7328a0b` dated **Wed Aug 12 2026**;
+all three reachable from `origin/claude/s5-*`. **Declined and re-verified, not inherited.**
+
+### C-88-2 — the guard fires, refuses, and passes; all three measured
+
+```bash
+scripts/fleet-probe.sh self-test ../careerseeker; echo "EXIT=$?"
+```
+
+*Expected, and observed:* six PASS rows, `self-test: OK`, **EXIT=0**. The three new rows are
+`plan() accepts a table naming a real leaf (p4-entitlement)`,
+`plan() fires on a table naming the non-leaf 's2-seq-bound'`, and
+`plan() refuses (exit 2) when it parses zero rows`. **The fire row is the load-bearing one** — a
+guard never observed failing is not evidence of anything.
+
+### C-88-3 — §3 as it stands today still names leaves
+
+```bash
+scripts/fleet-probe.sh plan ../careerseeker RETURN-DAY.md; echo "EXIT=$?"
+```
+
+*Expected, and observed:* six plan rows, all `leaf`; `plan rows: 6   leaves now: 8   ROT: 0
+UNPLANNED: 2`; **EXIT=0**. The two UNPLANNED are `p4-entitlement` (a leaf with no open PR — the case
+`leaves`' own comment names) and `s6-resume-reconciliation` (#53, which §3 step 0 deliberately
+excludes). **Both were already explained before this run; neither is a new finding.**
+
+### C-88-4 — the guard reproduces run 87's finding from the pre-correction plan, in one command
+
+```bash
+git show f884a99:RETURN-DAY.md > /tmp/RD-precorrection.md
+scripts/fleet-probe.sh plan ../careerseeker /tmp/RD-precorrection.md; echo "EXIT=$?"
+```
+
+*Expected, and observed:* **EXIT=1**, `PLAN IS STALE -- 1 row(s)`, and the row
+
+```
+  s2-seq-bound   ROT   no longer a leaf; contained by: s2-latest-retention-skew
+                       s2-latest-since-invariant s2-relay-constant-pins s2-relay-header-pairing
+```
+
+with `s2-relay-header-pairing` additionally listed as an **UNPLANNED** leaf. `f884a99` is the last
+commit to touch `RETURN-DAY.md` before run 87's correction `e2c3f27` (`git log --oneline --
+RETURN-DAY.md`). **The output contains both halves of run 87's conclusion** — that `#35` rotted, and
+that `#57`'s branch is what replaces it.
+
+### C-88-5 — the guard reads refs only; no `gh`, no token, no network
+
+```bash
+grep -nE 'gh |curl|wget|api\.github' scripts/fleet-probe.sh
+```
+
+*Expected, and observed:* **no match.** Every question the script asks is answered by
+`git for-each-ref`, `git merge-base --is-ancestor`, `git rev-parse` and `git merge-tree` against the
+local object store. This is what makes B-19's attempt-3 premise wrong for the ancestry class:
+**a fetch is the whole cost.**
+
+### C-88-6 — when the rot began, and that it was self-inflicted
+
+```bash
+git -C ../careerseeker log --format='%H %cd %s' --date=iso-strict --reverse \
+  origin/claude/s2-seq-bound..origin/claude/s2-latest-since-invariant | head -3
+```
+
+*Expected, and observed:* `f95b66e … 2026-08-22T13:09:35+00:00  S2: pin that 'latest' is
+independent of 'since' …` — the first commit to contain `s2-seq-bound` without being it. PR #54 was
+created **2026-08-22T13:10:08Z**, thirty-three seconds later. The plan was written **2026-08-19**
+(`f884a99`) and corrected **2026-08-23** (`e2c3f27`), so the silent-wrong window is ≈20 hours.
+**All four rotting branches are this program's own** (run 86 opened #57; run 85's heartbeat records
+#56 as run 84's branch).
+
+### C-88-7 — the board, post-fetch
+
+```bash
+git -C ../careerseeker fetch --all --prune
+scripts/fleet-probe.sh leaves ../careerseeker
+```
+
+*Expected, and observed:* **8 leaves**, reproducing run 87's **C-87-3** exactly, and
+`claude/s2-seq-bound` is **not** among them. The open-PR board is **22 open, 22 draft, 0 merged**
+(21 `claude/*` + `#26` `codex/r6-dependency-sbom`), read via the GitHub API — **unmoved since run
+87**. Engine `origin/main` is `aac05f3`; android `main` is `ebfaf81`.
+
+### C-88-8 — the guard survives an edit to the file it parses
+
+This run edited `RETURN-DAY.md` (step −1). A parser keyed on a table format can silently start
+reading zero rows when the file around it changes, which is exactly the failure C-88-2's third row
+refuses.
+
+```bash
+scripts/fleet-probe.sh plan ../careerseeker RETURN-DAY.md | tail -3
+```
+
+*Expected, and observed:* still `plan rows: 6`, **re-run after the edit, not before.**
+
+### C-88-9 — no gate ran, and none is claimed
+
+```bash
+for c in dotnet pwsh sdkmanager avdmanager emulator adb; do printf '%-12s ' "$c"; which $c || echo ABSENT; done
+echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
+node docs/sync-vectors/generate.mjs --check     # run in ../careerseeker, on main's tree
+head -4 core/src/test/resources/sync-vectors/VECTORS.lock
+ls core/src/test/resources/sync-vectors/v1/ | wc -l
+```
+
+*Expected, and observed:* all six **ABSENT**, `ANDROID_HOME` **unset**; `java` is 21, not the pinned
+17. `Verify-Alpha.ps1` did not run and the android gate did not run. `generate.mjs --check` →
+**`OK: 26 vector files match the generator.`**, exit 0 — **26 because it ran on the engine
+checkout's `main`**, where the S5 stack's vectors are not; this is not a claim about the stack's 29.
+The phone's pin reads **`7328a0bc043335491cd96a67d634e8eea2a13af9`** with **29** vendored files —
+**the prompt's `679a317` is stale** (**C-PIN-1**, re-verified).
