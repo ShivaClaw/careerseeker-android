@@ -4409,3 +4409,58 @@ already the recommendation in `RETURN-DAY.md` §3.
 **Why this is BLOCKED and not merely open.** The durable fix is a CI job needing a cross-repo
 credential this session must not create. The manual fix is landed. **Nothing further is verifiable
 from here.**
+
+### B-19 status 2026-08-23 (eighty-eighth run) — NARROWED, and attempt 3's premise was wrong
+
+**B-19 was filed this morning, and its third attempt is the part that needs correcting.** It read:
+
+> **Add an automated guard.** Not attempted here, deliberately. The check is easy — recompute leaves
+> from `gh pr list --json number,baseRefName,headRefName` and diff against the six numbers §3
+> names — but it belongs in the android repo's CI, which **cannot run `gh` against the engine repo
+> without a cross-repo token** … That is Brandon's, not this session's.
+
+**The premise is false for the rot that actually fired, and the distinction is the finding.** The
+guard was specified in terms of **PR numbers**, so it needed the **PR list**, so it needed a
+**token**, so it became a credential decision. But B-19's own symptom sentence says *"PR numbers are
+not stable descriptions of a merge graph"* — and the corollary nobody took: **branch names are.**
+
+`claude/s2-seq-bound` stopped being a leaf because four other **refs** came to contain it. Ref
+ancestry is what `git fetch` already brings down. **Keyed on the branch column instead of the PR
+column, the guard needs no `gh`, no token, and no CI job** (**C-88-5**).
+
+**Built and measured this run** — `scripts/fleet-probe.sh plan` (`b9b0e6c`), and it is wired into
+`RETURN-DAY.md` as **step −1** so it is a step rather than a script nobody runs:
+
+- green on §3 as it stands today, **6 rows parsed, ROT 0**, exit 0 (**C-88-3**);
+- **exit 1 on §3 as it stood at `f884a99` (2026-08-19)** — the version naming `#35` — printing the
+  rot, all four containing branches, and `s2-relay-header-pairing` as the unnamed leaf (**C-88-4**).
+  **That is run 87's correction, produced by one command.**
+- self-test proves it **fires**, not merely that it passes: three rows, including a refusal
+  (exit 2) on a zero-row parse (**C-88-2**).
+
+**What is STILL BLOCKED, and it is a real remainder, not a formality.** The guard sees **ancestry
+only**. It cannot see:
+
+1. a named PR **closed or merged** behind the plan's back — the branch stays a leaf, the row goes
+   wrong anyway;
+2. whether a leaf **has an open PR at all** — `claude/p4-entitlement` is a leaf with none, which is
+   why unnamed leaves are reported informationally and not as rot;
+3. anything semantic. **A green plan still names leaves; it is not a plan that is still a good
+   idea.**
+
+All three need the PR list, so all three still need the cross-repo token, and **that half is
+unchanged and still Brandon's**. What changed is that it is no longer *all* of B-19 — the class that
+actually cost a run to find is now guarded for free.
+
+**Smallest human unblock (revised).** Unchanged in substance and cheaper in practice: option (b),
+**land the six merges**, is still strictly better — a merged stack has no leaf set left to rot. But
+option (a) is no longer "require every run to re-derive eight lines by hand"; it is now **one
+command with an exit code**, and it is written into the plan at step −1.
+
+**A note the next run should not have to rediscover: this program rots its own plan.** The four
+branches that broke §3 — `#54`, `#55`, `#56`, `#57` — were **all opened by these iterations**
+(run 86 opened `#57`; run 85's heartbeat records `#56` as run 84's branch). The rot began at
+`f95b66e`, **2026-08-22T13:09:35Z**, thirty-three seconds before `#54` was opened (**C-88-6**), and
+ran for roughly twenty hours across several runs before run 87 caught it by hand. **Any run that
+opens a PR on a planned branch's head should run step −1 before it finishes** — the staleness source
+is not an outside event, it is us.
