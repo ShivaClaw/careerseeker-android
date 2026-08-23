@@ -16256,3 +16256,105 @@ keystore or emulator. **No secret read, printed or echoed.** Terra's territory
 (`autonomy/codex-state`) was **read, never written** — Terra reports **COMPLETE, files claimed:
 none** — **no collision.** The synthetic plan files the self-test writes live in `mktemp -d` and are
 removed on exit; `/tmp/RD-precorrection.md` is a scratch extraction, **committed nowhere**.
+
+---
+
+# RUN 89 — 2026-08-23. Run 88 deferred three checks to "the PR list, and therefore the token". This session had the PR list. Two of the three are green; the third's obvious implementation is a trap.
+
+**The slice: the half of B-24 that run 88 named and could not reach**, chosen because run 88 wrote
+the boundary down precisely — *"Those need the PR list, and that is the half B-19 still owns"*
+(`scripts/fleet-probe.sh:288`) — and this session's GitHub tooling reaches **both** repos, so the
+boundary was checkable rather than inherited. **The assigned S5 slice was declined for the
+fifty-fourth time**, on evidence re-derived this run, not read off the banner (**C-STOP-1**).
+
+**Milestone 1 — rule one.** `git fetch --all --prune` in both checkouts before anything was read.
+The android checkout again arrived **detached at the docs-only `main`** (`ebfaf81`), **329 commits
+behind** the work branch — the same arrival state runs 76, 85 and 88 recorded. Engine `origin/main`
+**`aac05f3`**, unmoved. Every count below is post-fetch.
+
+**Milestone 2 — the assigned slice, re-derived rather than inherited.** `8575539` (2026-08-09,
+`docs/Sync-Protocol.md` only, +114/−3), `22b028e` (both ack vectors + `generate.mjs`), `7328a0b`
+(`invalid-unknown-field`) all present in the engine repo. `node docs/sync-vectors/generate.mjs
+--check` on `origin/claude/s5-entitlement-ack-emitter` → **`OK: 29 vector files match the
+generator.`**, **exit 0**, run this session. Vendored corpus vs. pin `7328a0b`: **29 files both
+sides, `diff -r` exit 0, no output.** **All four gates the recurring prompt assigns are closed**, and
+the prompt's pin `679a317` is stale — it is `7328a0b`.
+
+**Milestone 3 — a blocker ID that resolved to two different blockers.** `BLOCKED.md` carried **two**
+filings numbered **B-19**: run 58's *"S5's phone route exists and nothing in `:app` constructs it"*
+and run 87's *"the landing plan has no guard against its own leaf set moving"*. **B-20, B-21, B-22
+and B-23 all exist** (runs 65, 66, 75, 79), so the free ID was **B-24** (**C-89-1**).
+
+**This was not cosmetic.** For two runs the token `B-19` was ambiguous, and run 88's headline —
+*"B-19 is NARROWED, not closed"* — reads against the register as a claim that **the S5 phone-route
+blocker was narrowed.** It was not; run 88 wrote no Kotlin and no `:app` file and said so itself. The
+collision also retro-poisoned five earlier *"B-19 — untouched this run"* lines, each of which meant
+run 58's blocker. **Renumbered to B-24 in the register, with a pointer note under the original
+B-19. Run 87's and run 88's LOG entries were left unedited** — they are evidence of what those
+sessions wrote, and the register is what an ID resolves against.
+
+**And the check that catches the next one was written wrong first.** `grep -oE '^## B-[0-9]+'` also
+reports **`B-2 B-4 B-6 B-7`** — those are *status* headings (`## B-6 RESOLVED — …`), not second
+filings. Anchoring on the trailing em-dash separates a filing from an update, and only then does the
+command return **exactly one** duplicate before the fix and **none** after (**C-89-1**). *A command
+that over-reports is not weak evidence for the claim; it is evidence for a different, false one.*
+The honest limit is recorded too: a `##`-only scan still returns **B-23** as the maximum, so the fact
+that **B-20/B-21 are filed at `###`** — and that **B-11 was deliberately never filed**
+(BLOCKED.md:1669) — **does not by itself explain** run 87's choice. Facts recorded; cause not
+claimed.
+
+**Milestone 4 — the deferred half, measured.** Run 88's guard is green on ancestry: **6 rows, all
+`leaf`, ROT 0, UNPLANNED 2, exit 0** (re-run this session). Its three stated blind spots, against
+the real board of **22 open PRs / 8 leaves**:
+
+1. **A named PR closed or merged behind the plan's back — none.** All six branches §3 names map to
+   **open, draft** PRs: **#48, #57, #36, #51, #52, #49** (**C-89-3**). §3 is green on the PR-state
+   axis too, which run 88 could not assert.
+2. **A leaf with no open PR — one of eight.** `claude/p4-entitlement` → **#8, closed and genuinely
+   unmerged**. Its content re-landed on *different* branches as **#27–#30**, all four merged, but
+   the branch is **not an ancestor of `main` and carries 199 commits that will never land**
+   (**C-89-4**). **"Leaf" is not "landable"**, and 199 is that gap's size. The second unplanned
+   leaf, `s6-resume-reconciliation` → **#53**, is **open and deliberately excluded** — §3 step 0
+   recommends closing it (**C-89-5**).
+3. **Anything semantic** — unchanged, still unguardable.
+
+**Milestone 5 — the finding: the one-call version of check 1 reports every merged PR as unmerged.**
+The natural implementation reads each PR-list row's `merged` field. **That field is `false` on every
+row, including for PRs that are demonstrably merged** (**C-89-2**): **#31** and **#44** both come
+back `merged: false` in a list and `merged: true` with a real `merged_at` on a per-PR read, while
+**#8** is correctly `false` both ways. **`#44`'s merge commit is `main`'s current HEAD** — the list
+row contradicts the branch it describes. A guard built the obvious way would answer *"nothing merged
+behind the plan's back"* **unconditionally**: run 88's own zero-row false-negative class, arriving
+through a different door. **Key on `merged_at`, or read PRs singly.**
+
+**Milestone 6 — the remainder, stated as a remainder.** **B-24 is not closed and this run does not
+narrow it the way run 88 narrowed its ancestry half.** All three checks need the PR list **at CI
+time**, not at session time; this session's credentials are session-scoped and the android repo's CI
+has none. What changed is that the deferred half is no longer *unknown* — it is **known-green with
+one documented exception and one documented trap**. A scope note the guard's own output cannot
+carry: `fleet()` filters `codex/` and `autonomy/`, so **`#26` (`codex/r6-dependency-sbom`, open
+draft) can never appear** as a row or an UNPLANNED leaf, and `RETURN-DAY.md` names it **0** times
+(**C-89-6**) — so `ROT: 0  UNPLANNED: 2` **is not** an inventory of unlanded work.
+
+**SCOPE AND PROHIBITION — what this run did NOT touch.** **No rung moved**; the ladder table is
+unchanged and this run does not claim otherwise. **No gate ran and none is claimed**: `dotnet`,
+`pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` **and `gh`** all **ABSENT** by `which`,
+`ANDROID_HOME` **unset** (**C-89-7**); `Verify-Alpha.ps1` did not run, the android gate did not run,
+and **the fused android tree has still never been built**. **No production source in either repo**:
+no C#, no Kotlin, no `:app` or `:core` file, no `relay/src/` or `relay/test/` file — so
+**`$ExpectedOfflineTotal` is untouched** (**B-17**), and this run adds **zero landing cost and zero
+new engine branches**. **`scripts/fleet-probe.sh` was run, never edited** — the guard is unchanged
+from `b9b0e6c`; this run measured what it cannot see rather than extending it, because extending it
+needs the credential that is still Brandon's. **No vector byte written, no pin moved, no
+`generate.mjs` edit** — `--check` only, read-only; the phone's pin stays **`7328a0b`** with 29
+vendored files, byte-identical to the engine at that commit. **No engine file was written at all**;
+the engine checkout was read-only (`for-each-ref`, `merge-base`, `rev-list`, `log`, `archive`,
+`generate.mjs --check`), and the only engine-side push is `autonomy/claude-state`'s STATE.md, a
+docs-only branch that is never merged. **GitHub was read, never written**, apart from this run's own
+draft PR: **nothing merged, closed, undrafted, force-pushed or deleted** in either repo; **no review
+submitted, no comment posted on any other PR; no history rewritten; no branch deleted.** **No deploy
+of any kind.** **The production relay was not contacted at all**, not even `GET /v1/health`. No Play,
+Google or OAuth console; no account, purchase, Gmail, keystore or emulator. **No secret read,
+printed or echoed.** Terra's territory (`autonomy/codex-state`) was **read, never written** — Terra
+reports **COMPLETE, files claimed: none** — **no collision.** The pin extraction under
+`scratchpad/pin/` is scratch, committed nowhere.
