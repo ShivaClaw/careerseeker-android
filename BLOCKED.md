@@ -2536,6 +2536,13 @@ intent's **NEW ITEM 1** with the exact mutation that proves it.
 
 ## B-19 — S5's phone route exists and nothing in `:app` constructs it (fifty-eighth run, 2026-08-18)
 
+> **ID NOTE (run 89).** This is the **only** B-19. Run 87 filed a second, unrelated blocker under
+> the same number; it was renumbered **B-24** at run 89 (**C-89-1**). If you are reading run 87's or
+> run 88's LOG/STATE entries, every `B-19` there means **B-24**, the landing-plan guard —
+> **not this blocker.** In particular run 88's *"B-19 NARROWED"* is about the guard. **This blocker
+> is untouched since run 58 and remains fully open:** no `ProStateStore`, no `knownProductIds`, no
+> composition root.
+
 **Symptom.** `EntitlementRoutingApplier` and `ProStateStore` landed this run in `:core`, test-green
 at **299 / 0** (**C-S5-2**), with a negative control pinning the pre-fix behaviour (**C-S5-3**).
 **None of it runs on a phone yet**, and it cannot until three `:app`-side pieces exist:
@@ -4378,7 +4385,24 @@ on 2026-08-22 instead of 2026-08-23.
 
 ---
 
-## B-19 — the landing plan has no guard against its own leaf set moving (eighty-seventh run, 2026-08-23)
+## B-24 — the landing plan has no guard against its own leaf set moving (eighty-seventh run, 2026-08-23)
+
+> **RENUMBERED AT RUN 89: this blocker was filed as `B-19` and `B-19 was already taken.`** The
+> original **B-19** — *"S5's phone route exists and nothing in `:app` constructs it"* (run 58,
+> line ~2537) — is a different, still-open blocker about a missing composition root. Run 87 picked
+> the next number by eye rather than from the register; **B-20, B-21, B-22 and B-23 all exist**
+> (runs 65, 66, 75, 79), so the next free ID was **B-24** (**C-89-1**).
+>
+> **Why this mattered rather than being tidy-up.** For two runs the token `B-19` resolved to two
+> different blockers, and run 88's headline — *"**B-19** is NARROWED, not closed"* — reads, against
+> the register, as a claim that **the S5 phone-route blocker was narrowed.** It was not: run 88
+> wrote no Kotlin and no `:app` file, and said so in its own prohibition paragraph. The collision
+> also retro-poisons every earlier *"B-19 — untouched this run"* line (BLOCKED.md lines ~2974,
+> ~3244, ~3317, ~3352, ~3420), each of which meant the run-58 blocker and now reads ambiguously.
+>
+> **Run 87's and run 88's LOG entries are evidence and were left unedited** — they still say
+> `B-19`, and that is correct for what those sessions wrote. This heading is the register, and the
+> register is what a reader resolves an ID against. Cross-reference added under the original B-19.
 
 **Milestone:** the return-day landing sequence (`RETURN-DAY.md` §3, `docs/Merge-Topology.md` §12).
 
