@@ -11,9 +11,14 @@ number in it has a re-verification command in [`AUDIT-REQUEST.md`](AUDIT-REQUEST
 
 ## 1. The one-paragraph version
 
-The engine sync track works and is **not on `main`**. Seventeen draft PRs are open in
-`ShivaClaw/careerseeker` and none is merged, because the merge condition is a full local
-`Verify-Alpha.ps1` that no cloud session can run. Those 17 PRs are **7 merges**, of which **3 stop on
+The engine sync track works and is **not on `main`**. ~~Seventeen~~ **twenty-two** draft PRs are open
+in `ShivaClaw/careerseeker` and none is merged, because the merge condition is a full local
+`Verify-Alpha.ps1` that no cloud session can run.
+
+> **Count updated run 87, 2026-08-23 (C-87-2).** Seventeen was correct when written at run 47. Five
+> more have been opened since — **#54, #55, #56, #57** — and **§3's step 2 is stale as a result: merge
+> `#57`, not `#35`.** See the correction banner in §3. The **7 merges / 3 stops** figures below are
+> otherwise unchanged and were re-measured this morning. Those 17 PRs are **7 merges**, of which **3 stop on
 a conflict** — all of them the same `$ExpectedOfflineTotal` pin family, and all of them mechanical
 once you decide one design question. The single highest-value hour on return day is: **decide PR #53,
 then land six merges in the order in §3.** Everything else on the ladder is either done, partial in a
@@ -71,10 +76,40 @@ not a merge conflict, and it is yours.
 
 ### Then land in this order (the measured minimum)
 
+> ## ⚠ CORRECTED AT RUN 87 — 2026-08-23. **Step 2 is stale: merge `#57`, not `#35`.**
+>
+> **This is the first substantive correction to §3 since it was written**, and it is not a
+> re-validation — the plan rotted underneath itself. Four PRs opened **after** this section was last
+> derived (`docs/Merge-Topology.md` `bbd942b`, 2026-08-16; this file `f884a99`, 2026-08-19):
+> **#54, #55, #56, #57** — the last of them at **09:13 UTC on the morning of run 87**. They stack, in
+> that order, **on top of `#35`'s head `claude/s2-seq-bound`**.
+>
+> **So `#35` is no longer a leaf.** It is an interior node, and the leaf that lands its stack is now
+> **`#57`**, seven PRs deep from `main` (**C-87-3**). §3 says merge `#35`; doing that today lands
+> #34/#32 and **strands seven commits across four open PRs whose base you just merged** — #54 (1),
+> #55 (2), #56 (6), #57 (7) (**C-87-6**).
+>
+> **The good news, and it is most of the news: the cost table below is otherwise intact.** Replaying
+> the corrected order for real against a `main` fetched this morning (**C-87-5**):
+>
+> | | stops | conflicting files |
+> | --- | --- | --- |
+> | §3 verbatim (`#35`) | **2** | #52 → 5, #49 → 6 |
+> | **corrected (`#57`)** | **2** | **identical — #52 → 5, #49 → 6** |
+>
+> **Swapping `#35` for `#57` adds no stop and no new conflicting file**, despite carrying four extra
+> PRs. Both stops are the `$ExpectedOfflineTotal` pin family §3 already names. The `+1` order penalty
+> also reproduces: `#49` first costs **3** instead of **2** (**C-87-7**). The vector outcome is
+> unchanged at **30 files**, and `node docs/sync-vectors/generate.mjs --check` returns
+> **`OK: 30 vector files match the generator.`** at the post-landing tree (**C-87-8**) — the first
+> time that has been checked *after* the merges rather than before.
+>
+> **Everything else in this section stands as written.** Read the row below as **#57**.
+
 | # | PR | Branch | Lands | Cost |
 | --- | --- | --- | --- | --- |
 | 1 | **#48** | `s8-harness-linux-reach` | itself | clean |
-| 2 | **#35** | `s2-seq-bound` | #34, #32 | clean |
+| 2 | **~~#35~~ → #57** | `s2-relay-header-pairing` | #56, #55, #54, **#35**, #34, #32 | clean (**corrected run 87**; `#35` is no longer a leaf — **C-87-3**) |
 | 3 | **#36** | `s2-transport-vocabulary` | #33, #32 | clean — but read §10.5 first, its declared base ≠ its actual base |
 | 4 | **#51** | `s3-pairing-confirm-consumer` | #50 | clean — **takes the free pin slot** |
 | 5 | **#52** | `s6-outcome-disposition` | itself | **STOP** — pin family, 5 files |
