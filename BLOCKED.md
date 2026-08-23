@@ -4488,3 +4488,65 @@ branches that broke §3 — `#54`, `#55`, `#56`, `#57` — were **all opened by 
 ran for roughly twenty hours across several runs before run 87 caught it by hand. **Any run that
 opens a PR on a planned branch's head should run step −1 before it finishes** — the staleness source
 is not an outside event, it is us.
+
+### B-24 status 2026-08-23 (eighty-ninth run) — the deferred half is MEASURED, and its obvious implementation is a trap
+
+**Run 88 deferred three checks to "the PR list, and therefore the token".** This run *had* the PR
+list — the session's GitHub tooling reaches **both** repos — so the deferred half was **measured**.
+It is still **not built**, and the distinction is the whole entry: measuring it needed credentials
+this session happens to hold, and **CI does not hold them**. What follows is a result, not a guard.
+
+**All three checks, run against the real board (22 open PRs, 8 leaves):**
+
+1. **Is any planned branch's PR closed or merged behind the plan's back?** **No.** All six branches
+   `RETURN-DAY.md` §3 names map to **open, draft** PRs: `s8-harness-linux-reach` → **#48**,
+   `s2-relay-header-pairing` → **#57**, `s2-transport-vocabulary` → **#36**,
+   `s3-pairing-confirm-consumer` → **#51**, `s6-outcome-disposition` → **#52**,
+   `s6-composition-root-decision` → **#49** (**C-89-3**). **§3 is green on this axis too**, which
+   run 88 could assert for ancestry only.
+
+2. **Does every leaf have an open PR?** **Seven of eight.** The exception is
+   `claude/p4-entitlement` → **#8**, **closed and genuinely unmerged** (no `merged_at`), exactly as
+   the guard's comment predicts. Its content re-landed on *different* branches as **#27–#30**, all
+   four merged into `main` — but the branch itself is **not an ancestor of `main` and carries 199
+   commits that will never land** (**C-89-4**). **"Leaf" is not "landable"**, and 199 is the
+   concrete size of that gap. The other unplanned leaf, `s6-resume-reconciliation` → **#53**, is
+   **open** and its exclusion is **deliberate** — §3 step 0 recommends closing it (**C-89-5**).
+
+3. **Anything semantic.** Unchanged, still unguardable, still nobody's to automate.
+
+**THE TRAP, AND IT IS THE FINDING: the one-call implementation of check 1 silently reports every
+merged PR as unmerged.** The natural way to build it is one list call —
+`list_pull_requests(state: all)` — and read each row's `merged` field. **That field is `false` on
+every row, including for PRs that are demonstrably merged.** Measured on three samples
+(**C-89-2**):
+
+| PR | list row says | authoritative per-PR read says | truth |
+| --- | --- | --- | --- |
+| **#31** | `merged: false` | `merged: true`, `merged_at 2026-08-09T01:24:10Z` | **merged** |
+| **#44** | `merged: false` | `merged: true`, `merged_at 2026-08-13T02:28:21Z` | **merged** |
+| **#8** | `merged: false` | `merged: false`, no `merged_at` | **closed, unmerged** |
+
+`#44`'s merge commit **is `main`'s current HEAD** (`aac05f3 Merge pull request #44 …`), so the list
+row contradicts the branch it is describing. A guard built the obvious way would have reported
+"nothing merged behind the plan's back" **unconditionally** — the false-negative class that run 88's
+own zero-row refusal exists to prevent, arriving through a different door. **The check must key on
+`merged_at`, or read PRs one at a time (N calls).**
+
+**Why this does NOT close B-24, and the reason is not caution.** All three checks need the PR list
+at *CI* time, not at *session* time. This session's tooling is **session-scoped**; the android
+repo's CI has no cross-repo credential, and provisioning one is still a decision with a credential
+attached — **still Brandon's**. What changed: the remaining half is no longer *unknown*, it is
+**known-green with one documented exception (`p4-entitlement`) and one documented trap**. A human
+who wants it automated now knows both the answer today and the way the naive version fails.
+
+**A scope note the guard's output does not carry.** `fleet()` filters out `codex/` and `autonomy/`
+refs, so **`#26` (`codex/r6-dependency-sbom`, open draft) can never appear** in `plan` output as
+either a row or an UNPLANNED leaf, and `RETURN-DAY.md` never names it either (**C-89-6**). That is
+correct for a plan scoped to the claude fleet, and it means **the guard's UNPLANNED line is not a
+complete inventory of unlanded work** — 22 open PRs, 21 `claude/*` plus `#26`. Recorded so a reader
+does not treat `ROT: 0 UNPLANNED: 2` as "everything is accounted for".
+
+**Smallest human unblock — unchanged.** Option (b), **land the merges**, still dominates. Option (a)
+is now: run step −1 (free, ancestry) **and** accept that checks 1–2 are re-measured by hand at
+whatever cadence matters, using `merged_at` rather than `merged`.
