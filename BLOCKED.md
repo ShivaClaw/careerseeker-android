@@ -4350,3 +4350,62 @@ guard that keeps it that way — the same shape as run 85's DDL finding.
 scheduled prompt to replace the S5 assignment with *"read `RETURN-DAY.md`, then `STATE.md`'s
 ordered intent, and take its top item."* Everything else on the ladder needs the Windows gate, an
 emulator (**B-4**), or a relay deploy — see `RETURN-DAY.md` §5.
+
+---
+
+### B-18 status 2026-08-23 (eighty-seventh run) — the fifty-second firing, and the first with a measured cost paid by the *records*
+
+**Unchanged and still true:** the prompt assigns S5's spec half; that work has existed since
+2026-08-09 (`8575539`, `22b028e`, `7328a0b`); the vendored pin is `7328a0b`, not the prompt's
+`679a317`. Declined again, on re-derived evidence, for the reason attempt 1 gives: rebuilding it
+would fork §4.3 and risk the corpus the android repo vendors.
+
+**What is new, and it is why this firing was not free.** Every previous firing cost an *iteration*.
+This one exposed a cost paid by the **records themselves**: while forty runs were being handed a
+completed slice, **`RETURN-DAY.md` §3 — the landing plan, the first thing Brandon reads — went
+stale and nobody noticed for four days.** Four PRs (#54–#57) were opened *by these very runs*, each
+stacked on the previous, and each one moved the plan's step-2 leaf further out of date. Step 2 now
+names an **interior node** (**C-87-3**). The loop is no longer only wasting runs; it is **generating
+the drift that invalidates the handoff**, because a run with no admissible slice writes another
+stacked draft PR, and the plan is not re-derived when it does.
+
+**Smallest human unblock — unchanged, and now cheaper to justify.** Turn the routine off, or repoint
+its "YOUR SLICE THIS ITERATION" section at `RETURN-DAY.md` §5's human queue. **A run that cannot land
+anything should not be able to deepen the stack.** If the schedule keeps running as written, the
+minimum mitigation is a standing instruction to **re-derive §3's leaf set every run** — that is a
+`gh pr list` and eight lines of shell (**C-87-3**), and it is the check that would have caught this
+on 2026-08-22 instead of 2026-08-23.
+
+---
+
+## B-19 — the landing plan has no guard against its own leaf set moving (eighty-seventh run, 2026-08-23)
+
+**Milestone:** the return-day landing sequence (`RETURN-DAY.md` §3, `docs/Merge-Topology.md` §12).
+
+**Symptom.** §3 names six merges by PR number. **PR numbers are not stable descriptions of a merge
+graph.** When a new PR bases on a branch §3 lists, that branch stops being a leaf and §3's row
+becomes an instruction to merge an interior node — landing part of a stack and stranding the rest.
+This happened between 2026-08-19 and 2026-08-23 and **nothing detected it**: no CI check, no
+harness, no assertion. It was found only because run 87 recomputed the leaf set by hand.
+
+**Attempts.**
+1. **Look for an existing guard.** None exists. `.github/workflows/ci.yml`'s vector check
+   (lines 91–133) guards the *vendored corpus*, not the *PR graph*, and it queries `?ref=$PIN` — it
+   cannot see PR topology at all. `docs/Merge-Topology.md` is a derivation, not a test.
+2. **Correct the plan in place.** Done, and it is this run's deliverable: §3 step 2 now reads
+   **#57** with a correction banner, and §1's count is **22** (**C-87-3**, **C-87-5**). This fixes
+   *today's* instance; it does not prevent the next one.
+3. **Add an automated guard.** Not attempted here, deliberately. The check is easy — recompute leaves
+   from `gh pr list --json number,baseRefName,headRefName` and diff against the six numbers §3
+   names — but it belongs in the android repo's CI, which **cannot run `gh` against the engine repo
+   without a cross-repo token**, and provisioning that token is a decision with a credential
+   attached. That is Brandon's, not this session's.
+
+**Smallest human unblock.** Either (a) accept the manual check and require every run to re-derive
+§3's leaf set (**C-87-3**'s eight lines), or (b) if the routine is being retired anyway, **land the
+six merges** — a merged stack has no leaf set left to rot. Option (b) is strictly better and is
+already the recommendation in `RETURN-DAY.md` §3.
+
+**Why this is BLOCKED and not merely open.** The durable fix is a CI job needing a cross-repo
+credential this session must not create. The manual fix is landed. **Nothing further is verifiable
+from here.**
