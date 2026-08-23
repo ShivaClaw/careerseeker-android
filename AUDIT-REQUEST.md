@@ -16758,3 +16758,140 @@ ls core/src/test/resources/sync-vectors/v1/ | wc -l
 checkout's `main`**, where the S5 stack's vectors are not; this is not a claim about the stack's 29.
 The phone's pin reads **`7328a0bc043335491cd96a67d634e8eea2a13af9`** with **29** vendored files —
 **the prompt's `679a317` is stale** (**C-PIN-1**, re-verified).
+
+## Eighty-ninth run — 2026-08-23 (Linux sandbox): the deferred half of B-24, and a collided blocker ID
+
+Every command below was **executed this run**, after `git fetch --all --prune` in both trees.
+Where a claim rests on GitHub PR metadata, the session read it through its **GitHub tooling**, which
+reaches both repos; **`gh` is absent on this host** (`which gh` → nothing), so the `gh` forms given
+below are the **human re-verification path** and were **not** the form executed. That distinction is
+the point of C-89-2 and is stated rather than glossed.
+
+### C-89-1 — two different blockers were filed as `B-19`
+
+```bash
+cd <android>
+git show HEAD:BLOCKED.md | grep -oE '^## B-[0-9]+ — ' | sort | uniq -d   # before this run's fix
+grep -oE '^## B-[0-9]+ — ' BLOCKED.md | sort | uniq -d                   # after
+```
+
+*Expected, and **observed**:* the first prints **`## B-19 — `** (exactly one duplicate); the second
+prints **nothing**. The two filings are `B-19 — S5's phone route exists and nothing in :app
+constructs it` (run 58, line 2537) and `B-19 — the landing plan has no guard against its own leaf
+set moving` (run 87), the latter **renumbered to B-24** this run (now line 4388).
+
+**The first form of this command was wrong and running it is what showed that.** Written as
+`grep -oE '^## B-[0-9]+'` — without the trailing em-dash — it reports **`B-2 B-4 B-6 B-7`** as
+duplicates too. Those are **status** headings (`## B-2 status 2026-08-14`, `## B-4 / B-7 status
+2026-08-10`, `## B-6 RESOLVED — 2026-08-12`), not second filings. The em-dash anchor is what
+separates a filing from an update. *A claim whose command over-reports is not evidence for the
+claim; it is evidence for a larger, false one.*
+
+The register's full filing set, both heading levels, and why "next free ID" is not glanceable:
+
+```bash
+grep -oE '^#{2,3} B-[0-9]+ — ' BLOCKED.md | grep -oE 'B-[0-9]+' | sort -t- -k2 -n | uniq | tr '\n' ' '
+grep -nE '^#{2,3} B-2[0-4] — ' BLOCKED.md
+```
+
+*Expected, and **observed**:* **`B-1 … B-24`** contiguous **except `B-11`**, which was
+**deliberately never filed** — BLOCKED.md:1669 says so in words (*"B-11 was never warranted and is
+not filed"*). **`B-20` and `B-21` are filed at `###`**, every other blocker at `##`. Note the honest
+limit: a `##`-only scan would still have returned **B-23** as the maximum, so the mixed heading level
+**does not by itself explain** run 87's choice of a taken number. The facts are recorded; the cause
+is not claimed.
+
+### C-89-2 — the `merged` field on a PR-list row is `false` even for merged PRs
+
+This is the trap in the one-call implementation of B-24's deferred check 1.
+
+```bash
+# human re-verification path (NOT the form this session ran -- gh is absent here):
+gh pr list  --repo ShivaClaw/careerseeker --state all --limit 100 --json number,merged \
+  | jq '.[] | select(.number==31 or .number==44 or .number==8)'
+gh pr view 31 --repo ShivaClaw/careerseeker --json number,merged,mergedAt
+gh pr view 44 --repo ShivaClaw/careerseeker --json number,merged,mergedAt
+gh pr view  8 --repo ShivaClaw/careerseeker --json number,merged,mergedAt
+```
+
+*Expected, and **observed** (via this session's GitHub tooling — list call vs. per-PR read):*
+
+| PR | list row | per-PR read | truth |
+| --- | --- | --- | --- |
+| **#31** | `merged: false` | `merged: true`, `merged_at 2026-08-09T01:24:10Z`, `merged_by ShivaClaw` | **merged** |
+| **#44** | `merged: false` | `merged: true`, `merged_at 2026-08-13T02:28:21Z`, `merged_by ShivaClaw` | **merged** |
+| **#8**  | `merged: false` | `merged: false`, **no** `merged_at` | **closed, unmerged** |
+
+Cross-check that needs no credential at all, and it is the one that makes the contradiction
+undeniable — **#44's merge commit is `main`'s HEAD**:
+
+```bash
+cd <engine> && git log origin/main --oneline -1
+```
+
+*Expected, and **observed**:* **`aac05f3 Merge pull request #44 from ShivaClaw/codex/r7-empty-profile-audit`**.
+A list row calling #44 unmerged is contradicting the branch it describes. **Key any such guard on
+`merged_at` (or read PRs singly); `merged` on a list row is unpopulated, not false.**
+
+### C-89-3 — every branch `RETURN-DAY.md` §3 names still maps to an open draft PR
+
+```bash
+cd <android> && bash scripts/fleet-probe.sh plan ../careerseeker RETURN-DAY.md; echo "exit=$?"
+# then map each printed row to its PR (gh form; session used its GitHub tooling):
+gh pr list --repo ShivaClaw/careerseeker --state open --limit 100 --json number,draft,headRefName
+```
+
+*Expected, and **observed**:* the guard prints **6 rows, all `leaf`, ROT 0, UNPLANNED 2, exit 0**.
+The six map to **#48, #57, #36, #51, #52, #49** — **all `state: open`, all `draft: true`**. So §3 is
+green on the *PR-state* axis as well as the ancestry axis. Board total: **22 open, 21 `claude/*`
+plus `#26`**.
+
+### C-89-4 — `claude/p4-entitlement` is a leaf that can never land, and 199 is its size
+
+```bash
+cd <engine>
+git merge-base --is-ancestor origin/claude/p4-entitlement origin/main && echo ANCESTOR || echo NOT-ANCESTOR
+git rev-list --count origin/main..origin/claude/p4-entitlement
+for p in 27 28 29 30; do git log origin/main --oneline --grep="Merge pull request #$p " -1; done
+```
+
+*Expected, and **observed**:* **`NOT-ANCESTOR`**, **`199`**, and all four successor merges present on
+`main` (`7f3e61e`/`f0b9bd5`/`160b317`/`a8ef552`). Its own PR **#8** is **closed, unmerged**
+(**C-89-2**). So the content landed via *different* branches and this branch is superseded
+lineage — **a leaf is not a landable PR**, and the guard's informational UNPLANNED row is exactly
+right to refuse to call it rot.
+
+### C-89-5 — the other unplanned leaf, `#53`, is excluded on purpose
+
+```bash
+cd <android> && grep -n '#53\|resume-reconciliation' RETURN-DAY.md | head
+```
+
+*Expected, and **observed**:* **§3 step 0 is titled "decide PR #53 (`claude/s6-resume-reconciliation`)"**
+and §11.4 **recommends closing it** — #53 and the #45/#46 stack implement the same defect fix twice,
+incompatibly. Its absence from the plan's six rows is **deliberate and documented**, not drift.
+
+### C-89-6 — `#26` can never appear in the guard's output, by construction
+
+```bash
+cd <android> && sed -n '80,84p' scripts/fleet-probe.sh
+grep -c 'dependency-sbom\|#26' RETURN-DAY.md
+```
+
+*Expected, and **observed**:* `fleet()` filters `grep -vE '/(codex|autonomy)/'`, so
+`codex/r6-dependency-sbom` is outside the fleet and appears as **neither a plan row nor an UNPLANNED
+leaf**; `RETURN-DAY.md` mentions it **0** times. Correct for a plan scoped to the claude fleet, and
+the reason **`ROT: 0  UNPLANNED: 2` must not be read as "all unlanded work is accounted for"**.
+
+### C-89-7 — what did NOT run, and the environment that decides it
+
+```bash
+for t in dotnet pwsh sdkmanager avdmanager emulator adb gh; do printf '%-12s ' "$t"; which $t || echo ABSENT; done
+echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
+```
+
+*Expected, and **observed**:* **all seven ABSENT**, `ANDROID_HOME` **unset**. `Verify-Alpha.ps1` did
+not run; the android gate did not run; **no gate result is claimed anywhere in this run's records**.
+`node docs/sync-vectors/generate.mjs --check` on `origin/claude/s5-entitlement-ack-emitter` →
+**`OK: 29 vector files match the generator.`**, exit 0 (**C-STOP-1**, re-run this run). The vendored
+corpus vs. pin `7328a0b`: `git archive` + `diff -r` → **no output, exit 0, 29 files** both sides.
