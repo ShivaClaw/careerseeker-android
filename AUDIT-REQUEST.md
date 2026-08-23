@@ -16942,3 +16942,51 @@ comment-matching grep, C-89-1's over-reporting regex, C-89-8's wrong-scope grep,
 case the *substance* was right and the *measurement* was absent, which is the failure mode this file
 exists to make expensive: **a number that appears in four documents and in no command output is a
 description, not evidence.**
+
+### C-89-10 — B-22 reproduced on this run's own head: red, then green, same commit
+
+```bash
+# 1. the head is records-only -- no causal path to :app
+cd <android> && git show --numstat --format='' cfd817f | cut -f3
+# 2. both attempts, same SHA (gh form; session used its GitHub tooling -- gh is absent here)
+gh run view 32666808465 --repo ShivaClaw/careerseeker-android --json jobs \
+  | jq '.jobs[] | {id, conclusion, startedAt: .startedAt}'
+# 3. the control series: six consecutive records-only commits and their outcomes
+for c in cfd817f 6ee92b8 edba861 d874193 2ce70be b6f1a3a; do
+  printf '%-9s code-files=%s\n' "$c" "$(git show --numstat --format='' $c | cut -f3 \
+    | grep -cE '\.(kt|kts|java|xml|pro)$')"
+done
+```
+
+*Expected, and **observed**:*
+
+1. `cfd817f` lists **exactly four paths**, all `.md` — `AUDIT-REQUEST.md`, `BLOCKED.md`, `LOG.md`,
+   `STATE.md`; **`code-files=0`**.
+2. Job **`97261373225`** → **`failure`** (21:12:45 → 21:18:08), job **`97262364409`** → **`success`**
+   (21:20:02 → 21:27:33), **both on head `cfd817f`**, the second via `rerun_failed_jobs` with **no
+   push in between**. Same tree, red then green.
+3. All six commits report **`code-files=0`**; their outcomes are **F, S, F, F, S, S** — 3 red,
+   3 green, across a series in which the `:app` sources are **byte-identical**.
+
+Failing tests in attempt 1: `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab` and
+`> theBannerFollowsIntoTheApplicationDetailOverlay`, both
+**`androidx.compose.ui.test.ComposeTimeoutException at ScreensFromFixtureTest.kt:72`**;
+`35 tests completed, 2 failed, 3 skipped`.
+
+**Line 72 is inside `awaitText`**, which commit **`30908de`** added as B-22's mitigation — so the
+run-75 signature (`AssertionError` at `:87`/`:69`) has become a **timeout at the mitigation's own
+wait**. Confirm:
+
+```bash
+sed -n '70,74p' app/src/test/kotlin/app/careerseeker/dashboard/ui/ScreensFromFixtureTest.kt
+git log --oneline -1 -- app/src/test/kotlin/app/careerseeker/dashboard/ui/ScreensFromFixtureTest.kt
+```
+
+*Expected, and **observed**:* `compose.waitUntil(timeoutMillis = 5_000) { … }`, and
+**`30908de :app: B-22 is a Room-Flow race, not a click race -- synchronize on the node`**.
+
+**The rate figure in the B-22 entry (~31%) is deliberately NOT given a one-command re-derivation**,
+because the honest version of that command would have to fix a window and a branch, and the number
+moves with both. It is an observation with a named confound (runner load), not a measurement anyone
+should pin a decision to. **The red-then-green fact and the symptom change are the load-bearing
+claims here, and both re-derive exactly.**

@@ -16361,3 +16361,52 @@ Google or OAuth console; no account, purchase, Gmail, keystore or emulator. **No
 printed or echoed.** Terra's territory (`autonomy/codex-state`) was **read, never written** — Terra
 reports **COMPLETE, files claimed: none** — **no collision.** The pin extraction under
 `scratchpad/pin/` is scratch, committed nowhere.
+
+## RUN 89 ADDENDUM — CI on this run's own head went red, and the re-run on the identical commit went green
+
+**This was checked rather than assumed, and it changed what the run had to do.** The slice was
+finished and the records were written before CI reported; the honest sequencing is that this
+addendum exists because the check was still in flight at that point and was **polled to completion
+instead of left unresolved**.
+
+**Attempt 1 (job `97261373225`, head `cfd817f`) FAILED.** `ScreensFromFixtureTest`, **2 failed**,
+`35 tests completed, 2 failed, 3 skipped`, both
+`androidx.compose.ui.test.ComposeTimeoutException at ScreensFromFixtureTest.kt:72`.
+**Attempt 2 (`rerun_failed_jobs`, job `97262364409`, the SAME commit, no push between) SUCCEEDED.**
+
+**It is not this run's failure, and that is measured rather than asserted.** `cfd817f` changes
+**four `.md` files and zero code files**; so do the five commits before it. Those six records-only
+commits split **3 red / 3 green** with the `:app` sources byte-identical throughout (**C-89-10**).
+A diff that cannot reach `:app` by any causal path did not break an `:app` Compose test.
+
+**One re-run, and bounded there** — the same bound run 75 set. It was spent to *confirm*, which is
+what the allowance is for, not to grind out a frequency this environment could not act on anyway.
+
+**The finding worth carrying forward: B-22's mitigation changed the symptom and left the race.**
+Run 75 recorded these as `AssertionError` at `:87` and `:69`. This one is a **`ComposeTimeoutException`
+at `:72`** — and line 72 is `compose.waitUntil(timeoutMillis = 5_000)` inside `awaitText`, the helper
+commit `30908de` added **as B-22's fix**. The diagnosis in that commit is right (Room's query
+executor is not the compose clock); the remedy bounded the race with a wall clock instead of removing
+it. **A timeout is also less informative than the assertion it replaced** — it reports that the node
+never arrived, not what rendered instead. Two tests failed this time rather than the one every prior
+record shows: **both** of the tests that render `DashboardApp` through that seam.
+
+**And the claim this addendum refuses to make.** The observed failure rate on this branch since
+2026-08-21 is **5 in 16 (~31%)** against run 75's **2 in 24 (~8%)**. That is **not** reported as
+"the mitigation made it worse": the windows differ, the samples are small, and runner load is an
+uncontrolled variable that could account for all of it. The **symptom change is mechanical and
+stands**; the rate is an observation with its confound named. *Recorded this way on purpose — this
+run has already corrected four claims that were written before they were measured, and a fifth
+would have been the easiest of them to write.*
+
+**No fix pushed, and the reason is the standing rule rather than caution.** A timeout constant is one
+line, and this host has no Android SDK (**B-7**, **C-89-7**) so it could be neither compiled nor run.
+Against an **intermittent** failure, one green CI run after a speculative fix proves nothing — that
+is B-22's own thesis applied to its would-be remedy. **No test was skipped, disabled or quarantined;
+no `:app` file was written.** The smallest human unblock is in B-22: loop the test on a machine with
+the SDK, then give the in-memory `ReplicaDb` a synchronous query executor so the first row lands
+before the assertion, rather than widening the window.
+
+**A note for whoever pushes next.** This addendum is itself a records-only push, so it re-rolls the
+same ~1-in-3 die. **A red `Build and test` on a `.md`-only commit is this blocker, not a
+regression** — check `C-89-10`'s three commands before treating it as one.

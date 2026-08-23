@@ -65,6 +65,19 @@
 > can never appear** in the guard's output and `RETURN-DAY.md` names it **0** times (**C-89-6**) —
 > `ROT: 0  UNPLANNED: 2` **is not** an inventory of unlanded work.
 >
+> **ADDENDUM — CI on this run's own head went red, then green on the identical commit.** Attempt 1
+> (`97261373225`, `cfd817f`) **FAILED**: `ScreensFromFixtureTest`, **2 failed**, both
+> `ComposeTimeoutException at :72`. Attempt 2 (`rerun_failed_jobs`, **same commit, no push between**)
+> **SUCCEEDED**. **Not this run's failure:** `cfd817f` is **4 `.md` files, 0 code files**, and the six
+> consecutive records-only commits ending in it split **3 red / 3 green** with `:app` byte-identical
+> (**C-89-10**). **B-22 reproduced.** New and mechanical: line 72 is `waitUntil(timeoutMillis =
+> 5_000)` inside `awaitText`, the helper `30908de` added **as B-22's mitigation** — so run 75's
+> `AssertionError` has become a **timeout at the fix's own wait**. The diagnosis held; the remedy
+> bounded the race instead of removing it. The higher observed rate (**5/16 vs 2/24**) is recorded
+> **with its confound named** and is *not* claimed as caused by the mitigation. **One re-run, bounded
+> there. No fix pushed** — no Android SDK here, and one green run cannot validate a fix to an
+> intermittent failure. **No test skipped, disabled or quarantined; no `:app` file written.**
+>
 > **No rung moved. No gate ran and none is claimed. `fleet-probe.sh` was run, never edited. No
 > vector byte, no pin move; pin stays `7328a0b`. Nothing merged, closed, undrafted, force-pushed or
 > deleted; the production relay was not contacted at all.**

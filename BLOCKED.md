@@ -4551,3 +4551,65 @@ does not treat `ROT: 0 UNPLANNED: 2` as "everything is accounted for".
 **Smallest human unblock — unchanged.** Option (b), **land the merges**, still dominates. Option (a)
 is now: run step −1 (free, ancestry) **and** accept that checks 1–2 are re-measured by hand at
 whatever cadence matters, using `merged_at` rather than `merged`.
+
+### B-22 status 2026-08-23 (eighty-ninth run) — REPRODUCED on this run's own head, and the run-78 mitigation changed the symptom without removing the race
+
+**This run's records-only push went red, then green on the identical commit.** `cfd817f` touches
+**four `.md` files and zero code files**, so no causal path to `:app` exists (**C-89-10**):
+
+| attempt | job | head | result |
+| --- | --- | --- | --- |
+| 1 | `97261373225` | `cfd817f` | **FAILURE** — `ScreensFromFixtureTest`, **2 failed**; `35 tests completed, 2 failed, 3 skipped` |
+| 2 (`rerun_failed_jobs`) | `97262364409` | **`cfd817f` — same commit** | **SUCCESS** |
+
+That is B-22's own signature, so **this run claims no novelty for the red-then-green fact** — run 75
+established it on `592afa4`. **Three things are new**, and two of them matter.
+
+**NEW 1 — the failure mode changed, and the change is attributable.** Run 75 recorded
+`AssertionError at ScreensFromFixtureTest.kt:87` and `:69`. This run's is
+**`ComposeTimeoutException at ScreensFromFixtureTest.kt:72`** — line 72 is inside **`awaitText`**,
+the helper that commit **`30908de`** (*":app: B-22 is a Room-Flow race, not a click race —
+synchronize on the node"*) added **as B-22's mitigation**. So the mitigation **converted an
+assertion failure into a timeout** on the same seam: the race it diagnosed correctly is still there,
+now bounded by a wall-clock `waitUntil(timeoutMillis = 5_000)` instead of failing an assertion.
+**The diagnosis held; the fix did not.** A timeout is also *less* informative than the assertion it
+replaced — it says the node never arrived, not what was rendered instead.
+
+**NEW 2 — two tests failed, not one.** Every prior recorded instance was `35 tests completed,
+**1** failed, 3 skipped`. This run: **2 failed** — `theProvenanceBannerIsShownOnEveryTab` **and**
+`theBannerFollowsIntoTheApplicationDetailOverlay`, i.e. **both** tests that render `DashboardApp`
+through the Room-Flow seam. The four tests that pass one-shot `*Now()` reads still never fail,
+exactly as the file's own KDoc predicts.
+
+**NEW 3 — the observed rate is higher, and this is the claim to treat most sceptically.** Across the
+last 16 completed non-cancelled runs on this branch (since 2026-08-21): **5 failures, ~31%**, versus
+run 75's measured **2 in 24, ~8%** over run numbers 172–201. Six consecutive **records-only** commits
+in that window — `cfd817f`, `6ee92b8`, `edba861`, `d874193`, `2ce70be`, `b6f1a3a`, all **0 code
+files** — split **3 red / 3 green** (**C-89-10**). **Do not read this as "the mitigation raised the
+rate."** The windows differ, the samples are small, and CI runner load is an uncontrolled variable
+that plausibly explains all of it. **What is established is the symptom change (NEW 1), which is
+mechanical; the rate is an observation with a confound named.**
+
+**Attempts.** One re-run, to confirm — **bounded there deliberately**, per the same reasoning run 75
+recorded: repeated re-runs would measure a frequency more precisely without making `:app` reachable
+from here.
+
+**Why no fix is pushed.** A timeout constant is a one-line change and **I cannot compile or run it**
+(**B-7**: no Android SDK on this host; `sdkmanager`, `adb`, `ANDROID_HOME` all absent, **C-89-7**).
+Pushing blind Kotlin is the exact thing this program's standing rule forbids, and here the rule is
+load-bearing rather than ceremonial: **against an intermittent failure, one green CI run after a
+speculative fix proves nothing** — that is B-22's own thesis turned on its would-be remedy. Widening
+a timeout would also widen the window rather than close the race.
+
+**Smallest human unblock.** On a machine with the SDK, run
+`./gradlew --no-daemon :app:testDebugUnitTest --rerun-tasks` in a loop (20+ iterations) to get a real
+rate, then **remove the race instead of widening its window**: build the in-memory `ReplicaDb` with a
+**synchronous query executor** (`.setQueryExecutor(Runnable::run)` / `.setTransactionExecutor(...)`)
+so Room's first row is delivered before the assertion rather than racing a 5-second wall clock, and
+re-measure over the same loop. If that holds, `awaitText`'s `waitUntil` becomes unnecessary rather
+than merely longer. **Not attempted here** — it is `:app`, and `:app` needs the SDK.
+
+**Scope.** B-22's original qualification is unchanged and worth restating because this run depended
+on it: the vector-drift step, `checkCoreIsAndroidFree`, `:core:test` and lint are **deterministic**;
+it is `:app:test`'s Compose-UI subset that is not. **No test was skipped, disabled or quarantined,
+and no `:app` file was written this run.**
