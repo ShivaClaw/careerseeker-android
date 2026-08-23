@@ -16159,3 +16159,100 @@ commit remains in the branch's history with its correction on top, which is the 
 scope paragraph above stands: the engine-side diff is still `autonomy/claude-state`'s STATE.md alone,
 on a docs-only branch that is never merged. **The window where the history was missing was one push
 long, and Terra reports COMPLETE with no active work, so nothing read it in that state.**
+
+---
+
+# RUN 88 — 2026-08-23. B-19 was filed as needing a credential. It needed a branch name.
+
+**The slice: build the guard B-19 declared unbuildable**, chosen because B-19 was filed *this
+morning* by run 87 and its third attempt contains a premise that is checkable in one command — and
+wrong. Needs `git` and `bash` alone (**C-88-9**). **The assigned S5 slice was declined for the
+fifty-third time**, on evidence re-derived this run, not inherited (**C-88-1**).
+
+**Milestone 1 — rule one.** `git fetch --all --prune` in both checkouts before anything was read.
+Engine `origin/main` **`aac05f3`**, android `main` **`ebfaf81`**, both unmoved. The android checkout
+again arrived **detached at the docs-only `main`**, 322 commits behind the work branch — the same
+arrival state runs 76 and 85 recorded. Every count below is post-fetch. The board is **22 open PRs,
+22 draft, 0 merged**, **unmoved since run 87** (**C-88-7**).
+
+**Milestone 2 — the premise, and why it was worth checking.** B-19's attempt 3 reads: the guard
+*"belongs in the android repo's CI, which cannot run `gh` against the engine repo without a
+cross-repo token … That is Brandon's, not this session's."* That reasoning is sound **given its
+specification** — it specified the check in terms of **PR numbers**, which live on a server. But
+B-19's own symptom sentence is *"PR numbers are not stable descriptions of a merge graph"*, and the
+corollary went untaken: **branch names are.** `claude/s2-seq-bound` stopped being a leaf because
+four other **refs** came to contain it, and refs arrive with `git fetch`. **Keyed on the branch
+column, the guard needs no `gh`, no token and no CI job** (**C-88-5**).
+
+**This is not a criticism of run 87's reasoning so much as of its specification.** The token was
+real for the check as described. Re-describing the check removed it.
+
+**Milestone 3 — built, and built to fail.** `scripts/fleet-probe.sh plan` (`b9b0e6c`): it reads the
+landing table's **branch** column out of `RETURN-DAY.md`, asserts each named branch is still a leaf,
+and when one is not, **names the successors that now contain it** — because "not a leaf" alone does
+not tell a human which PR to merge instead. `leaves` was factored into `leaves_list()` and behaves
+identically; two implementations of "leaf" is the drift this file exists to catch.
+
+**Three self-test rows, all executed against the real fleet** (**C-88-2**): it accepts a table naming
+a real leaf; it **fires** on a table naming `claude/s2-seq-bound` — the branch that actually rotted,
+so the row stays tied to the incident rather than to a synthetic fixture; and it **refuses, exit 2,
+on a zero-row parse**. That last row is the one that matters most: a guard that silently reads zero
+rows reports "no rot" forever, which is **worse than no guard**. This is `fleet()`'s `**` bug one
+level up, and this file has already made that mistake once — its own comments say so.
+
+**Milestone 4 — the guard reproduces run 87's day of work in one command.** Run against §3 as it
+stood at `f884a99` (2026-08-19, the last commit before run 87's correction): **exit 1**, `PLAN IS
+STALE`, `s2-seq-bound  ROT  no longer a leaf; contained by: s2-latest-retention-skew
+s2-latest-since-invariant s2-relay-constant-pins s2-relay-header-pairing` — **and**
+`s2-relay-header-pairing` reported as an UNPLANNED leaf (**C-88-4**). **Both halves of run 87's
+conclusion**: that `#35` rotted, and that `#57`'s branch replaces it. Against §3 today: six rows,
+all `leaf`, ROT 0, **exit 0** (**C-88-3**).
+
+**Milestone 5 — wired in, so it is a step and not a script nobody runs.** `RETURN-DAY.md` gains
+**step −1**, before step 0, with the command, both exit codes, and an explicit statement of what the
+guard cannot see. **Then re-run against the file it had just edited** — a format-keyed parser can
+start reading zero rows the moment the prose around it moves — still `plan rows: 6` (**C-88-8**).
+
+**Milestone 6 — the remainder, stated as a remainder.** The guard sees **ancestry only**. A named PR
+**closed or merged** behind the plan's back leaves the branch a leaf and the row wrong; a leaf with
+**no open PR** is a real case (`claude/p4-entitlement`), which is why unnamed leaves are reported
+**informationally**; and nothing here is semantic — **a green plan still names leaves, it is not a
+plan that is still a good idea.** All three need the PR list and therefore the token. **B-19 is
+NARROWED, not closed**, in the shape B-15 was.
+
+**Milestone 7 — the finding the guard's own history hands us: this program rots its own plan.** The
+four branches that broke §3 — #54, #55, #56, #57 — were **all opened by these iterations**. The rot
+began at `f95b66e`, **2026-08-22T13:09:35Z**, thirty-three seconds before #54 was opened, and ran
+≈20 hours before run 87 caught it by hand (**C-88-6**). The staleness source is not an outside
+event. **Any run that opens a PR on a planned branch's head should run step −1 before it finishes**,
+and that sentence is now in B-19.
+
+**One self-correction, and the house rule is exactly what caught it.** C-88-5 was first written with
+the command `grep -nE 'gh |curl|wget|api\.github'` and the words *"no match"*. Running the command
+the claim prescribes returned **line 276** — the comment inside `plan` quoting B-19's own `gh pr
+list`. The claim's substance was right; its command did not measure it. Fixed in `db5c1a3` to match
+non-comment lines and to enumerate the script's external commands (`comm echo git grep head mktemp
+printf rm sed tr wc` — **no network client**). *A claim whose command you did not run is a
+description, not evidence.*
+
+**SCOPE AND PROHIBITION — what this run did NOT touch.** **No rung moved**; the ladder table is
+unchanged, and this run does not claim otherwise. **No gate ran and none is claimed**: `dotnet`,
+`pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` all **ABSENT** by `which`, `ANDROID_HOME`
+**unset**, `java` 21 not the pinned 17 (**C-88-9**); `Verify-Alpha.ps1` did not run, the android gate
+did not run, and **the fused android tree has still never been built**. **The guard is not a gate and
+decides nothing** — it reports whether a plan still points at leaves, and **it is not a claim that
+any merge is safe to land**; `RETURN-DAY.md` §3's merge condition is untouched. **No engine file was
+written at all** — the engine checkout was read-only (`git`, `for-each-ref`, `merge-base`,
+`generate.mjs --check`), and the only engine-side push is `autonomy/claude-state`'s STATE.md, a
+docs-only branch that is never merged. **No production source in either repo**: no C#, no Kotlin, no
+`:app` or `:core` file, no `relay/src/` or `relay/test/` file — so **`$ExpectedOfflineTotal` is
+untouched** (**B-17**) and this run adds **zero landing cost** and **zero new engine branches**.
+**No vector byte written, no pin moved, no `generate.mjs` edit** — it was run **`--check` only**,
+read-only, and the phone's pin stays **`7328a0b`** with 29 vendored files, byte-untouched.
+**Nothing merged, closed, undrafted, force-pushed or deleted** in either repo; **no history
+rewritten; no branch deleted.** **No deploy of any kind.** **The production relay was not contacted
+at all**, not even `GET /v1/health`. No Play, Google or OAuth console; no account, purchase, Gmail,
+keystore or emulator. **No secret read, printed or echoed.** Terra's territory
+(`autonomy/codex-state`) was **read, never written** — Terra reports **COMPLETE, files claimed:
+none** — **no collision.** The synthetic plan files the self-test writes live in `mktemp -d` and are
+removed on exit; `/tmp/RD-precorrection.md` is a scratch extraction, **committed nowhere**.
