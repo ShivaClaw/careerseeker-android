@@ -16061,3 +16061,83 @@ A green CI means this branch is *neutral*, not that the landing plan is safe.
 `additions: 75`, `changed_files: 1`, `commits: 1`. Nothing required a fix, so nothing was pushed in
 response to the wake — the subscription's drive-to-green posture is satisfied by a green head, not by
 a change for its own sake.
+
+---
+
+# RUN 87 — 2026-08-23. The landing plan rotted under four PRs that postdate it, and step 2 now names an interior node
+
+**The slice: `RETURN-DAY.md` §3's leaf set.** Not the assigned S5 spec half — that has existed since
+2026-08-09 and this is its **fifty-second** assignment (B-18). Not another comparison of the three
+transcriptions; run 86 closed that axis. The slice was chosen because it is the one claim in the
+records that had **silently become false** rather than merely incomplete, and because re-deriving it
+needs `git` and `node` alone — **no Windows gate, no emulator, no SDK** (**C-87-9**).
+
+**Milestone 1 — rule one, and the counts that follow it.** `git fetch --all --prune` in both
+checkouts before anything else. Engine `origin/main` is **`aac05f3`**, **unmoved for eleven days**;
+android `origin/main` is **`ebfaf81`**, unmoved for seventeen (**C-87-1**). Every number below was
+taken after those fetches.
+
+**Milestone 2 — the tower is twenty-two, and it grew this morning.** **22 open PRs, 22 draft, 0
+merged** (**C-87-2**). `RETURN-DAY.md` §3 was derived against **17**. The additions are **#54, #55,
+#56 and #57** — and **#57 was opened at 09:13 UTC today**, hours before this run started. The
+program's own records have been describing a 17-PR board for four days.
+
+**Milestone 3 — the actual defect, and it is one table row.** Recomputing the leaf set — a head that
+is no other open PR's base — returns **eight leaves**, and **`claude/s2-seq-bound` is not among
+them** (**C-87-3**). #54 bases on it, #55 on #54, #56 on #55, #57 on #56. **§3 step 2 says merge
+`#35`. `#35` is now an interior node.** The leaf that lands its stack is **`#57`**, seven PRs deep
+from `main`. This is not a stale estimate; it is an instruction that would do the wrong thing.
+
+**Milestone 4 — what following §3 verbatim would actually cost.** Replayed for real from `aac05f3`
+in a throwaway clone, both configurations, six merges each (**C-87-5**, **C-87-6**). The verbatim
+plan is **not more expensive — it is incomplete**: still **2 stops**, but it leaves **seven commits
+unlanded across four open PRs whose base branches it just merged** (#54 → 1, #55 → 2, #56 → 6,
+#57 → 7). That end state — open PRs rooted at merged branches — is the part that is expensive to
+untangle later.
+
+**Milestone 5 — the correction is cheap, which is the run's best finding.** Substituting `#57` for
+`#35` costs **no extra stop and no new conflicting file**: both configurations stop at **#52** (5
+files) and **#49** (6 files), the `$ExpectedOfflineTotal` pin family §3 already names, plus
+`tests/SyncHarness/Program.cs` at #49 (**C-87-5**). Four extra PRs and seven extra commits land for
+free. **§3's cost table survives; only its step-2 row changes**, and it has been changed in place
+with a correction banner rather than left for the reader to discover.
+
+**Milestone 6 — the two claims §3 leans on, re-measured in the corrected configuration.** The
+order-dependence penalty reproduces: `#49` first costs **3** stops instead of **2** (**C-87-7**) —
+the `+1` §3 says is the figure that transfers. And the post-landing vector corpus is **30 files**
+with **`OK: 30 vector files match the generator.`** from `node docs/sync-vectors/generate.mjs
+--check`, exit 0, **run in this session at the post-landing tree** (**C-87-8**). That check had only
+ever been run *before* the merges.
+
+**Milestone 7 — no cross-repo drift, and the re-pin instruction is still exactly one file wide.**
+Byte-comparing the phone's vendored corpus (pin **`7328a0b`**, 29 files) against the post-landing
+tree: **28 shared payload vectors, 0 differing**; only-upstream is **`pairing-high-bit-confirm.json`**
+alone; only-on-phone is **empty** (**C-87-8**). `index.json` differs solely because it enumerates the
+new file. `RETURN-DAY.md`'s "re-pin in the same sitting" step is re-confirmed correct as written.
+
+**Milestone 8 — the notification, and why this run sent one.** B-18's standing triggers were all
+negative again (nothing merged, nothing undrafted, both `main`s unmoved, prompt unchanged, no gate
+result). **The notification this run sent is not one of those**: it reports that **the return-day
+plan itself had gone stale** — a records defect with a concrete failure mode on the one day the
+records exist to serve — alongside the board count and the fifty-second stale assignment. A wrong
+instruction in the first document Brandon reads is the strongest thing this program has had to say
+in forty runs, and it is the kind of finding a scheduled run exists to surface.
+
+**SCOPE AND PROHIBITION — what this run did NOT touch.** **No rung moved**; the ladder table is
+unchanged. **No gate ran and none is claimed**: `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`,
+`emulator` and `adb` are **absent** and `ANDROID_HOME` is **unset**, checked with `which`
+(**C-87-9**); `Verify-Alpha.ps1` did not run, the android gate did not run, and **the fused android
+tree has still never been built**. **The merge-cost numbers above are `git`-level measurements and
+are NOT a claim that any merge is safe to land** — the merge condition in `RETURN-DAY.md` §3 is
+untouched by this run. **All merges were replayed in a throwaway clone under the scratch directory
+and pushed nowhere.** **Nothing merged, closed, undrafted, force-pushed or deleted** in either repo;
+**no history rewritten; no branch deleted.** **No production source in either repo**: no C#, no
+Kotlin, no `:app` or `:core` file, no `relay/src/` file — so **`$ExpectedOfflineTotal` is untouched**
+(**B-17**). **No vector byte written, no pin moved, no `generate.mjs` edit** — `generate.mjs` was run
+**`--check` only**, read-only, and the phone's pin stays at **`7328a0b`**. The android diff is
+**records only** (`RETURN-DAY.md`, `LOG.md`, `STATE.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`); the
+engine diff is **`autonomy/claude-state` STATE.md only**, a docs-only branch that is never merged.
+**No deploy of any kind.** **The production relay was not contacted at all**, not even
+`GET /v1/health`. No Play, Google or OAuth console; no account, purchase, Gmail, keystore or
+emulator. **No secret read, printed or echoed.** Terra's territory (`autonomy/codex-state`) was
+**read, never written** — Terra reports **COMPLETE, files claimed: none** — no collision.
