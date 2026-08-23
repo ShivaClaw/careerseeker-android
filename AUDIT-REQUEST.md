@@ -16444,3 +16444,174 @@ means this branch is *neutral*, not that the landing plan is safe.
 (`pull_request_read` `get_review_comments` → `totalCount: 0`; `get_comments` → `[]`), and
 `mergeable_state: clean`, `additions: 75`, `changed_files: 1`, `commits: 1` — the last three
 independently confirming C-86-8's diff shape and the corrected line count.
+
+---
+
+# RUN 87 — 2026-08-23. The landing plan went stale under four PRs that postdate it
+
+Run 87's slice was **not** the assigned S5 spec half (built 2026-08-09; see B-18, fifty-second
+firing). It is the one thing that had genuinely rotted since run 47 wrote `RETURN-DAY.md`: **the
+landing plan's leaf set**. Every claim below is re-derivable with `git` and `node` alone — no
+Windows gate, no emulator, no SDK.
+
+Set up the measurement tree once; claims C-87-3 through C-87-8 all run inside it:
+
+```bash
+git clone --no-checkout https://github.com/ShivaClaw/careerseeker mg && cd mg
+git fetch origin '+refs/heads/*:refs/heads/*'
+git checkout -B landing aac05f3
+```
+
+### C-87-1 — rule one: both fetches, and neither `main` has moved
+
+```bash
+cd careerseeker         && git fetch --all --prune && git rev-parse --short origin/main
+cd ../careerseeker-android && git fetch --all --prune && git rev-parse --short origin/main
+```
+
+*Expected, and **observed**:* engine `origin/main` = **`aac05f3`**, last commit **2026-08-12
+20:28:21 -0600** — **unmoved for eleven days**. Android `origin/main` = **`ebfaf81`**, last commit
+**2026-08-06** — unmoved for seventeen days. Every count in this section was taken **after** these
+fetches.
+
+### C-87-2 — twenty-two open draft PRs in the engine repo, none merged
+
+```bash
+gh pr list --repo ShivaClaw/careerseeker --state open --limit 40 \
+   --json number,isDraft,baseRefName,headRefName | jq 'length, (map(select(.isDraft)) | length)'
+```
+
+*Expected, and **observed**:* **22 open, 22 draft, 0 merged**. `RETURN-DAY.md` §3 was derived
+against **17**. The five added since are **#54, #55, #56, #57** (plus #53's re-derivation), and
+**#57 was opened 2026-08-23T09:13:21Z — the morning of this run**.
+
+### C-87-3 — `#35` is no longer a leaf; `#57` is. This is the defect in the plan
+
+A "leaf" is a PR head that is not another open PR's base — the merge that actually lands a stack.
+
+```bash
+gh pr list --repo ShivaClaw/careerseeker --state open --limit 40 \
+   --json number,baseRefName,headRefName > prs.json
+jq -r '.[] | "\(.number) \(.baseRefName) \(.headRefName)"' prs.json > graph.txt
+while read n b h; do awk '{print $2}' graph.txt | grep -qx "$h" || echo "#$n $h"; done < graph.txt
+```
+
+*Expected, and **observed** — eight leaves:*
+
+```
+#26  codex/r6-dependency-sbom              (Terra's, out of scope)
+#36  claude/s2-transport-vocabulary
+#48  claude/s8-harness-linux-reach
+#49  claude/s6-composition-root-decision
+#51  claude/s3-pairing-confirm-consumer
+#52  claude/s6-outcome-disposition
+#53  claude/s6-resume-reconciliation        (step 0 recommends closing)
+#57  claude/s2-relay-header-pairing
+```
+
+`RETURN-DAY.md` §3 step 2 says **merge `#35`**. `#35`'s head `claude/s2-seq-bound` is now the base
+of `#54`, which is the base of `#55` → `#56` → `#57`. **`#35` is an interior node.** The leaf that
+replaces it is **`#57`**, seven PRs deep from `main`.
+
+### C-87-4 — the plan's own documents do not mention any of the four
+
+```bash
+cd careerseeker-android
+for n in 54 55 56 57; do echo -n "#$n: "; grep -c "#$n\b" RETURN-DAY.md docs/Merge-Topology.md | tr '\n' ' '; echo; done
+git log -1 --format='%h %ci' -- docs/Merge-Topology.md
+```
+
+*Expected, and **observed**:* **0 hits in both files for every one of #54, #55, #56, #57.**
+`docs/Merge-Topology.md` was last touched **`bbd942b`, 2026-08-16**; `RETURN-DAY.md` **`f884a99`,
+2026-08-19**. All four PRs postdate the later of those. **The plan is not wrong about what it
+covers — it is silent about what it does not.**
+
+### C-87-5 — the corrected order still costs TWO stops, and the same five files
+
+```bash
+# in the measurement tree, from aac05f3:
+for b in claude/s8-harness-linux-reach claude/s2-relay-header-pairing \
+         claude/s2-transport-vocabulary claude/s3-pairing-confirm-consumer \
+         claude/s6-outcome-disposition claude/s6-composition-root-decision; do
+  git merge --no-edit --no-ff "$b" || { git diff --name-only --diff-filter=U; \
+    for f in $(git diff --name-only --diff-filter=U); do git checkout --theirs -- "$f"; git add "$f"; done; \
+    git commit --no-edit; }
+done
+```
+
+*Expected, and **observed** — `#48`, `#57`, `#36`, `#51` **clean**; two stops:*
+
+- **`#52`** — 5 files: `README.md`, `docs/CareerSeeker-Project-Summary.md`,
+  `docs/External-Audit-Handoff.md`, `scripts/Verify-Alpha.ps1`, `src/Engine/README.md`
+- **`#49`** — 6 files: the same five **plus `tests/SyncHarness/Program.cs`**
+
+**Both stops are the `$ExpectedOfflineTotal` pin family that §3 already names.** Swapping `#35` for
+`#57` — four extra PRs, seven extra commits — **adds no stop and no new conflicting file.** §3's
+cost table survives the correction intact; only its step-2 row changes.
+
+### C-87-6 — the plan as literally written strands seven commits
+
+```bash
+# replay §3 verbatim (with #35), then:
+for b in claude/s2-latest-since-invariant claude/s2-latest-retention-skew \
+         claude/s2-relay-constant-pins claude/s2-relay-header-pairing; do
+  echo "$b -> $(git rev-list --count HEAD..$b) commits NOT landed"; done
+```
+
+*Expected, and **observed**:* `#54` **1**, `#55` **2**, `#56` **6**, `#57` **7** commits unlanded.
+The verbatim plan also costs **2 stops** — it is not more expensive, it is **incomplete**. It
+leaves four open PRs whose base branches have just been merged, which is the state that is
+expensive to reason about later, not now.
+
+### C-87-7 — order is still load-bearing: `#49` first costs one extra stop
+
+```bash
+# same replay, #49 moved to position 1
+```
+
+*Expected, and **observed**:* **3 stops** instead of 2 — `#49` (5 files), `#51` (6 files), `#52`
+(5 files). **The `+1` order penalty §3 documents reproduces in the corrected configuration**, which
+is the claim §3 says actually transfers between configurations. The absolute counts (2 vs 3) are
+the ones a reader will measure today.
+
+### C-87-8 — the post-landing vector corpus is 30, generator-clean, and the phone's delta is exactly one file
+
+```bash
+# at the post-landing tree (corrected order):
+git ls-tree HEAD docs/sync-vectors/v1/ --name-only | wc -l
+node docs/sync-vectors/generate.mjs --check
+```
+
+*Expected, and **observed**:* **30 files**, and **`OK: 30 vector files match the generator.`**
+(exit 0) — **run in this session**, at the post-landing tree, with both stops resolved `--theirs`.
+This is the first time the corpus has been checked *after* the merges rather than before.
+
+Against the phone's vendored corpus (pin **`7328a0b`**, **29 files**):
+
+```bash
+comm -23 post.names phone.names   # only upstream
+comm -13 post.names phone.names   # only on phone == drift
+```
+
+*Expected, and **observed**:* only-upstream = **`pairing-high-bit-confirm.json`**; only-on-phone =
+**empty**. Byte-comparing the 28 shared payload vectors: **0 differ**. `index.json` differs, and
+only because it enumerates the new file. **No cross-repo drift.** `RETURN-DAY.md`'s "re-pin in the
+same sitting" instruction is re-confirmed correct and still one file wide.
+
+**Caveat, stated rather than buried:** the corpus was measured with the two stops resolved
+`--theirs`. `RETURN-DAY.md` C-POST-2 established the corpus is byte-identical either way; **this run
+did not re-derive that**, it relies on it.
+
+### C-87-9 — no gate ran, and none is claimed
+
+```bash
+for t in dotnet pwsh sdkmanager avdmanager emulator adb; do which $t || echo "$t ABSENT"; done
+echo "ANDROID_HOME=${ANDROID_HOME:-UNSET}"
+```
+
+*Expected, and **observed**:* `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` **all
+absent**; `ANDROID_HOME` **unset**; `node v22.22.2` and `gradle` present but unusable for `:app`
+without the SDK. **`Verify-Alpha.ps1` did not run. The android gate did not run. The fused android
+tree has still never been built.** The merge condition in `RETURN-DAY.md` §3 is **unchanged by this
+run** — every measurement above is a `git`-level merge cost, **not** a statement that any merge is
+safe to land.
