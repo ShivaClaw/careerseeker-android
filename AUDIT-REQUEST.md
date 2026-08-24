@@ -17110,33 +17110,201 @@ session should take it instead.**
 
 ## RUN 91 (2026-08-24) — re-verification commands for this run's claims
 
-- **C-91-1** — the assigned slice's vector corpus is intact and generated (the one runnable gate here):
-  ```
-  cd careerseeker && git fetch origin claude/s5-entitlement-ack-emitter && \
-    git checkout origin/claude/s5-entitlement-ack-emitter && \
-    node docs/sync-vectors/generate.mjs --check
-  # expect: "OK: 29 vector files match the generator.", exit 0
-  ```
-- **C-91-2** — `entitlement_ack` body (PQ-A6-1) is defined in the spec:
-  ```
-  cd careerseeker && git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md \
-    | grep -nE 'entitlement_ack|acknowledged_at|product_id'
-  # expect: §4.3.3 near :307-319, body {product_id, acknowledged_at, order_id?}
-  ```
-- **C-91-3** — PQ-A2-1 (cap on decoded ciphertext) and PQ-A2-2 (`decrypt_failed`) prose present:
-  ```
-  cd careerseeker && git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md \
-    | grep -nE 'decrypt_failed|decoded ciphertext'
-  # expect: decrypt_failed at ~:103, "decoded ciphertext" cap at ~:111
-  ```
-- **C-91-4** — the work is unmerged, not unbuilt (engine main still 26 vectors):
-  ```
-  cd careerseeker && git fetch origin main && \
-    git ls-tree -r --name-only origin/main -- docs/sync-vectors/v1/ | grep -c '\.json$'
-  # expect: 26
-  ```
-- **C-91-5** — no human commit in either repo for twelve days:
-  ```
-  cd careerseeker && git log -1 --format='%ci %H' origin/main   # expect 2026-08-12, aac05f3
-  cd careerseeker-android && git log -1 --format='%ci %H' origin/main  # expect 2026-08-06, ebfaf81
-  ```
+> **Form corrected at run 92.** Run 91 wrote these five entries as **list items**
+> (`- **C-91-1** — …`) rather than as **headings**. `scripts/check-citations.sh` reads definitions
+> off heading lines only, so all five registered as **cited-but-undefined** and CI on this branch
+> went red (**C-92-1**). The commands and expectations below are run 91's, unaltered and re-run at
+> run 92 — only the heading level changed. See **C-92-2**.
+
+### C-91-1 — the assigned slice's vector corpus is intact and generated (the one runnable gate here)
+
+```
+cd careerseeker && git fetch origin claude/s5-entitlement-ack-emitter && \
+  git checkout origin/claude/s5-entitlement-ack-emitter && \
+  node docs/sync-vectors/generate.mjs --check
+# expect: "OK: 29 vector files match the generator.", exit 0
+```
+
+*Re-run at run 92:* `OK: 29 vector files match the generator.`, `exit=0`.
+
+### C-91-2 — `entitlement_ack` body (PQ-A6-1) is defined in the spec
+
+```
+cd careerseeker && git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md \
+  | grep -nE 'entitlement_ack|acknowledged_at|product_id'
+# expect: §4.3.3 near :307-319, body {product_id, acknowledged_at, order_id?}
+```
+
+*Re-run at run 92:* §4.3.3 heading at **:307**, body block at **:317–320**, `product_id` /
+`acknowledged_at` / optional `order_id` all present.
+
+### C-91-3 — PQ-A2-1 (cap on decoded ciphertext) and PQ-A2-2 (`decrypt_failed`) prose present
+
+```
+cd careerseeker && git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md \
+  | grep -nE 'decrypt_failed|decoded ciphertext'
+# expect: decrypt_failed at ~:103, "decoded ciphertext" cap at ~:111
+```
+
+*Re-run at run 92:* `decrypt_failed` at **:103** and in §7.2's table at **:601**; the cap on the
+**decoded** ciphertext at **:111–112**; the S5 amendment note at **:132**.
+
+### C-91-4 — the work is unmerged, not unbuilt (engine main still 26 vectors)
+
+```
+cd careerseeker && git fetch origin main && \
+  git ls-tree -r --name-only origin/main -- docs/sync-vectors/v1/ | grep -c '\.json$'
+# expect: 26
+```
+
+*Re-run at run 92:* **26**.
+
+### C-91-5 — no human commit in either repo for twelve days
+
+```
+cd careerseeker && git log -1 --format='%ci %H' origin/main   # expect 2026-08-12, aac05f3
+cd careerseeker-android && git log -1 --format='%ci %H' origin/main  # expect 2026-08-06, ebfaf81
+```
+
+*Re-run at run 92:* engine `2026-08-12 20:28:21 -0600 aac05f3`; android
+`2026-08-06 19:38:20 -0600 ebfaf81`. Twelve and eighteen days respectively, as of 2026-08-24.
+
+---
+
+## RUN 92 (2026-08-24) — re-verification commands for this run's claims
+
+### C-92-1 — CI on this branch's head was red, and the cause was run 91's citation form, not a flake
+
+```bash
+# the failing check run on PR #6's head (7908b12), read from GitHub:
+#   "Build and test" -> conclusion: failure, 05:03:31Z -> 05:04:06Z (35s)
+# reproduce it locally, no toolchain required:
+cd careerseeker-android && git checkout 7908b12
+./scripts/check-citations.sh; echo "exit=$?"
+```
+
+*Expected, and **observed** this run before the fix:* `definitions: 856   cited: 862
+documented-absent: 1`, then `::error::dangling citation(s) -- cited, but defined nowhere:` listing
+**C-91-1 … C-91-5** with `LOG.md:16508-16510` and `AUDIT-REQUEST.md:17113-17138`, `exit=1`. The CI
+log for job `97327713816` prints the identical five ids. **This is not B-22.** B-22 is an
+intermittent `ComposeTimeoutException` in `ScreensFromFixtureTest`; this job failed at the
+citation step, **before** Gradle ran at all, and it is deterministic — it reproduces on every
+invocation on that commit.
+
+### C-92-2 — the fix is form-only, and the guard is green on this run's head
+
+```bash
+cd careerseeker-android
+./scripts/check-citations.sh --self-test        # expect: all 10 cases pass, exit 0
+./scripts/check-citations.sh; echo "exit=$?"    # expect: OK: every cited C-/B- id resolves…, exit 0
+git diff 7908b12 -- AUDIT-REQUEST.md | grep -E '^[-+].*C-91-[1-5]'
+```
+
+*Expected, and **observed**:* self-test `all cases passed`; the check prints
+`OK: every cited C-/B- id resolves to an entry that exists.`, `exit=0`. The diff shows the five
+ids moving from `- **C-91-N** — …` to `### C-91-N — …` and **no change to any command inside a
+fence** — the fenced blocks are byte-identical to run 91's.
+
+### C-92-3 — run 91's five claims were apt, not merely present; all five re-verified
+
+```bash
+# C-91-1
+cd careerseeker && git checkout origin/claude/s5-entitlement-ack-emitter && \
+  node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+# C-91-2 / C-91-3
+git checkout origin/claude/s5-engine-wire-parser && \
+  grep -nE 'entitlement_ack|acknowledged_at|order_id|decrypt_failed|decoded ciphertext' docs/Sync-Protocol.md
+# C-91-4
+git ls-tree -r --name-only origin/main -- docs/sync-vectors/v1/ | grep -c '\.json$'
+# C-91-5
+git log -1 --format='%ci %h' origin/main
+cd ../careerseeker-android && git log -1 --format='%ci %h' origin/main
+```
+
+*Expected, and **observed** this run:* `OK: 29 vector files match the generator.` / `exit=0`;
+§4.3.3 at `:307` with the body at `:317–320`; `decrypt_failed` at `:103` and `:601`, decoded-
+ciphertext cap at `:111–112`; **26** on `main`; `2026-08-12 … aac05f3` and
+`2026-08-06 … ebfaf81`. **This matters for the fix's honesty:** promoting a citation to a
+definition blesses it, so each was re-run rather than assumed.
+
+### C-92-4 — the vendored corpus is still byte-identical to the pin; no drift introduced
+
+```bash
+cd careerseeker && git archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pin
+diff -r ../careerseeker-android/core/src/test/resources/sync-vectors/v1 /tmp/pin/docs/sync-vectors/v1
+echo "exit=$?"
+```
+
+*Expected, and **observed**:* **exit 0**, 29 files each side, no output. The pin in
+`core/src/test/resources/sync-vectors/VECTORS.lock` is
+`7328a0bc043335491cd96a67d634e8eea2a13af9` — **the prompt's `679a317` remains stale**, as
+**C-90-2** and **C-PIN-1** already record.
+
+### C-92-5 — the schedule is not reachable from the session, measured rather than reasoned
+
+```
+CronList        # Claude Code tool; expect: "No scheduled jobs."
+```
+
+*Expected, and **observed**:* `No scheduled jobs.` **B-18 attempt 2** has asserted since run 48
+that the recurring prompt *"is stored scheduler configuration … the sandbox has no access to the
+schedule"* — an inference, with no command behind it. This is the command. The session's own cron
+surface is **empty**, so the schedule was created outside it and **no agent can stop it from
+here**; the stop must happen where it was created. Narrow, but it converts B-18's central
+assertion from reasoning into a measurement, and it forecloses "ask the agent to turn itself off"
+as a remedy.
+
+### C-92-6 — the board is unchanged since run 91: 28 open drafts, nothing merged in eleven days
+
+```bash
+# GitHub PR lists, both repos, state=open
+#   ShivaClaw/careerseeker          -> expect 22, every one draft:true
+#   ShivaClaw/careerseeker-android  -> expect  6, every one draft:true
+# newest merge anywhere: read merged_at on the closed list (NOT the list's `merged` field --
+# see C-89-2: it reports false on every row, including for merged PRs)
+```
+
+*Expected, and **observed** this run:* **22 + 6 = 28 open, all `draft: true`**; newest `merged_at`
+anywhere is **PR #44, 2026-08-13T02:28:21Z** — **eleven days**. Engine `main` is still `aac05f3`
+and android `main` still `ebfaf81`. Run 91's notification produced **no repo event**: the only ref
+that moved since is this agent's own probe branch.
+
+### C-92-7 — the guard now diagnoses the form error, replayed against the commit that had it
+
+```bash
+cd careerseeker-android
+S=$(mktemp -d); mkdir -p "$S/scripts" "$S/docs"
+git archive 7908b12 AUDIT-REQUEST.md BLOCKED.md LOG.md STATE.md RETURN-DAY.md \
+  HANDOFF-Android-Alpha.md docs/S-Ladder.md docs/Merge-Topology.md \
+  docs/protocol-questions.md docs/CLAUDE-ANDROID-MISSION.md | tar -x -C "$S"
+cp scripts/check-citations.sh "$S/scripts/"      # THIS run's guard, run 91's records
+"$S/scripts/check-citations.sh"; echo "exit=$?"
+```
+
+*Expected, and **observed**:* `exit=1` — **the verdict is unchanged, which is the point; the
+report is not.** Each of C-91-1…5 now prints
+
+```
+      ^ NEAR MISS: present in a definition doc but NOT on a heading line:
+        AUDIT-REQUEST.md:17113: - **C-91-1** — the assigned slice's vector corpus is intact…
+        fix: make it a heading -- '### C-91-1 — <title>' -- not a list item.
+```
+
+naming the exact file, line and remedy. The self-test pins both halves: case 9 asserts the hint
+fires **and** that a list-item entry still **fails**; case 9b asserts the hint does **not** fire on
+a genuinely absent id (run 75's incident), because a hint that reassures on a real absence is worse
+than no hint. `--self-test` now runs **10 cases / 14 assertions**, all passing (**C-92-2**).
+
+**Honest limit:** this improves the *diagnosis*, not the *detection*. The guard's coverage is
+unchanged — it still checks only that a referent exists, never that a citation is apt. And the
+near-miss search is deliberately narrow: it looks only inside `DEF_DOCS`, so an entry written into
+the wrong *file* is still reported as plain "defined nowhere".
+
+### What has no command, and is therefore not a claim
+
+That run 92 **withheld** a fourth "stop the schedule" notification is a **judgement**, not a
+measurement. What is measured is C-92-6: three notifications (runs 81, 86, 91) preceded zero repo
+events. The inference — that a fourth would be cost without benefit — is run 91's own recorded
+handoff (*"a later session should not send a fourth"*) applied to a board that has not moved. **A
+repository still cannot distinguish "did not see it" from "saw it and chose not to act."** If a
+later session has evidence of the former, the judgement is wrong and it should notify.
