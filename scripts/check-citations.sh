@@ -253,13 +253,56 @@ run_check() {
   fi
 
   echo "::error::dangling citation(s) -- cited, but defined nowhere:"
-  local id
+  local id near
   while IFS= read -r id; do
     [ -z "$id" ] && continue
     echo "  $id"
     printf '%s\n' "$cites" | awk -F'\t' -v want="$id" '$1==want{print "      " $2}' | head -5
+    # NEAR-MISS HINT (run 92).
+    #
+    # Run 91 wrote its five entries into AUDIT-REQUEST.md as list items --
+    # "- **C-91-1** — the corpus is intact" -- instead of headings. The ids were
+    # in the right FILE, in the right ORDER, with correct commands under them;
+    # only the heading level was missing. The guard was right to fail, but it
+    # said "defined nowhere", which is the one description that sends a reader
+    # looking in the wrong place: the entry is not missing, it is unparseable.
+    # Run 92 spent its slice on that diagnosis. This prints it instead.
+    near="$(find_near_miss "$root" "$id")"
+    if [ -n "$near" ]; then
+      echo "      ^ NEAR MISS: present in a definition doc but NOT on a heading line:"
+      printf '%s\n' "$near" | sed 's/^/        /'
+      echo "        fix: make it a heading -- '### $id — <title>' -- not a list item."
+    fi
   done <<< "$dangling"
   return 1
+}
+
+# ---------------------------------------------------------------------------
+# find_near_miss <root> <id> -> "file:line: text" for a non-heading, outside-a-
+# fence mention of <id> in a DEF_DOC, or empty.
+#
+# Deliberately narrow: it reports only the case where the id is ALREADY in a
+# document that defines ids, so the remedy is a one-character edit. It never
+# suppresses a failure -- it only explains one.
+# ---------------------------------------------------------------------------
+find_near_miss() {
+  local root="$1" id="$2" doc
+  for doc in "${DEF_DOCS[@]}"; do
+    [ -f "$root/$doc" ] || continue
+    awk -v FNAME="$doc" -v WANT="$id" '
+      /^[ \t]*(```|~~~)/ { infence = !infence; next }
+      infence { next }
+      /^(##|###|####) / { next }               # a heading would have been a definition
+      index($0, WANT) == 0 { next }
+      {
+        pre = (index($0, WANT) > 1) ? substr($0, index($0, WANT) - 1, 1) : " "
+        if (pre ~ /[A-Za-z0-9.]/) next          # S5.B-0 style label, not a mention
+        t = $0; sub(/^[ \t]+/, "", t)
+        if (length(t) > 88) t = substr(t, 1, 85) "..."
+        printf "%s:%d: %s\n", FNAME, FNR, t
+      }
+    ' "$root/$doc"
+  done | head -3
 }
 
 # ---------------------------------------------------------------------------
@@ -361,6 +404,36 @@ self_test() {
   printf '## B-1 — a blocker\n' > "$tmp/case/BLOCKED.md"
   printf 'Closed C-A2-1/-2/-3 this run.\n' > "$tmp/case/LOG.md"
   _case "continuation form cites its siblings" 1
+
+  # 9. run 91's actual incident: the entry is in the right FILE, in the wrong
+  #    FORM. Still a failure -- but the report must say which, or the reader
+  #    goes looking for a missing entry that is sitting in front of them.
+  _fixture
+  printf '### C-1-1 — a check\n\n- **C-91-1** — a list item, not a heading\n' \
+    > "$tmp/case/AUDIT-REQUEST.md"
+  printf '## B-1 — a blocker\n' > "$tmp/case/BLOCKED.md"
+  printf 'The corpus is intact (C-91-1).\n' > "$tmp/case/LOG.md"
+  _case "list-item entry still fails" 1
+  if grep -q 'NEAR MISS' "$tmp/out" && grep -q 'AUDIT-REQUEST.md:3:' "$tmp/out"; then
+    echo "  PASS  ...and the report names it as a form error, with the line"
+  else
+    echo "  FAIL  ...but the report did not name it as a form error"
+    sed 's/^/        /' "$tmp/out"; fails=$((fails+1))
+  fi
+
+  # 9b. the hint must NOT fire for a genuinely absent id -- otherwise it
+  #     reassures on exactly the case run 75 proved is real.
+  _fixture
+  printf '### C-1-1 — a check\n' > "$tmp/case/AUDIT-REQUEST.md"
+  printf '## B-1 — a blocker\n' > "$tmp/case/BLOCKED.md"
+  printf 'Filed as B-22 this run, verified (C-75-11).\n' > "$tmp/case/LOG.md"
+  _case "genuinely absent id still fails" 1
+  if grep -q 'NEAR MISS' "$tmp/out"; then
+    echo "  FAIL  ...but a near-miss hint fired on an id that is truly absent"
+    sed 's/^/        /' "$tmp/out"; fails=$((fails+1))
+  else
+    echo "  PASS  ...and no near-miss hint fired"
+  fi
 
   echo
   if [ "$fails" = 0 ]; then echo "self-test: all cases passed"; return 0; fi
