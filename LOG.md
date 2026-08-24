@@ -16697,3 +16697,141 @@ printed, no `.appdata`, no `Desktop\site-v2`. Terra's worktrees and `autonomy/co
 read only. **No test was skipped, disabled or quarantined**, and no CI job was re-run. The only
 files written this run: `AUDIT-REQUEST.md`, `scripts/check-citations.sh`, this LOG entry,
 `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat.
+
+---
+
+## RUN 93 — 2026-08-24 (Linux cloud sandbox). B-25's attempt 3, taken
+
+**The slice was not chosen from the ordered intent.** It was chosen because this branch's CI was
+red, the cause was inside this repository's own workflow file, and it is one of the very few things
+a sandbox with no Android SDK can fix completely rather than propose.
+
+### Milestone 0 — the fetch, and the assigned slice re-derived rather than inherited
+
+`git fetch --all --prune` in **both** checkouts before any count was read. The engine repo's
+`origin/main` is `aac05f3`; the android branch head was `1b42adc`.
+
+The recurring prompt assigned S5's spec half again — §4.3 `entitlement_ack`, the ack vectors, and
+PQ-A2-1/-2/-3. **All of it is built, and this run proved it with its own hands rather than by
+reading a previous run's note** (**C-93-1**): §4.3.3 defines the body as
+`{product_id, acknowledged_at, order_id?}` under gate PQ-A6-1 (default-proceed); the 1 MiB cap is
+stated as measured on the **decoded ciphertext** (PQ-A2-1); structural rejection reports
+`decrypt_failed` with no `malformed` code added (PQ-A2-2); `invalid-unknown-field.json` is present
+(PQ-A2-3). The prompt's own named check —
+`node docs/sync-vectors/generate.mjs --check` — returned **`OK: 29 vector files match the
+generator.`**, `exit 0`, on `claude/s5-engine-wire-parser` **and** on
+`claude/s5-entitlement-ack-emitter`. **Fifty-eighth assignment; declined again.**
+
+The prompt's vendored pin `679a317` is **stale**: `VECTORS.lock` pins **`7328a0b`**. The corpus is
+**29/29 byte-identical** to that pin — `diff -r`, no output, `exit 0` (**C-93-6**). **No cross-repo
+drift, and no vector byte was written this run.**
+
+### Milestone 1 — what was actually failing, measured on this run's own head
+
+Run `32711242722`, head **`1b42adc`**, conclusion **`failure`**, one failed job `97382898729`
+(**C-93-2**). The log's last successful line is `OK: no analytics or tracking SDKs on the release
+classpath.` — the final *gate* step — and the job then dies in `actions/upload-artifact@v4`:
+
+```
+##[error]Failed to CreateArtifact: Artifact storage quota has been hit. Unable to upload any new
+artifacts. Usage is recalculated every 6-12 hours.
+```
+
+**Third head, third observation** (`cda9a58` run 90, `ebadeca` run 92, `1b42adc` run 93), spanning
+more than one 6–12 h recalculation window. **Deterministic. Not B-22** — the Robolectric flake did
+not fire on any of the three.
+
+### Milestone 2 — the cost, quantified for the first time
+
+Run 92 identified the *producer*. This run measured what it produces (**C-93-3**). The artifact on
+run `32667740105` is `app-debug`, **`size_in_bytes: 12741138`**, `expires_at 2026-09-06T21:37:53Z`
+— the 14-day life read off **the artifact**, not off the config requesting it. The run listing
+reports `total_count: 246` and returns rows spanning **2026-08-22T05:37:59Z → 2026-08-24T09:23:09Z**
+(2.16 days), of which **11 concluded `success`** — about **5.1 uploads/day**.
+
+Steady state at 14-day retention: **≈71 artifacts ≈ 0.9 GB**, against GitHub's **500 MB**
+private-repo Actions allowance on the Free plan. **This one workflow exceeds it unaided.**
+
+Three limits are recorded with the number, because they bound what it can be used for: the rate is
+**extrapolated** from a 2.16-day window (the API returns 30 rows whatever `per_page` says, so the
+older window is not enumerated); only `success` runs are counted as uploads; and **account-wide
+usage is still not measurable from here** — the claim is about *this workflow's contribution*, which
+is the only part this run can change.
+
+### Milestone 3 — the fix, and the line it deliberately does not cross
+
+`.github/workflows/ci.yml:234-241` now carries `if: github.event_name == 'workflow_dispatch'` on the
+*Upload debug APK* step (**C-93-5**). The YAML parses; there are **13 steps** and **exactly one**
+carries an `if:`, and it is the upload.
+
+- **Retention stays 14.** Run 92 refused to shrink it — nobody in a sandbox should quietly reduce
+  how long the owner's build survives — and that refusal is preserved.
+- **`workflow_dispatch` keeps the capability.** B-4 records that the owner's machine has no
+  `sdkmanager`, so CI may be the only route to an installable APK. That route survives at one click.
+- **`main` is deliberately excluded** from the condition, so RETURN-DAY §3's six merges cannot go
+  red on a quota error at the moment the owner is finally landing them.
+
+**No test, lint, assertion or build step was touched**, and `if-no-files-found: error` is kept, so
+the step still fails the job on a missing APK when it runs. **Nothing was skipped, disabled or
+quarantined to reach green.** The upload publishes an artifact; it verifies nothing. That
+distinction is the entire licence for this change, and if it were false the change would be
+illegitimate.
+
+### Milestone 4 — the three documents that pinned the step, moved in the same change
+
+This repo's drift rule applied to itself (**C-93-7**). `C-IOS-2` claimed "CI **already** produces a
+sideloadable debug APK" — now dispatch-only — and still carried `sed -n '117,123p'`, a range the
+step left long ago. **A stale `sed` range does not error; it prints *some* seven lines, so it reads
+as a working re-verification.** `C-92-9`'s command was `-A6`; the added `if:` line pushes
+`retention-days` out of a six-line window, so `-A6` would have made a **correct** file look wrong —
+now `-A7`, with run 92's finding untouched. `docs/Apple-iOS-Strategy.md` told the owner *"you can
+have this today, without your laptop"*; it now says one click rather than zero, warns that the quota
+must be freed **before** dispatching, and retires a dead link whose artifact is long past retention.
+
+**One limit was retired as too strong.** `C-IOS-2` called itself *"inference from config plus a
+green job … the sandbox cannot list Actions artifacts."* It can — through **MCP**, not `curl`.
+**C-S4P-12 measured `curl` and still holds for `curl`**; it never covered MCP. That claim is now a
+measurement.
+
+`scripts/check-citations.sh`: self-test `exit 0`; guard `exit 0`, **879 definitions / 880 cited**.
+Every `C-93-*` id is filed as a **heading** — run 92's lesson, applied.
+
+### The half that is not closed, stated plainly
+
+Gating stops the refill. It **cannot** free the ~0.9 GB already held, so **while the account is over
+quota any upload still fails, a dispatched one included.** The smallest human unblock is now exactly
+one item — free the quota, about a minute — where before it was two.
+
+**Falsifier, written down before the push.** On a **push**, the step should be **skipped** and the
+job green. **A push-triggered run still red *at the upload step* means the condition is wrong and it
+is this run's defect** — not the quota and not B-22.
+
+### Environment, stated so no claim can be misread
+
+Verified this run, not inherited: `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`
+and `gh` **all ABSENT**; `ANDROID_HOME` **UNSET**. `node` v22.22.2, `git`, `bash` and `java` present;
+`gradle` is on `PATH` at `/opt/gradle/bin/gradle` but **was not invoked** — `:app` cannot build here
+(run 80's finding: `androidx` is not on Maven Central and `dl.google.com` is denied by egress
+policy). **No gate ran and none is claimed** — neither `scripts\Verify-Alpha.ps1` nor
+`./gradlew … :app:assembleDebug :app:lintDebug`. **The workflow change is therefore verified by YAML
+parse, step census and diff inspection, not by a green runner**; the runner is the next push's
+evidence, and until it lands the fix is **unproven on a runner** and is labelled so.
+
+### Prohibition — what this run did not touch
+
+No rung moved. **No vector byte was written in either repo; the pin stays `7328a0b`.** No `:app`,
+`:core`, `src/` or `relay/` source file was written; no `.kt`, `.kts`, `.cs` or `.ts` file was
+touched at all. No spec file was edited in either repo — `docs/Sync-Protocol.md` was **read only**,
+in both directions. `$ExpectedOfflineTotal` and every count-reporting doc are **unmodified**; **no
+pinch point touched**. The engine checkout was **read-only** — `fetch`, `log`, `show`, `ls-tree`,
+`checkout --detach`, `diff -r` and `generate.mjs --check`. **`.github/workflows/ci.yml` was written
+this run** — one `if:` line and a comment block, and it is the first time this lane has written that
+file; **no other workflow, in either repo, was touched**. Nothing was merged, closed, undrafted,
+force-pushed, rebased or deleted, in either repo. **No new PR was opened** — PR #6 was refreshed,
+and the board's depth is unchanged. **No test was skipped, disabled or quarantined**, and **no CI
+job was re-run**. No deploys of any kind; **the production relay was not contacted at all**, not even
+`/v1/health`. No Play/Google/OAuth console, no accounts, no purchases, no Play Billing code, no
+Gmail or email, no secrets read or printed, no `.appdata`, no `Desktop\site-v2`. Terra's worktrees
+and `autonomy/codex-state` were **read only**. Files written this run: `.github/workflows/ci.yml`,
+`AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`, `docs/Apple-iOS-Strategy.md`, this LOG entry, and the
+`autonomy/claude-state` heartbeat in the engine repo.
