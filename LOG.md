@@ -16410,3 +16410,87 @@ before the assertion, rather than widening the window.
 **A note for whoever pushes next.** This addendum is itself a records-only push, so it re-rolls the
 same ~1-in-3 die. **A red `Build and test` on a `.md`-only commit is this blocker, not a
 regression** — check `C-89-10`'s three commands before treating it as one.
+
+---
+
+## RUN 90 — 2026-08-24 (Linux sandbox). **The fifty-fifth assignment of a built slice, declined. No substitute slice was manufactured, and that is the decision this entry is about.**
+
+**This entry is deliberately short.** Run 87 measured that the records' own growth is a cost the
+program pays every iteration. A run that moves no rung should pay less than a run that moves one.
+Everything below is measured this run; nothing is inherited.
+
+### Milestone 1 — rule one, then the assigned slice re-derived
+
+`git fetch --all --prune` ran in both checkouts before any ref was read. Every count below is
+after that fetch.
+
+The prompt assigns S5's spec half (§4.3 `entitlement_ack`, the vector via `generate.mjs`,
+PQ-A2-1/-2/-3) and calls S5 "NOT STARTED". **All four gates are closed and have been since
+2026-08-09 / 2026-08-12** (**C-90-1**), re-derived here in four commands rather than read out of
+the records:
+
+- `8575539` (2026-08-09) — `docs/Sync-Protocol.md` only, **+114/−3**.
+- `22b028e` (2026-08-09) — both ack vectors, `index.json`, **and `generate.mjs`**.
+- `7328a0b` (2026-08-12) — `invalid-unknown-field.json` (PQ-A2-3).
+- `node docs/sync-vectors/generate.mjs --check` on `claude/s5-entitlement-ack-emitter` →
+  **`OK: 29 vector files match the generator.`**, `exit=0`.
+- The four gate sentences read **in `docs/Sync-Protocol.md` itself** on
+  `claude/s5-entitlement-ack-spec`: the `{product_id, acknowledged_at, order_id?}` body at :319,
+  the cap on the **decoded** ciphertext at :112, `decrypt_failed` for structural rejection at :103.
+
+**The prompt's vendored pin `679a317` is stale; the pin is `7328a0b`** (**C-90-2**) — corpus
+**29 files, `diff -r` exit 0** against the phone's vendored copy. `origin/main` still carries
+**26** vectors, so the work is unmerged, not unwritten. Declined for the reason attempt 1 gave
+fifty-four runs ago: **rebuilding it would fork §4.3 and regenerate a corpus the android repo
+vendors byte-identically** — the cross-repo drift event the prompt itself says to stop for.
+
+### Milestone 2 — the finding: the loop has outlived its premise, and this is the first run to measure that rather than restate it
+
+The mission's premise is one sentence: *"Brandon is out until 2026-08-18."* That premise expired
+six days ago, and the repositories say it was never resumed:
+
+- **No human commit in either repo for twelve days** (**C-90-3**). Engine `main` last moved
+  **2026-08-12 20:28:21 -0600**; android `main` last moved **2026-08-06**. The only ref that has
+  moved since is this agent's own probe branch.
+- **This is the 36th run dated on or after return day** (**C-90-4**) — runs 55–89 are all dated
+  2026-08-18 or later. None of them moved a rung, because none of them could.
+- **Terra's track reached the same exhaustion and stopped.** `autonomy/codex-state:STATE.md`
+  reads *"COMPLETE … the ladder is exhausted and the goal is complete"*, heartbeat
+  **2026-08-12T20:28:36-06:00** (**C-90-5**). Terra's goal was cleared. This one was not, and it
+  has fired ~78 times since.
+- **28 PRs open, zero merged** — 22 engine, 6 android, all draft (**C-90-6**). **PR #32 is the
+  assigned slice's own PR**, open and untouched since 2026-08-09.
+
+**The two facts together are the finding.** The work is done *and* the person who could land it
+has not been present for twelve days. Prior runs reported the first half fifty-four times and
+notified twice (runs 81, 86). Neither notification produced a repo event. **What has not been
+said, and is this run's actual output: the schedule cannot help any more, and every further
+firing is cost with no reachable benefit.** Every item left on the board — `RETURN-DAY.md` §5's
+H1–H8 — needs a Windows gate, an emulator (**B-4**), a relay deploy, or a product decision. None
+of those is reachable from any sandbox, and no amount of iteration changes that.
+
+### Milestone 3 — what this run deliberately did not do
+
+**It did not manufacture a slice.** `STATE.md`'s ordered intent still lists reachable spec work
+(PQ-S6-1, PQ-S2-3). Taking one would have produced a 29th unreviewed draft PR and ~30 KB of
+records, on a board where 28 PRs already wait on a human. **A rung-slice is only progress if
+something downstream can consume it.** Nothing can, until H2 runs. Declining to add to the queue
+is the more useful action, and it is recorded here so the next session does not read the gap as
+an omission.
+
+### Environment, stated so no claim can be misread
+
+`dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` **absent**; `ANDROID_HOME`
+**unset**; no Android SDK, no Windows, no JBR. **No gate ran this run and none is claimed** —
+neither `scripts\Verify-Alpha.ps1` nor the android gate. `node` v22.22.2 and `git` are present,
+and they are the whole basis of Milestones 1–2.
+
+### Prohibition — what this run did not touch
+
+No rung moved. **No vector byte was written in either repo; the pin stays `7328a0b`.** No `:app`,
+`:core`, `src/`, or `relay/` source file was written. No spec file was edited. Nothing was merged,
+closed, undrafted, force-pushed, rebased or deleted, in either repo. No new PR was opened. No
+deploys of any kind; **the production relay was not contacted at all**, not even `/v1/health`. No
+Play/Google/OAuth console, no accounts, no purchases, no Play Billing code, no email or Gmail
+anything, no secrets read or printed, no `.appdata`, no `Desktop\site-v2`. Terra's worktrees and
+`autonomy/codex-state` were read only. No test was skipped, disabled or quarantined.

@@ -16990,3 +16990,118 @@ because the honest version of that command would have to fix a window and a bran
 moves with both. It is an observation with a named confound (runner load), not a measurement anyone
 should pin a decision to. **The red-then-green fact and the symptom change are the load-bearing
 claims here, and both re-derive exactly.**
+
+---
+
+## Ninetieth run — 2026-08-24 (Linux sandbox): the slice is built, and the premise behind the schedule expired six days ago
+
+Run every command after `git fetch --all --prune` in **both** trees, or the counts are stale.
+`<engine>` = a checkout of `ShivaClaw/careerseeker`; `<android>` = `ShivaClaw/careerseeker-android`.
+
+### C-90-1 — the assigned slice is built, for the fifty-fifth consecutive run
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do echo "== $c =="; git log -1 --format='%ad  %s' $c; git show --stat --format='' $c; done
+git checkout -B s5-check origin/claude/s5-entitlement-ack-emitter
+node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected, and **observed** this run:* `8575539` (2026-08-09) touches **`docs/Sync-Protocol.md`
+only, +114/−3**; `22b028e` adds both ack vectors, `index.json` and `generate.mjs`; `7328a0b` adds
+`invalid-unknown-field.json`. Generator check prints **`OK: 29 vector files match the generator.`**,
+**`exit=0`**. The vectors are generator-output, not hand-written — that is the load-bearing half,
+and it is checked on the branch that **carries** them, not on `main`.
+
+The four gate sentences read **in the spec file itself**, which is a stronger check than reading a
+commit message:
+
+```bash
+cd <engine>
+git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md | grep -n "acknowledged_at" | head -3
+git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md | grep -ni "1 MiB"      | head -3
+git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md | grep -n "decrypt_failed" | head -3
+```
+
+*Observed:* the `{product_id, acknowledged_at, order_id?}` body at **:319**, the cap measured on the
+**decoded** ciphertext at **:112** (PQ-A2-1), structural rejection reported as `decrypt_failed` at
+**:103** (PQ-A2-2). PQ-A6-1, PQ-A2-1, PQ-A2-2 and PQ-A2-3 are all closed.
+
+### C-90-2 — the prompt's pin is stale, and the corpus is byte-identical to the real one
+
+```bash
+cd <engine> && rm -rf /tmp/pin-check && mkdir -p /tmp/pin-check
+git archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pin-check
+diff -r /tmp/pin-check/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+ls /tmp/pin-check/docs/sync-vectors/v1 | wc -l
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l
+head -5 <android>/core/src/test/resources/sync-vectors/VECTORS.lock
+```
+
+*Expected, and **observed**:* **no output, `exit=0`, 29 files**; `origin/main` carries **26**;
+`VECTORS.lock` names **`7328a0bc043335491cd96a67d634e8eea2a13af9`**. **The prompt's `679a317` is
+stale.** 26 + 3 = 29 reconciles the two counts. **No vector byte was written by this run.**
+
+### C-90-3 — no human commit in either repository for twelve days
+
+```bash
+cd <engine>  && git log -1 --format='%ad  %an  %s' --date=iso origin/main
+cd <android> && git log -1 --format='%ad  %an  %s' --date=iso origin/main
+cd <android> && git for-each-ref --sort=-committerdate --format='%(committerdate:short)  %(authorname)  %(refname:short)' refs/remotes/origin | head -4
+```
+
+*Observed:* engine `main` **`aac05f3`, 2026-08-12 20:28:21 -0600**; android `main` **`ebfaf81`,
+2026-08-06**. In the android ref listing the **only** ref dated after 2026-08-06 is
+`origin/claude/android-a0-probe` (2026-08-23) — **this agent's own branch**. Return day was
+**2026-08-18**; today is **2026-08-24**.
+
+**Attack this first if you doubt the run.** The claim is about *absence*, which is the easiest kind
+to get wrong: it is falsifiable exactly as written — if any ref in either repo carries a human
+author and a date after 2026-08-12, the finding is wrong. Note the honest limit: this measures
+**commits**, not attention. Brandon may have read the notifications and chosen not to act, and
+nothing in a repository can distinguish that from not having seen them.
+
+### C-90-4 — this is the 36th run dated on or after return day
+
+```bash
+cd <android> && grep -oE '^> ## ▶ RUN [0-9]+ — 2026-08-[0-9]{2}' STATE.md | sed 's/^> ## ▶ //' | sort -u | tail -40
+```
+
+*Observed:* runs **55–89** are all dated **2026-08-18 or later**; 34 of those 35 carry a dated
+banner (**run 77 has none** — stated so the count is not read as 34). This run is the **36th**.
+None moved a rung.
+
+### C-90-5 — the parallel track reached exhaustion and stopped
+
+```bash
+cd <engine> && git show origin/autonomy/codex-state:STATE.md | head -12
+```
+
+*Observed:* **"Current rung: COMPLETE"**, **"Files claimed: none. Do not begin another R7 theme:
+the ladder is exhausted and the goal is complete."**, heartbeat **`2026-08-12T20:28:36-06:00`**.
+Terra's goal was cleared on the day of its last commit. **No collision with this run** — Terra
+claims no files, and this run wrote no engine file.
+
+### C-90-6 — 28 PRs open, none merged, including the assigned slice's own
+
+```
+GitHub MCP: list_pull_requests(ShivaClaw/careerseeker,        state=open) -> 22, all draft:true
+GitHub MCP: list_pull_requests(ShivaClaw/careerseeker-android, state=open) ->  6, all draft:true
+```
+
+*Observed:* **22 + 6 = 28**, every one `draft: true`. **PR #32 —
+`claude/s5-entitlement-ack-spec`, "S5 (first half): the `entitlement_ack` body, PQ-A2-1/-2 …" — is
+the assigned slice's own PR, `updated_at` 2026-08-09T21:15:59Z**, untouched for fifteen days. Note
+the trap **C-89-2** recorded: a PR **list** reports `merged: false` on every row, including for
+merged PRs. **These rows are used here only for `state`/`draft`, never for `merged`.**
+
+### What has no command, and is therefore not a claim
+
+That the schedule *should be stopped* is a **recommendation**, not a measurement. What is measured
+is C-90-1 through C-90-6: the work is built, the pin is stale, the board is 28-deep, nothing has
+merged, and no human has committed in twelve days. The inference from those to "further firings
+cannot help" rests on `RETURN-DAY.md` §5 (H1–H8 each need Windows, an emulator, a deploy, or a
+product decision) and on **C-ENV-1**/**C-89-7**'s environment findings, re-observed this run:
+`dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` absent, `ANDROID_HOME` unset.
+**If any one of H1–H8 turns out to be sandbox-reachable, the recommendation is wrong and the next
+session should take it instead.**
