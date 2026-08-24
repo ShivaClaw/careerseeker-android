@@ -169,12 +169,24 @@ genuinely parallel, which is the main scheduling point of this document.
   machine. Also gated on the merge decisions already queued in `STATE.md` — in particular that the
   full gate is run **on the merged tree**, not on the branches, since #5 and #6 auto-fuse three
   screen files that no gate has ever seen in combination.
-- **Android `.apk`** — **you can have this today, without your laptop.** CI builds
-  `:app:assembleDebug` and uploads it as artifact **`app-debug`** (`.github/workflows/ci.yml:117-123`,
-  14-day retention, `if-no-files-found: error`). The green run on `e6e6dc5` is
-  [31495754391](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31495754391) —
-  download the artifact and sideload it. **Debug-signed, so it is for you, not for testers**; a
-  release build wants the upload keystore and belongs to S7.
+- **Android `.apk`** — **you can still have this without your laptop, but it is now one click
+  rather than zero.** CI builds `:app:assembleDebug` and uploads it as artifact **`app-debug`**
+  (`.github/workflows/ci.yml:234-241`, 14-day retention, `if-no-files-found: error`). Since run 93
+  that upload is **dispatch-only** (`if: github.event_name == 'workflow_dispatch'`), so to get a
+  fresh APK: **Actions → CI → Run workflow →** pick the branch → the artifact appears on that run.
+  **Debug-signed, so it is for you, not for testers**; a release build wants the upload keystore
+  and belongs to S7.
+
+  **Read this before you dispatch, or the button will look broken.** The reason the step was gated
+  is **B-25**: the account-wide artifact storage quota is **exhausted**, and while it stays that way
+  *any* upload fails in about a second — including a dispatched one. Gating stopped the ~5/day
+  refill, but it cannot free what is already held (~0.9 GB by this workflow, C-93-3). **Free the
+  quota first** (repo → Actions → Artifacts, or the account's storage settings), then dispatch.
+
+  The previously-cited green run on `e6e6dc5`
+  ([31495754391](https://github.com/ShivaClaw/careerseeker-android/actions/runs/31495754391)) is
+  kept only as provenance for the reference build; its artifact is long past 14-day retention and
+  is **not** downloadable now.
 - **iOS alpha** — §1 and §2 above.
 
 ---

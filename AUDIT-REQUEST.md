@@ -3742,23 +3742,36 @@ grep -n "kotlinx.serialization\|ktor.client.core" core/build.gradle.kts
 include comments and blank lines** — this is a proportionality measurement, not a LOC estimate, and
 should not be quoted as effort.
 
-### C-IOS-2 — CI already produces a sideloadable debug APK
+### C-IOS-2 — CI produces a sideloadable debug APK, **on dispatch** (amended run 93)
 
-> **Claim.** `.github/workflows/ci.yml` uploads `app/build/outputs/apk/debug/*.apk` as artifact
-> **`app-debug`** with `if-no-files-found: error` and 14-day retention. Since the *Build and test*
-> job concluded `success` on `e6e6dc5` (run `31495754391`), the artifact exists **by construction**:
-> the step fails the job when the APK is missing.
+> **Claim, as amended.** `.github/workflows/ci.yml` uploads `app/build/outputs/apk/debug/*.apk`
+> as artifact **`app-debug`** with `if-no-files-found: error` and 14-day retention — but since
+> run 93 that step carries `if: github.event_name == 'workflow_dispatch'`, so it runs **only when
+> a human dispatches the workflow**, not on every push. The capability is intact and is one click;
+> what changed is that it is no longer automatic. **Why: B-25** — the unconditional version
+> exhausted the account-wide artifact storage quota and turned this branch's CI red regardless of
+> the diff (C-93-2, C-93-3).
 
 ```bash
-sed -n '117,123p' careerseeker-android/.github/workflows/ci.yml
-# then, in a browser (the Actions artifacts REST API is 403 to this sandbox -- C-S4P-12):
-#   https://github.com/ShivaClaw/careerseeker-android/actions/runs/31495754391
+sed -n '234,241p' careerseeker-android/.github/workflows/ci.yml
 ```
 
-*Expected:* the `Upload debug APK` step as described, and an `app-debug` artifact on that run.
-**This is inference from config plus a green job, not an artifact I downloaded** — the sandbox
-cannot list Actions artifacts. It is **debug-signed**, so it is for the owner's own device and not
-for testers.
+*Expected:* the `Upload debug APK` step with the `workflow_dispatch` condition on line 235, and
+`retention-days: 14` retained on line 241.
+
+**Two corrections to the original entry, both measured this run.**
+
+1. **The line range was stale.** It read `sed -n '117,123p'`; the step has been at 200+ for some
+   time and is at **234–241** after run 93's change. A stale `sed` range is the quiet form of the
+   drift this file exists to prevent — it prints *something*, so it looks like it worked.
+2. **"the sandbox cannot list Actions artifacts" is no longer true.** The original called itself
+   *"inference from config plus a green job, not an artifact I downloaded."* Run 93 listed one
+   through the GitHub **MCP** tool rather than `curl` — `list_workflow_run_artifacts` on run
+   `32667740105` returned `app-debug`, **12,741,138 bytes**, `expires_at 2026-09-06T21:37:53Z`
+   (C-93-3). **C-S4P-12 still holds for `curl`**, which is what it actually measured; it does not
+   hold for MCP. So this claim is now a measurement, not an inference.
+
+It is **debug-signed**, so it is for the owner's own device and not for testers.
 
 ### C-IOS-3 — Do not poll GitHub CI with `curl` from this sandbox; it fails silently
 
@@ -17346,19 +17359,25 @@ check list. Distinguish them by **which step failed**, never by the check's colo
 ### C-92-9 — the android lane is the whole consumer; the engine repo uploads nothing
 
 ```bash
-cd careerseeker-android && grep -n -A6 'Upload debug APK' .github/workflows/ci.yml
+cd careerseeker-android && grep -n -A7 'Upload debug APK' .github/workflows/ci.yml
 # expect: actions/upload-artifact@v4, name app-debug, retention-days: 14
 cd ../careerseeker && grep -rn 'upload-artifact' .github/workflows/ || echo "engine: none"
 # expect: engine: none
 ```
 
-*Expected, and **observed**:* the android workflow uploads **one debug APK per run** with
-**`retention-days: 14`** at `.github/workflows/ci.yml:200-206`; the engine repo's workflows contain
-**no `upload-artifact` step at all**. This branch has taken **~92 runs**. Storage quota is
-**account-wide**, so the accumulation is this program's own, and it is concentrated in one step of
-one workflow. **Honest limit:** this identifies the only *producer* in these two repositories. It
-does **not** measure current usage, and it cannot see any other repository on the account — quota
-could have other contributors this sandbox cannot enumerate.
+*Expected, and **observed** when run 92 filed this:* the android workflow uploaded **one debug APK
+per run** with **`retention-days: 14`**; the engine repo's workflows contain **no `upload-artifact`
+step at all**. Storage quota is **account-wide**, so the accumulation is this program's own, and it
+is concentrated in one step of one workflow. **Honest limit:** this identifies the only *producer*
+in these two repositories. It does **not** measure current usage, and it cannot see any other
+repository on the account — quota could have other contributors this sandbox cannot enumerate.
+
+> **Amended run 93 — the command, not the finding.** The finding stands unchanged and is what
+> run 93 acted on. Two mechanical fixes were needed to keep it re-derivable: `-A6` became **`-A7`**
+> (run 93 added an `if:` line to the step, which pushed `retention-days` out of a six-line window,
+> so the stated expectation would have failed against a correct file), and the location moved from
+> `ci.yml:200-206` to **`ci.yml:234-241`**. The upload is now **dispatch-only**, so "one debug APK
+> per run" describes the state run 92 measured, not the state today — see **C-93-5**.
 
 ### C-92-10 — the near-miss hint misfired on this run's own prose, and was narrowed the same hour
 
@@ -17392,3 +17411,160 @@ events. The inference — that a fourth would be cost without benefit — is run
 handoff (*"a later session should not send a fourth"*) applied to a board that has not moved. **A
 repository still cannot distinguish "did not see it" from "saw it and chose not to act."** If a
 later session has evidence of the former, the judgement is wrong and it should notify.
+
+---
+
+## Run 93 — 2026-08-24. B-25 attempt 3 taken: the refill is stopped
+
+Run 93's slice was **not** taken from the ordered intent. It was taken because this branch's CI
+was red, the cause was inside this repository's own workflow, and it is one of the few things a
+Linux sandbox with no Android SDK can fix correctly and completely.
+
+### C-93-1 — the assigned S5 spec slice is built, re-derived this run with its own commands
+
+The recurring prompt assigned §4.3 `entitlement_ack`, the ack vectors, and PQ-A2-1/-2/-3 again.
+All of it exists, in the **engine** repo, on the `claude/s5-*` drafts:
+
+```bash
+cd careerseeker && git fetch --all --prune
+git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md | grep -n 'entitlement_ack'
+# expect: 4.3.3 heading; body {product_id, acknowledged_at, order_id?}; gate PQ-A6-1 default-proceed
+git show origin/claude/s5-engine-wire-parser:docs/Sync-Protocol.md \
+  | grep -n 'PQ-A2-1\|PQ-A2-2\|PQ-A2-3'
+# expect: 1 MiB cap measured on the decoded CIPHERTEXT (PQ-A2-1);
+#         structural rejection reports decrypt_failed, no `malformed` code (PQ-A2-2);
+#         invalid-unknown-field vector added (PQ-A2-3)
+git checkout --detach origin/claude/s5-engine-wire-parser && node docs/sync-vectors/generate.mjs --check
+```
+
+*Expected, and **observed**:* `OK: 29 vector files match the generator.`, **exit 0** — on
+`claude/s5-engine-wire-parser` **and** on `claude/s5-entitlement-ack-emitter`. `invalid-unknown-field.json`
+is present on both. **This is the fifty-eighth run assigned this slice.** It was declined again, on
+evidence re-derived rather than inherited.
+
+### C-93-2 — CI red on this branch's head is the upload step alone; every gate passed
+
+```bash
+# MCP, not curl -- the Actions REST API is 403 to curl from this sandbox (C-S4P-12):
+#   actions_list  list_workflow_runs   ci.yml  branch=claude/android-a0-probe
+#   get_job_logs  run_id=32711242722   failed_only=true  return_content=true
+```
+
+*Expected, and **observed**:* run `32711242722`, head **`1b42adc`**, conclusion **`failure`**, one
+failed job (`97382898729`). Its log's last successful line is
+`OK: no analytics or tracking SDKs on the release classpath.` — the final *gate* step — and the job
+then dies in `actions/upload-artifact@v4` with
+`##[error]Failed to CreateArtifact: Artifact storage quota has been hit.` **Third observation of
+B-25, on a third head** (run 90's `cda9a58`, run 92's `ebadeca`, run 93's `1b42adc`), spanning more
+than one 6–12 h recalculation window. **Deterministic, not a flake.**
+
+### C-93-3 — what the refill actually costs, measured rather than estimated
+
+```bash
+# MCP: actions_list  list_workflow_run_artifacts  resource_id=32667740105
+# MCP: actions_list  list_workflow_runs           ci.yml  per_page=100
+```
+
+*Expected, and **observed**:* the artifact on run `32667740105` is `app-debug`,
+**`size_in_bytes: 12741138`**, `expires_at 2026-09-06T21:37:53Z` — a 14-day life, confirming the
+retention setting from the artifact rather than from the config that requests it. The run listing
+reports **`total_count: 246`** and returns 30 rows spanning
+**2026-08-22T05:37:59Z → 2026-08-24T09:23:09Z** (2.16 days), of which **11 concluded `success`**,
+i.e. 11 uploads — about **5.1 a day**.
+
+Steady state at 14-day retention: `5.1 × 14 ≈ 71` artifacts `× 12,741,138 B ≈ **0.9 GB**`. GitHub's
+private-repo Actions storage allowance on the **Free** plan is **500 MB**, so this one workflow
+exceeds it unaided.
+
+**Honest limits, and they matter here.** (1) The rate is extrapolated from a 2.16-day window, not
+counted over the full 14 days — the API returned 30 rows regardless of `per_page`, so the older
+window is not enumerated. (2) Only `success` runs are counted as uploads; runs that died at the
+upload step hold nothing, so recent quota-failed runs are correctly excluded, but a run that failed
+*before* the upload for an unrelated reason is also excluded and would not have uploaded anyway.
+(3) **This still does not measure account-wide usage** — no endpoint available here reports it, and
+other repositories on the account may contribute. The claim is about **this workflow's own
+contribution**, which is what run 93 can change.
+
+### C-93-4 — this lane is still the only artifact producer across the two repositories
+
+```bash
+cd careerseeker-android && grep -n -A7 'Upload debug APK' .github/workflows/ci.yml
+cd ../careerseeker && grep -rn 'upload-artifact' .github/workflows/ || echo "engine: none"
+```
+
+*Expected, and **observed**:* the android step at **`ci.yml:234-241`** with the dispatch condition;
+`engine: none`. Unchanged from run 92's C-92-9 in substance — re-run because run 93 edited the very
+step that entry describes.
+
+### C-93-5 — the fix is a gate on one non-gate step, and no check was weakened
+
+```bash
+cd careerseeker-android
+git diff origin/claude/android-a0-probe -- .github/workflows/ci.yml | grep -E '^[+-]' | grep -v '^[+-][+-]'
+python3 -c "
+import yaml
+s=yaml.safe_load(open('.github/workflows/ci.yml'))['jobs']['build']['steps']
+print('steps:',len(s))
+print([(x.get('name'),x.get('if')) for x in s if x.get('if')])
+"
+```
+
+*Expected, and **observed**:* the only non-comment change is the single added line
+`if: github.event_name == 'workflow_dispatch'` on the *Upload debug APK* step. The YAML parses;
+there are **13 steps** and **exactly one** carries an `if:`, and it is the upload. `retention-days:
+14` and `if-no-files-found: error` are both **retained**.
+
+**The distinction this rests on:** the upload publishes an artifact, it does **not** verify
+anything. Every test, lint, build and assertion step — the citation guard, `checkCoreIsAndroidFree`,
+the vendored-vector diff, `:core:test`, `:app:test`, `assembleDebug`, `lintDebug`, the analytics
+assertion — is untouched and still unconditional. **No test was skipped, disabled or quarantined to
+reach green**, which is the line this change deliberately does not cross.
+
+### C-93-6 — the shared vector corpus is byte-identical to its pin; no cross-repo drift
+
+```bash
+cd careerseeker && git checkout --detach 7328a0bc043335491cd96a67d634e8eea2a13af9
+diff -r docs/sync-vectors/v1/ ../careerseeker-android/core/src/test/resources/sync-vectors/v1/; echo "exit=$?"
+ls docs/sync-vectors/v1 | wc -l
+```
+
+*Expected, and **observed**:* **no output, `exit=0`, 29 files on each side.** The prompt's stated
+vendored pin `679a317` is **stale**; `VECTORS.lock` pins **`7328a0b`**. **No vector byte was written
+this run** — the corpus and the pin are untouched.
+
+### C-93-7 — the three documents that pinned this step were moved in the same change
+
+```bash
+cd careerseeker-android
+grep -n 'ci.yml:234-241' AUDIT-REQUEST.md docs/Apple-iOS-Strategy.md
+grep -n "sed -n '234,241p'" AUDIT-REQUEST.md
+grep -n -- '-A7' AUDIT-REQUEST.md | head
+./scripts/check-citations.sh --self-test && ./scripts/check-citations.sh; echo "exit=$?"
+```
+
+*Expected, and **observed**:* `C-IOS-2` now cites `sed -n '234,241p'` and describes the upload as
+dispatch-only; `C-92-9`'s command is `-A7` (six lines of context no longer reach `retention-days`
+once the `if:` is added, so `-A6` would have made a correct file look wrong); the iOS strategy doc
+points at `ci.yml:234-241` and tells the reader to free the quota **before** dispatching. Guard
+`exit=0`.
+
+**This is the repository's own drift trap, and it was live.** `C-IOS-2` still carried
+`sed -n '117,123p'` — a range the step left long ago. A stale `sed` range does not error; it prints
+*some* seven lines, so it reads as a working re-verification. It was corrected here because the
+same change moved the step again.
+
+### What has no command, and is therefore not a claim
+
+**That gating is the right remedy is a judgement, not a measurement.** What is measured is that the
+upload is the sole cause of red (C-93-2), that it holds ~0.9 GB (C-93-3), and that no gate step was
+touched (C-93-5). The *choice* of `workflow_dispatch` over `retention-days: 2` or a diff-based
+condition is reasoning, and run 92 reached the opposite conclusion on the same facts — it declined
+to push, calling the patch "someone else's problem." Run 93 disagrees on that specific point: B-25's
+own text says *"the accumulation is this program's own doing"* and *"the android lane is the whole
+consumer,"* which makes it this lane's problem and this branch's red CI.
+
+**What this does NOT do:** it does not free the already-consumed quota, so **CI may stay red until
+the owner clears it** — gating stops the refill, nothing more. If the next run on this branch is
+still red at the upload step, that is expected only if the step *ran*; on a push it should now be
+**skipped**. A push-triggered run that is still red at the upload step would mean the condition is
+wrong, and should be treated as run 93's defect.
