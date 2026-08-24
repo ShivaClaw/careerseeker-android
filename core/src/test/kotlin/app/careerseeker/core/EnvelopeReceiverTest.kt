@@ -151,6 +151,37 @@ class EnvelopeReceiverTest {
         assertEquals(ErrorCode.BAD_SIGNATURE, r.receive(bad, ::keyFor).error)
     }
 
+    /**
+     * §3's `dir` rule, and the only construction that can observe it.
+     *
+     * `Direction.fromWire(env.dir) ?: reject(DECRYPT_FAILED)` sits between the signature-placement
+     * check and replay. A single-rule envelope cannot see that step at all: delete it and an
+     * unknown `dir` still ends in `decrypt_failed`, because the AAD it then feeds no longer matches
+     * what the sender sealed. Measured at run 95 — replacing the rejection with a fallback to
+     * [Direction.ENGINE_TO_PHONE] left `:core:test` green at **347/0**.
+     *
+     * Violating a *later* rule in the same envelope is what makes the step observable, which is
+     * this file's whole technique. Under that fallback the envelope below is filed against the e2p
+     * stream, where seq 3 is a replay, so the receiver answers `replay_rejected` — a different
+     * code, from a check §3 says should never have been reached.
+     *
+     * **The engine twin has no equivalent check at all.** `src/Sync/EnvelopeReceiver.cs` passes the
+     * raw string to `keyForDir`, to the AAD and to its sequence tracker, and an unknown `dir` is
+     * refused only because the AEAD tag then fails. Both implementations answer `decrypt_failed`
+     * today, so this is not a live defect — but two mechanisms that coincide are not one rule, and
+     * no vector holds them together (B-26; the corpus gap is C-95-5).
+     */
+    @Test
+    fun `a dir v1 does not define is refused before replay, not by the AEAD`() {
+        val r = receiver()
+        assertTrue(r.receive(envelope(dir = "e2p", seq = 5L), ::keyFor).accepted)
+
+        // Two rules at once: `dir` is not a direction §3 defines, AND seq 3 would be a replay if
+        // the receiver decided this envelope belonged to the e2p stream.
+        val bad = envelope(dir = "e2p-x", seq = 3L)
+        assertEquals(ErrorCode.DECRYPT_FAILED, r.receive(bad, ::keyFor).error)
+    }
+
     @Test
     fun `replay is checked before decrypt`() {
         val r = receiver()
@@ -324,6 +355,30 @@ class EnvelopeReceiverTest {
         }
     }
 
+    /**
+     * **This test is the falsifier for a sentence in §3, and it has been green the whole time.**
+     *
+     * §3 says: *"Every structural rejection — an unknown top-level field, padded base64, a nonce
+     * that is not 12 bytes, a `dir` that is neither `e2p` nor `p2e`, **a body that is not parseable
+     * JSON** — is reported as `decrypt_failed`."* §7.2's own `decrypt_failed` row, in the same
+     * document, lists four of those five and names the fifth **"unparseable framing"** — which is
+     * the envelope, not the body, and the two are separated by an AEAD open.
+     *
+     * The assertion below says what this receiver actually does, and the engine agrees:
+     * `src/Sync/EnvelopeReceiver.cs` catches `JsonException` from `JsonDocument.Parse` and returns
+     * `SyncError.UnknownKind`, with a comment saying the agreement is deliberate. So **both
+     * implementations conform to §7.2 and contradict §3's sentence**, and nothing is wrong on the
+     * wire — the document disagrees with itself.
+     *
+     * It survived because **no vector covers the rule** (C-95-5), and a vector is the only artifact
+     * that forces the document, the phone and the engine to be read against one another. Filed as
+     * PQ-STR-1, undecided here: striking the body clause from §3 needs no code change on either
+     * side, but a spec sentence is normative for two codebases and one cannot be compiled in a
+     * cloud sandbox.
+     *
+     * **Do not "fix" this test to expect `decrypt_failed` without changing both receivers and the
+     * document in the same change.**
+     */
     @Test
     fun `a body that is not a JSON object is unknown_kind, not a crash`() {
         for (body in listOf("[]", "\"snapshot\"", "17", "not json at all", "")) {
