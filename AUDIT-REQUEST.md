@@ -18029,3 +18029,23 @@ MUST reject the envelope with `unknown_kind` (§7.2) and MUST NOT act on `body`.
 not parse has no recognisable `kind`, so §4.2 reaches it and agrees with §7.2 and with both
 implementations (**C-95-10**, **C-95-11**). **§3 line 101 is the only text in the document that
 says otherwise.**
+
+### C-95-14 — the full android gate RAN ON A RUNNER for this head, and passed
+
+The local session ran no gate (**C-95-9**); CI did. This upgrades every `:app`-side claim from
+"not run" to "run and passed", and it is the only evidence in this run that touches
+`:app:assembleDebug` and `:app:lintDebug`.
+
+```bash
+# via the GitHub API, run 32780560858 / job 97601547917, head 56a305c
+```
+
+*Observed:* job **`success`** in **8 m 21 s**, `ubuntu-latest`, attempt 1. **Steps 6–13 all
+`success`** — *Assert every cited C-/B- id resolves*, *Assert :core has no Android dependency*,
+**Assert vendored sync vectors match the pinned main-repo commit**, *Unit tests (:core)*, *Unit
+tests (:app, Robolectric)*, *Assemble debug APK*, *Lint*, *Assert no analytics or tracking SDKs
+ship*. **Step 14 `Upload debug APK` = `skipped`**, which is run 93's B-25 gate still holding.
+**B-22 did not fire** (step 10 `success`).
+
+Step 8 is the one worth naming separately: it is an independent, runner-side confirmation of
+**C-95-2** — the vendored corpus still matches pin `7328a0b` — measured by CI rather than by me.

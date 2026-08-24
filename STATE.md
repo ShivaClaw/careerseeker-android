@@ -68,7 +68,13 @@
 > `7328a0b` and no vector byte was written.**
 >
 > **One file changed:** `EnvelopeReceiverTest.kt` — one test, one KDoc, **no production byte**.
-> **PR #6 refreshed, not replaced; no new PR in either repo.** No gate ran and none is claimed.
+> **PR #6 refreshed, not replaced; no new PR in either repo.**
+>
+> **RUNNER-VERIFIED, same iteration** (**C-95-14**). No gate ran *in the sandbox*; **CI ran the full
+> gate on the pushed head and it passed** — run `32780560858`, head `56a305c`, **`success` in
+> 8 m 21 s, steps 6–13 all `success`**, including `:app:test` (Robolectric), `assembleDebug` and
+> `lintDebug`, which no cloud session can run. **Step 14 `Upload debug APK` = `skipped`** — run 93's
+> B-25 gate still holds. **B-22 did not fire.** Step 8 independently re-confirms the pin claim.
 >
 > ## ▶ RUN 94 — 2026-08-24. **The relay lane runs here for real, and the §2.3 vocabulary guard turned out to be per-NAME only.**
 >

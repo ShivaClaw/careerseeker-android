@@ -16485,6 +16485,20 @@ an omission.
 neither `scripts\Verify-Alpha.ps1` nor the android gate. `node` v22.22.2 and `git` are present,
 and they are the whole basis of Milestones 1–2.
 
+### Runner verification — appended after the push, and it upgrades the section above
+
+The "Environment" section says no gate ran, and that was true of **this session**. **CI then ran
+the full gate on the pushed head and it passed** (**C-95-14**): run `32780560858`, job
+`97601547917`, head `56a305c`, **`success` in 8 m 21 s**, **steps 6–13 all `success`** — citation
+guard, `checkCoreIsAndroidFree`, the vendored-vector drift check, `:core:test`, `:app:test`
+(Robolectric), `assembleDebug`, `lintDebug` and the analytics assertion. **Step 14 `Upload debug
+APK` = `skipped`**, so run 93's B-25 gate is still holding. **B-22 did not fire.**
+
+Two things this adds that the sandbox could not: `:app:assembleDebug` and `:app:lintDebug` are now
+**run and green**, not "did not run"; and step 8 is an **independent runner-side confirmation of
+C-95-2**, that the vendored corpus still matches pin `7328a0b`. The section above is left standing
+rather than rewritten — it was true when written, and the sequence is the point.
+
 ### Prohibition — what this run did not touch
 
 No rung moved. **No vector byte was written in either repo; the pin stays `7328a0b`.** No `:app`,
