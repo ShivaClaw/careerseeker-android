@@ -4613,3 +4613,50 @@ than merely longer. **Not attempted here** — it is `:app`, and `:app` needs th
 on it: the vector-drift step, `checkCoreIsAndroidFree`, `:core:test` and lint are **deterministic**;
 it is `:app:test`'s Compose-UI subset that is not. **No test was skipped, disabled or quarantined,
 and no `:app` file was written this run.**
+
+---
+
+### B-18 status 2026-08-24 (ninetieth run) — the fifty-fifth firing, and the first with the return-day premise measured as expired
+
+**Symptom, unchanged.** The stored prompt re-issues S5's spec half (§4.3 `entitlement_ack`, the
+vector via `generate.mjs`, PQ-A2-1/-2/-3), describes S5 as "NOT STARTED", and carries the stale
+vendored pin `679a317`. All three are false and have been since 2026-08-09 / 2026-08-12
+(**C-90-1**, **C-90-2**, both re-derived this run, not inherited). **B-18 cannot be closed by any
+agent** — the obstacle is scheduler configuration outside both repositories.
+
+**Attempts, cumulative:** fifty-five declines on re-derived evidence; two notifications (runs 81,
+86); one silence policy with five triggers (runs 82–85 correctly silent). **Neither notification
+produced a repo event** (**C-90-3**).
+
+**What is new this run, and it is a premise check rather than another restatement.** Every prior
+firing argued about the *content* of the prompt — that the slice is built. This run checked the
+sentence the whole mission rests on: *"Brandon is out until 2026-08-18."* **That premise expired
+six days ago and was never resumed.** No human commit in either repo for **twelve days**
+(**C-90-3**); this is the **36th** run dated on or after return day (**C-90-4**); the parallel
+Codex track reached the same exhaustion and **stopped**, its goal cleared, on 2026-08-12
+(**C-90-5**). **28 PRs are open and none is merged** (**C-90-6**).
+
+**Why that changes the ask.** Fifty-four runs asked for the prompt to be *edited*. That ask assumed
+a scheduler whose next firing could still do useful work. It cannot: `RETURN-DAY.md` §5's H1–H8
+each need a Windows gate, an emulator (**B-4**), a relay deploy, or a product decision, and none of
+those is reachable from a sandbox (**C-ENV-1**, **C-89-7**, re-observed). **The smallest human
+unblock is therefore no longer "edit the prompt" — it is "turn the schedule off, then run H2 when
+you are next at the Windows machine."** H2 alone lands six of the merges.
+
+**Recorded honestly: this entry cannot distinguish "did not see the notifications" from "saw them
+and chose not to act."** A repository measures commits, not attention. If it is the latter, the
+correct read of this entry is only its first paragraph, and the recommendation should be ignored.
+
+**Smallest human unblock (superseded form).**
+1. **Stop the recurring schedule.** It is the only action that ends the cost, and no agent can take it.
+2. When next at the Windows machine: **H2** — `Verify-Alpha.ps1 -IncludePublish -IncludePackage`,
+   then land `RETURN-DAY.md` §3's six merges. Everything else on the board unblocks behind it.
+3. Only if the schedule is to continue: replace the S5 assignment with *"read `RETURN-DAY.md`, then
+   `STATE.md`'s ordered intent, and take its top item."*
+
+### B-1, B-2, B-4, B-5, B-6, B-7, B-8, B-9, B-12, B-13, B-14, B-15, B-16, B-17, B-19, B-20, B-21, B-22, B-23, B-24 — untouched this run
+
+Not exercised. This run wrote no code, ran no gate, and opened no PR, so none of them could move.
+**B-22 specifically was not re-rolled by a test run** — but this run does push records-only
+commits, so if CI reports red on `Build and test` for a `.md`-only head, that is **B-22**, not a
+regression; check **C-89-10**'s three commands before treating it as one.
