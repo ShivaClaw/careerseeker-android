@@ -17568,3 +17568,43 @@ the owner clears it** — gating stops the refill, nothing more. If the next run
 still red at the upload step, that is expected only if the step *ran*; on a push it should now be
 **skipped**. A push-triggered run that is still red at the upload step would mean the condition is
 wrong, and should be treated as run 93's defect.
+
+### C-93-8 — the fix is proven on a runner: step skipped, job green, first green since B-25
+
+```bash
+# MCP: actions_list  list_workflow_jobs  resource_id=32731154465  filter=latest
+```
+
+*Expected, and **observed**:* run `32731154465`, head **`a006376`** (run 93's push), job
+`97443453402`, conclusion **`success`**, 13:10:49 → 13:17:45 (**6 m 56 s**).
+
+| step | name | conclusion |
+| --- | --- | --- |
+| 6 | Assert every cited C-/B- id resolves | `success` |
+| 7 | Assert `:core` has no Android dependency | `success` |
+| 8 | Assert vendored sync vectors match the pinned main-repo commit | `success` |
+| 9 | Unit tests (`:core`) | `success` |
+| 10 | Unit tests (`:app`, Robolectric) | `success` |
+| 11 | Assemble debug APK | `success` |
+| 12 | Lint | `success` |
+| 13 | Assert no analytics or tracking SDKs ship | `success` |
+| **14** | **Upload debug APK** | **`skipped`** |
+
+**`skipped`, not `success`** — that is the distinction that makes this evidence rather than luck.
+GitHub recalculates quota every 6–12 h, so a green job whose step 14 *ran and passed* would prove
+only that the window had turned over. It did not run. The condition fired, and the job is green
+because the step was **not executed**.
+
+**This upgrades C-93-5 from inspection to runner-verified.** Before this run the change was
+supported by a YAML parse, a step census and a diff; it is now supported by a runner. **Every gate
+step still executed and still passed** — steps 6–13 are unconditional and all `success`, which is
+the direct check that nothing was disabled to buy the green.
+
+**B-22 did not fire** (step 10 `success`), so this run says nothing about it either way.
+
+**First green on this branch since B-25 began**, across heads `cda9a58`, `ebadeca` and `1b42adc`.
+
+**What it does NOT prove.** The quota is **not** freed — nothing here touched it. A
+`workflow_dispatch` run would still fail at step 14, and the owner's one-minute action stands
+(B-25). This proves only that **push-triggered CI on this branch now carries information about the
+diff again**, which is the property that was lost.

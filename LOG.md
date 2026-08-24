@@ -16806,6 +16806,25 @@ one item — free the quota, about a minute — where before it was two.
 job green. **A push-triggered run still red *at the upload step* means the condition is wrong and it
 is this run's defect** — not the quota and not B-22.
 
+### Milestone 5 — the falsifier was tested by the push, and it held
+
+The prediction in the previous section was written **before** the push. The push tested it
+(**C-93-8**): run `32731154465`, head `a006376`, job `97443453402` — **conclusion `success`**,
+6 m 56 s. **Steps 6–13 all `success`** (citation guard, `checkCoreIsAndroidFree`, the vendored-vector
+diff, `:core:test`, `:app:test`, `assembleDebug`, `lintDebug`, the analytics assertion), and **step
+14 `Upload debug APK` = `skipped`**.
+
+**`skipped`, not `success`, is what makes this evidence rather than luck.** Quota recalculates every
+6–12 h; a green job whose step 14 *ran and passed* would have shown only that the window turned over.
+It did not run. **First green on this branch since B-25 began** — `cda9a58`, `ebadeca` and `1b42adc`
+were all red. **B-22 did not fire** (step 10 `success`), so this run says nothing about it.
+
+**This upgrades the previous section's own caveat.** That section said the fix was "verified by YAML
+parse, step census and diff inspection, not by a green runner" and "unproven on a runner". **It is
+now proven on a runner**, and the entry above is left standing rather than rewritten, because it was
+true when written and the sequence is the point. What is still unproven is nothing about the
+condition — it is that the **quota remains full**, so a dispatched upload will still fail.
+
 ### Environment, stated so no claim can be misread
 
 Verified this run, not inherited: `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`

@@ -4815,4 +4815,16 @@ artifacts. **The "or take the patch" option is gone — the patch is taken.** Af
 removed *this workflow's* contribution and can prove that much; it cannot prove the account is
 therefore under quota, and it does not claim to.
 
-**Status: PARTIALLY CLOSED.** Producer stopped, backlog outstanding, one human minute required.
+**RUNNER-VERIFIED, same run (C-93-8).** The prediction above was written before the push and then
+tested by it. Run `32731154465`, head `a006376`, job `97443453402`: **conclusion `success`**, 6 m 56 s,
+**steps 6–13 all `success`** and **step 14 `Upload debug APK` = `skipped`**.
+
+**`skipped`, not `success`, is the load-bearing word.** Quota recalculates every 6–12 h, so a green
+job whose step 14 *ran and passed* would have shown only that the window turned over. It did not run.
+**This is the first green on this branch since B-25 began** (`cda9a58`, `ebadeca`, `1b42adc` all red).
+Every gate step still executed and passed, which is the direct evidence that nothing was disabled to
+buy it. **B-22 did not fire** (step 10 `success`).
+
+**Status: PARTIALLY CLOSED — producer stopped and PROVEN stopped; backlog outstanding, one human
+minute required.** Push-triggered CI on this branch carries information about the diff again. A
+`workflow_dispatch` upload will still fail until the owner frees the quota.
