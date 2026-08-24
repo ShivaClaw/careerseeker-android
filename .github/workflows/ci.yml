@@ -197,7 +197,42 @@ jobs:
           fi
           echo "OK: no analytics or tracking SDKs on the release classpath."
 
+      # B-25. This step -- and only this step -- is what has been concluding `Build and
+      # test` as `failure` on this branch. It is not a gate: on each observed run every
+      # check above it passed, and this failed in about one second with
+      #
+      #   Failed to CreateArtifact: Artifact storage quota has been hit.
+      #
+      # The quota is ACCOUNT-WIDE and this lane is its whole consumer -- the engine repo
+      # uploads nothing at all (C-93-4). Measured rather than estimated (C-93-3): one
+      # `app-debug` is 12,741,138 bytes, and 11 successful uploads landed in the 2.16 days
+      # ending 2026-08-24T09:23Z, about 5.1 a day. At `retention-days: 14` the steady state
+      # is ~71 artifacts, ~0.9 GB -- past GitHub's 500 MB private-repo allowance on the
+      # Free plan on this workflow's own.
+      #
+      # WHY GATED RATHER THAN SHORTENED OR DELETED, since all three would clear the red:
+      #
+      #   - Retention stays at 14 days. An APK that IS produced keeps exactly the evidence
+      #     life it always had. Run 92 declined to shrink it and was right to: nobody in a
+      #     sandbox should be quietly reducing how long the owner's build survives.
+      #   - `workflow_dispatch` KEEPS the capability the artifact exists for. B-4 records
+      #     that the owner's machine has no `sdkmanager`, so CI may be the only route to an
+      #     installable APK. That route is preserved and is one click -- Actions -> CI ->
+      #     Run workflow -- instead of running on every push.
+      #   - What stops is the ~5/day records-only refill, which is the entire waste. Most
+      #     runs on this branch change `.md` files and nothing else, and each was still
+      #     shipping a 12 MB APK.
+      #
+      # `main` is deliberately NOT in this condition. When RETURN-DAY.md §3's six merges
+      # land, those pushes must not go red on a quota error at the exact moment the owner
+      # is finally landing them. Dispatch is always available on any ref, `main` included.
+      #
+      # THIS IS NOT A WEAKENED GATE. No test, lint, assertion or build step is touched;
+      # `if-no-files-found: error` is kept, so when the step does run it still fails the job
+      # on a missing APK. Freeing the already-consumed quota remains the owner's one-time
+      # action (B-25); this only stops it refilling behind them.
       - name: Upload debug APK
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
