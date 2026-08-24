@@ -16962,3 +16962,168 @@ no secrets read or printed, no `.appdata`, no `Desktop\site-v2`. Terra's worktre
 is exhausted"* and claims no files, so there was no collision to resolve. Files written this
 run: `relay/test/relay.test.ts` (engine), `AUDIT-REQUEST.md`, `LOG.md`, `STATE.md`,
 `docs/protocol-questions.md` (android), and the `autonomy/claude-state` heartbeat.
+
+---
+
+## Run 95 — 2026-08-24 (Linux cloud sandbox). An unvectored rule is not untested, it is unreconciled — and one of the three turned out to be a rule nobody implements
+
+**Rule one first.** `git fetch --all --prune` in both checkouts before any count. The android tree
+again arrived **detached at the docs-only `main`** (`ebfaf81`), **352 commits** behind the work
+branch — the count is this run's own, taken after the fetch.
+
+**The assigned slice was declined for the sixtieth time, re-derived rather than inherited**
+(**C-95-1**). `node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the
+generator.`**, `exit 0`. §4.3.3's body, PQ-A2-1's decoded-ciphertext cap and PQ-A2-2's
+`decrypt_failed` row all read in `docs/Sync-Protocol.md` itself; PQ-A2-3's vector is on disk. The
+prompt's pin `679a317` is stale — the real pin is **`7328a0b`**, and the vendored corpus is
+**29/29 byte-identical** to it by two independent checks, one of them the repo's own
+`repin-vectors.sh --check` (**C-95-2**). Both `main`s and both boards are unmoved: android
+`ebfaf81` (2026-08-06), engine `aac05f3` (2026-08-12), **22 engine drafts and 6 android drafts
+open, none merged** (**C-95-3**).
+
+### Milestone 1 — the lane widened: `:core:test` executes here now
+
+The ordered intent's top open item is **NEW ITEM 2(b)** — *"the vector corpus's own completeness:
+which §3 rejection reasons have no vector?"* — untaken since run 85, and re-verified open before
+being taken, per the standing precondition. Run 86's note on that list says the `:core` rows of its
+enforcement table were **`grep` over source, not execution**, and asks a later run to re-derive
+them if it ever gains the toolchain.
+
+**This run gained it.** `scripts/core-probe.sh` needs a JDK 17 under `/usr/lib/jvm`; this sandbox
+ships only 21. `apt-get install openjdk-17-jdk-headless` **succeeded** — a machine change, logged
+as one. Baseline on a clean tree: **`core-probe: 347 tests, 0 failed, 0 skipped, across 22
+classes`** (**C-95-4**). Every `:core` claim below is therefore **executed**, not read.
+
+**It is not the gate, and nothing here is reported as one.** `:app:assembleDebug`, `:app:lintDebug`
+and `:app:test` did not run; `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` and
+`gh` are **ABSENT** and `ANDROID_HOME` is **UNSET**, measured with `command -v` (**C-95-9**).
+
+### Milestone 2 — the measurement the item asked for
+
+§3 names five structural rejections in one sentence; §7.2 names ten error codes. Measured against
+the 28-vector corpus (**C-95-5**):
+
+| §3 structural rejection | vector |
+| --- | --- |
+| unknown top-level field | `invalid-unknown-field` |
+| padded base64 | `invalid-padded-base64` |
+| a nonce that is not 12 bytes | **none** |
+| a `dir` that is neither `e2p` nor `p2e` | **none** |
+| a body that is not parseable JSON | **none** |
+
+Of §7.2's ten codes, seven are vectored; `rev_conflict`, `pairing_unknown` and `unimplemented` are
+not, and `ProtocolTest` already records that. **Three gaps — and both of the two this run followed
+were hiding something.**
+
+### Milestone 3 — the site sweep, and the distinction that keeps it honest
+
+`:core`'s §3 rejection sites had never been mutation-swept; runs 83–85 swept *constants*. Ten
+sites, each disabled **one at a time**, full suite each time, source restored between runs
+(**C-95-6**): **seven RED, three GREEN**.
+
+**A harness defect had to be fixed before any of it counted, and it inverts every red.**
+`core-probe.sh` runs under `set -euo pipefail`, so a *failing* test aborts the script before its
+own XML-derived summary prints. The first driver read only that summary line, saw nothing, and
+filed a genuine RED as a harness error. Gradle's own `N tests completed, M failed` is the red path.
+Both must be parsed — and a sweep that only parses the green path reports *"nothing is guarded"*,
+which is the most flattering possible wrong answer.
+
+**A green mutation is a finding only once the mutation is not behaviour-preserving**, and that
+distinction disposes of two of the three greens (**C-95-7**):
+
+- `EnvelopeJson:42`, the non-object wire — replacing the rejection with an empty `JsonObject`
+  sends every field lookup down its own `?: return fail()`. Same code, different route.
+- `EnvelopeReceiver:67`, the nonce length — `SyncCrypto.gcm` carries its own
+  `require(nonce.size == Protocol.NONCE_BYTES)` and the receiver's `catch` is broad, so a
+  wrong-length nonce is `decrypt_failed` either way. **No test can construct the distinguishing
+  case through this API**, because `SyncCrypto.seal` refuses to seal with one.
+
+Both are **equivalent mutants**, recorded as non-findings rather than banked as finds. Run 84 made
+the same point about constants; it generalises.
+
+### Milestone 4 — the third green was real, and it is now closed
+
+`EnvelopeReceiver:75`'s `dir` rejection **is** observable, and that is what separates it from the
+other two: under a fallback to `ENGINE_TO_PHONE` the envelope is filed against the e2p stream,
+where a lower `seq` is a replay — so the code changes from `decrypt_failed` to `replay_rejected`.
+No existing test used that construction, though it is this file's stated technique.
+
+`a dir v1 does not define is refused before replay, not by the AEAD` — **348/0**, and the same
+mutation now turns it **1 failed**, naming exactly that test (**C-95-8**). Negative control
+replayed, source restored, 348/0 again.
+
+### Milestone 5 — the finding: §3 contains a rule neither implementation performs
+
+The body gap is the larger of the two.
+
+§3, line 101: *"Every structural rejection — … **a body that is not parseable JSON** — is reported
+as `decrypt_failed`."*
+§7.2's `decrypt_failed` row, line 601, same document: *"Also every structural rejection: unknown
+top-level field, padded base64, wrong nonce length, **unparseable framing**."*
+
+**A body is not framing.** They are separated by an AEAD open, and only framing is reachable before
+the key is used. Both implementations classify an unparseable **body** as **`unknown_kind`**
+(**C-95-10**): the phone's `kindOf` returns null and the caller maps it to `UNKNOWN_KIND`, and
+`src/Sync/EnvelopeReceiver.cs` catches `JsonException` and returns `SyncError.UnknownKind` — with a
+comment saying the agreement between the two was deliberate. So both conform to §7.2 and
+**contradict §3's sentence**; the document disagrees with itself, and nothing is wrong on the wire.
+
+**The falsifier has been green in `:core` the entire time.** `a body that is not a JSON object is
+unknown_kind, not a crash` feeds `"not json at all"` through and asserts `UNKNOWN_KIND`. Nothing
+ever compared it to §3's list, **because no vector covers the rule** — and a vector is the only
+artifact in this program that forces the document, the phone and the engine to be read against one
+another.
+
+That is the lesson worth carrying past this instance: **an unvectored rule is not merely untested,
+it is unreconciled.** Three sources of truth drift apart and all three stay green. Filed as
+**PQ-STR-1**, undecided on purpose — a spec sentence is normative for two codebases and one of them
+cannot be compiled here. Reading (a), striking the body clause from §3, needs **no code change on
+either side**. The KDoc on that test now carries the conflict, so the next reader hits it there.
+
+### Milestone 6 — `dir`, one layer down, and why no vector was added
+
+The phone refuses an unknown `dir` explicitly. **The engine has no such check at all**: the raw
+string flows into `_seq.HighestAccepted`, into the AAD and into `keyForDir`, and the refusal is the
+AEAD's doing. Not a live defect — both answer `decrypt_failed` — but the corpus's whole purpose is
+evidence that they agree, and two mechanisms that coincide are not one rule. The latent half is
+real: `keyForDir` is a caller-supplied delegate invoked with attacker-controlled text, `Receive`
+catches only `CryptographicException`, and the production composition root that will supply that
+delegate **does not exist yet**. Filed as **B-26** with the smallest human unblock.
+
+**No vector was added, and that was the judgement call of this run.** Both consumers enumerate the
+corpus generically, so a new invalid envelope is an automatic conformance demand on a C# harness
+this session cannot compile — and it would move the pin and re-vendor the android corpus. **The
+vector is what makes the two sides agree, so it belongs in the sitting where both can be run
+against it.** B-26 records that ordering as the point rather than as an excuse.
+
+### Environment, stated so no claim can be misread
+
+Verified this run, not inherited (**C-95-9**): `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`,
+`emulator`, `adb`, `gh` **all ABSENT**; `ANDROID_HOME` **UNSET**. `node` v22.22.2, `git`, `bash`,
+`java` (21, plus the 17 installed this run) and `gradle` present. **No gate ran and none is
+claimed** — neither `scripts\Verify-Alpha.ps1` nor
+`./gradlew … :app:assembleDebug :app:lintDebug`. What *did* run is `:core:test` in full, eleven
+times, and every number above is read off its output. **Every engine-side claim is `grep` over
+source and is labelled so** — no C# was compiled or executed.
+
+### Prohibition — what this run did not touch
+
+**No rung moved.** **No vector byte was written in either repo; the pin stays `7328a0b`**, and the
+vendored corpus is byte-identical to it. **No vector was added** — deliberately, for the reason in
+Milestone 6. **No spec byte in either direction** — `docs/Sync-Protocol.md` was read only, and the
+§3 defect is recorded as a question rather than patched unilaterally. **No `:core` or `:app`
+PRODUCTION byte**: every `EnvelopeJson.kt` and `EnvelopeReceiver.kt` edit this run was a mutation
+probe, each restored by the harness and proven restored by `git status` before the commit, which
+showed **one modified file — the test**. No `.cs`, `.ts`, `.kts` or workflow file in either repo.
+`$ExpectedOfflineTotal` and every count-reporting doc are **unmodified**; **no pinch point
+touched**. Nothing was merged, closed, undrafted, force-pushed, rebased or deleted; **no new PR was
+opened** in either repo and **no CI job was re-run**. **No test was skipped, disabled or
+quarantined** — the suite grew 347 → 348. No deploys of any kind; **the production relay was not
+contacted at all**, not even `/v1/health`. No Play/Google/OAuth console, no accounts, no purchases,
+no Play Billing code, no Gmail or email, no secrets read or printed, no `.appdata`, no
+`Desktop\site-v2`. Terra's worktrees and `autonomy/codex-state` were **read only** — Terra reports
+COMPLETE and claims no files, so there was no collision to resolve. **One machine change:**
+`openjdk-17-jdk-headless` installed in this disposable sandbox. Files written this run:
+`core/src/test/kotlin/app/careerseeker/core/EnvelopeReceiverTest.kt`, `AUDIT-REQUEST.md`,
+`BLOCKED.md`, `LOG.md`, `STATE.md`, `docs/protocol-questions.md`, and the `autonomy/claude-state`
+heartbeat in the engine repo.

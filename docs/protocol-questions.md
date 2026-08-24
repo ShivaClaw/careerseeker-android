@@ -2209,3 +2209,82 @@ the reason written next to `doc`'s and `conflict`'s**, and this question closes 
 change. If it is anything else, the surface is `:app` and needs the Windows box.
 
 **Re-verification:** `AUDIT-REQUEST.md` **C-74-1..8**.
+## PQ-STR-1 — §3 and §7.2 enumerate different structural rejections, and §3's extra item is one neither implementation performs
+
+**Found by** the ordered intent's NEW ITEM 2(b) — *"the vector corpus's own completeness: which
+§3 rejection reasons have no vector?"* — on the ninety-fifth run. It is the answer to that
+question rather than a side effect of it: the rule that turned out to be wrong is one of the
+three with no vector, and that is why it survived.
+
+### The two sentences
+
+§3 (`docs/Sync-Protocol.md`, the paragraph closing the envelope section):
+
+> Every **structural** rejection — an unknown top-level field, padded base64, a nonce that is
+> not 12 bytes, a `dir` that is neither `e2p` nor `p2e`, **a body that is not parseable JSON** —
+> is reported as `decrypt_failed` (§7.2).
+
+§7.2's `decrypt_failed` row, in the same document:
+
+> **Also every structural rejection**: unknown top-level field, padded base64, wrong nonce
+> length, **unparseable framing** (§3).
+
+Four items are common to both. The fifth differs: §3 says **a body**, §7.2 says **framing**.
+A body is the decrypted plaintext; framing is the envelope JSON. They are not the same layer,
+they are separated by an AEAD open, and only one of them is reachable before the key is used.
+
+### What the implementations do — measured, not read
+
+Both classify an unparseable **body** as `unknown_kind`, not `decrypt_failed`:
+
+- **Phone** — `EnvelopeReceiver.kt`'s `kindOf` returns null for malformed JSON and the caller
+  maps that to `ErrorCode.UNKNOWN_KIND`. `:core`'s own suite has asserted this since the file was
+  written: `a body that is not a JSON object is unknown_kind, not a crash` feeds
+  `"not json at all"` through and asserts `UNKNOWN_KIND` (**C-95-10**, executed this run).
+- **Engine** — `src/Sync/EnvelopeReceiver.cs` catches `JsonException` from `JsonDocument.Parse`
+  and returns `SyncError.UnknownKind`. Its own comment says the two implementations were made to
+  agree deliberately: *"matches the engine's `JsonDocument.Parse` behaviour so both
+  implementations classify a garbage body identically."*
+
+So the two implementations **agree with each other and with §7.2**, and **§3's sentence is the
+outlier**. Nothing is wrong on the wire today.
+
+### Why nobody noticed for the life of the document
+
+The falsifier has been green in `:core` the whole time. It was never compared to §3's list
+because **no vector covers the rule** — and a vector is the only artifact in this program that
+forces the document, the phone and the engine to be read against one another. §3's other four
+items: two have vectors (`invalid-unknown-field`, `invalid-padded-base64`) and are guarded on
+both sides; wrong nonce length and unknown `dir` have none (**C-95-5**), and the `dir` one turned
+out to hide a second divergence (**B-26**).
+
+That is the general lesson, and it is worth more than this instance: **an unvectored rule is not
+merely untested, it is unreconciled.** Three sources of truth drift apart silently and the suite
+stays green in all three.
+
+### The question (NOT decided here)
+
+Which sentence is normative?
+
+- **(a) §7.2 is right and §3 over-reaches** — strike *"a body that is not parseable JSON"* from
+  §3's list, or restate it as *"unparseable framing"*. **No code changes; both implementations
+  already conform.** This is the reading the engine-compatible interpretation rule points at, and
+  it is almost certainly the intent: every other item in §3's list is checkable *before* the key
+  is used, and the body is the one item that is not.
+- **(b) §3 is right** — then both receivers are wrong and must report `decrypt_failed` for a
+  garbage body. That is a **wire-visible change to two shipping implementations**, it deletes a
+  distinction §7.2 draws deliberately (`unknown_kind` means *the kind is not recognised*), and it
+  would make an authenticated-but-garbage body indistinguishable from a failed tag — which §7.2's
+  own indistinguishability requirement does **not** ask for and which loses a real diagnostic.
+
+**This run did not decide it**, because a spec sentence is normative for two codebases and one of
+them cannot be compiled here (`dotnet` ABSENT, **C-95-9**), and because `docs/Sync-Protocol.md`
+lives in the engine repo where the board is already 22 unmerged drafts deep. The house rule for
+exactly this case — *match the engine, ship that, record the question* — is what this entry is.
+
+**To close:** on a gated machine, amend §3 per (a) — a one-sentence edit — and add the
+`invalid-unknown-dir` and `invalid-wrong-nonce-length` vectors via `generate.mjs` so the
+remaining unvectored §3 rules stop being unreconciled. See **B-26** for why the vector must come
+*after* the engine side can be run, not before.
+
+**Re-verification:** `AUDIT-REQUEST.md` **C-95-5**, **C-95-10**, **C-95-11**.

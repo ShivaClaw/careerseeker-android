@@ -6,14 +6,69 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **fifty-nine** runs
-> have now been assigned it (count refreshed at run 94). **Run 91
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty** runs
+> have now been assigned it (count refreshed at run 95). **Run 91
 > re-verified the slice with its own hands (`node docs/sync-vectors/generate.mjs --check` → `OK: 29
 > vector files match the generator.`, exit 0) and sent the "stop this schedule" notification run 90
 > recommended but did not send. B-18's smallest unblock is unchanged: a human stops the schedule.**
 > **The prompt's vendored pin `679a317` is stale too: it is
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
+>
+> ## ▶ RUN 95 — 2026-08-24. **`:core:test` runs here now, and §3 turned out to contain a rule neither implementation performs.**
+>
+> **Heartbeat:** 2026-08-24, ninety-fifth cloud iteration. **Assigned slice declined for the
+> sixtieth time** (**C-95-1**), re-derived: `--check` → `OK: 29 vector files match the generator.`,
+> exit 0; pin `7328a0b`, corpus **29/29** by `diff -r` *and* by the repo's own
+> `repin-vectors.sh --check` (**C-95-2**). Both `main`s and both boards unmoved — 22 engine drafts,
+> 6 android drafts, none merged (**C-95-3**).
+>
+> **The lane widened, and that is what made this slice possible.** `scripts/core-probe.sh` needs a
+> JDK 17; this sandbox ships 21. `apt-get install openjdk-17-jdk-headless` succeeded — a machine
+> change — so **`:core:test` EXECUTES here: 347/0 across 22 classes on a clean tree** (**C-95-4**).
+> Run 86 asked a later run to re-derive its `grep`-only `:core` rows if it ever gained the
+> toolchain; this is that run. **Still not the gate** — `:app:assembleDebug`, `:app:lintDebug`,
+> `:app:test` did not run, and `dotnet`/`pwsh`/`sdkmanager`/`adb`/`gh` are ABSENT (**C-95-9**).
+>
+> **The slice: the ordered intent's NEW ITEM 2(b)** — *"which §3 rejection reasons have no
+> vector?"* — untaken since run 85 and re-verified open before being taken. **Answer: three of
+> §3's five** (**C-95-5**). A nonce that is not 12 bytes, a `dir` that is neither `e2p` nor `p2e`,
+> and a body that is not parseable JSON. **Both gaps this run followed were hiding something.**
+>
+> **A ten-site mutation sweep of `:core`'s §3 rejection sites — seven RED, three GREEN**
+> (**C-95-6**). **A harness defect had to be fixed first and it inverts every red:** `core-probe.sh`
+> runs under `set -euo pipefail`, so a failing test aborts before its own summary line prints — a
+> driver reading only that line files every genuine RED as a harness error, which is the most
+> flattering possible wrong answer. **Two of the three greens are equivalent mutants and are
+> recorded as non-findings** (**C-95-7**): the non-object wire re-fails at the next field lookup,
+> and `SyncCrypto.gcm` carries its own 12-byte `require`, so no test can even construct the
+> distinguishing case.
+>
+> **The third green was real and is closed.** `EnvelopeReceiver:75`'s `dir` rejection is observable
+> only when the envelope also violates a *later* rule: under a fallback the code changes
+> `decrypt_failed` → `replay_rejected`. **348/0, negative control 1 failed naming exactly the new
+> test** (**C-95-8**).
+>
+> **THE FINDING: §3 and §7.2 enumerate different structural rejections, and §3's extra item is one
+> nobody implements** (**C-95-10**, **C-95-11**). §3 line 101 says *"a body that is not parseable
+> JSON"*; §7.2 line 601 says *"unparseable framing"* in the same position. **A body is not
+> framing.** Both implementations classify an unparseable body as **`unknown_kind`** — they agree
+> with each other and with §7.2, and contradict §3. **The falsifier has been green in `:core` the
+> whole time**; nothing compared it to §3's list **because no vector covers the rule**. Filed as
+> **PQ-STR-1**, undecided: striking the clause needs no code change, but a spec sentence is
+> normative for two codebases and one cannot be compiled here.
+>
+> **The lesson, which outlives the instance: an unvectored rule is not merely untested, it is
+> unreconciled.** Three sources of truth drift and all three stay green.
+>
+> **`dir`'s engine half is `B-26`** — the phone checks it explicitly, the engine has no such check
+> and relies on the AAD. Not a live defect; both answer `decrypt_failed`. **No vector was added, on
+> purpose**: both consumers enumerate the corpus generically, so a new vector is an automatic
+> demand on a C# harness this session cannot compile, and it would move the pin. **The pin stays
+> `7328a0b` and no vector byte was written.**
+>
+> **One file changed:** `EnvelopeReceiverTest.kt` — one test, one KDoc, **no production byte**.
+> **PR #6 refreshed, not replaced; no new PR in either repo.** No gate ran and none is claimed.
 >
 > ## ▶ RUN 94 — 2026-08-24. **The relay lane runs here for real, and the §2.3 vocabulary guard turned out to be per-NAME only.**
 >
@@ -2198,8 +2253,53 @@ respectively and they can be done today.
 
 ## Next intent (in order)
 
+**ORDERED INTENT REVISED 2026-08-24 (ninety-fifth run) — NEW ITEM 2(b) IS CLOSED, AND IT PAID OUT
+TWICE. THE SANDBOX-RUNNABLE LANES ARE WIDER THAN THIS LIST HAS ASSUMED SINCE RUN 85.**
+
+**CLOSED — NEW ITEM 2(b), the vector corpus's own completeness.** Measured (**C-95-5**): of §3's
+five structural rejections, **three have no vector** — wrong nonce length, unknown `dir`,
+unparseable body. Both of the two this run followed were hiding something, so the item was worth
+its place. **Do not re-take it**; what remains of it is `B-26` and `PQ-STR-1`, both of which need a
+machine with .NET.
+
+**THE STANDING ASSUMPTION THAT SHOULD CHANGE: `:core:test` RUNS IN THIS SANDBOX.** It needs one
+`apt-get install openjdk-17-jdk-headless` (`core-probe.sh` requires a JDK 17; the image ships 21),
+after which `scripts/core-probe.sh` gives **348/0 across 22 classes** (**C-95-4**, **C-95-8**).
+Run 85's note *"the two node-runnable lanes"* and run 86's *"the `:core` rows are grep, not
+execution"* are both **superseded**: `:core` is a THIRD executable lane, and it is the largest
+one. A successor should reach for it before concluding the sandbox is out of work.
+
+**NEW ITEM A — the rest of `:core` has never been mutation-swept.** This run swept **ten** §3
+rejection sites in `EnvelopeJson`/`EnvelopeReceiver` and found one real hole in three greens. The
+same technique is untried on `OutboundEnvelopes`, `OutboundQueue`, `PullPolicy`, `SyncPump`,
+`PairingFlow` and `EntitlementRoute` — **~2,000 lines of `:core` with no site-level evidence at
+all.** Highest-value first: `SyncPump` and `OutboundQueue`, because both carry counters and
+retry state that a green suite can easily be indifferent to.
+
+**Two methodological rules this run had to learn the hard way — carry them:**
+1. **Parse BOTH of `core-probe.sh`'s report paths.** It runs under `set -euo pipefail`, so a
+   failing test aborts before its own summary line. A driver reading only that line files every
+   genuine RED as a harness error and concludes *"nothing is guarded"* (**C-95-6**).
+2. **A green mutation is a finding only once the mutation is not behaviour-preserving.** Two of
+   this run's three greens were **equivalent mutants** and are recorded as non-findings
+   (**C-95-7**). Ask what input would distinguish them *before* banking a find.
+
+**NEW ITEM B — `PQ-STR-1` and `B-26` are the two items that now need the Windows/.NET box**, and
+they are in the same sitting: both are §3-conformance, both touch `src/Sync/EnvelopeReceiver.cs`,
+and the vector that closes them should be written **last**, when both sides can be run against it.
+
+**Standing precondition, unchanged and vindicated for the eighth time:** before taking any item,
+re-verify that item. This run's assigned slice was landed on 2026-08-09 and this was its
+**sixtieth** firing (**C-95-1**). `origin/main` is not the state of the program — **22** engine PRs
+and **6** android PRs are open and none is merged (**C-95-3**).
+
+---
+
 **ORDERED INTENT REVISED 2026-08-23 (eighty-sixth run) — THE DISAGREEMENT-SURFACE AXIS PAID OUT ON
 ITS FIRST SWEEP, AND IT IS NOT EXHAUSTED.**
+
+> **NEW ITEM 2(a) CLOSED BY RUN 94; NEW ITEM 2(b) CLOSED BY RUN 95. NEW ITEM 1 and NEW ITEM 3 are
+> unchanged and both still need the gate.** See the run-95 block above before taking anything here.
 
 **CLOSED — "nobody compared the three transcriptions to each other."** Swept this run. The result
 worth carrying forward is that **the values all agree** (kinds, error codes, HKDF constants, suite

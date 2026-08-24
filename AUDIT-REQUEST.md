@@ -17799,3 +17799,220 @@ git show --stat 6700078
 Observed: **`6700078`**, `relay/test/relay.test.ts` only, **+163/−0**. **PR #36 refreshed, not
 replaced** — the engine board stays at 22 open drafts. **No relay source byte, no vector, no
 spec file, no `$ExpectedOfflineTotal`.**
+
+---
+
+## Run 95 — NEW ITEM 2(b): the vector corpus's completeness against §3
+
+**Auditor setup for this run's `:core` claims** (Linux, no Android SDK; the JDK 17 is a machine
+change this run made and logged):
+
+```bash
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+git checkout claude/android-a0-probe
+```
+
+### C-95-1 — the assigned S5 slice is built, re-derived not inherited (sixtieth firing)
+
+```bash
+cd /home/user/careerseeker
+git checkout --detach origin/claude/s5-entitlement-ack-emitter
+node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+grep -n "entitlement_ack body = {" docs/Sync-Protocol.md
+grep -n "decoded ciphertext" docs/Sync-Protocol.md | head -1
+grep -n "Also every structural rejection" docs/Sync-Protocol.md
+ls docs/sync-vectors/v1/invalid-unknown-field.json
+```
+
+*Observed:* `OK: 29 vector files match the generator.`, `EXIT=0`. §4.3.3's body at line 317;
+PQ-A2-1's decoded-ciphertext cap at §3.1 line 111; PQ-A2-2's row at §7.2 line 601; PQ-A2-3's
+vector present. **All four assigned items were already built.**
+
+### C-95-2 — the pin is `7328a0b` and the vendored corpus is byte-identical to it
+
+Two independent checks, the second using the repo's own tool:
+
+```bash
+cd /home/user/careerseeker
+mkdir -p /tmp/pin && git archive 7328a0b docs/sync-vectors | tar -x -C /tmp/pin
+diff -r /tmp/pin/docs/sync-vectors/v1 \
+        /home/user/careerseeker-android/core/src/test/resources/sync-vectors/v1; echo "EXIT=$?"
+cd /home/user/careerseeker-android && scripts/repin-vectors.sh --check
+```
+
+*Observed:* no output, `EXIT=0`, **29** files; and `OK: the vendored corpus is byte-identical to
+pin 7328a0bc043335491cd96a67d634e8eea2a13af9, and the pin is unchanged.` The prompt's `679a317`
+is stale.
+
+### C-95-3 — both `main`s are unmoved and both boards are unmerged
+
+```bash
+git -C /home/user/careerseeker-android log -1 --format="%h %ad" --date=iso origin/main
+git -C /home/user/careerseeker         log -1 --format="%h %ad" --date=iso origin/main
+```
+
+*Observed:* android `ebfaf81` **2026-08-06**, engine `aac05f3` **2026-08-12**. Via the GitHub API:
+**22** open engine PRs and **6** open android PRs, **all draft, none merged**.
+
+### C-95-4 — `:core:test` EXECUTES in this sandbox; the clean-tree baseline is 347/0
+
+```bash
+cd /home/user/careerseeker-android && git status --short   # must print nothing
+scripts/core-probe.sh
+```
+
+*Observed:* `BUILD SUCCESSFUL`, `core-probe: 347 tests, 0 failed, 0 skipped, across 22 classes`.
+
+**This is NOT the android gate.** `:app:assembleDebug`, `:app:lintDebug` and `:app:test` did not
+run and no result is claimed for them.
+
+### C-95-5 — the corpus measurement NEW ITEM 2(b) asked for
+
+```bash
+cd /home/user/careerseeker
+sed -n '101,105p' docs/Sync-Protocol.md          # §3's five structural rejections, one sentence
+sed -n '601p'     docs/Sync-Protocol.md          # §7.2's decrypt_failed row
+python3 -c "
+import json
+d=json.load(open('docs/sync-vectors/v1/index.json'))
+print(len(d['vectors']),'vectors')
+print(sorted({v['expect_error'] for v in d['vectors'] if not v['valid']}))"
+ls docs/sync-vectors/v1/ | grep -iE 'nonce|dir|body'   # expect: no matches
+```
+
+*Observed:* 28 vectors. Of §3's five structural rejections **two are vectored**
+(`invalid-unknown-field`, `invalid-padded-base64`) and **three are not**: a nonce that is not 12
+bytes, a `dir` that is neither `e2p` nor `p2e`, and a body that is not parseable JSON. Of §7.2's
+ten codes, seven are vectored; `rev_conflict`, `pairing_unknown` and `unimplemented` are not
+(already recorded by `ProtocolTest`).
+
+### C-95-6 — the ten-site mutation sweep of `:core`'s §3 rejection sites
+
+Each site disabled **one at a time**, full suite each time, source restored between runs. The
+driver is `sweep.py` in the run's scratch dir; the mutations are reproduced here so the sweep can
+be replayed by hand.
+
+```bash
+cd /home/user/careerseeker-android
+# example, one site: remove the unknown-field rejection from EnvelopeJson.kt:49
+sed -i 's|if (root.keys.any { it !in KNOWN_FIELDS }) return fail()|// MUTATED|' \
+    core/src/main/kotlin/app/careerseeker/core/EnvelopeJson.kt
+scripts/core-probe.sh; git checkout -- core/src/main/kotlin/app/careerseeker/core/
+```
+
+*Observed*, against the 347/0 baseline:
+
+| site | mutation | verdict |
+| --- | --- | --- |
+| `EnvelopeJson:49` unknown top-level field | check removed | **RED** 4 failed |
+| `EnvelopeJson:42` non-object wire | `?: JsonObject(emptyMap())` | **GREEN** |
+| `EnvelopeJson:51` `v` | `?: 1` | **RED** 2 failed |
+| `EnvelopeJson:54` `seq` | `?: 1L` | **RED** 2 failed |
+| `EnvelopeJson:55` `ts` | `?: "2026-06-11T14:02:11Z"` | **RED** 1 failed |
+| `EnvelopeJson:68` non-string `sig` | `else -> null` | **RED** 1 failed |
+| `EnvelopeJson:73` pairing shape | check removed | **RED** 1 failed |
+| `EnvelopeReceiver:67` nonce length | check removed | **GREEN** |
+| `EnvelopeReceiver:70` size cap | check removed | **RED** 4 failed |
+| `EnvelopeReceiver:75` unknown `dir` | `?: Direction.ENGINE_TO_PHONE` | **GREEN** |
+
+**Note the harness defect this run had to fix first, because it inverts every red:**
+`core-probe.sh` runs under `set -euo pipefail`, so a *failing* test aborts the script before its
+own XML-derived summary line prints. A driver that reads only `core-probe: N tests, M failed`
+sees nothing and reports every genuine RED as a harness error. Gradle's own
+`N tests completed, M failed` is the red path and must be parsed too.
+
+### C-95-7 — two of the three greens are equivalent mutants, and are NOT holes
+
+A green mutation is a finding only once the mutation is **not** behaviour-preserving. Two of the
+three fail that test, and are recorded as non-findings rather than banked:
+
+- **`EnvelopeJson:42`** — replacing `?: return fail()` with an empty `JsonObject` sends every
+  subsequent field lookup down its own `?: return fail()`. Same `decrypt_failed`, different route;
+  no input distinguishes them.
+- **`EnvelopeReceiver:67`** — `SyncCrypto.gcm` itself carries
+  `require(nonce.size == Protocol.NONCE_BYTES)`, and the receiver's `catch (_: Exception)` is
+  broad, so a wrong-length nonce becomes `decrypt_failed` either way. **No test can construct the
+  distinguishing case through this API**, because `SyncCrypto.seal` refuses to seal with one.
+
+```bash
+grep -n "require(nonce.size" core/src/main/kotlin/app/careerseeker/core/crypto/SyncCrypto.kt
+grep -n "catch (_: Exception)" core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt
+```
+
+### C-95-8 — the `dir` site was a genuine hole, and is now guarded (348/0, negative control red)
+
+Unlike the other two greens, this mutation **is** observable: under the fallback the envelope is
+filed against the e2p stream, where a lower `seq` is a replay, so the code changes from
+`decrypt_failed` to `replay_rejected`. That is the discriminating construction, and no existing
+test used it.
+
+```bash
+cd /home/user/careerseeker-android
+scripts/core-probe.sh                       # with the new test: 348 tests, 0 failed
+sed -i 's|Direction.fromWire(env.dir) ?: return reject(ErrorCode.DECRYPT_FAILED)|Direction.fromWire(env.dir) ?: Direction.ENGINE_TO_PHONE|' \
+    core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt
+scripts/core-probe.sh                       # expect exactly 1 failed, and expect it to be the new test
+git checkout -- core/src/main/kotlin/app/careerseeker/core/
+```
+
+*Observed:* `core-probe: 348 tests, 0 failed, 0 skipped, across 22 classes`; then
+`EnvelopeReceiverTest > a dir v1 does not define is refused before replay, not by the AEAD()
+FAILED` and `348 tests completed, 1 failed`; then 348/0 again after restore.
+
+### C-95-9 — the toolchain, measured rather than inherited
+
+```bash
+for t in dotnet pwsh sdkmanager avdmanager emulator adb gh node git java gradle; do
+  printf "%-12s %s\n" "$t" "$(command -v $t 2>/dev/null || echo ABSENT)"; done
+echo "ANDROID_HOME=${ANDROID_HOME:-UNSET}"
+```
+
+*Observed:* `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` **all ABSENT**;
+`ANDROID_HOME` **UNSET**; `node` v22.22.2, `git`, `java`, `gradle` present. **No gate ran and none
+is claimed** — neither `scripts\Verify-Alpha.ps1` nor
+`./gradlew … :app:assembleDebug :app:lintDebug`.
+
+### C-95-10 — both implementations classify an unparseable BODY as `unknown_kind`
+
+```bash
+cd /home/user/careerseeker-android
+grep -n "kindOf(plaintext) ?: return reject" core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt
+sed -n '/a body that is not a JSON object is unknown_kind/,/^    }/p' \
+    core/src/test/kotlin/app/careerseeker/core/EnvelopeReceiverTest.kt
+cd /home/user/careerseeker && sed -n '69,79p' src/Sync/EnvelopeReceiver.cs
+```
+
+*Observed:* the phone maps a null `kindOf` to `ErrorCode.UNKNOWN_KIND`, and its own suite has
+asserted since the file was written that `"not json at all"` yields `UNKNOWN_KIND`. The engine
+catches `JsonException` from `JsonDocument.Parse` and returns `SyncError.UnknownKind`. **The two
+agree with each other.** The engine half is `grep` over source — `dotnet` is absent (C-95-9), so
+no C# execution is claimed.
+
+### C-95-11 — §3 and §7.2 enumerate different structural rejections
+
+```bash
+cd /home/user/careerseeker
+sed -n '101,105p' docs/Sync-Protocol.md
+sed -n '601p'     docs/Sync-Protocol.md
+```
+
+*Observed:* §3 line 101 lists *"a body that is not parseable JSON"*; §7.2 line 601 lists
+*"unparseable framing"* in the same position. A body is not framing — they are separated by an
+AEAD open, and only framing is reachable before the key is used. **Both implementations conform to
+§7.2 and contradict §3's sentence** (C-95-10). Filed as **PQ-STR-1**, undecided.
+
+### C-95-12 — what landed, and that no new PR was opened
+
+```bash
+cd /home/user/careerseeker-android
+git log --oneline -3 origin/claude/android-a0-probe
+git show --stat HEAD
+git status --short          # must print nothing
+scripts/check-citations.sh
+```
+
+*Observed:* the only source change is
+`core/src/test/kotlin/app/careerseeker/core/EnvelopeReceiverTest.kt` — **one test added, one
+KDoc added, no production byte**. **No vector was written in either repo and the pin stays
+`7328a0b`.** **PR #6 refreshed, not replaced**; no new PR in either repo, so the engine board
+stays at 22 open drafts and the android board at 6.

@@ -4853,3 +4853,74 @@ what a behavioural test can reach, not an obstacle needing a human.
 **Smallest human unblock — unchanged.** Turn the routine off, or replace its "YOUR SLICE THIS
 ITERATION" section with *read `RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox
 can actually advance.*
+
+---
+
+## B-26 — §3's `dir` rule is a check on the phone and an accident of the AAD on the engine, and no vector holds them together (ninety-fifth run, 2026-08-24)
+
+**Symptom.** §3 lists five structural rejections in one sentence, all reported as
+`decrypt_failed`. Three of the five have **no vector** (**C-95-5**), and for one of them the two
+implementations do not enforce the rule the same way:
+
+- **Phone** — `core/src/main/kotlin/app/careerseeker/core/EnvelopeReceiver.kt:75`:
+  `Direction.fromWire(env.dir) ?: return reject(ErrorCode.DECRYPT_FAILED)`. An explicit refusal,
+  taken *before* any crypto and *before* the replay check.
+- **Engine** — `src/Sync/EnvelopeReceiver.cs:32-97` (ShivaClaw/careerseeker): **there is no such
+  check.** The raw string flows into `_seq.HighestAccepted(env.Dir)`, into the AAD, and into
+  `keyForDir(env.Dir)`. An unknown `dir` is refused only because the AAD it produced no longer
+  matches what the sender sealed, so `EnvelopeCodec.Open` throws.
+
+**This is not a live defect, and saying so is part of the filing.** Both implementations answer
+`decrypt_failed` for an unknown `dir` today. What is missing is the thing the shared corpus exists
+to provide: evidence that they *agree*. **Two mechanisms that coincide are not one rule.**
+
+**Why it is worth a filing anyway — the latent half.**
+
+1. **`keyForDir` is a caller-supplied delegate invoked with attacker-controlled text.** Every
+   delegate that exists today ignores its argument (`_ => kP2e`,
+   `tests/SyncHarness/Program.cs:748`; `_ => phoneKeys.KeyPhoneToEngine`,
+   `tests/SyncLiveSmoke/Program.cs:183`), and the production composition root does not construct
+   an `InboundDispatcher` at all yet — that is still on the unmerged `claude/s5-inbound-pump`.
+   A future root written as `dir switch { "e2p" => k1, "p2e" => k2, _ => throw }` turns a hostile
+   envelope into an **unhandled exception**: `Receive` catches only `CryptographicException`.
+2. **The order differs, and this file's own docstring says order is protocol.** That docstring is
+   carried verbatim in both implementations. On the phone `dir` is answered before replay; on the
+   engine there is no `dir` step to order at all.
+
+**Attempts.**
+
+1. **Add the missing vector.** **Not attempted, deliberately.** Both consumers enumerate the
+   corpus generically — `ProtocolVectorsTest.envelopeVectors()` in Kotlin and the `invalidEnv`
+   loop in `tests/SyncHarness/Program.cs` — so a new invalid envelope vector becomes an automatic
+   conformance demand on both suites. The Kotlin half is runnable here; **the C# half is not**
+   (`dotnet` ABSENT, **C-95-9**). Adding it would push an unverifiable demand into a codebase this
+   session cannot compile, and would move the pin `7328a0b` and re-vendor the android corpus
+   (**B-17**'s landing cost).
+2. **Fix the engine.** Not attempted: `src/Sync/EnvelopeReceiver.cs` cannot be compiled or gated
+   here, and the main repo's `CLAUDE.md` ritual requires `scripts\Verify-Alpha.ps1`.
+3. **Pin the phone half.** **Done, and landed rather than described** — `EnvelopeReceiverTest.a
+   dir v1 does not define is refused before replay, not by the AEAD`, 348/0 with the negative
+   control red at 1 failed (**C-95-8**). That is the half this environment can actually verify.
+
+**Smallest human unblock.** On a machine with .NET, in `ShivaClaw/careerseeker`:
+
+```powershell
+# 1. Establish what the engine actually does with an unknown dir: add a SyncHarness case with
+#    dir="e2p-x" sealed against its own AAD, and a keyForDir that THROWS on an unknown dir.
+#    If Receive() propagates instead of returning decrypt_failed, that is the latent half firing.
+# 2. Then decide ONE of:
+#    (a) add  if (env.Dir is not "e2p" and not "p2e") return Reject(SyncError.DecryptFailed);
+#        to src/Sync/EnvelopeReceiver.cs ahead of the replay check, matching the phone; or
+#    (b) record in docs/Sync-Protocol.md that the AAD binding IS the enforcement mechanism.
+scripts\Verify-Alpha.ps1
+```
+
+**Only then** add the vector and re-pin:
+
+```bash
+node docs/sync-vectors/generate.mjs          # add invalid-unknown-dir
+cd ../careerseeker-android && scripts/repin-vectors.sh <new-sha> && scripts/core-probe.sh
+```
+
+**The ordering is the whole lesson of this entry**: the vector is what makes the two sides agree,
+so it must be added when both sides can be run against it — not before.
