@@ -16494,3 +16494,34 @@ deploys of any kind; **the production relay was not contacted at all**, not even
 Play/Google/OAuth console, no accounts, no purchases, no Play Billing code, no email or Gmail
 anything, no secrets read or printed, no `.appdata`, no `Desktop\site-v2`. Terra's worktrees and
 `autonomy/codex-state` were read only. No test was skipped, disabled or quarantined.
+
+---
+
+## RUN 91 — 2026-08-24 (Linux sandbox). **The fifty-sixth assignment of a built slice, declined — and the "stop the schedule" notification run 90 recommended but withheld was sent this run.**
+
+**Kept short on purpose** (runs 87–90's measured finding: on a run that moves no rung, the records' own growth is the only cost still being paid). Everything below was run this session.
+
+### Milestone 1 — rule one, then the slice re-derived with my own hands
+
+`git fetch --all --prune` ran in **both** checkouts before any ref was read; every count is post-fetch. The assigned S5 spec half is closed and unchanged, verified by four commands here — not read from the records:
+
+- `node docs/sync-vectors/generate.mjs --check` on `origin/claude/s5-entitlement-ack-emitter` → **`OK: 29 vector files match the generator.`**, **exit 0** (**C-91-1**). The one gate this environment can actually run, and it is green.
+- `entitlement_ack` body `{product_id, acknowledged_at, order_id?}` at `docs/Sync-Protocol.md` **§4.3.3 (:307–319)** on `origin/claude/s5-entitlement-ack-spec` — PQ-A6-1 closed (**C-91-2**).
+- `decrypt_failed` for structural rejection at **:103**, cap measured on the **decoded ciphertext** at **:111** — PQ-A2-1 / PQ-A2-2 closed (**C-91-3**).
+- `invalid-unknown-field.json` present in the 29-file corpus (PQ-A2-3). Engine `origin/main` carries **26** vectors → the work is **unmerged, not unbuilt**.
+
+Declined for the reason attempt 1 gave fifty-five runs ago and every run since: rebuilding it forks §4.3 and regenerates a corpus the android repo **vendors byte-identically (29 files, pin `7328a0b`)** — the cross-repo drift event the prompt itself says to stop for.
+
+### Milestone 2 — nothing changed, and this run did the one thing that can change it
+
+Re-measured, not inherited: **no human commit in either repo for twelve days** (engine `main` `aac05f3`, 2026-08-12; android `main` `ebfaf81`, 2026-08-06); the mission's premise (*"Brandon is out until 2026-08-18"*) expired **six days ago**; the parallel Codex/Terra track is **COMPLETE, goal cleared** (2026-08-12). **28 draft PRs open, 0 merged.** Every remaining item (RETURN-DAY.md §5, H1–H8; B-18) needs a Windows gate, an emulator, a relay deploy, or a product decision — none reachable from this sandbox.
+
+Run 90 named the useful move (owner stops the schedule, then runs H2) but **declined to notify**, reasoning a repository cannot tell "did not see runs 81/86" from "saw and chose not to act." **Run 91's judgement differs on exactly that point:** an unattended schedule that has fired ~55 times with zero reachable benefit is precisely the "the routine cannot do its job — a human is needed" condition a notification exists for, and run 90 was itself the last firing (earlier today) that produced no repo event. **The notification was sent** (stop the schedule; run `Verify-Alpha.ps1 -IncludePublish -IncludePackage` then land the six-PR stack). If it too goes unanswered, the honest reading shifts toward "saw and chose not to act," and a later run should not send a fourth.
+
+### Environment, so no claim can be misread
+
+`dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` **absent**; `ANDROID_HOME` **unset**; no Android SDK, no Windows, no JBR. **No gate ran and none is claimed** beyond `generate.mjs --check` above. `node` v22.22.2 and `git` are the whole basis of Milestone 1.
+
+### Prohibition — what this run did not touch
+
+No rung moved. **No vector byte was written in either repo; the pin stays `7328a0b`.** No `:app`, `:core`, `src/`, `relay/`, or spec source file was written or edited. Nothing was merged, closed, undrafted, force-pushed, rebased, or deleted. No new PR was opened. No deploys; **the production relay was not contacted at all**, not even `/v1/health`. No Play/Google/OAuth console, no accounts, no purchases, no Play Billing code, no Gmail/email, no secrets read or printed, no `.appdata`, no `Desktop\site-v2`. Terra's worktrees and `autonomy/codex-state` were read only. No test was skipped, disabled, or quarantined. The only writes this run: this LOG entry, the STATE run-count line, and the `autonomy/claude-state` heartbeat.

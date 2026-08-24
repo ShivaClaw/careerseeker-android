@@ -17105,3 +17105,38 @@ product decision) and on **C-ENV-1**/**C-89-7**'s environment findings, re-obser
 `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` absent, `ANDROID_HOME` unset.
 **If any one of H1–H8 turns out to be sandbox-reachable, the recommendation is wrong and the next
 session should take it instead.**
+
+---
+
+## RUN 91 (2026-08-24) — re-verification commands for this run's claims
+
+- **C-91-1** — the assigned slice's vector corpus is intact and generated (the one runnable gate here):
+  ```
+  cd careerseeker && git fetch origin claude/s5-entitlement-ack-emitter && \
+    git checkout origin/claude/s5-entitlement-ack-emitter && \
+    node docs/sync-vectors/generate.mjs --check
+  # expect: "OK: 29 vector files match the generator.", exit 0
+  ```
+- **C-91-2** — `entitlement_ack` body (PQ-A6-1) is defined in the spec:
+  ```
+  cd careerseeker && git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md \
+    | grep -nE 'entitlement_ack|acknowledged_at|product_id'
+  # expect: §4.3.3 near :307-319, body {product_id, acknowledged_at, order_id?}
+  ```
+- **C-91-3** — PQ-A2-1 (cap on decoded ciphertext) and PQ-A2-2 (`decrypt_failed`) prose present:
+  ```
+  cd careerseeker && git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md \
+    | grep -nE 'decrypt_failed|decoded ciphertext'
+  # expect: decrypt_failed at ~:103, "decoded ciphertext" cap at ~:111
+  ```
+- **C-91-4** — the work is unmerged, not unbuilt (engine main still 26 vectors):
+  ```
+  cd careerseeker && git fetch origin main && \
+    git ls-tree -r --name-only origin/main -- docs/sync-vectors/v1/ | grep -c '\.json$'
+  # expect: 26
+  ```
+- **C-91-5** — no human commit in either repo for twelve days:
+  ```
+  cd careerseeker && git log -1 --format='%ci %H' origin/main   # expect 2026-08-12, aac05f3
+  cd careerseeker-android && git log -1 --format='%ci %H' origin/main  # expect 2026-08-06, ebfaf81
+  ```

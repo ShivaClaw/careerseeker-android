@@ -6,8 +6,11 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **fifty-five** runs
-> have now been assigned it (count refreshed at run 90; it read "forty-five" for nine runs).
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **fifty-six** runs
+> have now been assigned it (count refreshed at run 91; it read "forty-five" for nine runs). **Run 91
+> re-verified the slice with its own hands (`node docs/sync-vectors/generate.mjs --check` → `OK: 29
+> vector files match the generator.`, exit 0) and sent the "stop this schedule" notification run 90
+> recommended but did not send. B-18's smallest unblock is unchanged: a human stops the schedule.**
 > **The prompt's vendored pin `679a317` is stale too: it is
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
