@@ -4740,6 +4740,12 @@ is `.md` files only. The job still concludes **`failure`**, because step 14 does
    The engine repo uploads **no** artifacts at all (**C-92-9**), so the android lane is the whole
    consumer. Storage quota is **account-wide**, not per repository.
 
+**CONFIRMED on run 92's own head, eight hours after the first observation.** Job `97380177807`,
+head `ebadeca`: **steps 1–13 all `success`** — the citation guard, `:core:test`, `:app:test`
+(Robolectric), `assembleDebug`, `lintDebug`, the analytics assertion — and **step 14 `failure` in
+one second**. Job red. **It reproduced across the recalculation window, so it is deterministic, not
+a one-off.** **B-22 did not fire on either run** (step 10 `success` both times).
+
 **Attempts.**
 
 1. **Wait for it to clear.** GitHub recalculates usage every 6–12 hours, so a run can pass by luck.

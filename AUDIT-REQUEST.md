@@ -17326,6 +17326,19 @@ on a commit that is `.md` files only, and the job is still red — **because ste
 `ScreensFromFixtureTest`, in step 10, and it fires *before* this one); it is deterministic; and
 **no push can fix it** — the failing step never touches the diff.
 
+**CONFIRMED on this run's own head, eight hours later** — job `97380177807`, head `ebadeca`,
+2026-08-24T09:13:29Z → 09:21:16Z:
+
+| steps 1–13 | step 14 | job |
+| --- | --- | --- |
+| **all `success`** — incl. the citation guard (**6**), `:core:test` (**9**), `:app:test` Robolectric (**10**), `assembleDebug` (**11**), `lintDebug` (**12**), analytics assertion (**13**) | *Upload debug APK* → **`failure`**, 09:21:11 → 09:21:12 (**1 s**) | **`failure`** |
+
+**Two things this pins.** First, run 92's citation fix is **green in CI**, not merely green locally
+(step 6, on `2715627` and again on `ebadeca`). Second, **B-25 is deterministic, not a one-off**: it
+reproduced across the 6–12 h recalculation window, on a head whose every other step passed. **B-22
+did not fire** on either run — step 10 is `success` both times — so this is a third, distinct cause
+of red on this branch, and the only one currently standing.
+
 **The consequence that matters more than the failure:** while this holds, red CI on this repo
 carries **no information** about the diff. A regression and a quota error present identically in the
 check list. Distinguish them by **which step failed**, never by the check's colour.

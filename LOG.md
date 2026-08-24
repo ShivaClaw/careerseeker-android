@@ -16638,6 +16638,14 @@ under one second**:
    by the timing being wrong for it (35 s, not 8 min). **Read which *step* failed. The colour no
    longer means anything here.**
 
+**Confirmed on this run's own head, eight hours later.** Job `97380177807`, head `ebadeca`:
+**steps 1–13 all `success`** — including the citation guard this run fixed, `:core:test`,
+`:app:test`, `assembleDebug` and `lintDebug` — and **step 14 `failure` in one second**. So two
+things are now measured rather than hoped: **the citation fix is green in CI**, not just locally;
+and **B-25 is deterministic**, reproducing across the 6–12 h recalculation window. **B-22 did not
+fire on either run** (step 10 `success` both times), so it is not among this branch's current
+causes of red.
+
 **The patch was deliberately not pushed.** Shrinking `retention-days`, or gating the upload on a
 non-`.md` diff, is a real one-line fix — but it is outside this slice, the APK is the artifact
 `SIDELOAD.md` points at, and shrinking evidence retention on a PR the owner has not reviewed is
