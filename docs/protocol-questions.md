@@ -1162,6 +1162,33 @@ separately as **PQ-S2-4**.
 
 **Re-verify:** `AUDIT-REQUEST.md` **C-S2T-1** … **C-S2T-6**.
 
+### Second pass 2026-08-24 (run 94) — the guard was per-NAME, and ten per-SITE holes rode in behind it
+
+**The question itself is unchanged and still open**: whether these names should be renamed to end
+the §7.2 collision is a spec decision for a gated machine, and nothing was renamed. What moved is
+the *coverage* half, and the distinction it turned on is worth carrying.
+
+PR #36's §2.3 block pins every transport error **name**: mutating any of the nine turns at least
+two of its tests red (**C-94-6**). That is a vocabulary guard and it holds. It is **not** a site
+guard. Mutating each `error: '...'` literal **one at a time, by line number** left the suite green
+at **49/49 on ten sites** (**C-94-7**) — a name is pinned wherever *some other* site emits it, so a
+site with no test of its own is pinned by nothing.
+
+Seven were reachable and are now asserted, each proven `0 failed → 1 failed` under its own
+single-site mutation (**C-94-8**). Three — `channel.ts:74`, `:81`, `:218` — are shadowed by
+`index.ts` and **remain site-unguarded, deliberately and in writing**: no behavioural test can
+reach them, and two mutations proved that none can even tell which layer answered, because the
+Worker's and the channel's replies are byte-identical (**C-94-9**). That is defence in depth
+working, not a hole, and the block says so rather than implying coverage it does not have.
+
+**If PQ-S2-3 is ever answered "rename",** the §2.3 block plus these ten sites are the list of what
+must move together. Having it before the decision rather than after is the reason to write it now.
+
+**One measurement for whoever takes the rename** (**C-94-11**): `'Bearer '` arrives as `'Bearer'`
+— Fetch strips trailing header whitespace — so `index.ts:60`'s `startsWith('Bearer ')` is what
+rejects an empty bearer and its `auth.length <= 'Bearer '.length` clause cannot fire while that
+stands. Left untouched; trimming the relay from a sandbox is what PQ-S2-1's rule forbids.
+
 ---
 
 ## PQ-S2-4 — A purged pairing answers `unauthorized`, so the phone's terminal "unpaired" state is unreachable

@@ -16854,3 +16854,111 @@ Gmail or email, no secrets read or printed, no `.appdata`, no `Desktop\site-v2`.
 and `autonomy/codex-state` were **read only**. Files written this run: `.github/workflows/ci.yml`,
 `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`, `docs/Apple-iOS-Strategy.md`, this LOG entry, and the
 `autonomy/claude-state` heartbeat in the engine repo.
+
+---
+
+## Run 94 — 2026-08-24 (Linux cloud sandbox). The vocabulary block pinned every error NAME, and ten error SITES rode in behind that
+
+**Rule one first.** `git fetch --all --prune` in both checkouts before any count. The android
+tree again arrived **detached at the docs-only `main`** (`ebfaf81`), **351 commits** behind the
+work branch — the same trap the mission's rule one exists for, now on its own count.
+
+**The assigned slice was declined for the fifty-ninth time, re-derived rather than inherited**
+(**C-94-1**). `node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the
+generator.`**, `exit 0`. §4.3.3's body, PQ-A2-1's decoded-ciphertext cap and PQ-A2-2's
+`decrypt_failed` all read **in `docs/Sync-Protocol.md` itself**. The prompt's pin `679a317` is
+stale; the real pin is `7328a0b` and the vendored corpus is **29/29, `diff -r` exit 0**
+(**C-94-2**). Both `main`s are unmoved and the boards are unmoved (**C-94-3**).
+
+### Milestone 1 — picking, and the item that turned out to be stale
+
+The ordered intent's **NEW ITEM 2(a)** — *"error-path coverage: which of the relay's status
+codes are asserted by exactly one test?"* — was the top item this sandbox can actually execute,
+because `relay/` is Node + vitest + miniflare and needs no Android SDK, no .NET and no
+`dl.google.com`. `npm ci` succeeds here and `origin/main`'s suite runs at **32/32** (**C-94-4**).
+
+Measured on `main`, the hole was real and large: renaming **26 of 27** error-name literals left
+the suite **green at 32/32**, and both `upgrade_required` sites could go 426 → 400 green as well
+(**C-94-5**). The names are a wire contract — `src/Sync/Protocol.cs` maps three of them onto
+`SyncError` — so that looked like a finding.
+
+**It was already answered.** PR **#36** (`claude/s2-transport-vocabulary`, last pushed
+2026-08-15) pins all nine names: mutating any one turns **at least two** of its tests red, and
+the 409's `latest` hint is pinned too (**C-94-6**). **NEW ITEM 2(a) was written at run 85 and
+had been stale ever since.** The standing precondition — *re-verify the item before taking it* —
+is what caught this, and it caught it before a second branch existed rather than after. **No
+duplicate PR was opened.**
+
+### Milestone 2 — the real gap, one line at a time
+
+A name guard is not a site guard, and the difference is measurable. Mutating each
+`error: '...'` literal **one at a time, by line number** — 27 sites — left #36's suite green at
+**49/49 on ten of them** (**C-94-7**): `channel.ts` **:74, :81, :92, :115, :118, :120, :143,
+:159, :197, :218**. A name is pinned wherever *some other* site emits it; a site with no test of
+its own is pinned by nothing and can change its status, its name, or stop firing entirely with
+nothing going red. Every `index.ts` site was already caught.
+
+**Seven are reachable and are now asserted** — create's wrong-bearer 401, `/pair`'s oversize 413
+and its two `bad_request` 400s, push's unparseable and bad-shape 400s, and pull's negative-`since`
+400. Each goes **0 failed → 1 failed** under its own single-site mutation (**C-94-8**).
+
+### Milestone 3 — the half this run got wrong first, and the mutations that said so
+
+The first draft also claimed to pin the other three. **Two mutations falsified that** (**C-94-9**).
+Deleting the Worker's own `upgrade_required` check left the suite **green**, because
+`channel.ts:218` emits a byte-identical 426. Letting the Worker admit an empty bearer left it
+**green** too, because `channel.ts:81` answers 401 and creates nothing, exactly as `index.ts:61`
+does. **No behavioural test can prove which layer answered, because the layers are
+observationally identical** — which is what defence in depth looks like when it is working.
+
+So the claim was withdrawn before publication rather than after, in run 75's shape. The three
+tests are renamed for the front-door properties they *do* pin, the block states in terms that
+:74, :81 and :218 **remain site-unguarded**, and each of the three is mutation-proven for its
+new claim: removing a channel case turns the first red (9 failed), removing both bearer-presence
+guards turns the second red, validating `dir` before `upgrade` turns the third red (**C-94-10**).
+
+**One incidental thing was measured and deliberately not fixed** (**C-94-11**). The header value
+`'Bearer '` arrives as `'Bearer'`, length 6 — Fetch strips trailing header whitespace — so
+`startsWith('Bearer ')` is the clause that rejects an empty bearer and
+`auth.length <= 'Bearer '.length` cannot fire while it stands. Left exactly as it is: a redundant
+defensive clause is not a defect, and tightening or trimming the relay from a sandbox is what
+PQ-S2-1's standing rule forbids in as many words.
+
+### What landed
+
+`6700078` on `claude/s2-transport-vocabulary`, **`relay/test/relay.test.ts` only, +163/−0**,
+**49 → 59 tests, 0 failed** (**C-94-12**). **PR #36 refreshed, not replaced** — the engine board
+stays at 22 open drafts, and this run did not add a 23rd. Citation guard: **892 definitions /
+893 cited**, `exit 0`.
+
+### Environment, stated so no claim can be misread
+
+Verified this run, not inherited: `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`,
+`adb`, `gh` **all ABSENT**; `ANDROID_HOME` **UNSET**. `node` v22.22.2, `git`, `bash`, `java`
+present. **No gate ran and none is claimed** — neither `scripts\Verify-Alpha.ps1` nor
+`./gradlew … :app:assembleDebug :app:lintDebug`. What *did* run is the relay's own suite under
+miniflare, in full, repeatedly, and every number above is read off its output. **`npx tsc
+--noEmit` was attempted and is not usable here**: it reports pre-existing errors in `src/` for
+missing Worker ambient types, which `npm run typecheck` generates via `wrangler types` — that
+needs Cloudflare API access this sandbox does not have. **No typecheck result is claimed**; the
+change is test-only and vitest transpiles it.
+
+### Prohibition — what this run did not touch
+
+**No rung moved.** **No vector byte was written in either repo; the pin stays `7328a0b`.** No
+`docs/Sync-Protocol.md` in either direction — read only. **No relay SOURCE byte**: every
+`src/channel.ts` and `src/index.ts` edit this run was a mutation probe, each reverted by
+`git checkout` and proven reverted by the suite returning to its baseline count before the
+commit; `git status` at commit time showed **one modified file**, the test. No `:app`, `:core`,
+`src/` C#, `.kt`, `.kts` or `.cs` file was touched. `$ExpectedOfflineTotal` and every
+count-reporting doc are **unmodified**; **no pinch point touched**. No workflow file in either
+repo. Nothing was merged, closed, undrafted, force-pushed, rebased or deleted; **no new PR was
+opened** and **no CI job was re-run**. **No test was skipped, disabled or quarantined** — the
+suite only grew. No deploys of any kind; **the production relay was not contacted at all**, not
+even `/v1/health` — every request in this run went to `miniflare` inside the test runner. No
+Play/Google/OAuth console, no accounts, no purchases, no Play Billing code, no Gmail or email,
+no secrets read or printed, no `.appdata`, no `Desktop\site-v2`. Terra's worktrees and
+`autonomy/codex-state` were **read only** — Terra reports *"Next intent: none, the R0–R7 ladder
+is exhausted"* and claims no files, so there was no collision to resolve. Files written this
+run: `relay/test/relay.test.ts` (engine), `AUDIT-REQUEST.md`, `LOG.md`, `STATE.md`,
+`docs/protocol-questions.md` (android), and the `autonomy/claude-state` heartbeat.

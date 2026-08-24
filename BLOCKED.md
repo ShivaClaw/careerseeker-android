@@ -4828,3 +4828,28 @@ buy it. **B-22 did not fire** (step 10 `success`).
 **Status: PARTIALLY CLOSED — producer stopped and PROVEN stopped; backlog outstanding, one human
 minute required.** Push-triggered CI on this branch carries information about the diff again. A
 `workflow_dispatch` upload will still fail until the owner frees the quota.
+
+---
+
+### B-18 status 2026-08-24 (ninety-fourth run) — the fifty-ninth firing, and a second staleness of the same class
+
+**Unchanged as a blocker, and nothing blocked this run's work.** The stored prompt was re-issued
+verbatim: same built slice, same stale pin `679a317` (real: `7328a0b`), same "S5 is NOT STARTED".
+Declined and re-derived (**C-94-1**, **C-94-2**). Both `main`s and both boards are unmoved
+(**C-94-3**), so none of run 82's four notification triggers fired and **no notification was sent** —
+the third deliberate silence, on the rule run 83 wrote down.
+
+**What is new is small but worth the next session's attention: the staleness is not only in the
+prompt.** This run's slice was chosen off the ordered intent's **NEW ITEM 2(a)**, written at run 85,
+and it had been **answered by PR #36 since 2026-08-15** (**C-94-6**). The standing precondition
+caught it — the item was re-verified before being taken, and the check cost one `vitest` run — but
+the lesson generalises past the prompt: **this lane's own records go stale too, and an ordered-intent
+item is exactly as much a summary as the prompt's ladder table is.** Re-verify both.
+
+**No new blocker filed.** The relay lane executes here in full (**C-94-4**), so nothing about this
+slice was obstructed; the three site-unguarded error paths (**C-94-9**) are a stated limitation of
+what a behavioural test can reach, not an obstacle needing a human.
+
+**Smallest human unblock — unchanged.** Turn the routine off, or replace its "YOUR SLICE THIS
+ITERATION" section with *read `RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox
+can actually advance.*

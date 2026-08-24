@@ -17608,3 +17608,194 @@ the direct check that nothing was disabled to buy the green.
 `workflow_dispatch` run would still fail at step 14, and the owner's one-minute action stands
 (B-25). This proves only that **push-triggered CI on this branch now carries information about the
 diff again**, which is the property that was lost.
+
+---
+
+## Run 94 (2026-08-24) — the vocabulary block was a name guard, not a site guard
+
+Environment for every command below: Linux cloud sandbox, two checkouts at
+`/home/user/careerseeker-android` and `/home/user/careerseeker`. `dotnet`, `pwsh`,
+`sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` **absent**; `ANDROID_HOME` unset.
+**No gate ran and none is claimed** — neither `scripts\Verify-Alpha.ps1` nor
+`./gradlew … :app:assembleDebug :app:lintDebug`. The relay lane is Node + vitest +
+miniflare and needs none of them; `npm ci` in `relay/` succeeds here (Maven/npm egress is
+open, `dl.google.com` is not — B-7).
+
+### C-94-1 — the assigned slice is built, for the fifty-ninth consecutive run
+
+```bash
+cd /home/user/careerseeker && git fetch --all --prune
+git checkout --detach 7328a0b
+node docs/sync-vectors/generate.mjs --check
+```
+
+Expected and observed: **`OK: 29 vector files match the generator.`**, `exit 0`. The three
+commits the prompt asks to author already exist:
+
+```bash
+git log -1 --format='%H %ad %s' --date=short 8575539   # 2026-08-09, §4.3.3 body + PQ-A2-1 + PQ-A2-2
+git log -1 --format='%H %ad %s' --date=short 22b028e   # 2026-08-09, both entitlement_ack vectors
+git log -1 --format='%H %ad %s' --date=short 7328a0b   # 2026-08-12, invalid-unknown-field, PQ-A2-3
+grep -n 'entitlement_ack body = ' docs/Sync-Protocol.md   # :317, {product_id, acknowledged_at, order_id?}
+grep -n 'decoded ciphertext' docs/Sync-Protocol.md        # PQ-A2-1
+grep -n 'decrypt_failed' docs/Sync-Protocol.md            # :103, :601 — PQ-A2-2
+```
+
+### C-94-2 — the prompt's vendored pin is stale, and the corpus is byte-identical to the real one
+
+```bash
+cd /home/user/careerseeker-android && ls core/src/test/resources/sync-vectors/v1/ | wc -l   # 29
+diff -r core/src/test/resources/sync-vectors/v1/ /home/user/careerseeker/docs/sync-vectors/v1/ ; echo $?
+```
+
+Observed: **29 files, `exit 0`, no output.** Pin is `7328a0b` (`docs/Merge-Topology.md:176`),
+not the prompt's `679a317`. **No vector byte was written this run, in either repo.**
+
+### C-94-3 — nothing on either board moved
+
+```bash
+git -C /home/user/careerseeker-android rev-parse origin/main   # ebfaf81, unmoved since 2026-08-06
+git -C /home/user/careerseeker rev-parse origin/main           # aac05f3, unmoved since 2026-08-12
+```
+
+Android PRs: **6 open, all `draft: true`, none merged** (`list_pull_requests`, state `all`).
+Engine PRs: **22 open, all draft**; newest `merged_at` anywhere is still PR #44, 2026-08-13.
+
+### C-94-4 — the relay suite executes in this sandbox, and that is what makes this run's claims evidence
+
+```bash
+cd /home/user/careerseeker && git checkout --detach origin/main && cd relay
+npm ci && npx vitest run
+```
+
+Observed on `origin/main`: **`Tests  32 passed (32)`**, `exit 0`.
+
+### C-94-5 — on `main`, twenty-six of twenty-seven error-name sites can be renamed with the suite green
+
+```bash
+cd /home/user/careerseeker/relay
+sed -i "s/'unauthorized'/'MUT_unauthorized'/g; s/'not_found'/'MUT_not_found'/g; \
+s/'bad_request'/'MUT_bad_request'/g; s/'too_large'/'MUT_too_large'/g; s/'exists'/'MUT_exists'/g; \
+s/'replay_rejected'/'MUT_replay_rejected'/g; s/'upgrade_required'/'MUT_upgrade_required'/g; \
+s/'method_not_allowed'/'MUT_method_not_allowed'/g" src/channel.ts src/index.ts
+npx vitest run    # observed: Tests  32 passed (32)
+git checkout src/channel.ts src/index.ts
+```
+
+Renaming **all** nine names (adding `pairing_unknown`) turns exactly **one** test red.
+Changing both `upgrade_required` sites from 426 to 400 (`sed -i "s/}, 426)/}, 400)/g"`) is
+**green** as well: `main`'s suite asserts 426 nowhere.
+
+### C-94-6 — PR #36 already closes the NAME half, which is why this run did not open a second branch
+
+```bash
+cd /home/user/careerseeker && git checkout --detach origin/claude/s2-transport-vocabulary
+cd relay && npx vitest run     # Tests  49 passed (49)
+# then, one name at a time:
+for n in unauthorized not_found bad_request too_large exists replay_rejected \
+         upgrade_required method_not_allowed pairing_unknown; do
+  git checkout src/channel.ts src/index.ts
+  sed -i "s/'$n'/'MUT_$n'/g" src/channel.ts src/index.ts
+  npx vitest run | grep -E "^ +Tests  "
+done
+```
+
+Observed: **every one of the nine turns at least two tests red** (3/3/3/2/2/2/2/2/3). Dropping
+the 409's `latest` hint turns 1 red. **The ordered intent's NEW ITEM 2(a) was stale**: it was
+written at run 85 and #36 (last pushed 2026-08-15) had already answered the vocabulary half.
+This run re-derived it rather than inheriting it, which is the standing precondition working.
+
+### C-94-7 — but #36 is a NAME guard, not a SITE guard: ten sites are unreached
+
+```bash
+cd /home/user/careerseeker/relay
+for f in src/channel.ts src/index.ts; do
+  for ln in $(grep -n "error: '" $f | cut -d: -f1); do
+    git checkout $f
+    sed -i "${ln}s/error: '\([a-z_]*\)'/error: 'SITE_\1'/" $f
+    echo "$f:$ln $(npx vitest run 2>&1 | grep -oE '[0-9]+ failed')"
+  done
+  git checkout $f
+done
+```
+
+Observed at `b0b6c77`: **0 failed** for `channel.ts` **:74, :81, :92, :115, :118, :120, :143,
+:159, :197, :218** — ten sites whose single-site mutation nothing catches. Every
+`index.ts` site is caught.
+
+### C-94-8 — after `6700078`, the seven reachable sites are caught
+
+```bash
+cd /home/user/careerseeker && git checkout claude/s2-transport-vocabulary && cd relay
+npx vitest run     # Tests  59 passed (59)
+for ln in 74 81 92 115 118 120 143 159 197 218; do
+  git checkout src/channel.ts
+  sed -i "${ln}s/error: '\([a-z_]*\)'/error: 'SITE_\1'/" src/channel.ts
+  echo "channel.ts:$ln $(npx vitest run 2>&1 | grep -oE '[0-9]+ failed')"
+done
+git checkout src/channel.ts
+```
+
+Observed: **:92, :115, :118, :120, :143, :159, :197 → `1 failed`** (each was `0 failed` before).
+**:74, :81, :218 → still `0 failed`.**
+
+### C-94-9 — the three shadowed sites stay unguarded, and this run's first draft was wrong about them
+
+The block's first draft claimed to pin all three. Two mutations falsified that, and both are
+recorded because the correction is the finding:
+
+```bash
+cd /home/user/careerseeker/relay
+# S3 — delete the Worker's own upgrade_required check (index.ts:68-70)
+npx vitest run     # observed: Tests  59 passed (59)  -- channel.ts:218 emits an identical 426
+# T-B(first attempt) — Worker admits an empty bearer: s/auth.length <= /auth.length < /
+npx vitest run     # observed: Tests  59 passed (59)  -- channel.ts:81 also answers 401, creating nothing
+```
+
+Both green. **No behavioural test can prove which layer answered**, because the layers are
+observationally identical — which is what defence in depth means when it is working. The three
+tests are therefore named for the front-door properties they *do* pin, and the block says in
+terms that :74, :81 and :218 remain site-unguarded.
+
+### C-94-10 — each of the three front-door tests is mutation-proven for the property it now claims
+
+```bash
+cd /home/user/careerseeker/relay
+# A: remove the channel's `case 'GET pull'`
+npx vitest run     # observed: Tests  9 failed | 50 passed (59)
+# B: replace the Worker's whole bearer guard with `if (!auth) …` AND delete channel.ts's
+#    `if (!bearer) return this.json({ error: 'unauthorized' }, 401);`
+npx vitest run     # observed: Tests  1 failed | 58 passed (59)  -- "an empty bearer … creates no channel"
+# C: in channel.ts live(), validate `dir` BEFORE the upgrade header, and drop index.ts's check
+npx vitest run     # observed: Tests  2 failed | 57 passed (59)  -- "… is 426, even when dir is also invalid"
+```
+
+### C-94-11 — `'Bearer '` arrives as `'Bearer'`, so the length clause cannot fire
+
+Measured with the C-S2R-8 trick (assert a deliberately wrong value so the runner's diff prints
+the measured one; `console.log` does not escape the Workers pool). Temporary probe, not committed:
+
+```ts
+const r = new Request('https://relay.example/v1/p_7Fq2mXk9LtVbN3wR/pull',
+                      { headers: { authorization: 'Bearer ' } });
+const got = r.headers.get('authorization');
+expect({ value: got, length: got?.length, startsWithBearerSpace: got?.startsWith('Bearer ') })
+  .toEqual({ value: 'PRINT-ME', length: -1, startsWithBearerSpace: 'PRINT-ME' });
+```
+
+Observed: **`{ value: 'Bearer', length: 6, startsWithBearerSpace: false }`** — Fetch strips
+trailing header whitespace. So `index.ts:60`'s first clause is what rejects an empty bearer, and
+`auth.length <= 'Bearer '.length` cannot fire while that clause stands. **Deliberately not
+changed:** a redundant defensive clause is not a defect, and tightening or trimming the relay
+from a sandbox is exactly what PQ-S2-1's standing rule forbids.
+
+### C-94-12 — what landed, and that no new PR was opened
+
+```bash
+cd /home/user/careerseeker && git log --oneline -1 origin/claude/s2-transport-vocabulary
+git show --stat 6700078
+```
+
+Observed: **`6700078`**, `relay/test/relay.test.ts` only, **+163/−0**. **PR #36 refreshed, not
+replaced** — the engine board stays at 22 open drafts. **No relay source byte, no vector, no
+spec file, no `$ExpectedOfflineTotal`.**
