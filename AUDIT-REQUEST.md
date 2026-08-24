@@ -17297,12 +17297,79 @@ report is not.** Each of C-91-1…5 now prints
 naming the exact file, line and remedy. The self-test pins both halves: case 9 asserts the hint
 fires **and** that a list-item entry still **fails**; case 9b asserts the hint does **not** fire on
 a genuinely absent id (run 75's incident), because a hint that reassures on a real absence is worse
-than no hint. `--self-test` now runs **10 cases / 14 assertions**, all passing (**C-92-2**).
+than no hint. `--self-test` now runs **13 cases / 16 assertions**, all passing (**C-92-2**). *(Case **9c** was
+added after the hint misfired on this run's own B-25 prose — see **C-92-10**.)*
 
 **Honest limit:** this improves the *diagnosis*, not the *detection*. The guard's coverage is
 unchanged — it still checks only that a referent exists, never that a citation is apt. And the
 near-miss search is deliberately narrow: it looks only inside `DEF_DOCS`, so an entry written into
 the wrong *file* is still reported as plain "defined nowhere".
+
+### C-92-8 — `Build and test` cannot reach green: the artifact upload is out of account storage quota
+
+```bash
+# job 97291351051, head cda9a58 (run 90's records commit), read from GitHub:
+#   steps 1-13  ALL success -- incl. :core:test, :app:test, assembleDebug, lintDebug
+#   step  14    "Upload debug APK"  -> FAILURE, 01:13:03 -> 01:13:03  (<1s)
+#   job         conclusion: failure
+# the log line:
+```
+
+```
+##[error]Failed to CreateArtifact: Artifact storage quota has been hit. Unable to upload any
+new artifacts. Usage is recalculated every 6-12 hours.
+```
+
+*Expected, and **observed**:* exactly that. **Everything the diff could plausibly break passed**,
+on a commit that is `.md` files only, and the job is still red — **because step 14 is.** This is
+**B-25**, filed this run. It is **not B-22** (that is an intermittent `ComposeTimeoutException` in
+`ScreensFromFixtureTest`, in step 10, and it fires *before* this one); it is deterministic; and
+**no push can fix it** — the failing step never touches the diff.
+
+**The consequence that matters more than the failure:** while this holds, red CI on this repo
+carries **no information** about the diff. A regression and a quota error present identically in the
+check list. Distinguish them by **which step failed**, never by the check's colour.
+
+### C-92-9 — the android lane is the whole consumer; the engine repo uploads nothing
+
+```bash
+cd careerseeker-android && grep -n -A6 'Upload debug APK' .github/workflows/ci.yml
+# expect: actions/upload-artifact@v4, name app-debug, retention-days: 14
+cd ../careerseeker && grep -rn 'upload-artifact' .github/workflows/ || echo "engine: none"
+# expect: engine: none
+```
+
+*Expected, and **observed**:* the android workflow uploads **one debug APK per run** with
+**`retention-days: 14`** at `.github/workflows/ci.yml:200-206`; the engine repo's workflows contain
+**no `upload-artifact` step at all**. This branch has taken **~92 runs**. Storage quota is
+**account-wide**, so the accumulation is this program's own, and it is concentrated in one step of
+one workflow. **Honest limit:** this identifies the only *producer* in these two repositories. It
+does **not** measure current usage, and it cannot see any other repository on the account — quota
+could have other contributors this sandbox cannot enumerate.
+
+### C-92-10 — the near-miss hint misfired on this run's own prose, and was narrowed the same hour
+
+```bash
+cd careerseeker-android
+# reproduce the misfire against the FIRST cut of find_near_miss():
+#   BLOCKED.md's B-25 cites "(**C-92-8**)" mid-sentence, before C-92-8 was filed.
+#   The first cut fired on ANY off-heading mention in a DEF_DOC, and printed
+#     "fix: make it a heading -- '### C-92-8 — <title>'"
+#   which would have been wrong: it is a forward reference, not a mis-filed definition.
+./scripts/check-citations.sh --self-test 2>&1 | grep -A1 'mid-sentence'
+```
+
+*Expected, and **observed**:* `PASS  mid-sentence citation in a def doc still fails (exit 1)` then
+`PASS  ...and the hint stayed silent on a prose citation` — **case 9c**, added because the misfire
+happened, not because it was imagined. `find_near_miss()` now fires only when the id **opens** the
+line after at most a list marker and an opening bold/emphasis run.
+
+**Why this is recorded rather than quietly fixed.** The hint's whole value is that a reader trusts
+it. A false positive that says *"the fix is to make it a heading"* about a correct sentence spends
+that trust on the first use. The verdict and exit code were right both before and after — **only
+the advice was wrong**, which is precisely the defect class this run's slice was about, reproduced
+by the fix for it within the hour. Bias is now toward **silence**: a missing hint costs a sentence
+of help; a wrong one costs the reader's trust in every other line the guard prints.
 
 ### What has no command, and is therefore not a claim
 

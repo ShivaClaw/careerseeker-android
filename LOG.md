@@ -16589,7 +16589,7 @@ failure, never to suppress one — **verdict and exit code unchanged**. Pinned b
 and the second matters more than the first: **9** asserts a list-item entry still **fails** and the
 hint fires; **9b** asserts the hint does **not** fire on a genuinely absent id — run 75's actual
 incident — because a hint that reassures on a real absence is strictly worse than no hint.
-`--self-test`: **10 cases / 14 assertions, all passed, exit 0**.
+`--self-test`: **13 cases / 16 assertions, all passed, exit 0**.
 
 **Replayed against the commit that had the defect** (**C-92-7**) — this run's guard, run 91's
 records at `7908b12`: **exit 1, unchanged**, and each of C-91-1…5 now prints
@@ -16597,6 +16597,52 @@ records at `7908b12`: **exit 1, unchanged**, and each of C-91-1…5 now prints
 improves the *diagnosis*, not the *detection*. Coverage is unchanged — the guard still checks only
 that a referent exists, never that a citation is **apt** — and the search is scoped to `DEF_DOCS`,
 so an entry written into the wrong *file* still reports as plain "defined nowhere".
+
+### Milestone 2b — the fix's own defect, found within the hour, and the second failure underneath it
+
+**The near-miss hint misfired on this run's own prose.** `BLOCKED.md`'s new B-25 cites
+**`(**C-92-8**)`** mid-sentence, before C-92-8 was filed. The first cut of `find_near_miss()` fired
+on *any* off-heading mention in a definition doc, so it reported that ordinary forward reference as
+a mis-filed definition and advised *"make it a heading"* — **wrong advice, confidently given**
+(**C-92-10**). Narrowed to lines where the id **opens** the line after at most a list marker and an
+opening bold run; **case 9c** pins it, and the suite is now **13 cases / 16 assertions**.
+
+**Recorded rather than quietly fixed, because the shape is the point.** The verdict and exit code
+were correct before and after — **only the advice was wrong.** That is the same defect class this
+run's slice was about, reproduced by the fix for it, inside an hour. The bias is now toward
+**silence**: a missing hint costs a sentence of help; a wrong one costs the reader's trust in every
+other line the guard prints.
+
+**AND THE BRANCH WAS RED FOR TWO RUNS FROM TWO DIFFERENT CAUSES.** Checking run 90's commit
+`cda9a58` — to see whether the citation break predated run 91 — found a **different** failure. Job
+`97291351051`: steps 1–13 **all `success`**, including `:core:test`, `:app:test` (Robolectric),
+`assembleDebug`, `lintDebug` and the analytics assertion. Step 14, *Upload debug APK*, failed **in
+under one second**:
+
+```
+##[error]Failed to CreateArtifact: Artifact storage quota has been hit.
+```
+
+**Filed as B-25** (**C-92-8**). One APK per run at `retention-days: 14`
+(`.github/workflows/ci.yml:200-206`) × **~92 runs**; the engine repo uploads **nothing**
+(**C-92-9**), so this lane is the whole consumer, and the quota is **account-wide**.
+
+**Three things follow, and the third is the expensive one.**
+
+1. **No push can fix it.** The failing step never touches the diff. A perfectly green tree still
+   ends in a red job.
+2. **It is not B-22**, which is intermittent, lives in step 10, and fires *before* this one.
+3. **While it holds, red CI on this repo carries no information about the diff.** A real regression
+   and a quota error are indistinguishable in the check list. **This run nearly made that mistake
+   in the other direction** — reading its own citation failure as B-22's coin — and was saved only
+   by the timing being wrong for it (35 s, not 8 min). **Read which *step* failed. The colour no
+   longer means anything here.**
+
+**The patch was deliberately not pushed.** Shrinking `retention-days`, or gating the upload on a
+non-`.md` diff, is a real one-line fix — but it is outside this slice, the APK is the artifact
+`SIDELOAD.md` points at, and shrinking evidence retention on a PR the owner has not reviewed is
+widening the PR to solve someone else's problem. **B-25 carries the patch as a proposal and names
+the two smallest human unblocks.**
 
 ### Milestone 3 — one measurement that closes a six-run-old assertion, and one notification withheld
 
@@ -16632,7 +16678,8 @@ every claim above. `gradle` is on `PATH` but **was not invoked**: `:app` cannot 
 
 No rung moved. **No vector byte was written in either repo; the pin stays `7328a0b`.** No `:app`,
 `:core`, `src/` or `relay/` source file was written; no `.kt`, `.kts`, `.cs` or `.ts` file was
-touched at all. No spec file was edited in either repo. The engine checkout was **read-only** —
+touched at all. No spec file was edited in either repo, and **`.github/workflows/ci.yml` was read but not
+written** — B-25's patch is a proposal, not a push. The engine checkout was **read-only** —
 `fetch`, `log`, `show`, `archive`, `ls-tree`, `checkout --detach` and `generate.mjs --check`.
 Nothing was merged, closed, undrafted, force-pushed, rebased or deleted, in either repo. **No new
 PR was opened** — PR #6 was refreshed, and the 28-deep board is unchanged. No deploys of any kind;

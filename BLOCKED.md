@@ -4706,3 +4706,62 @@ is unverified from this sandbox** — no Android SDK, no JBR, and `:app` cannot 
 (run 80). Whether the next CI run is green depends on B-22's coin, which is the whole content of
 B-22 and is why *"CI was green"* has never been evidence in these records without a sample count.
 **No job was re-run this session, and no test was skipped, disabled or quarantined.**
+
+---
+
+## B-25 — the android CI job cannot reach green: `actions/upload-artifact` is out of account storage quota (ninety-second run, 2026-08-24)
+
+**Symptom.** The last step of `Build and test`, *Upload debug APK*, fails in **under one second**
+with a quota error, not a build error:
+
+```
+##[error]Failed to CreateArtifact: Artifact storage quota has been hit. Unable to upload any new
+artifacts. Usage is recalculated every 6-12 hours.
+```
+
+Observed on job `97291351051`, head `cda9a58` (run 90's records commit), 2026-08-24T01:13:03Z
+(**C-92-8**). **Everything before it passed** — `:core:test`, `:app:test` (Robolectric),
+`assembleDebug`, `lintDebug` and the analytics assertion were all `success`, on a commit whose diff
+is `.md` files only. The job still concludes **`failure`**, because step 14 does.
+
+**Why this is worth a filing rather than a line in the log.**
+
+1. **It is not a code defect, and no push can fix it.** The failing step never touches the diff. A
+   green tree still ends in a red job.
+2. **It is not B-22.** B-22 is an intermittent `ComposeTimeoutException` in `ScreensFromFixtureTest`.
+   This is deterministic, is in a different step, and happens *after* the tests pass.
+3. **It masks the real signal, which is the expensive part.** With step 14 failing on every run,
+   `Build and test` is red unconditionally — so a genuine regression and a quota error look
+   identical from the check list, and *"CI is red"* stops carrying information. **Run 92 nearly read
+   its own citation failure this way**, and would have, had the timings not been so different
+   (35 s vs 8 min).
+4. **The accumulation is this program's own doing.** The workflow uploads one debug APK per run with
+   `retention-days: 14` (`.github/workflows/ci.yml:200-206`), and this branch has taken **~92 runs**.
+   The engine repo uploads **no** artifacts at all (**C-92-9**), so the android lane is the whole
+   consumer. Storage quota is **account-wide**, not per repository.
+
+**Attempts.**
+
+1. **Wait for it to clear.** GitHub recalculates usage every 6–12 hours, so a run can pass by luck.
+   That is not a fix: the next run re-uploads and re-fills. **Not attempted as a remedy** — waiting
+   is what has been happening for ~92 runs.
+2. **Delete old artifacts.** Requires write access to the account's Actions storage. **Not
+   attempted**; it is destructive to evidence the owner may want, and it is not a sandbox's call.
+3. **Shrink or condition the upload.** A real patch exists and is small — drop `retention-days: 14`
+   to `2`, or gate the whole step on the diff containing a non-`.md` file, so records-only runs stop
+   producing APKs at all. **Deliberately NOT pushed.** The step is not part of this run's slice, the
+   APK is the artifact `SIDELOAD.md` points at, and shrinking evidence retention on a PR the owner
+   has not reviewed is widening the PR to fix someone else's problem. **The patch belongs to whoever
+   decides how long a sideload build should live.**
+
+**Smallest human unblock — one of two, both about a minute.**
+
+- **Free the quota:** delete old `app-debug` artifacts (repo → Actions → any run → Artifacts, or
+  the account's storage settings). This unblocks CI *today* but refills.
+- **Or take attempt 3's patch**, which stops the refill: in `.github/workflows/ci.yml`, either set
+  `retention-days: 2`, or add `if:` to the *Upload debug APK* step so it runs only when the push
+  contains code. **Do both if you want CI green and kept green.**
+
+**Until one of those happens, `Build and test` on this repo is red regardless of the diff, and no
+agent iteration can change that.** Read which *step* failed before treating a red check here as a
+regression — that is now the only way to tell.

@@ -278,12 +278,28 @@ run_check() {
 }
 
 # ---------------------------------------------------------------------------
-# find_near_miss <root> <id> -> "file:line: text" for a non-heading, outside-a-
-# fence mention of <id> in a DEF_DOC, or empty.
+# find_near_miss <root> <id> -> "file:line: text" for a line in a DEF_DOC that
+# looks like an ATTEMPTED DEFINITION of <id> but is not a heading, or empty.
 #
-# Deliberately narrow: it reports only the case where the id is ALREADY in a
-# document that defines ids, so the remedy is a one-character edit. It never
-# suppresses a failure -- it only explains one.
+# WHY THE SHAPE TEST, AND NOT JUST "IS THE ID IN THIS FILE"
+#
+# The first cut of this fired on any off-heading mention in a DEF_DOC. That is
+# too broad, and it misfired the same day it was written: B-25's prose cites
+# "(C-92-8)" mid-sentence, in BLOCKED.md, a DEF_DOC -- an ordinary forward
+# reference, not a mis-filed definition. The hint told the author to "make it a
+# heading", which would have been wrong. A hint that gives confident wrong
+# advice is worse than a terse correct verdict.
+#
+# A mis-filed definition has a shape: the id OPENS the line, after at most a
+# list marker and a bold/emphasis run.
+#
+#   - **C-91-1** — the corpus is intact      <- attempted definition, hint
+#   * C-91-1: the corpus is intact           <- attempted definition, hint
+#   ...verified this run (**C-92-8**).       <- prose citation, NO hint
+#
+# It never suppresses a failure -- it only explains one -- so a false NEGATIVE
+# here costs a sentence of help, while a false POSITIVE costs the reader's
+# trust in every other line the guard prints. Bias to silence.
 # ---------------------------------------------------------------------------
 find_near_miss() {
   local root="$1" id="$2" doc
@@ -293,13 +309,19 @@ find_near_miss() {
       /^[ \t]*(```|~~~)/ { infence = !infence; next }
       infence { next }
       /^(##|###|####) / { next }               # a heading would have been a definition
-      index($0, WANT) == 0 { next }
       {
-        pre = (index($0, WANT) > 1) ? substr($0, index($0, WANT) - 1, 1) : " "
-        if (pre ~ /[A-Za-z0-9.]/) next          # S5.B-0 style label, not a mention
-        t = $0; sub(/^[ \t]+/, "", t)
-        if (length(t) > 88) t = substr(t, 1, 85) "..."
-        printf "%s:%d: %s\n", FNAME, FNR, t
+        # strip leading space, an optional list marker, and an optional
+        # opening bold/italic run -- what is left must START with the id.
+        t = $0
+        sub(/^[ \t]+/, "", t)
+        sub(/^([-*+]|[0-9]+[.)])[ \t]+/, "", t)
+        sub(/^(\*\*|__|\*|_|`)+/, "", t)
+        if (index(t, WANT) != 1) next
+        rest = substr(t, length(WANT) + 1, 1)
+        if (rest ~ /[0-9A-Za-z]/) next          # ran into a longer token
+        u = $0; sub(/^[ \t]+/, "", u)
+        if (length(u) > 88) u = substr(u, 1, 85) "..."
+        printf "%s:%d: %s\n", FNAME, FNR, u
       }
     ' "$root/$doc"
   done | head -3
@@ -433,6 +455,22 @@ self_test() {
     sed 's/^/        /' "$tmp/out"; fails=$((fails+1))
   else
     echo "  PASS  ...and no near-miss hint fired"
+  fi
+
+  # 9c. B-25's actual misfire: a DEF_DOC citing a not-yet-filed id MID-SENTENCE
+  #     is an ordinary forward reference, not a mis-filed definition. The first
+  #     cut of find_near_miss() fired here and told the author to "make it a
+  #     heading", which would have been wrong. Still a failure; no hint.
+  _fixture
+  printf '### C-1-1 — a check\n' > "$tmp/case/AUDIT-REQUEST.md"
+  printf '## B-1 — a blocker\n\nObserved on job 97291351051 (**C-92-8**), so it is red.\n' > "$tmp/case/BLOCKED.md"
+  printf 'See B-1.\n' > "$tmp/case/LOG.md"
+  _case "mid-sentence citation in a def doc still fails" 1
+  if grep -q 'NEAR MISS' "$tmp/out"; then
+    echo "  FAIL  ...but the hint misread a prose citation as a mis-filed definition"
+    sed 's/^/        /' "$tmp/out"; fails=$((fails+1))
+  else
+    echo "  PASS  ...and the hint stayed silent on a prose citation"
   fi
 
   echo
