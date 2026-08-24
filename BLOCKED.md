@@ -4771,3 +4771,48 @@ a one-off.** **B-22 did not fire on either run** (step 10 `success` both times).
 **Until one of those happens, `Build and test` on this repo is red regardless of the diff, and no
 agent iteration can change that.** Read which *step* failed before treating a red check here as a
 regression — that is now the only way to tell.
+
+### B-25 status 2026-08-24 (ninety-third run) — attempt 3 is TAKEN; half the blocker is closed, half is still the owner's
+
+**What changed.** Attempt 3 above is no longer "not attempted". `.github/workflows/ci.yml:234-241`
+now carries `if: github.event_name == 'workflow_dispatch'` on the *Upload debug APK* step
+(**C-93-5**). The variant chosen is the `if:`, **not** `retention-days: 2` — run 92's reason for
+refusing the shrink was correct and is preserved: nobody in a sandbox should quietly reduce how long
+the owner's build survives. Retention stays **14**.
+
+**Why run 93 took what run 92 declined.** Run 92's stated ground was that the patch would "widen the
+PR to fix someone else's problem". Two sentences in its own filing say otherwise — *"the
+accumulation is this program's own doing"* and *"the android lane is the whole consumer"* — and the
+red CI is on this branch. So it is neither someone else's problem nor a widening: it is the branch's
+own failing step, taken deliberately as the slice rather than bolted onto an unrelated one.
+
+**What is now measured that was not before (C-93-3).** One `app-debug` is **12,741,138 bytes**, with
+`expires_at 2026-09-06T21:37:53Z` — the 14-day life read off the **artifact**, not off the config
+that asks for it. **11 uploads in the 2.16 days** to 2026-08-24T09:23Z, ~**5.1/day**, giving a
+steady-state hold of ~71 artifacts ≈ **0.9 GB** — past the **500 MB** Free-plan private-repo
+allowance on this workflow's own. Run 92's C-92-9 identified the *producer*; this quantifies it.
+
+**THE HALF THAT IS NOT CLOSED, and it is the half that decides whether CI goes green.** Gating stops
+the **refill**. It cannot free what is **already held**. While the account remains over quota, any
+upload still fails — **including a dispatched one**. So:
+
+- **Expected on the next push to this branch:** the upload step is **skipped**, and `Build and test`
+  concludes **`success`** (absent B-22, which is independent and intermittent).
+- **If a push-triggered run is still red *at the upload step*, the condition is wrong and that is
+  run 93's defect**, not the quota. Read which step failed — that remains the only reliable signal
+  while B-25 stands.
+- **`workflow_dispatch` will still fail** until the quota is cleared. That is deliberate and honest:
+  if the owner explicitly asks for an APK and there is no room to store it, they should be told,
+  not handed silence.
+
+**Smallest human unblock — now exactly one item, and it is unchanged in size.** Free the quota once:
+repo → **Actions → Artifacts**, or the account's storage settings, deleting old `app-debug`
+artifacts. **The "or take the patch" option is gone — the patch is taken.** After clearing, the
+~5/day refill no longer happens, so this should not recur.
+
+**Honest limit, unchanged from C-93-3.** No endpoint reachable from this sandbox reports
+**account-wide** storage usage, and other repositories on the account may contribute to it. Run 93
+removed *this workflow's* contribution and can prove that much; it cannot prove the account is
+therefore under quota, and it does not claim to.
+
+**Status: PARTIALLY CLOSED.** Producer stopped, backlog outstanding, one human minute required.
