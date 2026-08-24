@@ -2249,6 +2249,14 @@ Both classify an unparseable **body** as `unknown_kind`, not `decrypt_failed`:
 So the two implementations **agree with each other and with §7.2**, and **§3's sentence is the
 outlier**. Nothing is wrong on the wire today.
 
+**And §7.2 is not the only place §3 disagrees with.** §4.2 (line 185) says: *"`kind` MUST be one of
+the kinds in §4.3. A receiver that does not recognise `kind` MUST reject the envelope with
+`unknown_kind` (§7.2) and MUST NOT act on `body`."* A body that will not parse has no recognisable
+`kind` at all, so §4.2's rule reaches it and points at **`unknown_kind`** as well. That makes §3's
+sentence the outlier against **three** things — §4.2, §7.2, and both shipping implementations —
+rather than one, and it is why reading (a) below is stated as near-certain rather than merely
+likely (**C-95-13**).
+
 ### Why nobody noticed for the life of the document
 
 The falsifier has been green in `:core` the whole time. It was never compared to §3's list

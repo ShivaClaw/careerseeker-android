@@ -18016,3 +18016,16 @@ scripts/check-citations.sh
 KDoc added, no production byte**. **No vector was written in either repo and the pin stays
 `7328a0b`.** **PR #6 refreshed, not replaced**; no new PR in either repo, so the engine board
 stays at 22 open drafts and the android board at 6.
+
+### C-95-13 — §4.2 independently points at `unknown_kind`, so §3's sentence is the outlier against three things
+
+```bash
+cd /home/user/careerseeker
+sed -n '184,185p' docs/Sync-Protocol.md
+```
+
+*Observed:* *"`kind` MUST be one of the kinds in §4.3. A receiver that does not recognise `kind`
+MUST reject the envelope with `unknown_kind` (§7.2) and MUST NOT act on `body`."* A body that will
+not parse has no recognisable `kind`, so §4.2 reaches it and agrees with §7.2 and with both
+implementations (**C-95-10**, **C-95-11**). **§3 line 101 is the only text in the document that
+says otherwise.**
