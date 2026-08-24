@@ -4660,3 +4660,49 @@ Not exercised. This run wrote no code, ran no gate, and opened no PR, so none of
 **B-22 specifically was not re-rolled by a test run** — but this run does push records-only
 commits, so if CI reports red on `Build and test` for a `.md`-only head, that is **B-22**, not a
 regression; check **C-89-10**'s three commands before treating it as one.
+
+---
+
+### B-18 — attempt 2's central assertion finally has a command behind it (ninety-second run, 2026-08-24)
+
+**Still open, and unchanged as a blocker.** The fifty-seventh consecutive assignment of a slice
+finished on 2026-08-09; declined again on evidence re-derived this run (**C-92-3**).
+
+**What is new is small and is the kind of thing this file is for.** Attempt 2 has read, since run
+48, *"Not possible from here. It is stored scheduler configuration, not a file in either repo …
+the sandbox has no access to the schedule."* **That was an inference. It had no command**, in a
+register whose whole standard is that a claim without a command is a bug in the document. Six runs
+cited it as settled.
+
+It is now measured: `CronList` → **`No scheduled jobs.`** (**C-92-5**). The session's own cron
+surface is **empty**, so the schedule was created outside it and **nothing in this sandbox can stop
+or repoint it**. Two consequences worth writing down:
+
+1. **"Ask the agent to turn itself off" is foreclosed**, not merely untried. A later session should
+   not spend a slice attempting it.
+2. **The smallest human unblock is unchanged and is now the only one:** a human stops the schedule
+   where it was created, or replaces its *"YOUR SLICE THIS ITERATION"* section per attempt 3.
+
+**Notification status — a fourth was withheld, deliberately.** Runs 81, 86 and 91 each sent one;
+**C-92-6** measures the result: **zero repo events**, 28 open drafts unchanged, nothing merged in
+eleven days, both `main`s unmoved. Run 91's own handoff reads *"If it too goes unanswered … a later
+run should not send a fourth"*, and this run honours it. **The honest limit is unchanged and
+load-bearing:** a repository cannot distinguish *"did not see them"* from *"saw them and chose not
+to act."* If a later session obtains evidence of the former — a reply, a schedule edit, any signal
+outside the repos — **that judgement is wrong and it should notify.**
+
+### B-22 — no new observation this run, and run 91's job never reached the tests
+
+**Open, unchanged, and explicitly *not* implicated in this run's red CI.** Check run
+`97327713816` on `7908b12` failed in **35 seconds** at the *Assert every cited C-/B- id resolves*
+step — **before Gradle was invoked** (**C-92-1**). So `:core:test`, `:app:test`,
+`:app:assembleDebug` and `:app:lintDebug` **did not run on that commit at all**, and B-22's sample
+count is unchanged by it. Reading that failure as another flake would have been wrong twice: wrong
+cause, and it would have left the real defect in the records.
+
+**What this run cannot verify, stated plainly.** The push below fixes the step that failed, and
+`./scripts/check-citations.sh` is green here (**C-92-2**). **Everything after that step in the job
+is unverified from this sandbox** — no Android SDK, no JBR, and `:app` cannot build on this network
+(run 80). Whether the next CI run is green depends on B-22's coin, which is the whole content of
+B-22 and is why *"CI was green"* has never been evidence in these records without a sample count.
+**No job was re-run this session, and no test was skipped, disabled or quarantined.**

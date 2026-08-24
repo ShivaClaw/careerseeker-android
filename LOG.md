@@ -16525,3 +16525,118 @@ Run 90 named the useful move (owner stops the schedule, then runs H2) but **decl
 ### Prohibition — what this run did not touch
 
 No rung moved. **No vector byte was written in either repo; the pin stays `7328a0b`.** No `:app`, `:core`, `src/`, `relay/`, or spec source file was written or edited. Nothing was merged, closed, undrafted, force-pushed, rebased, or deleted. No new PR was opened. No deploys; **the production relay was not contacted at all**, not even `/v1/health`. No Play/Google/OAuth console, no accounts, no purchases, no Play Billing code, no Gmail/email, no secrets read or printed, no `.appdata`, no `Desktop\site-v2`. Terra's worktrees and `autonomy/codex-state` were read only. No test was skipped, disabled, or quarantined. The only writes this run: this LOG entry, the STATE run-count line, and the `autonomy/claude-state` heartbeat.
+
+---
+
+## RUN 92 — 2026-08-24 (Linux sandbox). **CI on this branch's own head was red, and it was not the flake. Run 91 filed five citations in a form the guard cannot read; this run fixed it and made the guard say so next time.**
+
+**Kept short on purpose**, per runs 87–91's measured finding: on a run that moves no rung, the
+records' own growth is the only cost still being paid. Everything below was run this session.
+
+### Milestone 0 — rule one, then the assigned slice re-derived (fifty-seventh assignment, declined)
+
+`git fetch --all --prune` ran in **both** checkouts before any ref was read; every count below is
+post-fetch. The local android checkout was **detached at `ebfaf81` — 340 commits behind
+`origin/claude/android-a0-probe`**, which is exactly the stale-ref hazard rule one exists for.
+
+The assigned S5 spec half is closed and unchanged, verified by commands here, not read from the
+records (**C-92-3**): `node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match
+the generator.`**, **exit 0**; §4.3.3's `{product_id, acknowledged_at, order_id?}` body at
+`docs/Sync-Protocol.md:307–320`; the cap on the **decoded** ciphertext at `:111–112`;
+`decrypt_failed` for structural rejection at `:103` and `:601`; `invalid-unknown-field.json` in the
+29-file corpus. Engine `origin/main` carries **26** → the work is **unmerged, not unbuilt**.
+Declined for the reason attempt 1 of **B-18** gave fifty-six runs ago: rebuilding it forks §4.3 and
+regenerates a corpus the android repo vendors byte-identically — a cross-repo drift event the
+prompt itself says to stop for. **The corpus is still byte-identical to pin `7328a0b`: 29 files,
+`diff -r` exit 0** (**C-92-4**). The prompt's `679a317` remains stale.
+
+### Milestone 1 — the slice, and why it outranked the ordered intent
+
+**CI on PR #6's head was `failure`.** Check run `97327713816` on `7908b12`, 05:03:31Z → 05:04:06Z.
+**Thirty-five seconds** — too fast to be a test, and it was not one: the job died at the *Assert
+every cited C-/B- id resolves* step, **before Gradle ran at all** (**C-92-1**).
+
+This outranks anything on `STATE.md`'s ordered intent, and the reason is not "CI is red". It is
+that **the previous run broke it, the break is inside this program's own records, and the fix is
+records-only** — the one class of work a sandbox with neither an Android SDK nor Windows can
+actually finish. Reproduced locally, no toolchain: `./scripts/check-citations.sh` → `exit 1`, five
+dangling ids, **identical to the CI log**.
+
+**The cause.** `scripts/check-citations.sh` reads definitions off **heading lines only**
+(`### C-91-1 — …`). Run 91 wrote its five entries as **list items** (`- **C-91-1** — …`). Right
+file, right order, correct commands underneath — **unparseable as definitions**. So LOG.md and
+AUDIT-REQUEST.md cited C-91-1…5, nothing defined them, and the guard fired correctly.
+
+**The fix, and the one thing that made it slower than a sed.** Promoting a citation to a definition
+**blesses the claim it names**, so all five were **re-run before promotion** rather than reformatted
+on faith (**C-92-3**). All five hold: `OK: 29 …`/exit 0; §4.3.3 at `:307`; `decrypt_failed` at
+`:103`; **26** vectors on `main`; engine `main` `2026-08-12 aac05f3`, android `main`
+`2026-08-06 ebfaf81`. Fenced commands are byte-identical to run 91's; only the heading level moved.
+**`./scripts/check-citations.sh` → `OK: every cited C-/B- id resolves to an entry that exists.`,
+exit 0** (**C-92-2**), and `--self-test` green.
+
+### Milestone 2 — the guard was right and its report was misleading, which is its own defect
+
+The verdict `cited, but defined nowhere` is **the one description that sends a reader to the wrong
+place**: the entries were not missing, they were unreadable. That sentence is what cost this run its
+slice.
+
+Added `find_near_miss()`: when a dangling id already sits in a definition doc on a non-heading line
+outside a fence, the report names the **file, the line, and the remedy**. Built to explain a
+failure, never to suppress one — **verdict and exit code unchanged**. Pinned by two self-test cases,
+and the second matters more than the first: **9** asserts a list-item entry still **fails** and the
+hint fires; **9b** asserts the hint does **not** fire on a genuinely absent id — run 75's actual
+incident — because a hint that reassures on a real absence is strictly worse than no hint.
+`--self-test`: **10 cases / 14 assertions, all passed, exit 0**.
+
+**Replayed against the commit that had the defect** (**C-92-7**) — this run's guard, run 91's
+records at `7908b12`: **exit 1, unchanged**, and each of C-91-1…5 now prints
+`AUDIT-REQUEST.md:17113: - **C-91-1** — …` with `fix: make it a heading`. **Honest limit:** this
+improves the *diagnosis*, not the *detection*. Coverage is unchanged — the guard still checks only
+that a referent exists, never that a citation is **apt** — and the search is scoped to `DEF_DOCS`,
+so an entry written into the wrong *file* still reports as plain "defined nowhere".
+
+### Milestone 3 — one measurement that closes a six-run-old assertion, and one notification withheld
+
+**B-18 attempt 2 has asserted since run 48** that the recurring prompt *"is stored scheduler
+configuration … the sandbox has no access to the schedule."* That was an **inference with no command
+behind it**, in a document whose entire standard is that a claim without a command is a bug. It now
+has one: `CronList` → **`No scheduled jobs.`** (**C-92-5**). The session's own cron surface is
+empty, so the schedule was created outside it, **no agent can stop it from here**, and "ask the
+agent to turn itself off" is foreclosed as a remedy. Narrow — but it is the difference between
+reasoning and measurement, and B-18's smallest human unblock depends on it.
+
+**The board has not moved** (**C-92-6**): **22 engine + 6 android = 28 open PRs, every one
+`draft: true`**; newest `merged_at` anywhere is **PR #44, 2026-08-13** — eleven days; engine `main`
+still `aac05f3`, android `main` still `ebfaf81`. **Run 91's notification produced no repo event**;
+the only ref that has moved since is this agent's own probe branch.
+
+**No fourth notification was sent, and that is a decision, not an omission.** Run 91 sent the third
+and recorded its own handoff: *"If it too goes unanswered … a later run should not send a fourth."*
+It went unanswered, and this run honours that. **A repository still cannot distinguish "did not see
+runs 81/86/91" from "saw them and chose not to act"** — if a later session has evidence of the
+former, this judgement is wrong and it should notify.
+
+### Environment, stated so no claim can be misread
+
+`dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` **all absent**;
+`ANDROID_HOME` **unset**; no Android SDK, no Windows, no JBR. **No gate ran and none is claimed** —
+neither `scripts\Verify-Alpha.ps1` nor `./gradlew … :app:assembleDebug :app:lintDebug`. `node`
+v22.22.2, `git`, `bash` and `java` are present; `node`, `git` and `bash` are the whole basis of
+every claim above. `gradle` is on `PATH` but **was not invoked**: `:app` cannot build here (run
+80's finding — `androidx` is not on Maven Central and `dl.google.com` is denied by egress policy).
+
+### Prohibition — what this run did not touch
+
+No rung moved. **No vector byte was written in either repo; the pin stays `7328a0b`.** No `:app`,
+`:core`, `src/` or `relay/` source file was written; no `.kt`, `.kts`, `.cs` or `.ts` file was
+touched at all. No spec file was edited in either repo. The engine checkout was **read-only** —
+`fetch`, `log`, `show`, `archive`, `ls-tree`, `checkout --detach` and `generate.mjs --check`.
+Nothing was merged, closed, undrafted, force-pushed, rebased or deleted, in either repo. **No new
+PR was opened** — PR #6 was refreshed, and the 28-deep board is unchanged. No deploys of any kind;
+**the production relay was not contacted at all**, not even `/v1/health`. No Play/Google/OAuth
+console, no accounts, no purchases, no Play Billing code, no Gmail or email, no secrets read or
+printed, no `.appdata`, no `Desktop\site-v2`. Terra's worktrees and `autonomy/codex-state` were
+read only. **No test was skipped, disabled or quarantined**, and no CI job was re-run. The only
+files written this run: `AUDIT-REQUEST.md`, `scripts/check-citations.sh`, this LOG entry,
+`BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat.
