@@ -17203,7 +17203,11 @@ git diff 7908b12 -- AUDIT-REQUEST.md | grep -E '^[-+].*C-91-[1-5]'
 *Expected, and **observed**:* self-test `all cases passed`; the check prints
 `OK: every cited C-/B- id resolves to an entry that exists.`, `exit=0`. The diff shows the five
 ids moving from `- **C-91-N** — …` to `### C-91-N — …` and **no change to any command inside a
-fence** — the fenced blocks are byte-identical to run 91's.
+fence** — every command line is character-for-character run 91's. **Precise form of that claim:**
+the fenced blocks are identical **after stripping the two-space indent a list item requires and a
+top-level heading does not**; `git diff` therefore shows the fence lines as changed. Check it with
+`git diff 7908b12..HEAD -- AUDIT-REQUEST.md | grep '^[-+]  *#' `, or diff the two blocks with
+`sed 's/^  //'` applied to the old side.
 
 ### C-92-3 — run 91's five claims were apt, not merely present; all five re-verified
 

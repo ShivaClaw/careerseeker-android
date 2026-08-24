@@ -26,7 +26,8 @@
 > C-/B- id resolves* — **before Gradle ran at all** (**C-92-1**). `scripts/check-citations.sh`
 > reads definitions off **heading lines only**; run 91 wrote `C-91-1…5` as **list items**
 > (`- **C-91-1** — …`). Right file, right order, correct commands underneath — **unparseable as
-> definitions.** Promoted to `### C-91-N — …`; the fenced commands are byte-identical to run 91's,
+> definitions.** Promoted to `### C-91-N — …`; every command line is character-for-character run 91's
+> (**not** byte-identical — the two-space list indent is gone, so the fence lines show in `git diff`),
 > and **all five were re-run before promotion** — a definition blesses the claim it names, so none
 > was reformatted on faith. All five hold. Guard now green, `exit 0` (**C-92-2**).
 >

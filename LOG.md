@@ -16571,7 +16571,9 @@ AUDIT-REQUEST.md cited C-91-1…5, nothing defined them, and the guard fired cor
 **blesses the claim it names**, so all five were **re-run before promotion** rather than reformatted
 on faith (**C-92-3**). All five hold: `OK: 29 …`/exit 0; §4.3.3 at `:307`; `decrypt_failed` at
 `:103`; **26** vectors on `main`; engine `main` `2026-08-12 aac05f3`, android `main`
-`2026-08-06 ebfaf81`. Fenced commands are byte-identical to run 91's; only the heading level moved.
+`2026-08-06 ebfaf81`. Every command line is character-for-character run 91's — **though not
+byte-identical as first written here: the two-space indent a list item requires is gone, so the
+fence lines do show in `git diff`.** Nothing inside a command changed.
 **`./scripts/check-citations.sh` → `OK: every cited C-/B- id resolves to an entry that exists.`,
 exit 0** (**C-92-2**), and `--self-test` green.
 
