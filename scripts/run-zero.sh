@@ -27,10 +27,17 @@
 # slice is worth taking — it establishes the ground state a run needs before it
 # can decide, and it says out loud which checks it cannot perform here.
 #
-# Two of the four notification triggers need the GitHub API and `gh` is absent
-# from this sandbox (B-7's neighbourhood; see C-97-7). Those are printed as a
-# MANUAL section with the exact queries and the last recorded answers, never
-# guessed at and never folded into the verdict as though they had been checked.
+# Two of the four notification triggers need the GitHub API, which a shell script
+# here cannot reach: `gh` is absent from this sandbox (B-7's neighbourhood; see
+# C-97-7). Those are printed as a MANUAL section with the exact queries and the
+# last verified answers, never guessed at and never folded into the verdict as
+# though they had been checked.
+#
+# Read that limit as the script's, not the session's. Run 99 answered both
+# queries through the GitHub MCP server — no `gh` involved — and section 6 now
+# says so, because "gh ABSENT" had been read for three runs as "unanswerable"
+# when it only ever meant "not answerable from bash". A probe that overstates
+# what is out of reach costs as much as one that overstates what it checked.
 #
 # BASELINES
 #
@@ -166,20 +173,28 @@ note "No gate is reachable from here: neither Verify-Alpha.ps1 nor the five-task
 note "android command. scripts/core-probe.sh runs :core:test — ONE of those five."
 
 # --- 6. what this cannot check ---------------------------------------------
-head2 "6. MANUAL — two notification triggers this script cannot answer (gh absent)"
+head2 "6. MANUAL — two notification triggers THIS SCRIPT cannot answer (your session may)"
 cat <<EOF
   Run 82's standing test notifies on: main moving (checked above, section 4),
   a PR merged or undrafted, the stored prompt changing, or a gate result.
   It does NOT fire on another firing, and NOT on another draft PR.
 
-  Query these two by hand, via the GitHub API, and compare:
+  READ SECTION 5's 'gh ABSENT' NARROWLY. It means the gh BINARY is not on PATH
+  in this container — it does NOT mean your session has no GitHub API path.
+  Run 99 answered both queries below through the GitHub MCP server, which needs
+  no gh and which runs 96-98 did not try (C-99-1). A shell script cannot reach
+  that server, so this section stays MANUAL and stays out of the verdict; but
+  'this script cannot' is not 'you cannot'. TRY THE QUERIES BEFORE DEFERRING.
+
+  Query these two, via the GitHub MCP server or any API path you have:
 
     list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
     list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
 
-  Last recorded (run 98): ${BASE_ENGINE_DRAFTS} engine + ${BASE_ANDROID_DRAFTS} android open, ALL draft:true,
-  ${BASE_MERGED_SINCE_RUN95} merged since. Note that the list rows' 'merged' field reads false even for
-  PRs that demonstrably merged (C-89-2) — use the commit graph, not that field.
+  Last VERIFIED (run 99, 2026-08-25, MCP): ${BASE_ENGINE_DRAFTS} engine + ${BASE_ANDROID_DRAFTS} android open, ALL
+  draft:true, ${BASE_MERGED_SINCE_RUN95} merged since — newest merge anywhere is engine #44, 2026-08-13.
+  Note that the list rows' 'merged' field reads false even for PRs that
+  demonstrably merged (C-89-2) — use merged_at or the commit graph, not that field.
 
   The stored prompt: compare against the two facts known stale — it still says
   pin '679a317' (real pin is in section 2) and 'S5 ... NOT STARTED' (section 1).
@@ -192,10 +207,14 @@ if [ "$FAIL" -eq 0 ]; then
   NOTHING MOVED on every check this sandbox can run, and all three guards are green.
 
   If the two MANUAL checks above also come back unchanged, then this firing has
-  the same ground state as run 98, and STATE.md's newest banner already describes
+  the same ground state as run 99, and STATE.md's newest banner already describes
   it. Runs 96, 97 and 98 each derived candidate slices independently — eight
-  between them — and the standing precondition rejected all eight. The lane is
-  exhausted; that is a recorded finding, not a fresh one to re-discover.
+  between them — and the standing precondition rejected all eight. Run 99 then
+  answered section 6's two queries for the first time (all four of run 82's
+  triggers negative) and tested B-18 attempt 2's 'the sandbox cannot reach the
+  schedule' with a command rather than inheriting it: CronList reports only
+  jobs created in-session, so the premise holds. The lane is exhausted; that is
+  a recorded finding, not a fresh one to re-discover.
 
   B-18's smallest human unblock is unchanged: a human stops the schedule.
 EOF
