@@ -5063,3 +5063,53 @@ re-verified as correctly specified** (**C-97-4b**) — the two missing §3 vecto
 the reason B-26 gives, which survives scrutiny. **B-7 was re-confirmed, not changed**: the denial
 set that blocks `dl.google.com` also blocks `api.foojay.io`, exactly as **C-S5B-1** already recorded
 — which is why the withdrawn **B-27** was a rediscovery and not a finding.
+
+---
+
+### B-18 status 2026-08-25 (ninety-eighth run) — the sixty-third firing, and attempt 5: make each one cheap
+
+**Unchanged as a blocker, and no closer to closing.** The scheduled prompt assigned S5's spec half
+again. It has been built since 2026-08-09; re-derived this run from the commits and, more to the
+point, **from the four gates as they read in `docs/Sync-Protocol.md` itself** (**C-98-1**,
+**C-98-2**), and declined again. **Sixty-three consecutive assignments across sixteen days.**
+
+**Attempts 1–4, restated because attempt 5 only makes sense against them.** (1) Do the slice anyway
+— refused, correctly. (2) Edit the prompt — impossible; it is scheduler configuration no file in
+either checkout can reach. (3) Move the pointer to where the reader looks — run 48's banner, which
+worked. (4) Notify out of band — runs 53, 81, 86 and 91. **Attempt 4 has now been made four times
+and produced no repo event**, which is as much as this repository can honestly say about it.
+
+**Attempt 5 — stop trying to end the firings and start making them cheap. Executed this run.**
+`scripts/run-zero.sh` (**C-98-6**) answers "has anything moved?" from both repositories in one
+command: rule-one fetch in both trees, the three slice commits and their ancestry, the pin and
+corpus guard, the citation guard, the landing-plan guard, both `main`s against pinned baselines, the
+toolchain table, and a MANUAL section for the two notification triggers it cannot answer because
+`gh` is absent. Verdict on this head: **NOTHING MOVED, exit 0**.
+
+**Why this is the right target now.** Runs 96, 97 and 98 each independently derived candidate slices
+and rejected all eight between them. The derivation is not what a firing spends itself on — reading
+enough of ~45,000 lines of records to be sure nothing moved is. **Attempt 5 does not reduce the
+number of firings; it reduces what each one costs**, which is the only lever that remains inside the
+repository once attempt 4 has been spent four times.
+
+**What attempt 5 is not.** It is **not a fix and it does not close B-18.** It cannot turn the
+routine off; only a human can. It also carries a real risk worth naming for the auditor: **a probe
+that is trusted and wrong is worse than no probe**, which is why its five failure paths were
+mutation-tested before it was committed and why **M1 found a genuine defect** — a copy run from
+outside the checkout reported confidently about the wrong tree. That is fixed (it now refuses), but
+the general hazard stands: **its baselines are pinned constants, and a run that finds them stale
+must update them in the same commit rather than trusting the verdict.**
+
+**Smallest human unblock — unchanged since run 48, and now sixteen days overdue.** Either turn the
+routine off, or replace its "YOUR SLICE THIS ITERATION" section with *read `RETURN-DAY.md` §5 and
+pick from the human queue what a Linux sandbox can actually advance*. **Do not leave it pointed at
+S5's spec half.** Brandon's stated return date was 2026-08-18; it passed **seven days ago**, and his
+last commit anywhere in either repository is **2026-08-12**.
+
+### B-1, B-2, B-4, B-5, B-6, B-7, B-8, B-9, B-12–B-17, B-19–B-26 — untouched this run
+
+Not exercised. This run wrote **no production code**, ran **no gate**, opened **no new PR in the
+engine repo** and took **no rung slice**, so none of them could move. **B-7 was re-confirmed rather
+than retested**: the toolchain table in `run-zero.sh` §5 records `dotnet`, `pwsh`, `sdkmanager`,
+`avdmanager`, `emulator`, `adb` and `gh` all ABSENT, which is why no gate is claimed anywhere in
+this run's records.

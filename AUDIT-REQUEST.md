@@ -18479,3 +18479,153 @@ write-up, not after — the draft was complete when I ran it.
 sixty-second consecutive empty run created real pressure to have found *something*. **An
 exhausted lane is exactly the condition under which a rediscovery looks like a finding.**
 
+
+---
+
+## Run 98 — 2026-08-25 (ninety-eighth cloud iteration, Linux sandbox)
+
+### C-98-1 — the assigned slice is built and off main, for the sixty-third time
+
+```bash
+cd <engine> && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do git show --stat --oneline $c | head -6; done
+for c in 8575539 22b028e 7328a0b; do
+  git merge-base --is-ancestor $c origin/main; echo "$c ancestor-of-main? exit=$?"
+done
+```
+
+*Observed:* `8575539` "define the entitlement_ack body…" touches `docs/Sync-Protocol.md` **only,
++114/−3**; `22b028e` adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`, the
+`generate.mjs` cases and the `index.json` rows, **+117/−1**; `7328a0b` adds
+`invalid-unknown-field.json` **+60/−0**. All three `merge-base --is-ancestor` calls **exit 1** —
+not on `main`. The prompt's "S5 … is NOT STARTED" is **false**, and has been since 2026-08-09.
+
+### C-98-2 — the four gates read in the protocol file itself, not in a commit message
+
+```bash
+cd <engine> && git checkout origin/claude/s5-entitlement-ack-emitter
+sed -n '316,322p' docs/Sync-Protocol.md     # PQ-A6-1: the entitlement_ack body
+sed -n '110,115p' docs/Sync-Protocol.md     # PQ-A2-1: what the 1 MiB cap measures
+grep -n 'decrypt_failed' docs/Sync-Protocol.md | head -3   # PQ-A2-2
+```
+
+*Observed:* the body block is present with `product_id`, `acknowledged_at`, and `order_id` marked
+**OPTIONAL**, exactly PQ-A6-1's default-proceed shape. §3.1 reads *"The **decoded ciphertext** —
+the AEAD output including its 16-byte tag, after base64url decoding — MUST NOT exceed **1 MiB**"*
+with the explicit "not the length of the JSON envelope and not the length of the base64url text".
+`decrypt_failed` at **:103** and at **:601**, the latter reading *"**Also every structural
+rejection**: unknown top-level field, padded base64, wrong nonce length, unparseable framing"*.
+**All four gates the prompt assigns are already answered in the file.**
+
+### C-98-3 — the generator, at the pin and at main, and why the two numbers differ
+
+```bash
+cd <engine> && git checkout origin/main                    && node docs/sync-vectors/generate.mjs --check
+cd <engine> && git checkout origin/claude/s5-entitlement-ack-emitter && node docs/sync-vectors/generate.mjs --check
+```
+
+*Observed:* at `origin/main`, **`OK: 26 vector files match the generator.`, exit 0**; at the S5
+branch, **`OK: 29 vector files match the generator.`, exit 0**. The difference is exactly the three
+vectors `22b028e` and `7328a0b` add. **This is not new** — `VECTORS.lock`'s 2026-08-17 note already
+records main at 26 files and the vendored corpus at 29, and run 43 already recorded `--check` at 26
+on main. Stated here only because a run that measures 26 and has not read that note will read it as
+drift. **It is not drift.**
+
+### C-98-4 — the pin, and the corpus against it, by the repo's own guard
+
+```bash
+cd <android> && cat core/src/test/resources/sync-vectors/VECTORS.lock | head -6
+cd <android> && scripts/repin-vectors.sh --check; echo "exit=$?"
+```
+
+*Observed:* pin **`7328a0bc043335491cd96a67d634e8eea2a13af9`** — the prompt's `679a317` is **stale**,
+as it has been since 2026-08-12. The guard reports *"vendored: 29 files    at pin: 29 files"* and
+*"OK: the vendored corpus is byte-identical to pin `7328a0b…`, and the pin is unchanged."*, **exit
+0**. **No vector byte was written this run.**
+
+### C-98-5 — an eighth candidate slice, derived and rejected against citations that already existed
+
+The candidate: `fleet-probe.sh plan` reports **UNPLANNED: 2** — two leaves `RETURN-DAY.md` §3's
+landing plan does not name. Runs 96 and 97 both noted the number and neither examined the rows.
+
+```bash
+cd <android> && scripts/fleet-probe.sh plan <engine> RETURN-DAY.md; echo "exit=$?"
+grep -n 's6-resume-reconciliation' LOG.md | tail -3
+sed -n '16316,16322p' LOG.md
+```
+
+*Observed:* `plan rows: 6   leaves now: 8   ROT: 0   UNPLANNED: 2`, **exit 0**, the two rows being
+`p4-entitlement` and `s6-resume-reconciliation`. **Both are already documented, precisely.**
+`LOG.md:16316-16322` records `p4-entitlement` → **#8, closed and genuinely unmerged**, content
+re-landed as #27–#30, *"**not** an ancestor of `main` and carries 199 commits that will never land"*
+(**C-89-4**); and the second leaf `s6-resume-reconciliation` → **#53** as *"**open and deliberately
+excluded** — §3 step 0 recommends closing it"* (**C-89-5**). The probe's own output says UNPLANNED
+rows are *"informational — a leaf with no open PR, or one the plan deliberately excludes"*. **No
+slice. Rejected before the write-up, not after** — which is run 97's lesson (**C-97-8**) applied
+rather than restated.
+
+### C-98-6 — `scripts/run-zero.sh`: the whole re-derivation in one command, and its failure paths exercised
+
+```bash
+cd <android> && scripts/run-zero.sh <engine>; echo "exit=$?"
+```
+
+*Observed:* the six sections run and the verdict reads **"NOTHING MOVED on every check this sandbox
+can run, and all three guards are green."**, **exit 0**. It composes the checks runs 96, 97 and 98
+each ran by hand — rule-one fetch in both trees, the three slice commits with their ancestry, the
+pin and corpus guard, the citation guard, the landing-plan guard, both `main`s against pinned
+baselines, and the toolchain table — and prints the two notification triggers it **cannot** answer
+(`gh` is ABSENT) as a MANUAL section with the exact queries, rather than folding them into the
+verdict as though they had been checked.
+
+**Its failure paths were mutation-tested, because an assertion whose red path never ran is the
+vacuous-assertion trap this file already records** (the four assertions at run 43). Each mutation
+was applied **in place and reverted**, and the script was `diff`ed byte-identical afterwards:
+
+| mutation | expected | observed |
+| --- | --- | --- |
+| M1 `BASE_ENGINE_MAIN` → zeros | engine main flagged MOVED | `!! engine  main MOVED  0000000 -> aac05f3` , exit 1 |
+| M2 `BASE_ANDROID_MAIN` → ones | android main flagged MOVED | `!! android main MOVED  1111111 -> ebfaf81` , exit 1 |
+| M3 `SLICE_COMMITS` → `aac05f3` | slice flagged as landed | `!! aac05f3 is now an ancestor of origin/main — THE SLICE LANDED.` , exit 1 |
+| M4 `SLICE_COMMITS` → `deadbee` | missing commit flagged | `!! deadbee does NOT exist in the engine checkout` , exit 1 |
+| M5 the three guard invocations made to fail | all three flagged | all three `!!` lines, exit 1 |
+
+**Re-run the mutations:** apply each `sed` to a copy, run, and confirm exit 1 and exactly one new
+`!!` line — then restore. **All five caught; the clean run returns to exit 0.**
+
+**M1 found a real defect before the script was committed.** `$ANDROID` is derived from
+`${BASH_SOURCE[0]}`, so a copy of the script executed from elsewhere resolved the android root to
+that other directory and then reported confidently about the wrong tree — three spurious `!!` lines
+about drift and rotted plans. Fixed by asserting three marker paths (`STATE.md`,
+`scripts/repin-vectors.sh`, `VECTORS.lock`) and **refusing rather than misleading**:
+
+```bash
+cp scripts/run-zero.sh /tmp/copy.sh && bash /tmp/copy.sh <engine>; echo "exit=$?"
+```
+
+*Observed:* `run-zero: '/tmp' does not look like the android checkout (no STATE.md).` , **exit 1**.
+
+**What it is not:** not a gate, and it claims none. It runs no build and no test suite.
+
+### C-98-7 — the notification test, applied; all four triggers negative
+
+| trigger | this run | evidence |
+| --- | --- | --- |
+| `main` moved | **no** | engine `aac05f3` (2026-08-12), android `ebfaf81` (2026-08-06) — both unmoved, checked by `run-zero.sh` §4 |
+| a PR merged or undrafted | **no** | **22 engine + 6 android open, every row `draft:true`, none merged** |
+| the stored prompt changed | **no** | same text, same stale pin `679a317`, same "S5 … NOT STARTED" |
+| a gate result | **no** | no gate is reachable here (`dotnet`, `pwsh`, `sdkmanager`, `adb`, `gh` all ABSENT); none ran and none is claimed |
+
+```bash
+cd <android> && scripts/run-zero.sh <engine>          # triggers 1 and 4
+# trigger 2, via the GitHub API:
+#   list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+#   list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+**No notification sent — the third consecutive deliberate silence.** Runs 81, 86 and 91 each sent
+*stop the schedule*; **none produced a repo event**, and the recommendation still stands unanswered.
+This run adds no fact those three did not carry: the same state, a larger firing count. A fifth
+banner restating it would spend the channel rather than inform it, and **B-18 is the one blocker
+that cannot afford a channel taught to be ignored.** `run-zero.sh` is this run's answer instead —
+it lowers the cost of the firings that keep happening, which is the only lever available from here.
