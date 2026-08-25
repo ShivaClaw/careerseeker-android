@@ -4924,3 +4924,63 @@ cd ../careerseeker-android && scripts/repin-vectors.sh <new-sha> && scripts/core
 
 **The ordering is the whole lesson of this entry**: the vector is what makes the two sides agree,
 so it must be added when both sides can be run against it — not before.
+
+---
+
+### B-18 status 2026-08-25 (ninety-sixth run) — the sixty-first firing, and the first run with no surviving candidate
+
+**Symptom, unchanged and re-derived rather than inherited.** The stored prompt re-issues S5's spec
+half (§4.3 `entitlement_ack`, the vector via `generate.mjs`, PQ-A2-1/-2/-3), describes S5 as **"NOT
+STARTED"**, describes S2 as PARTIAL with PR #31 as the tip, and carries the stale vendored pin
+`679a317`. **All of it is false**, and has been since 2026-08-09 / 2026-08-12 (**C-96-1**,
+**C-96-2**). **B-18 cannot be closed by any agent** — the obstacle is scheduler configuration
+outside both repositories, measured at run 92 (`CronList` → *"No scheduled jobs."*, **C-92-5**).
+
+**Attempts, cumulative:** sixty-one declines on re-derived evidence; **three** notifications (runs
+81, 86, 91); one silence policy with four triggers (runs 82–85, 88, 92–96 correctly silent).
+**None of the three notifications produced a repo event** (**C-90-3**, re-confirmed **C-96-3**).
+
+**What is new this run, and it is a change of state rather than another restatement.** Runs 82–95
+each reported one candidate that survived measurement and one that did not — the lane was
+*unmergeable but productive*. **This run derived three candidates independently and the standing
+precondition rejected all three** (**C-96-4**): the CI/merge-gate premise (recorded five times over),
+the landing-plan rot guard (**green, exit 0, no rot**), and B-19's leaf-with-no-open-PR
+(`p4-entitlement` / PR #8 — closed, unmerged, **already recorded three times**). The ordered
+intent's own live item needs `dotnet`, which is **ABSENT** (**C-96-7**). **Zero survivors is the
+first of its kind**, and it moves the lane from *productive* to **exhausted**.
+
+**Why that matters for this entry specifically.** B-18's cost has until now been *duplication risk*
+plus records growth. It is now **the whole run**: a firing that cannot produce work is no longer
+paying for itself in findings, only in tokens and in ~44,000 lines of records that grow faster than
+the program they describe (run 87's measured cost, restated in this run's LOG Milestone 4).
+
+**Deliberately NOT filed as a new blocker.** Exhaustion is **not** a B-* obstacle — nothing
+human-shaped is missing that is not already **H1–H8** in `RETURN-DAY.md` §5 and already **B-4**,
+**B-5**, **B-18**. Filing it again would send the next session hunting a phantom, which is the exact
+failure this file exists to prevent.
+
+**Recorded honestly, as run 90 recorded it:** this entry measures **commits, not attention**
+(**C-96-5**). Brandon's last commit anywhere is **2026-08-12**, thirteen days ago and six days
+*before* his own stated return date; return day passed **seven days ago**; **28 PRs open, 0
+merged**. It cannot distinguish *"did not see the notifications"* from *"saw them and chose not to
+act."* **If it is the latter, the correct read of this entry is its first paragraph only, and the
+recommendation below should be ignored.**
+
+**Smallest human unblock — unchanged from run 90, and now with less competing for it.**
+1. **Stop the recurring schedule.** It is the only action that ends the cost, and **no agent can
+   take it** (**C-92-5**). This is the whole ask.
+2. When next at the Windows machine: **H2** — `Verify-Alpha.ps1 -IncludePublish -IncludePackage`,
+   then land `RETURN-DAY.md` §3's six merges (guard re-verified green this run, **C-96-4b**, so the
+   plan is still correct as written). H2 alone lands six of the merges and unblocks the board.
+3. **Only if the schedule is to continue:** replace the "YOUR SLICE THIS ITERATION" section with
+   *"read `RETURN-DAY.md`, then `STATE.md`'s ordered intent, and take its top item"* — and note
+   that as of this run, **its top item needs `dotnet`**, so the next firing will decline too.
+
+### B-1, B-2, B-4, B-5, B-6, B-7, B-8, B-9, B-12–B-17, B-19–B-26 — untouched this run
+
+Not exercised. **This run wrote no code, ran no gate, opened no PR and took no slice**, so none of
+them could move. **B-19 was read but not narrowed further**: this run exercised its open half
+(a leaf with no open PR, via the API) and found the answer **already recorded** at run 89, which
+confirms the narrowing rather than advancing it. **B-22 was not re-rolled by a test run** — this run
+pushes records-only commits, so a red `Build and test` on a `.md`-only head is **B-22**, not a
+regression; check **C-89-10**'s three commands before treating it as one.

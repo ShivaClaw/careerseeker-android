@@ -6,8 +6,8 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty** runs
-> have now been assigned it (count refreshed at run 95). **Run 91
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty-one** runs
+> have now been assigned it (count refreshed at run 96). **Run 91
 > re-verified the slice with its own hands (`node docs/sync-vectors/generate.mjs --check` → `OK: 29
 > vector files match the generator.`, exit 0) and sent the "stop this schedule" notification run 90
 > recommended but did not send. B-18's smallest unblock is unchanged: a human stops the schedule.**
@@ -15,6 +15,49 @@
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
 >
+> ## ▶ RUN 96 — 2026-08-25. **The first run with zero surviving candidates: the lane is exhausted, not merely unmergeable.**
+>
+> **Heartbeat:** 2026-08-25, ninety-sixth cloud iteration (Linux sandbox). **Assigned slice declined
+> for the sixty-first time** (**C-96-1**), re-derived with this run's own hands: all three commits
+> verified by `git show --stat`, `--check` → `OK: 29 vector files match the generator.`, exit 0, and
+> **all four gates read IN `docs/Sync-Protocol.md` itself** — §4.3.3's body at lines 318–320, the
+> decoded-ciphertext cap at 111–112, `decrypt_failed` at 103 and 601. Pin **`7328a0b`** (prompt's
+> `679a317` stale), corpus **29/29** by `diff -r` *and* `repin-vectors.sh --check` (**C-96-2**).
+> Both `main`s and both boards unmoved — **22 engine drafts, 6 android drafts, 0 merged**
+> (**C-96-3**).
+>
+> **THE FINDING: three candidate slices, derived independently, and the standing precondition
+> rejected all three** (**C-96-4**). **(a)** The CI/merge-gate premise — `ci.yml:28` *is*
+> `windows-latest` and `:48` *does* run `Verify-Alpha.ps1`, but **bare**: no `-IncludePublish`, no
+> `-IncludePackage`, which the merge condition names. CI green is the **offline half**. Already
+> recorded five times over. **(b)** The landing plan — `fleet-probe.sh plan` → `plan rows: 6
+> leaves now: 8   ROT: 0   UNPLANNED: 2`, **exit 0**, *PLAN STILL NAMES LEAVES*. **No rot; therefore
+> no slice.** **(c)** B-19's open half — `p4-entitlement` is a leaf whose **PR #8 is closed,
+> `merged:false`, 8 commits, +1861/−47**. Reads like a real find; **already recorded three times**
+> (`BLOCKED.md:4510`, **C-89-4**, `STATE.md:239`), successors landed as #27–#30.
+>
+> **Runs 82–95 each produced one target that survived measurement. This run produced none** — and
+> the ordered intent's own live item needs `dotnet`, **ABSENT** (**C-96-7**). That is a state change
+> worth naming: the lane moved from *unmergeable but productive* to **exhausted**.
+>
+> **The mission's premise, re-measured** (**C-96-5**): Brandon's last commit **anywhere in either
+> repo** is **2026-08-12** — thirteen days ago, and **six days before his own stated return date**.
+> Return day passed **seven days ago**. Last fourteen days across all android branches: **Claude
+> 254+, Brandon 1**. Zero commits on either `main` since 2026-08-16. **Measures commits, not
+> attention** — it cannot distinguish "did not see" from "saw and chose not to act."
+>
+> **NO NOTIFICATION SENT, and that is the disciplined choice** (**C-96-6**). Run 82's four triggers —
+> `main` moving, a PR merged or undrafted, the prompt changing, a gate result — **all four negative**.
+> Three notifications have gone (runs 81, 86, 91), the last carrying this run's own recommendation,
+> and none produced a repo event. A fourth restating the same fact would only teach the channel to be
+> ignored, which is the one thing **B-18** cannot afford.
+>
+> **NO SLICE TAKEN, NO CODE WRITTEN, NO GATE RUN, NO PR OPENED.** Not one byte of production source
+> in either repo; **no vector byte, pin unmoved**; `$ExpectedOfflineTotal` and every count-reporting
+> doc untouched; **zero landing cost, zero new branches**. Records-only, and **deliberately short**:
+> three rejected candidates are worth a paragraph each, not a milestone each (run 87's measured
+> records cost — the four files now stand at ~44,000 lines). **No machine change.** Terra
+> **COMPLETE, files claimed: none** — no collision.
 > ## ▶ RUN 95 — 2026-08-24. **`:core:test` runs here now, and §3 turned out to contain a rule neither implementation performs.**
 >
 > **Heartbeat:** 2026-08-24, ninety-fifth cloud iteration. **Assigned slice declined for the
