@@ -18049,3 +18049,174 @@ ship*. **Step 14 `Upload debug APK` = `skipped`**, which is run 93's B-25 gate s
 
 Step 8 is the one worth naming separately: it is an independent, runner-side confirmation of
 **C-95-2** — the vendored corpus still matches pin `7328a0b` — measured by CI rather than by me.
+
+## Ninety-sixth run — 2026-08-25 (Linux sandbox): three candidates derived, three rejected by the precondition
+
+**Every command below requires `git fetch --all --prune` in BOTH checkouts first.** That is rule
+one, and every count in this section was taken after it. `<engine>` = a clone of
+`ShivaClaw/careerseeker`; `<android>` = a clone of `ShivaClaw/careerseeker-android` on
+`claude/android-a0-probe`.
+
+### C-96-1 — the assigned slice is built, for the sixty-first run, and the gates read IN THE FILE
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  echo "== $c =="; git log -1 --format='%ad  %s' $c; git show --stat --format='' $c
+done
+git checkout -B s5-check origin/claude/s5-entitlement-ack-emitter
+node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected, and **observed** this run:* `8575539` (Sun Aug 9 2026) touches **`docs/Sync-Protocol.md`
+only, +114/−3**; `22b028e` adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`,
+`index.json` **and `generate.mjs`** (+117/−1 across 4 files); `7328a0b` (Wed Aug 12 2026) adds
+`invalid-unknown-field.json`, `index.json`, `generate.mjs` (+60). Then **`OK: 29 vector files match
+the generator.`**, **`exit=0`**.
+
+**The content half — read in the file, not inferred from commit subjects.** This is the part a
+sceptical auditor should insist on, because a commit subject can claim anything:
+
+```bash
+cd <engine> && git checkout origin/claude/s5-entitlement-ack-emitter
+grep -n "product_id\|acknowledged_at\|order_id" docs/Sync-Protocol.md | head -4   # PQ-A6-1
+grep -n -i "decoded ciphertext\|1 MiB"          docs/Sync-Protocol.md | head -4   # PQ-A2-1
+grep -n "decrypt_failed"                        docs/Sync-Protocol.md | head -4   # PQ-A2-2
+ls docs/sync-vectors/v1/invalid-unknown-field.json                                # PQ-A2-3
+```
+
+*Observed:* §4.3.3's body at **lines 318–320**; the **decoded ciphertext** cap at **111–112**
+(*"MUST NOT exceed 1 MiB … measures those decoded bytes, not the"*); `decrypt_failed` at **103** and
+in §7.2's table at **601** (*"Also every structural rejection"*); the vector present. **All four
+gates named in the recurring prompt are closed.**
+
+**Why this is a re-verification and not a build instruction:** `git ls-tree --name-only origin/main
+docs/sync-vectors/v1/ | wc -l` returns **26**. The work is **unmerged, not unwritten**. Rebuilding
+it would duplicate `8575539` and stand a regenerated corpus next to the one the android repo
+vendors at `7328a0b`.
+
+### C-96-2 — the pin is `7328a0b`, not the prompt's `679a317`, by two independent checks
+
+```bash
+cd <engine> && rm -rf /tmp/pin-check && mkdir -p /tmp/pin-check
+git archive 7328a0b docs/sync-vectors/v1 | tar -x -C /tmp/pin-check
+diff -r /tmp/pin-check/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1
+echo "exit=$?"; ls /tmp/pin-check/docs/sync-vectors/v1 | wc -l
+cd <android> && scripts/repin-vectors.sh --check; echo "exit=${PIPESTATUS[0]}"
+```
+
+*Expected, and **observed**:* **no output, `exit=0`, 29 files**; then **`vendored: 29 files    at
+pin: 29 files`** and **`OK: the vendored corpus is byte-identical to pin
+7328a0bc043335491cd96a67d634e8eea2a13af9, and the pin is unchanged.`**, `exit=0`. **No vector byte
+was written by this run in either repo.**
+
+### C-96-3 — both `main`s and both boards are unmoved
+
+```bash
+cd <engine>  && git log -1 --format='%ad %an %s' --date=iso origin/main
+cd <android> && git log -1 --format='%ad %an %s' --date=iso origin/main
+# boards, via the API:
+#   ShivaClaw/careerseeker         open PRs -> 22, all draft, 0 merged
+#   ShivaClaw/careerseeker-android open PRs ->  6, all draft, 0 merged
+```
+
+*Observed:* engine `main` **`aac05f3`**, `2026-08-12 20:28:21 -0600`; android `main` **`ebfaf81`**,
+`2026-08-06 19:38:20 -0600`. **Zero commits on either `main` since 2026-08-16.**
+
+### C-96-4 — the three candidate slices, and the command that rejected each
+
+**This is the run's substance, and each row is falsifiable on its own.** The standing precondition
+is *re-verify the item before taking it*; these are three applications of it.
+
+**(a) CI runs the gate on Windows — but bare, so it is not the merge condition.**
+
+```bash
+cd <engine> && git checkout origin/main
+grep -n "runs-on\|Verify-Alpha" .github/workflows/ci.yml
+```
+
+*Observed:* `:28  runs-on: windows-latest`, `:48  run: ./scripts/Verify-Alpha.ps1`, `:52  runs-on:
+ubuntu-latest`. **The invocation carries no flags** — no `-IncludePublish`, no `-IncludePackage`, no
+`-IncludeLive` — while the merge condition names the first two. **CI green is the offline half.**
+*Already recorded* — the finding is not new, and that is the point of the row:
+`grep -n "IncludePublish" AUDIT-REQUEST.md STATE.md` returns hits at `AUDIT-REQUEST.md:6026`,
+`:8034`, `:8720`, `STATE.md:2089`, `:2096`, among others.
+
+**(b) The landing plan has not rotted again.**
+
+```bash
+cd <android> && scripts/fleet-probe.sh plan ../careerseeker RETURN-DAY.md; echo "exit=$?"
+```
+
+*Expected, and **observed**:* six rows — `s8-harness-linux-reach`, `s2-relay-header-pairing`,
+`s2-transport-vocabulary`, `s3-pairing-confirm-consumer`, `s6-outcome-disposition`,
+`s6-composition-root-decision` — each **`leaf`**; then `plan rows: 6   leaves now: 8   ROT: 0
+UNPLANNED: 2`, **`PLAN STILL NAMES LEAVES.`**, **`exit=0`**. The two UNPLANNED are
+`p4-entitlement` (row (c)) and `s6-resume-reconciliation` (§3's Step 0 decision), both expected.
+
+**(c) The leaf with no open PR is `p4-entitlement`, and it was already found.**
+
+```bash
+# needs a credential the shell guard lacks -- this is B-19's open half:
+#   GET /repos/ShivaClaw/careerseeker/pulls/8
+```
+
+*Observed:* **`"state":"closed"`, `"merged":false`, `"closed_at":"2026-08-09T01:12:14Z"`**, base
+**`claude/p2-publisher`** (not `main`), **8 commits, +1861/−47, 35 changed files**. *Already
+recorded three times* — `grep -n "p4-entitlement" BLOCKED.md AUDIT-REQUEST.md STATE.md` hits
+`BLOCKED.md:4510` (*"closed and genuinely unmerged (no `merged_at`)"*), `AUDIT-REQUEST.md:16862`
+(**C-89-4**), `STATE.md:239`. Successors landed as **#27–#30**.
+
+**Attack this first if you doubt the run:** the claim is *"three independently derived candidates,
+zero survivors"*, and it is falsifiable exactly as written. If any of (a), (b) or (c) is in fact
+open, unrecorded, or actionable from a Linux sandbox, **the finding is wrong and this run should
+have taken it.** The three commands above are the whole basis.
+
+### C-96-5 — the mission's own premise, re-measured seven days past its expiry
+
+```bash
+cd <android> && git log --all --format='%ad %an %s' --date=iso --author="Brandon" | head -3
+cd <android> && git log --all --since=2026-08-11 --format='%an' | sort | uniq -c | sort -rn
+cd <engine>  && git log origin/main --since=2026-08-16 --oneline | wc -l
+```
+
+*Observed:* Brandon's most recent commit **anywhere in either repository** is
+**`2026-08-12 19:55:39 -0600  B-2: the /pair page exists; record what is left and what it cost`** —
+**thirteen days ago, and six days before his own stated return date of 2026-08-18**, which passed
+**seven days ago**. Authors across all android branches in the last fourteen days: **`Claude` 254**
+(plus 22 across five Claude aliases), **`Brandon Kirksey` 1**. **`0`** commits on engine `main`
+since 2026-08-16; **`0`** on android `main`.
+
+**Stated as run 90 stated it, and the caveat is load-bearing:** this measures **commits, not
+attention**. It cannot distinguish *"did not see the notifications"* from *"saw them and chose not
+to act."* If it is the latter, only the first sentence of this citation is valid and its
+recommendation should be ignored.
+
+### C-96-6 — the notification test, applied, all four triggers negative
+
+Run 82's inherited rule: **notify on `main` moving, a PR merged or undrafted, the stored prompt
+changing, or a gate result — not on another firing and not on another draft PR.**
+
+| Trigger | This run | Basis |
+| --- | --- | --- |
+| `main` moved | **no** | **C-96-3** — both unmoved |
+| a PR merged or undrafted | **no** | **C-96-3** — 28 open, 0 merged, all draft |
+| the stored prompt changed | **no** | same text, same stale pin `679a317`, same *"S5 … NOT STARTED"* |
+| a gate result | **no** | no gate ran here (**C-96-7**); run 95's runner gate was new *at run 95* |
+
+**All four negative → no notification sent.** Three have gone already (runs **81**, **86**, **91**),
+the last carrying this run's own recommendation, and **none produced a repo event** (**C-90-3**,
+re-confirmed by **C-96-3**). Re-verify the decision by re-running the four rows above.
+
+### C-96-7 — the gates were re-verified ABSENT before being skipped
+
+```bash
+for t in dotnet pwsh sdkmanager avdmanager emulator adb gh node git java gradle; do
+  printf '%-12s ' "$t"; command -v $t >/dev/null && echo present || echo ABSENT
+done; echo "ANDROID_HOME=${ANDROID_HOME:-UNSET}"
+```
+
+*Observed:* `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` **ABSENT**;
+`ANDROID_HOME` **UNSET**; `node`, `git`, `java`, `gradle` present. **No gate ran this run and none
+is claimed** — neither `scripts\Verify-Alpha.ps1` nor
+`./gradlew … :app:assembleDebug :app:lintDebug`. **No machine change this run**; nothing installed.
