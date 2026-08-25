@@ -4984,3 +4984,82 @@ them could move. **B-19 was read but not narrowed further**: this run exercised 
 confirms the narrowing rather than advancing it. **B-22 was not re-rolled by a test run** — this run
 pushes records-only commits, so a red `Build and test` on a `.md`-only head is **B-22**, not a
 regression; check **C-89-10**'s three commands before treating it as one.
+
+---
+
+## B-27 — WITHDRAWN BEFORE IT STOOD: the JDK 21 / `jvmToolchain(17)` gap is already documented, and filing it again would have manufactured a phantom (ninety-seventh run, 2026-08-25)
+
+**This entry is kept as a correction, not as a blocker. There is no B-27 obstacle. Do not go
+looking for one.**
+
+**What happened.** `scripts/core-probe.sh` exited **1** at the start of this run —
+*"core-probe: no JDK 17 found under /usr/lib/jvm"* — because the sandbox ships **JDK 21** and
+`:core` pins `jvmToolchain(17)`, which Gradle cannot auto-provision (`api.foojay.io` is denied by
+the same policy as `dl.google.com`, **B-7**). I applied the script's documented remedy
+(`apt-get install -y --no-install-recommends openjdk-17-jdk-headless`), the probe then reported
+**348 tests, 0 failed, 0 skipped, across 22 classes**, and I began writing this up as a **new
+finding** about the records' machine premise.
+
+**It is not new, and one grep proved it** (**C-97-8**). The condition is recorded in at least three
+places that predate this run:
+
+- **C-VR-10** — *"the probe prints `core-probe: … tests` (**it needs a JDK 17 present — it says so
+  and gives the apt line if missing**)"*. That is this exact behaviour, documented as expected.
+- **C-S5B-1** — *"`api.foojay.io` is denied too, so the pinned JDK 17 toolchain cannot be
+  provisioned"*.
+- **Run 88's C-88-9** — environment line reads *"`java` is 21, not the pinned 17"*.
+
+**So the probe behaved exactly as designed and as documented.** It failed closed, printed its own
+remedy, and the remedy worked. **Nothing regressed, nothing drifted, and no premise was stale.**
+
+**Why this is written down anyway, and it is the only part with value.** The draft this replaced
+would have filed a fresh blocker, added a "finding" banner to `STATE.md`, and told the next session
+that its inherited machine premise was unreliable. **All three would have been false**, and the
+last is the expensive kind of false — it is precisely the *"calling something BLOCKED when nothing
+actually blocks it sends the next session hunting for a phantom"* failure this file opens by warning
+against. **The tell was available before I wrote a word of it: `grep -n 'jvmToolchain\|JDK 17'`
+across the record set, which is the same cheap check the records already prescribe for inherited
+claims — and I ran it only after drafting.**
+
+**The one true residual, and it is a footnote rather than an entry.** **B-26 attempt 1** says *"the
+Kotlin half is runnable here"* without naming the install it depends on. That sentence is
+**correct** — C-VR-10 carries the precondition — but a reader who meets a red probe may not connect
+the two. **No file is changed for this**; it is recorded here so the connection exists in one place.
+
+**Smallest human unblock: none. Nothing is blocked.** For any fresh sandbox:
+
+```bash
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+cd careerseeker-android && ./scripts/core-probe.sh     # expect: 348 tests, 0 failed
+```
+
+Two `apt-get update` warnings are **policy denials, not failures, and must not be retried**:
+`ppa.launchpadcontent.net/deadsnakes` and `.../ondrej/php` return **403** through the egress proxy.
+The Ubuntu archive resolves normally, which is why the install succeeds regardless.
+
+**What this still does NOT license.** `:core:test` is **one of the five tasks** in the verification
+command of record. `checkCoreIsAndroidFree`, `:app:test`, `:app:assembleDebug` and `:app:lintDebug`
+still need the Android SDK (**B-7**), still absent (**C-97-7**). Report it as *":core:test, via
+`scripts/core-probe.sh`"*, exactly as the script's own header instructs.
+
+### B-18 status 2026-08-25 (ninety-seventh run) — the sixty-second firing
+
+**Unchanged and re-derived, not inherited.** The stored prompt re-issues S5's spec half, calls S5
+**"NOT STARTED"**, names PR #31 as S2's tip, and carries the stale vendored pin `679a317`. **All of
+it is false**, and has been since 2026-08-09 / 2026-08-12 (**C-97-1**, **C-97-2**). **No agent can
+close B-18** — the obstacle is scheduler configuration outside both repositories (**C-92-5**).
+
+**One line is worth adding to this entry rather than restating it.** Sixty-two firings have now each
+paid a full session's cost to re-derive the same three facts. **This run found nothing the previous
+sixty-one did not** — the one thing that looked new was already documented three times over
+(**B-27**, withdrawn; **C-97-8**). Run 96 called the lane exhausted; this run tested that from a
+different direction and it held. That is not an argument for continuing.
+
+### B-1, B-2, B-4, B-5, B-6, B-7, B-8, B-9, B-12–B-17, B-19–B-26 — untouched this run
+
+Not exercised. This run wrote **no production code**, ran **no gate**, opened **no new PR** and took
+**no rung slice**, so none of them could move. **B-26 was re-read closely and its ordering argument
+re-verified as correctly specified** (**C-97-4b**) — the two missing §3 vectors stay unwritten for
+the reason B-26 gives, which survives scrutiny. **B-7 was re-confirmed, not changed**: the denial
+set that blocks `dl.google.com` also blocks `api.foojay.io`, exactly as **C-S5B-1** already recorded
+— which is why the withdrawn **B-27** was a rediscovery and not a finding.
