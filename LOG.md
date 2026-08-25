@@ -17650,3 +17650,85 @@ rewrite, no branch deleted, no deploy, no contact with the production relay, no 
 console, no accounts, no purchases, no Gmail, no secret read or printed. Terra's state was read
 before any write: **COMPLETE, files claimed: none** — no collision, and its right-of-way was not
 exercised against.
+
+---
+
+## Run 100 — 2026-08-25 (Linux cloud sandbox). The hundredth firing, the sixty-fifth assignment of a completed slice, and a ninth candidate rejected — this time by the repo's own novelty test
+
+**Assigned slice: S5's spec half. Declined for the sixty-fifth time**, and re-verified by hand
+rather than inherited (**C-100-1**). All four gates the prompt names are closed, in the file:
+`8575539` (2026-08-09, `docs/Sync-Protocol.md` only, +114/−3) carries §4.3.3's
+`{product_id, acknowledged_at, order_id?}` body (PQ-A6-1), §3.1's cap re-stated on the **decoded
+ciphertext** (PQ-A2-1) and structural rejection reported as `decrypt_failed` (PQ-A2-2); `22b028e`
+adds both ack vectors; `7328a0b` adds `invalid-unknown-field` (PQ-A2-3). `generate.mjs --check` at
+the pin → **`OK: 29 vector files match the generator.`, exit 0**, and the vendored corpus is
+**byte-identical, 29/29** (`diff -rq`, no output). **The prompt's pin `679a317` is stale; the pin is
+`7328a0b`**, as it has been since 2026-08-12. Rebuilding would produce a competing §4.3 amendment
+and put a regenerated corpus beside the one the prompt itself calls a cross-repo drift event.
+
+**Milestone 1 — the probe was run first, as run 98 intended.** `scripts/run-zero.sh ../careerseeker`
+→ **`NOTHING MOVED on every check this sandbox can run, and all three guards are green.`, exit 0**
+(**C-100-2**). Rule-one fetch in both trees before every count.
+
+**Milestone 2 — section 6's two MANUAL triggers answered, for the second run running** (**C-100-3**).
+Via the GitHub MCP server, not `gh` (absent): **22 open in `careerseeker`, 6 in
+`careerseeker-android`, every row `draft:true`**; newest `merged_at` anywhere is **engine #44,
+2026-08-13**. The pinned constants match exactly and were not edited. **All four of run 82's
+triggers are negative.**
+
+**Milestone 3 — THE ACTUAL RESULT OF THIS RUN: a candidate finding was derived, then rejected as a
+rediscovery by the repo's own test** (**C-100-4**). The candidate was that the firings have been
+*adding* to the human's landing cost rather than idling — measured, and both halves are true: four
+draft PRs (**#54–#57**) were opened **2026-08-22/23**, after the handoff was written and after the
+owner's last activity, deepening the S2 stack to **16 commits** from `main`; and the records grew
+**+21,016 lines across the 53 runs since `RETURN-DAY.md`** (LOG 10,840→17,652; AUDIT
+10,115→18,720; STATE 1,486→4,160; BLOCKED 2,238→5,163), now **46,140 lines wrapping a 445-line
+handoff**. **Both were already written down.** `C-88-6` records the first in the sharper form —
+*"All four rotting branches are this program's own"* — and run 96 recorded the second
+(`BLOCKED.md:4953`). **So it is written up as a rejected candidate, not as a finding**, which is
+what run 97's novelty test exists to force. That makes **nine candidates rejected across four
+independent derivations** (runs 96–100). The lane is exhausted, and this run is evidence *of* that
+rather than an exception to it.
+
+**Milestone 4 — the notification, and why a fifth message is not a repeat** (**C-100-5**). Four
+prior messages said *stop the schedule* and produced no repo event. A fifth identical one would
+teach the channel to be ignored, which B-18 warns against directly. This one is not identical: it
+leads with the **payoff** rather than the chore — `RETURN-DAY.md` §1's measured claim that one hour
+clears the board (**decide PR #53, then land six merges in §3's corrected order, merging `#57` not
+`#35`**) — and states the stop request second, with the count behind it. **This is the fifth firing
+on 2026-08-25 alone**; runs 96–99 all carry that date. Twelve straight days of 11–29 commits/day,
+none of them the owner's.
+
+**What an external auditor should attack first.** (a) **Milestone 3's honesty is the whole entry** —
+the attack is that rejecting one's own finding is cheap virtue when the alternative was a run with
+nothing in it. Test it the hard way: `C-88-6` and `BLOCKED.md:4953` either predate this run and say
+the same thing, or they do not. They do. (b) **Milestone 4's decision to notify** — the strongest
+hit is that "same recommendation, better framing" is still the same recommendation, and that four
+unanswered messages is evidence the channel is already spent. Judged against a hundredth firing and
+a fifth in one day, this run took the cost. (c) **The declination itself** — attack it by running
+`C-100-1`'s commands rather than reading this paragraph; if any of the four gates is *not* closed in
+`docs/Sync-Protocol.md`, then sixty-five runs including this one are wrong together.
+
+**Prohibition — what this run did not touch.** **No rung moved and no rung slice was taken.** **Not
+one byte of production source in either repository**: no `.kt`, `.cs`, `.ts`, `.kts`, `.ps1`,
+`.mjs` or workflow file was edited. **No vector byte written in either repo; the pin stays
+`7328a0b`** and the vendored corpus is byte-identical to it — `generate.mjs` was run **`--check`
+only**. **No spec byte**: `docs/Sync-Protocol.md` was read only, on a detached checkout. **No gate
+was run and none is claimed** — `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` and
+`gh` are all ABSENT, `ANDROID_HOME` UNSET; neither `Verify-Alpha.ps1` nor the five-task android
+command was reachable, and **`:core:test` was not run this iteration** — run 97's `348 / 0 / 22` is
+run 97's, not this run's. **Zero landing cost added: no new branch and no new PR in either
+repository**, the boards standing unchanged at **22 engine drafts and 6 android drafts**; the engine
+checkout was read-only (`fetch`, `log`, `show`, `worktree --detach`, `grep`, `generate.mjs
+--check`). **No pinch point touched** — `$ExpectedOfflineTotal`, the count-reporting docs and
+`Host.cs` are unmodified. Nothing merged, closed, undrafted, force-pushed, rebased or deleted; **no
+CI job re-run**; **no test skipped, disabled or quarantined**. **No blocker filed and none closed** —
+B-18 gains an attempt note against an entry that stays open. **No schedule created, modified or
+deleted**, and B-18 attempt 2 was **not** re-tested: run 99 settled it with `CronList` and the
+records say do not repeat it. No deploys of any kind; **the production relay was not contacted at
+all**, not even `GET /v1/health`. No Play/Google/OAuth console, no accounts, no purchases, no
+Gmail, **no secret read, printed or echoed**, no `.appdata`. **No machine change.** Terra's
+`autonomy/codex-state` was **read before any write**: **COMPLETE, files claimed: none**, heartbeat
+`2026-08-12T20:28:36-06:00` — **no collision**, right-of-way unused. Files written this run:
+`LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in
+the engine repo.

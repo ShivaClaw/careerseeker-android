@@ -18718,3 +18718,115 @@ vendored corpus byte-identical, citations green, `fleet-probe.sh plan` ROT 0 / U
 are green."**, **exit 0**. The edit touches §6's prose, the header comment and the verdict's
 narrative only — **no baseline constant, no check, and no exit path was altered**, which is why the
 run before and after this commit reports the same verdict and the same exit code.
+
+---
+
+## Run 100 — 2026-08-25. Re-verification commands
+
+Run `git fetch --all --prune` in **both** trees first, or every count below is stale. That is rule one.
+
+### C-100-1 — the assigned slice is built, for the sixty-fifth run, and the four gates read in the file
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  echo "== $c =="; git log -1 --format='%ad  %s' $c; git show --stat --format='' $c
+done
+git show 8575539:docs/Sync-Protocol.md > /tmp/spec.md
+grep -n 'product_id\|acknowledged_at\|order_id' /tmp/spec.md | head -5   # PQ-A6-1
+grep -n '1 MiB'                          /tmp/spec.md | head -5          # PQ-A2-1
+grep -n 'decrypt_failed'                 /tmp/spec.md | head -5          # PQ-A2-2
+```
+
+*Expected, and **observed** this run:* `8575539` (Sun Aug 9 2026) touches **`docs/Sync-Protocol.md`
+only, +114/−3**; `22b028e` adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`,
+`index.json` **and `generate.mjs`**; `7328a0b` (Aug 12) adds `invalid-unknown-field.json`. In the
+spec itself: the body block at **`:299-301`** with `order_id` **OPTIONAL**; **`:112`** *"MUST NOT
+exceed 1 MiB. A receiver measures those **decoded bytes***"; **`:103`** and **`:582`** reporting
+structural rejection as `decrypt_failed` with no `malformed` code added. **All four gates named in
+the recurring prompt are already closed.** The corpus and pin half:
+
+```bash
+cd <engine> && git worktree add -f --detach /tmp/pin 7328a0bc043335491cd96a67d634e8eea2a13af9
+(cd /tmp/pin && node docs/sync-vectors/generate.mjs --check); echo "exit=$?"
+diff -rq /tmp/pin/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1
+cd <android> && grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1
+cd <engine>  && git merge-base --is-ancestor 7328a0b origin/main && echo "on main" || echo "NOT on main"
+```
+
+*Expected, and **observed**:* **`OK: 29 vector files match the generator.`, exit 0**; `diff -rq`
+prints **nothing** (29 files each side, byte-identical); the lock reads
+**`7328a0bc043335491cd96a67d634e8eea2a13af9`** — **the prompt's `679a317` is stale** (**C-PIN-1**,
+re-verified) — and the pin is **NOT on main**, where `git ls-tree --name-only origin/main
+docs/sync-vectors/v1/ | wc -l` still returns **26**. 26 + 3 = 29 reconciles the two.
+
+### C-100-2 — the ground state, in one command
+
+```bash
+cd <android> && bash scripts/run-zero.sh ../careerseeker; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* **`NOTHING MOVED on every check this sandbox can run, and all three
+guards are green.`**, **exit 0** — engine `main` `aac05f3` and android `main` `ebfaf81` both against
+their pinned baselines, `fleet-probe.sh plan` **ROT 0 / UNPLANNED 2**, and the toolchain table
+`dotnet/pwsh/sdkmanager/avdmanager/emulator/adb/gh` **ABSENT**, `ANDROID_HOME` **UNSET**,
+`node`/`git`/`java`/`gradle` **PRESENT**.
+
+### C-100-3 — §6's two MANUAL triggers, answered again via MCP rather than deferred
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected, and **observed**:* **22 open in `careerseeker`** (21 `claude/*` + `#26`
+`codex/r6-dependency-sbom`) and **6 open in `careerseeker-android`**, **every row `draft:true`**;
+newest `merged_at` anywhere **engine #44, `2026-08-13T02:28:21Z`**. Matches the pinned constants
+exactly; they were **not** edited. Use `merged_at` or the commit graph, **not** the rows' `merged`
+field, which reads false even for PRs that demonstrably merged (**C-89-2**).
+
+### C-100-4 — this run's candidate finding was a rediscovery, and the check is what proves it
+
+The candidate: *the firings have been adding landing cost, not idling.* Both halves measure true —
+
+```bash
+cd <engine> && git rev-list --count origin/main..origin/claude/s2-relay-header-pairing
+cd <engine> && for b in claude/s2-latest-since-invariant claude/s2-latest-retention-skew \
+  claude/s2-relay-constant-pins claude/s2-relay-header-pairing; do \
+  printf '%-42s ' "$b"; git log -1 --format='%ad %h' --date=short origin/$b; done
+cd <android> && RD=$(git log -1 --format=%H --before=2026-08-17 origin/claude/android-a0-probe)
+for f in LOG.md AUDIT-REQUEST.md STATE.md BLOCKED.md; do \
+  printf '%-18s then=%-7s now=%s\n' "$f" "$(git show $RD:$f | wc -l)" "$(wc -l < $f)"; done
+```
+
+*Expected, and **observed**:* leaf **`#57` is 16 commits from `main`**; the four branches date
+**2026-08-22 / 08-22 / 08-23 / 08-23**, all after `RETURN-DAY.md` (2026-08-16) and after the owner's
+last activity (2026-08-13); records **10,840→17,652 / 10,115→18,720 / 1,486→4,160 / 2,238→5,163**,
+**+21,016 lines across 53 runs**, **46,140 total** against a **445-line** handoff.
+
+**And it is already recorded — which is the point of the entry.** The refutation is one command:
+
+```bash
+cd <android> && sed -n '16720,16733p' AUDIT-REQUEST.md   # C-88-6
+sed -n '4953,4955p' BLOCKED.md                           # run 96
+```
+
+*Expected, and **observed**:* **C-88-6** states it in the sharper form — *"All four rotting branches
+are this program's own"* (run 88, 2026-08-23) — and `BLOCKED.md:4953` carries run 96's records-growth
+finding. **Both predate this run.** So the candidate is logged as **rejected**, not as a finding:
+**nine candidates now rejected across runs 96–100**. A run that cannot tell rediscovery from
+discovery would have reported this as news.
+
+### C-100-5 — the firing rate behind the fifth notification
+
+```bash
+cd <android> && git log --format='%ad' --date=short origin/claude/android-a0-probe \
+  | sort | uniq -c | tail -12
+grep -n '^## Run 9[6-9] \|^## Run 100 ' LOG.md | tail -5
+```
+
+*Expected, and **observed**:* **11–29 commits/day for twelve consecutive days** (2026-08-14 →
+08-25), none of them the owner's; and runs **96, 97, 98, 99** all carry **2026-08-25**, making this
+run **the fifth firing on that date**. The notification's framing change (payoff first — decide #53,
+land six merges per §3 **merging `#57` not `#35`**; stop request second) is what distinguishes it
+from the four prior messages, all of which led with the chore and produced no repo event.
