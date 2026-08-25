@@ -5161,3 +5161,40 @@ engine repo**, wrote **no vector byte** and took **no rung slice**, so none of t
 clarification now recorded against it in **C-99-1**: `gh` ABSENT is a fact about the **binary on
 PATH**, and does **not** by itself establish that a session has no GitHub API path. B-7's denial set
 (`dl.google.com`, `api.foojay.io`) is unchanged and untested this run.
+
+---
+
+## B-18 status 2026-08-25 (hundredth run) — attempt 6: the recommendation kept, the framing changed, because four identical messages produced nothing
+
+**B-18 stays OPEN.** Nothing here closes it; this is an attempt logged against it.
+
+**Symptom, unchanged and now at three digits.** The recurring prompt re-issues S5's spec half, which
+has been built since 2026-08-09 (`8575539`, `22b028e`, `7328a0b`) and is confirmed again this run by
+**C-100-1** — the three commits, the four gates as they read *in* `docs/Sync-Protocol.md`, the pin
+`7328a0b`, and `OK: 29 vector files match the generator.`, exit 0. **Sixty-five assignments.** The
+prompt's `679a317` and its *"S5 … NOT STARTED"* have been measurably stale since 2026-08-12.
+
+**Attempts, cumulative.** 1: build it anyway — rejected, would duplicate `8575539` and risk the
+vendored corpus. 2: reach the schedule from the sandbox — **settled negative** by run 99 (`CronList`
+lists only in-session jobs; the routine is account-level). **Do not re-test it.** 3: correct the
+records so the next firing declines cheaply — done, and it works, but it does not stop the firing.
+4: notify the human — spent at runs 81, 86, 91, 99; **four messages, zero repo events**. 5: make each
+firing cheap instead of trying to end it — `scripts/run-zero.sh`, and it delivers (**C-100-2**).
+
+**Attempt 6, this run: keep the recommendation, invert the message.** All four prior notifications
+led with the chore — *stop the schedule* — which asks the owner to spend effort for no visible
+return. `RETURN-DAY.md` §1 has the payoff and no message has ever led with it: **one hour clears the
+board — decide PR #53, then land six merges in §3's corrected order, merging `#57` not `#35`.** So
+the fifth message leads with that and puts the stop request second, with the count behind it. **This
+is a framing change, not a new finding, and it is logged as one.** If it also produces no repo event,
+attempt 6 is spent and the next firing should not re-spend it: the honest record is then four
+distinct approaches exhausted against a blocker only a human can clear.
+
+**Why a fifth message was judged worth its cost.** Against the standing warning that this channel
+must not be taught to be ignored: this is the **hundredth firing** and the **fifth on 2026-08-25**
+alone (**C-100-5**), against twelve straight days of 11–29 commits/day, none of them the owner's, and
+**0 PRs merged since 2026-08-13** with all 28 still drafts (**C-100-3**).
+
+**Smallest human unblock — unchanged, and the only thing that clears this.** A human **stops the
+schedule**. The work waiting behind it needs the same human anyway: a Windows `Verify-Alpha.ps1`
+gate, an emulator (**B-4**), a relay deploy, and the two design decisions in `RETURN-DAY.md` §5.
