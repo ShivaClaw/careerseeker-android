@@ -18830,3 +18830,79 @@ grep -n '^## Run 9[6-9] \|^## Run 100 ' LOG.md | tail -5
 run **the fifth firing on that date**. The notification's framing change (payoff first — decide #53,
 land six merges per §3 **merging `#57` not `#35`**; stop request second) is what distinguishes it
 from the four prior messages, all of which led with the chore and produced no repo event.
+
+### C-101-1 — the assigned slice, declined a sixty-sixth time, re-derived not inherited
+
+```bash
+cd <android> && bash scripts/run-zero.sh ../careerseeker | sed -n '/== 1\./,/== 2\./p'
+```
+
+*Expected, and **observed**:* the three slice commits still report `off-main` —
+`8575539` (the `entitlement_ack` body and what the size cap measures), `22b028e` (the two §4.3.3
+vectors), `7328a0b` (the `invalid-unknown-field` vector, closing PQ-A2-3 / B-6). The prompt's
+premise that S5 is "NOT STARTED" is false for the sixty-sixth consecutive assignment, and its
+vendored pin `679a317` remains stale against the real pin `7328a0b`.
+
+### C-101-2 — ground state: NOTHING MOVED, on every check this sandbox can run
+
+```bash
+cd <android> && bash scripts/run-zero.sh ../careerseeker; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`NOTHING MOVED`, exit 0**. Pin `7328a0b`; `OK: 29 vector files
+match the generator.`; vendored 29 files / at pin 29 files, byte-identical. Guards: citations
+`940 definitions / 941 cited / 1 documented-absent` **as measured on arrival** — re-running after
+this run's five appends gives **`945 / 946 / 1`**, which is the number a reader re-checking at or
+after run 101's commit should expect. Plan `6 rows / 8 leaves / ROT 0 / UNPLANNED 2`.
+Both mains unmoved — engine `aac05f3` (2026-08-12), android `ebfaf81` (2026-08-06).
+
+### C-101-3 — all four of run 82's notification triggers, checked and negative
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected, and **observed**, via the GitHub MCP server (per C-99-1, `gh` the binary is still
+ABSENT):* **22 open in `careerseeker`** (#26, #32–#39, #45–#57) and **6 open in
+`careerseeker-android`** (#1–#6), **every row `draft:true`**. Newest `merged_at` anywhere is
+**#44, 2026-08-13T02:28:21Z** — unchanged for twelve days. Neither main moved (C-101-2), no PR
+merged or undrafted, the stored prompt still carries both known-stale facts, and no gate result
+changed (C-101-4 matches its recorded baseline). **All four triggers negative.**
+
+### C-101-4 — `:core:test` re-run by this run's own hands, and it matches the baseline exactly
+
+Run 100 explicitly did **not** run it, and correctly refused to inherit run 97's number. This run
+did, so the `348` now stands on this head rather than on a citation:
+
+```bash
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+cd <android> && bash scripts/core-probe.sh; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`BUILD SUCCESSFUL`**, **`core-probe: 348 tests, 0 failed, 0
+skipped, across 22 classes`**, exit **0**. The JDK 17 install is the script's own prescribed
+remedy and is **not a finding** — B-27 is the withdrawn entry that says so, and the two
+`apt-get update` 403s (`deadsnakes`, `ondrej/php`) are policy denials that must not be retried.
+
+**What this licenses, and nothing more:** the sentence *":core:test, via `scripts/core-probe.sh`,
+348 tests, 0 failed, 0 skipped"*. It is **one of the five tasks** in the verification command of
+record; `checkCoreIsAndroidFree`, `:app:test`, `:app:assembleDebug` and `:app:lintDebug` still
+need the Android SDK (B-7), still absent. **No gate ran and none is claimed.**
+
+### C-101-5 — the sixth notification was NOT sent, and the restraint is the decision
+
+```bash
+cd <android> && sed -n '2516,2524p' LOG.md      # the standing restraint policy
+grep -c 'NOTIFICATION SENT' STATE.md
+```
+
+*Expected, and **observed**:* the records' own policy — *"a notification per firing would train the
+channel to be ignored"* — plus **five messages already sent**, the first at run **86**
+(`LOG.md:16005`, *"the FIRST NOTIFICATION SENT since the policy began"*), then run **91**, and most
+recently runs **99** and **100** (`STATE.md:43`, *"fifth message"*), all recommending the one
+unblock B-18 needs, all producing **zero repo events** (C-101-3). With all
+four triggers negative and nothing this run found that a prior run had not, a sixth message would
+carry no new information and would spend the one channel B-18 depends on. **It was withheld
+deliberately.** This is not silence about a problem: the problem is fully recorded here and in
+`RETURN-DAY.md`; it is silence about a *repetition*.
