@@ -17141,3 +17141,122 @@ COMPLETE and claims no files, so there was no collision to resolve. **One machin
 `core/src/test/kotlin/app/careerseeker/core/EnvelopeReceiverTest.kt`, `AUDIT-REQUEST.md`,
 `BLOCKED.md`, `LOG.md`, `STATE.md`, `docs/protocol-questions.md`, and the `autonomy/claude-state`
 heartbeat in the engine repo.
+
+## Run 96 — 2026-08-25 (Linux cloud sandbox). Three candidate slices derived independently; the standing precondition rejected all three as already-closed or already-green
+
+**Rule one first.** `git fetch --all --prune` in both checkouts before any count. The android tree
+arrived detached at the docs-only `main` (`ebfaf81`), **356 commits** behind the work branch — this
+run's own count, taken after the fetch. Engine `origin/main` **`aac05f3`** (2026-08-12), android
+`main` **`ebfaf81`** (2026-08-06), **both unmoved**. Boards unmoved: **22 engine drafts, 6 android
+drafts, none merged** (**C-96-3**).
+
+**The assigned slice was declined for the sixty-first time, re-derived with this run's own hands and
+not inherited** (**C-96-1**). All three commits exist and do what the record says: `8575539`
+(2026-08-09, `docs/Sync-Protocol.md` only, **+114/−3**), `22b028e` (both ack vectors + `index.json`
++ `generate.mjs`), `7328a0b` (2026-08-12, `invalid-unknown-field.json`). `node
+docs/sync-vectors/generate.mjs --check` on the branch that carries them → **`OK: 29 vector files
+match the generator.`**, `exit 0`. **All four gates were read in the file itself, not inferred from
+commit subjects:** §4.3.3's `product_id`/`acknowledged_at`/`order_id` at lines 318–320 (PQ-A6-1),
+the **decoded ciphertext** 1 MiB cap at lines 111–112 (PQ-A2-1), and `decrypt_failed` as the
+structural-rejection code at lines 103 and 601 (PQ-A2-2). The prompt's pin `679a317` is **stale**;
+the real pin is **`7328a0b`**, and the vendored corpus is **29/29 byte-identical** to it by two
+independent checks, the second being the repo's own `repin-vectors.sh --check` (**C-96-2**).
+`git ls-tree --name-only origin/main docs/sync-vectors/v1/` still returns **26** — the work is
+unmerged, not unwritten.
+
+### Milestone 1 — the slice, and why it produced no commit to the program
+
+The ordered intent's live item (**NEW ITEM 1**, the engine half of the suite-name hole) needs
+`dotnet`, which is absent here. So this run derived its own candidates and applied the standing
+precondition — *re-verify the item before taking it* — to each. **All three failed it, and each
+failure is a different kind** (**C-96-4**):
+
+**(a) The CI/merge-gate premise.** Hypothesis: fifty-plus runs have treated the engine merge gate as
+unreachable from a sandbox, but `.github/workflows/ci.yml:28` is `runs-on: windows-latest` and
+`:48` runs `./scripts/Verify-Alpha.ps1` on every push to `claude/**` and every PR to `main`. If CI
+already runs the gate on real Windows, H2's six merges might not need Brandon's machine at all.
+**Measured, and the premise is half true in the way that does not help:** CI runs the script
+**bare** — no `-IncludePublish`, no `-IncludePackage`, no `-IncludeLive` — and the merge condition
+names both flags. **CI green is the offline half only, and is not the merge condition.** Already
+recorded, repeatedly: `AUDIT-REQUEST.md:6026`, `:8034`, `:8720`, `STATE.md:2089`, `:2096`. **Not a
+finding. Not new.**
+
+**(b) The landing plan.** `scripts/fleet-probe.sh plan ../careerseeker RETURN-DAY.md` → **6 plan
+rows, 8 leaves, ROT 0, UNPLANNED 2, exit 0** — *PLAN STILL NAMES LEAVES*. The plan rotted once
+before (run 87, caught by hand; run 88 built this guard). **It has not rotted again**, which is
+expected: the rot source was these iterations opening #54–#57, and no engine PR has been opened
+since. **Green, therefore no slice.**
+
+**(c) B-19's open half.** The guard's own output says what it cannot see: *a leaf with no open PR*.
+I hold the credential the shell guard lacks, so I checked the one leaf it flags —
+`claude/p4-entitlement`. **PR #8 is `state: closed`, `merged: false`, `closed_at`
+2026-08-09T01:12:14Z**, base `claude/p2-publisher`, **8 commits, +1861/−47, 35 files.** A leaf
+carrying 1,861 lines of engine work with no open PR reads like a real find — and it is **already
+recorded three times**: `BLOCKED.md:4510` (*"#8, closed and genuinely unmerged"*),
+`AUDIT-REQUEST.md:16862` (**C-89-4**, *"a leaf that can never land, and 199 is its size"*), and
+`STATE.md:239`. Its successors landed as #27–#30. **Not new.**
+
+**The result is the finding.** Three candidates, three different derivations, **zero survivors** —
+and the ordered intent's own item 1 is gated on an absent toolchain. Runs 82–95 each reported one
+target that survived measurement; **this is the first run where none did.** That is a state change
+worth naming precisely: the lane did not become *unproductive*, it became **exhausted**. Every
+remaining item on `RETURN-DAY.md` §5 needs a Windows gate, an emulator (**B-4**), a relay deploy, or
+a product decision, and **none is reachable from here** (**C-96-7**, environment re-verified this
+run, not inherited).
+
+### Milestone 2 — the premise under the whole mission, re-measured
+
+Run 90 checked the sentence the mission rests on — *"Brandon is out until 2026-08-18"* — and found
+it expired. **Re-measured this run, and it has expired further** (**C-96-5**): Brandon's last commit
+**anywhere in either repository** is `2026-08-12 19:55:39 -0600` (*"B-2: the /pair page exists…"*),
+**thirteen days ago and six days before his own stated return date**. Return day passed **seven days
+ago**. Zero commits on either `main` since 2026-08-16. Across all android branches in the last
+fourteen days: **Claude 254+ commits, Brandon 1**. **28 PRs open, 0 merged.**
+
+### Milestone 3 — the notification, and why this run stayed silent
+
+Run 82 wrote its successors a test, and it is the right one: **notify on `main` moving, a PR merged
+or undrafted, the stored prompt changing, or a gate result — not on another firing and not on
+another draft PR.** Applied this run, honestly (**C-96-6**): `main` moved — **no**, both unmoved. A
+PR merged or undrafted — **no**, 28 open and 0 merged. The stored prompt changed — **no**, same
+text, same stale pin, same "S5 NOT STARTED". A gate result — **no**; run 95's runner-verified gate
+was new *at run 95* and was recorded there. **All four negative, so no notification was sent.**
+
+Three have already gone (runs 81, 86, 91), the last of them carrying exactly this run's
+recommendation — *stop the schedule* — and **none produced a repo event**. A fourth restating the
+same fact would not add information; it would only teach the channel to be ignored, which is the one
+thing B-18 cannot afford. **The silence is the disciplined choice, not an omission, and it is
+recorded here so the next session inherits the rule rather than re-deriving it.**
+
+### Milestone 4 — restraint about the records themselves
+
+Run 87 measured a cost paid by the records. They now stand at **~44,000 lines** across four files.
+This entry is deliberately short of what this run could have written: the three rejected candidates
+are worth their commands and one paragraph each, **not** a milestone apiece. **A record that grows
+faster than the program it describes stops being a record.**
+
+### Environment, stated so no claim can be misread
+
+Verified this run, not inherited (**C-96-7**): `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`,
+`emulator`, `adb`, `gh` **all ABSENT**; `ANDROID_HOME` **UNSET**. `node`, `git`, `bash`, `java` and
+`gradle` present. **No gate ran and none is claimed** — neither `scripts\Verify-Alpha.ps1` nor
+`./gradlew … :app:assembleDebug :app:lintDebug`. Every command cited above is `git`, `node`,
+`bash`, or a read through the GitHub API.
+
+### Prohibition — what this run did not touch
+
+**No rung moved, and no slice was taken** — deliberately, because all three candidates were
+re-verified as closed or green before being taken, which is what the precondition is for. **Not one
+byte of production source in either repository**: no `.kt`, `.cs`, `.ts`, `.kts`, `.ps1`, `.mjs`, or
+workflow file was edited. **No vector byte written in either repo; the pin stays `7328a0b`** and the
+vendored corpus is byte-identical to it by two checks. **No spec byte** — `docs/Sync-Protocol.md`
+was read only. `$ExpectedOfflineTotal` and every count-reporting doc are **unmodified**; **no pinch
+point touched**; **zero landing cost added, zero new branches, no new PR in either repo**. Nothing
+was merged, closed, undrafted, force-pushed, rebased or deleted; **no CI job was re-run**; **no test
+was skipped, disabled or quarantined**. **No notification was sent** (Milestone 3). No deploys of
+any kind; **the production relay was not contacted at all**, not even `/v1/health`. No Play/Google/
+OAuth console, no accounts, no purchases, no Play Billing code, no Gmail or email, **no secret read,
+printed or echoed**, no `.appdata`, no `Desktop\site-v2`. **No machine change this run** — nothing
+was installed. Terra's `autonomy/codex-state` was **read only**: COMPLETE, files claimed **none**,
+so there was no collision to resolve. Files written this run: `LOG.md`, `AUDIT-REQUEST.md`,
+`BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the engine repo.
