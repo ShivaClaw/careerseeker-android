@@ -17277,3 +17277,167 @@ printed or echoed**, no `.appdata`, no `Desktop\site-v2`. **No machine change th
 was installed. Terra's `autonomy/codex-state` was **read only**: COMPLETE, files claimed **none**,
 so there was no collision to resolve. Files written this run: `LOG.md`, `AUDIT-REQUEST.md`,
 `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the engine repo.
+
+## Ninety-seventh run — 2026-08-25 (Linux sandbox): exhaustion confirmed from a second direction, and a finding withdrawn before it stood
+
+Every command cited below was **executed this run**, after `git fetch --all --prune` in **both**
+checkouts. That fetch is rule one and it is not ceremonial: the android checkout began detached at
+`ebfaf81`, **200 commits behind** `origin/claude/android-a0-probe`.
+
+### Milestone 0 — the assigned slice, declined for the sixty-second time
+
+The stored prompt assigns S5's spec half — amend §4.3 with the `entitlement_ack` body, add the
+vector via `generate.mjs`, close PQ-A2-1/-2/-3 — and describes S5 as **"NOT STARTED"** with the
+vendored pin at `679a317`. **Re-derived with this run's own hands, not read off the banner**
+(**C-97-1**): `8575539` (2026-08-09) amends `docs/Sync-Protocol.md` **only**, **+114/−3**;
+`22b028e` adds both ack vectors, `index.json` **and** `generate.mjs`; `7328a0b` (2026-08-12) adds
+`invalid-unknown-field.json`. `node docs/sync-vectors/generate.mjs --check` on
+`origin/claude/s5-entitlement-ack-emitter` → **`OK: 29 vector files match the generator.`**,
+**exit 0**. The pin is **`7328a0b`**, and the vendored corpus is **29/29 byte-identical** to it by
+two independent checks — `diff -rq` (no output, exit 0) and the repo's own `repin-vectors.sh
+--check` (**C-97-2**). **The work is unmerged, not unwritten**, and has been since 2026-08-12.
+
+### Milestone 1 — three candidates, three rejections, by a different route than run 96's
+
+Run 96 reported the first run with zero surviving candidates and named the lane **exhausted**. That
+is a conclusion worth attacking rather than inheriting, so this run derived its **own** three
+candidates — **none of them the three run 96 examined** — and applied the standing precondition
+(**C-97-4**):
+
+**(a) PQ-STR-1's §3 amendment.** §3 says an unparseable **body** is `decrypt_failed`; §7.2 says
+unparseable **framing**, and both shipping implementations answer `unknown_kind`. Reading (a)
+(strike §3's clause) needs **no code change on either side**. **Rejected anyway:** it decides a
+sentence normative for two codebases, one uncompilable here, and it is the same class as
+PQ-A2-1/-2/-3 — which the mission records **Brandon answering as gates** (§2.3). Not an agent's
+call, and the house rule already covers the interim: *match the engine, ship that, record the
+question*, which PQ-STR-1 is.
+
+**(b) The two unvectored §3 rules** — `invalid-unknown-dir`, `invalid-wrong-nonce-length`.
+**Rejected on B-26's ordering argument, which I re-read rather than inherited** — and it holds. Both
+suites enumerate the corpus **generically**, so a new invalid-envelope vector is an automatic
+conformance demand on a **C# suite this sandbox cannot compile**, and it moves the pin and forces a
+re-vendor. B-26's closing sentence is the correct one: *the vector is what makes the two sides
+agree, so it must be added when both sides can be run against it.*
+
+**(c) Pin the phone half of those two rules with `:core` tests.** **Rejected: already built** —
+`EnvelopeReceiverTest.kt:133` and `:175`. This is the candidate the records' own advice predicted:
+*re-run the cheap check before inheriting a deferral*. Here the cheap check said **done**, not
+**do it**.
+
+**Two independent derivations, six different candidates, the same answer.** That is stronger
+evidence for exhaustion than run 96 alone could offer, and it is the honest reading: the lane is
+exhausted **for a sandbox**, not for the program.
+
+### Milestone 2 — the candidate finding, and the grep that withdrew it
+
+The precondition sent me to run the one thing this environment can execute, and it was **red**
+(**C-97-3**). `scripts/core-probe.sh` exited **1**:
+
+```
+core-probe: no JDK 17 found under /usr/lib/jvm.
+```
+
+The sandbox ships **JDK 21**; `:core` pins `jvmToolchain(17)`; Gradle cannot auto-provision because
+`api.foojay.io` is denied by the same policy as `dl.google.com` (**B-7**). Applying the script's own
+documented remedy — `apt-get install -y --no-install-recommends openjdk-17-jdk-headless`, exit 0 —
+the probe reported **`348 tests, 0 failed, 0 skipped, across 22 classes`**, `BUILD SUCCESSFUL`,
+**identical to run 95's 348/0**.
+
+**I drafted this as the run's finding, and it was not one** (**C-97-8**). The write-up was complete
+— a new blocker **B-27**, a `STATE.md` banner reading *"the records were stale about the machine"*,
+and an argument that **B-26** attempt 1, **C-95-8** and **C-95-10** all rested on an unverified
+machine premise. Then one grep:
+
+```bash
+grep -n 'jvmToolchain\|JDK 17\|foojay' AUDIT-REQUEST.md | head
+```
+
+**C-VR-10** already says the probe *"needs a JDK 17 present — it says so and gives the apt line if
+missing"*. **C-S5B-1** already says `api.foojay.io` is denied and the pinned toolchain cannot be
+provisioned. **Run 88's C-88-9** already records *"`java` is 21, not the pinned 17"*. **The probe
+behaved exactly as designed and as documented.** Nothing regressed; no premise was stale; there is
+no B-27 obstacle. **B-27 is withdrawn in place**, not deleted, so the error stays legible.
+
+**The lesson is the inverse of the one this lane keeps learning, which is why it is worth the
+words.** Runs 85 and 88 both found a blocker whose *inherited* premise nobody re-read. **I re-read
+the inherited premises correctly and failed to check whether my own observation was already written
+down.** Novelty is a claim like any other and needs its command — and that command belongs
+**before** the write-up, not after it.
+
+**And the pressure that produced it should be named.** Run 96 recorded zero surviving candidates.
+A sixty-second consecutive empty run makes having found *something* feel like the job. **An
+exhausted lane is exactly the condition under which a rediscovery looks like a finding**, which is
+the most useful sentence this run can hand the next one.
+
+**Deliberately not done:** relax `jvmToolchain(17)` to accept 21. JDK 17 is a standing pin shared
+with CI and the Windows gate; bending a pinned artifact so the sandbox measuring it is happier is
+the size-cap bug's shape.
+
+### Milestone 3 — every guard the repository owns, run, and green
+
+All three (**C-97-5**): `check-citations.sh` → **923 definitions / 924 cited / 1 documented-absent**,
+*"OK: every cited C-/B- id resolves"*, exit 0 (re-run **after** this run's appends).
+`repin-vectors.sh --check` → byte-identical, pin unchanged, exit 0. `fleet-probe.sh plan` →
+**`plan rows: 6   leaves now: 8   ROT: 0   UNPLANNED: 2`**, exit 0, *PLAN STILL NAMES LEAVES*.
+**No rot; therefore no slice there** — the same green run 96 measured, re-measured rather than
+carried forward.
+
+### Milestone 4 — the notification, and why this run stayed silent
+
+Run 82's four triggers, applied honestly (**C-97-6**): `main` moved — **no** (engine `aac05f3`
+2026-08-12, android `ebfaf81` 2026-08-06). A PR merged or undrafted — **no** (**22 engine + 6
+android open, all draft, 0 merged**). The stored prompt changed — **no** (same stale pin, same
+"NOT STARTED"). A gate result — **no**; CI `32796960809` is `success` on `81c70cb`, and **run 96
+recorded it**. All four negative.
+
+**The JDK condition is not a fifth trigger.** It is a documented precondition with a one-command
+fix, resolved in-run, and it turned out not to be news at all (**C-97-8**). Reporting it would have
+been reporting a solved non-problem, and the one asset B-18 cannot
+afford to spend is a channel the reader learns to ignore. Runs 81, 86 and 91 sent the *stop the
+schedule* notification; run 96 chose silence over a fourth; **this run chooses silence over a
+fifth, for the same reason and with the same recommendation standing.**
+
+### Milestone 5 — restraint, again, and it is getting harder to justify the file
+
+Run 87 measured the records at ~44,000 lines and run 96 wrote *a record that grows faster than the
+program it describes stops being a record*. This entry adds **no finding**, three one-paragraph
+rejections, a guard sweep and one correction. The three rejected candidates get a paragraph each,
+not a milestone each. **The withdrawn draft would have added a blocker, a banner and a milestone
+for something already documented three times** — deleting it is the single largest contribution
+this run makes to the file's signal.
+
+### Environment, stated so no claim can be misread
+
+Re-verified this run, not inherited (**C-97-7**): `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`,
+`emulator`, `adb`, `gh` **all ABSENT**; `ANDROID_HOME` **UNSET**. `node` v22.22.2, `git`, `gradle`
+**PRESENT**. `java` **PRESENT at 21**, not the pinned 17, until this run applied the install
+`core-probe.sh` documents — the condition **C-VR-10** and **C-88-9** already record.
+
+**No gate ran and none is claimed** — neither `scripts\Verify-Alpha.ps1` nor the five-task android
+command. **`:core:test` ran, via `scripts/core-probe.sh`, and is reported as that and nothing more:
+one task of five.**
+
+### Prohibition — what this run did not touch
+
+**No rung moved and no rung slice was taken**, because all three derived candidates were re-verified
+as gate-shaped, ordering-blocked, or already built before being taken — which is what the
+precondition is for. **Not one byte of production source in either repository**: no `.kt`, `.cs`,
+`.ts`, `.kts`, `.ps1`, `.mjs`, or workflow file was edited. **No vector byte written in either
+repo; the pin stays `7328a0b`** and the vendored corpus is byte-identical to it by two checks.
+**No spec byte** — `docs/Sync-Protocol.md` was **read only**, and PQ-STR-1's amendment was
+deliberately left undecided. `$ExpectedOfflineTotal` and every count-reporting doc are
+**unmodified**; **no pinch point touched**; **zero landing cost added, zero new branches, no new PR
+in either repository** — the boards stand unchanged at **22 engine drafts and 6 android drafts**.
+Nothing was merged, closed, undrafted, force-pushed, rebased or deleted; **no CI job was re-run**;
+**no test was skipped, disabled or quarantined**, and `jvmToolchain(17)` was **not** relaxed.
+**No notification was sent** (Milestone 4). **No blocker was filed** — B-27 was drafted and
+**withdrawn in the same run** (**C-97-8**). No deploys of any kind; **the production relay was not
+contacted at all**, not even `/v1/health`. No Play/Google/OAuth console, no accounts, no purchases,
+no Play Billing code, no Gmail or email, **no secret read, printed or echoed**, no `.appdata`, no
+`Desktop\site-v2`. **One machine change, logged as required by mission §3:**
+`openjdk-17-jdk-headless` installed into this **ephemeral sandbox** — nothing outside the container,
+nothing in either repository, and it does not persist. Terra's `autonomy/codex-state` was **read
+only**: **COMPLETE, files claimed: none**, heartbeat `2026-08-12T20:28:36-06:00` — **no collision**;
+right-of-way unused because there was nothing to collide over. Files written this run: `LOG.md`,
+`AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the
+engine repo.

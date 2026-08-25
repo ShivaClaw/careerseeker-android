@@ -18264,3 +18264,218 @@ records-only head did not turn `Build and test` red.
 and the android repo is **never-self-merge** regardless. **PR #6 stays a DRAFT.** It also is not
 news in the notification sense (**C-96-6**): run 95 recorded a green gate on `56a305c`, so a second
 green on a records-only push confirms nothing broke rather than reporting a change.
+
+## Ninety-seventh run — 2026-08-25 (Linux sandbox): a second independent derivation of exhaustion, and a finding withdrawn before it stood
+
+**Every command below requires `git fetch --all --prune` in BOTH checkouts first** — rule one, and
+every count here was taken after it. `<engine>` = a clone of `ShivaClaw/careerseeker`;
+`<android>` = a clone of `ShivaClaw/careerseeker-android` on `claude/android-a0-probe`.
+
+**This run produced no finding.** It re-derived the assigned slice, tested run 96's *exhausted*
+verdict from a different direction and reproduced it, ran every guard the repository owns, and
+**withdrew its one candidate finding after a grep showed it was already documented three times**
+(**C-97-8**). That withdrawal is the entry worth reading.
+
+### C-97-1 — the assigned slice is built, for the sixty-second run
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  echo "== $c =="; git log -1 --format='%ad  %s' $c; git show --stat --format='' $c
+done
+git worktree add -f --detach /tmp/s5chk origin/claude/s5-entitlement-ack-emitter
+(cd /tmp/s5chk && node docs/sync-vectors/generate.mjs --check); echo "exit=$?"
+```
+
+*Expected, and **observed** this run:* `8575539` (**Sun Aug 9 2026**) touches `docs/Sync-Protocol.md`
+**only**, **+114/−3** — §4.3.3's `{product_id, acknowledged_at, order_id?}` body (**PQ-A6-1**), the
+1 MiB cap on the decoded ciphertext (**PQ-A2-1**), `decrypt_failed` for structural rejection
+(**PQ-A2-2**). `22b028e` adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`,
+`index.json` **and** `generate.mjs`, **+117/−1 across 4 files**. `7328a0b` (**Wed Aug 12 2026**)
+adds `invalid-unknown-field.json` (**PQ-A2-3**, closes **B-6**), **+60**. Then
+**`OK: 29 vector files match the generator.`**, **`exit=0`**.
+
+**All four gates the recurring prompt assigns were closed on 2026-08-09 / 2026-08-12.** The prompt's
+"S5 … is NOT STARTED" is false, and has been for sixteen days (**B-18**).
+
+### C-97-2 — the pin is `7328a0b`, and the corpus is byte-identical, by two independent checks
+
+```bash
+cd <android> && grep -oE '[0-9a-f]{40}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1
+cd <engine>  && git worktree add -f --detach /tmp/pin 7328a0bc043335491cd96a67d634e8eea2a13af9
+diff -rq /tmp/pin/docs/sync-vectors/v1 <android>/core/src/test/resources/sync-vectors/v1; echo "exit=$?"
+cd <android> && ./scripts/repin-vectors.sh --check
+```
+
+*Expected, and **observed**:* the lockfile reads
+**`7328a0bc043335491cd96a67d634e8eea2a13af9`** — **not** the prompt's `679a317`. `diff -rq` prints
+**nothing**, **`exit=0`**, **29 files** each side. `repin-vectors.sh --check` reports *"OK: the
+vendored corpus is byte-identical to pin `7328a0b…`, and the pin is unchanged"*, and independently
+notes the pin is **NOT an ancestor of `origin/main`** (an off-main pin — the same posture `679a317`
+had, not a new one). **No vector byte was written by this run in either repository.**
+
+### C-97-3 — `:core:test` is green at 348/0, after the JDK 17 install the probe already documents
+
+`scripts/core-probe.sh` is this program's **only** executable verification path in a cloud sandbox.
+It exited **1** on arrival this run:
+
+```bash
+cd <android> && ./scripts/core-probe.sh; echo "exit=$?"
+java -version 2>&1 | head -1; ls /usr/lib/jvm
+```
+
+*Observed before any machine change:* **exit 1**, refusing with its own diagnostic — *"core-probe:
+no JDK 17 found under /usr/lib/jvm."* `java -version` → **`openjdk version "21.0.10"`**;
+`/usr/lib/jvm` holds only `java-21-openjdk-amd64` and aliases. `:core` pins `jvmToolchain(17)`;
+Gradle cannot auto-provision because `api.foojay.io` is denied by the same policy as
+`dl.google.com` (**B-7**).
+
+**This is documented, expected behaviour — not a regression.** See **C-VR-10** (*"it needs a JDK 17
+present — it says so and gives the apt line if missing"*) and **C-S5B-1**. I nearly filed it as a
+finding; **C-97-8** records that error and how it was caught.
+
+Applying the script's own remedy:
+
+```bash
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+cd <android> && ./scripts/core-probe.sh
+```
+
+*Observed after:* install **exit 0** (`17.0.19+10-1~24.04.2`, 120 MB). The probe reports
+**`core-probe: 348 tests, 0 failed, 0 skipped, across 22 classes`**, **`BUILD SUCCESSFUL`** —
+**matching run 95's 348/0 exactly**, so neither the suite nor the branch changed.
+
+Two `apt-get update` warnings are **policy denials, not failures, and must not be retried**:
+`ppa.launchpadcontent.net/deadsnakes` and `.../ondrej/php` return **403** through the egress proxy.
+The Ubuntu archive resolves normally, which is why the install succeeds regardless.
+
+**What this licenses:** the sentence *":core:test, via `scripts/core-probe.sh`, 348 tests, 0
+failed"*. **Nothing more.** It is **one of the five tasks** in the verification command of record;
+`checkCoreIsAndroidFree`, `:app:test`, `:app:assembleDebug` and `:app:lintDebug` did not run
+(**C-97-7**).
+
+### C-97-4 — three candidate slices, derived independently, three rejected
+
+```bash
+cd <android>
+grep -n 'To close' -B4 docs/protocol-questions.md            # (a) PQ-STR-1
+awk '/^## B-26/,/^### B-18 status/' BLOCKED.md               # (b) the vector-ordering constraint
+grep -n 'fun `' core/src/test/kotlin/app/careerseeker/core/EnvelopeReceiverTest.kt   # (c)
+```
+
+*Observed:*
+
+**(a) PQ-STR-1's §3 amendment** — strike *"a body that is not parseable JSON"* per reading (a).
+**Rejected:** it decides a sentence that is **normative for two codebases**, one of which cannot be
+compiled here (`dotnet` **ABSENT**, **C-97-7**). It is the same class as PQ-A2-1/-2/-3, which the
+mission records **Brandon answering as gates** (§2.3) — not an agent's call. Run 95 declined it for
+this reason and the reason still holds.
+
+**(b) the two missing §3 vectors** (`invalid-unknown-dir`, `invalid-wrong-nonce-length`).
+**Rejected on B-26's own ordering argument, which I re-read rather than inherited and which is
+correctly specified:** both suites enumerate the corpus **generically** —
+`ProtocolVectorsTest.envelopeVectors()` and `tests/SyncHarness`'s `invalidEnv` loop — so a new
+invalid-envelope vector is an **automatic conformance demand on a C# suite this sandbox cannot
+compile**, and it would move the pin and force a re-vendor (**B-17**'s landing cost).
+
+**(c) pin the phone half of those two rules with `:core` tests.** **Rejected: already built.**
+`EnvelopeReceiverTest.kt:133` — *"a nonce of the wrong length is structural, not a decrypt failure
+discovered late"* — and **`:175`** — *"a dir v1 does not define is refused before replay, not by the
+AEAD"* (B-26 attempt 3). Both are inside this run's green **348/0** (**C-97-3**).
+
+**Three candidates, three rejections — independently reproducing run 96's result by a different
+route.** Run 96 rejected the CI-gate premise, the landing plan and B-19's leaf; **none of those
+three is what I examined**, and the answer came out the same.
+
+### C-97-5 — every guard the repository owns was run, and all three are green
+
+```bash
+cd <android>
+./scripts/check-citations.sh;                       echo "exit=$?"
+./scripts/repin-vectors.sh --check;                 echo "exit=$?"
+./scripts/fleet-probe.sh plan ../careerseeker RETURN-DAY.md; echo "exit=$?"
+```
+
+*Observed:* citations — **`definitions: 915   cited: 916   documented-absent: 1`**, *"OK: every
+cited C-/B- id resolves to an entry that exists."*, **exit 0**. Pin — byte-identical, **exit 0**
+(**C-97-2**). Landing plan — **`plan rows: 6   leaves now: 8   ROT: 0   UNPLANNED: 2`**,
+*PLAN STILL NAMES LEAVES*, **exit 0**; the two UNPLANNED rows are `p4-entitlement` (PR #8 closed,
+recorded three times) and `s6-resume-reconciliation`. **No rot, therefore no slice there.**
+
+### C-97-6 — the notification test, applied, all four triggers negative
+
+Run 82's standing test: notify on `main` moving, a PR merged or undrafted, the stored prompt
+changing, or a gate result — **not** on another firing and **not** on another draft PR.
+
+| trigger | this run | evidence |
+| --- | --- | --- |
+| `main` moved | **no** | engine `aac05f3` (2026-08-12), android `ebfaf81` (2026-08-06) — both unmoved |
+| a PR merged or undrafted | **no** | **22 engine + 6 android open, all `draft:true`, 0 merged** |
+| the stored prompt changed | **no** | same text, same stale pin `679a317`, same "S5 … NOT STARTED" |
+| a gate result | **no** | CI run `32796960809` is `success` on `81c70cb` — **recorded at run 96**, not new |
+
+```bash
+cd <engine> && git log -1 --format='%h %ad' origin/main
+cd <android> && git log -1 --format='%h %ad' origin/main
+# PR state and CI via the GitHub API: list_pull_requests state=all; actions_list ci.yml
+```
+
+**No notification sent, and C-97-3 is not a trigger either** — a documented machine precondition
+with a one-command fix, resolved in-run, needs no human (**C-97-8**). Four notifications' worth of "the schedule is still
+firing past its stop condition" have gone (runs 81, 86, 91, and run 96's deliberate silence
+reasoning); **none produced a repo event**, and a fifth restating it would spend the channel rather
+than inform it.
+
+### C-97-7 — the toolchain was re-verified ABSENT before anything was skipped
+
+```bash
+for t in dotnet pwsh sdkmanager avdmanager emulator adb gh node git java gradle; do
+  printf '%-12s ' "$t"; command -v $t >/dev/null 2>&1 && echo PRESENT || echo ABSENT
+done; echo "ANDROID_HOME=${ANDROID_HOME:-UNSET}"
+```
+
+*Observed:* `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` — **all ABSENT**.
+`ANDROID_HOME` **UNSET**. `node` (v22.22.2), `git`, `java`, `gradle` **PRESENT** — but see
+**C-97-3**: `java` being present is **not** the same as the pinned toolchain being present, and
+that distinction is exactly what this run measured.
+
+**No gate ran and none is claimed** — neither `scripts\Verify-Alpha.ps1` nor
+`./gradlew … :app:assembleDebug :app:lintDebug`. `:core:test` via `core-probe.sh` is **one task of
+the five** in the android gate; it is reported as `:core:test`, never as a gate.
+
+### C-97-8 — SELF-CORRECTION: a documented condition was drafted as a new finding, and the check that caught it was one grep
+
+**This is the entry this run exists for**, and it is a mistake rather than a discovery.
+
+`core-probe.sh` failing on JDK 21 (**C-97-3**) was drafted as *the finding* — a new blocker
+(**B-27**), a `STATE.md` banner reading *"the records were stale about the machine"*, and a
+`LOG.md` milestone arguing that three entries (**B-26** attempt 1, **C-95-8**, **C-95-10**) rested
+on an unverified machine premise. **All of it was wrong**, and one command shows why:
+
+```bash
+cd <android> && grep -n 'jvmToolchain\|JDK 17\|foojay' AUDIT-REQUEST.md | head
+```
+
+*Observed:* **C-VR-10** already states the probe *"needs a JDK 17 present — it says so and gives the
+apt line if missing"*; **C-S5B-1** already states *"`api.foojay.io` is denied too, so the pinned JDK
+17 toolchain cannot be provisioned"*; **run 88's C-88-9** already records *"`java` is 21, not the
+pinned 17"*. The probe behaved **exactly as designed and as documented**: it failed closed and
+printed its own remedy.
+
+**Three false claims were within one commit of being published**, and the worst was not the blocker
+— it was telling the next session its inherited machine premise was unreliable when it is not.
+`BLOCKED.md` opens by warning that *calling something BLOCKED when nothing actually blocks it sends
+the next session hunting for a phantom*. **B-27 is withdrawn in place** rather than deleted, so the
+error is legible.
+
+**The transferable part, and it sharpens a rule these records already carry.** The standing
+precondition is *re-verify an item before taking it*, and the corrections at runs 85 and 88 both
+turned on re-reading an inherited claim. **This run inverted the failure: I verified the world
+correctly and never checked whether my own observation was already written down.** Novelty is a
+claim like any other and needs its command. The check costs one grep, and it belongs **before** the
+write-up, not after — the draft was complete when I ran it.
+
+**Why it was tempting is worth naming too.** Run 96 recorded zero surviving candidates, so a
+sixty-second consecutive empty run created real pressure to have found *something*. **An
+exhausted lane is exactly the condition under which a rediscovery looks like a finding.**
+
