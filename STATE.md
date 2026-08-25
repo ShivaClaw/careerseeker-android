@@ -58,6 +58,15 @@
 > three rejected candidates are worth a paragraph each, not a milestone each (run 87's measured
 > records cost — the four files now stand at ~44,000 lines). **No machine change.** Terra
 > **COMPLETE, files claimed: none** — no collision.
+>
+> **RUNNER-VERIFIED, same iteration** (**C-96-8**). No gate ran *in the sandbox*; **CI ran the full
+> android gate on the pushed head and it passed** — run `32796324099`, `run_attempt: 1`, **`head_sha`
+> `a22857b`** read from the run's own field, **`success` in 8 m 12 s**, **steps 6–13 all `success`**,
+> including `:app:test` (Robolectric), `assembleDebug` and `lintDebug`. **Step 8 re-confirms the pin
+> on a second machine; step 6 confirms the citation guard passes on the runner.** **Step 14 `Upload
+> debug APK` = `skipped`** — run 93's B-25 gate holds. **B-22 did not fire.** **Not the merge
+> condition**, and not a notification trigger — run 95 already recorded a green gate, so a second
+> green on a records-only push confirms nothing broke rather than reporting a change.
 > ## ▶ RUN 95 — 2026-08-24. **`:core:test` runs here now, and §3 turned out to contain a rule neither implementation performs.**
 >
 > **Heartbeat:** 2026-08-24, ninety-fifth cloud iteration. **Assigned slice declined for the

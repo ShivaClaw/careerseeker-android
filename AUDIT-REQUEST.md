@@ -18220,3 +18220,47 @@ done; echo "ANDROID_HOME=${ANDROID_HOME:-UNSET}"
 `ANDROID_HOME` **UNSET**; `node`, `git`, `java`, `gradle` present. **No gate ran this run and none
 is claimed** — neither `scripts\Verify-Alpha.ps1` nor
 `./gradlew … :app:assembleDebug :app:lintDebug`. **No machine change this run**; nothing installed.
+
+### C-96-8 — RUNNER-VERIFIED: the full android gate ran on this run's own head and passed
+
+**No gate ran in the sandbox** (**C-96-7**) — but CI ran the whole android gate on the pushed head,
+including the three tasks no cloud session can execute. Read from the **run's own `head_sha`
+field**, not from the PR check-runs view, which follows the current head and lags a push:
+
+```
+GET /repos/ShivaClaw/careerseeker-android/actions/runs/32796324099
+GET /repos/ShivaClaw/careerseeker-android/actions/jobs/97648266539
+```
+
+*Expected, and **observed**:* run **`32796324099`**, `event: push`, **`run_attempt: 1`** (no
+re-run), **`head_sha: a22857bde63618f184f7a61dac920dc9bdddeb98`** — this run's third commit, exactly
+— **`conclusion: success`** in **8 m 12 s** (01:07:23 → 01:15:35Z).
+
+| # | Step | Result |
+| --- | --- | --- |
+| 6 | Assert every cited C-/B- id resolves | **success** |
+| 7 | Assert `:core` has no Android dependency | **success** |
+| 8 | Assert vendored sync vectors match the pinned main-repo commit | **success** |
+| 9 | Unit tests (`:core`) | **success** |
+| 10 | Unit tests (`:app`, Robolectric) | **success** |
+| 11 | Assemble debug APK | **success** |
+| 12 | Lint | **success** |
+| 13 | Assert no analytics or tracking SDKs ship | **success** |
+| 14 | Upload debug APK | **`skipped`** |
+
+**Three things this settles that the sandbox could not.** **Step 8 independently re-confirms
+C-96-2's pin claim on a second machine** — a clean checkout re-fetching the pinned commit and
+diffing, rather than this session's own `diff -r`. **Step 6 confirms the citation guard passes on
+the runner**, not only locally, which is what run 92 had to fix. **Steps 10–12 are `:app:test`,
+`assembleDebug` and `lintDebug`** — the three tasks `C-96-7` records as structurally impossible
+here.
+
+**Step 14 `skipped`, not `success`** — run 93's **B-25** gate (upload made `workflow_dispatch`-only
+to stop refilling an account-wide artifact quota) **still holds**. **B-22 did not fire**: a
+records-only head did not turn `Build and test` red.
+
+**What this does NOT license.** It is the **android** gate on a **docs-only** diff. It is **not**
+`Verify-Alpha.ps1`, **not** `-IncludePublish`/`-IncludePackage`, and **not** the merge condition —
+and the android repo is **never-self-merge** regardless. **PR #6 stays a DRAFT.** It also is not
+news in the notification sense (**C-96-6**): run 95 recorded a green gate on `56a305c`, so a second
+green on a records-only push confirms nothing broke rather than reporting a change.

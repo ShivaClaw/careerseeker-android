@@ -17243,6 +17243,23 @@ Verified this run, not inherited (**C-96-7**): `dotnet`, `pwsh`, `sdkmanager`, `
 `./gradlew … :app:assembleDebug :app:lintDebug`. Every command cited above is `git`, `node`,
 `bash`, or a read through the GitHub API.
 
+### Runner-verified, same iteration
+
+**No gate ran in this sandbox and none is claimed** (**C-96-7**) — **but CI ran the full android
+gate on this run's own head and it passed** (**C-96-8**). Run **`32796324099`**, `event: push`,
+**`run_attempt: 1`**, **`head_sha` `a22857b`** read from the run's own field rather than the
+lagging check-runs view: **`success` in 8 m 12 s**, **steps 6–13 all `success`** — including
+`:app:test` (Robolectric), `assembleDebug` and `lintDebug`, the three tasks no cloud session can
+run. **Step 8 independently re-confirms this run's pin claim on a second machine**, and **step 6
+confirms the citation guard passes on the runner**, not only locally. **Step 14 `Upload debug APK`
+= `skipped`** — run 93's **B-25** gate still holds. **B-22 did not fire.**
+
+**It is the android gate on a records-only diff** — not `Verify-Alpha.ps1`, not
+`-IncludePublish`/`-IncludePackage`, **not the merge condition**, and this repo is never-self-merge
+regardless. **PR #6 stays draft.** It is also **not** a notification trigger (**C-96-6**): run 95
+recorded a green gate on `56a305c`, so a second green on a docs-only push confirms nothing broke
+rather than reporting a change.
+
 ### Prohibition — what this run did not touch
 
 **No rung moved, and no slice was taken** — deliberately, because all three candidates were
