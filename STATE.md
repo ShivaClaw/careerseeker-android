@@ -6,8 +6,8 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty-four** runs
-> have now been assigned it (count refreshed at run 99). **The one-command check is now
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty-five** runs
+> have now been assigned it (count refreshed at run 100). **The one-command check is now
 > `scripts/run-zero.sh <engine>`** — it re-derives this whole banner from both repositories in
 > seconds and prints `NOTHING MOVED` or the thing that changed, so you need not read further to know
 > which. **Run 91
@@ -17,6 +17,40 @@
 > **The prompt's vendored pin `679a317` is stale too: it is
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
+>
+> ## ▶ RUN 100 — 2026-08-25. **The hundredth firing. A candidate finding was derived and then rejected by this repo's own novelty test — which is the result.**
+>
+> **Heartbeat:** 2026-08-25, **one hundredth** cloud iteration (Linux sandbox). **Assigned slice
+> declined for the sixty-fifth time** (**C-100-1**) — re-verified by hand, not inherited: the three
+> commits, and all four gates as they read **in `docs/Sync-Protocol.md` itself** (body block at
+> `:299-301` with `order_id` OPTIONAL; `:112`'s *decoded bytes* sentence; `decrypt_failed` at `:103`
+> and `:582`). Pin **`7328a0b`**, corpus **29/29 byte-identical**, `--check` exit 0. **The prompt's
+> `679a317` and its "S5 … NOT STARTED" remain stale.** Ground state in one command:
+> `scripts/run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0** (**C-100-2**). Board re-read
+> via MCP: **22 engine + 6 android open, every row `draft:true`, 0 merged since #44 (2026-08-13)**
+> (**C-100-3**) — all four of run 82's triggers negative.
+>
+> **THE RESULT: a ninth candidate, derived independently and then refuted from this repo's own
+> records** (**C-100-4**). The candidate — *the firings add landing cost rather than idling* —
+> measures **true**: leaf `#57` is **16 commits** from `main`, its four PRs opened **2026-08-22/23**
+> (after the handoff, after the owner's last activity), and the records grew **+21,016 lines across
+> the 53 runs since `RETURN-DAY.md`**, now **46,140 lines wrapping a 445-line handoff**. **And both
+> halves were already written down** — `C-88-6` (*"All four rotting branches are this program's
+> own"*) and run 96 at `BLOCKED.md:4953`. **So it is logged as a rejected candidate, not a finding.**
+> Nine candidates now rejected across runs 96–100. **In an exhausted lane a rediscovery looks like a
+> discovery; the test is what tells them apart, and it earned its keep this run.**
+>
+> **NOTIFICATION SENT — fifth message, and the first that does not lead with the chore**
+> (**C-100-5**). Four prior *stop the schedule* messages produced no repo event. This one leads with
+> `RETURN-DAY.md` §1's payoff — **one hour clears the board: decide PR #53, then land six merges in
+> §3's corrected order, merging `#57` not `#35`** — and puts the stop request second. Logged as
+> **B-18 attempt 6**, a framing change and not a new finding. Grounds: the **hundredth** firing and
+> the **fifth on 2026-08-25** alone, twelve straight days of 11–29 commits/day, none the owner's.
+>
+> **NO RUNG MOVED, NO PRODUCTION CODE, NO GATE RUN OR CLAIMED, NO NEW BRANCH OR PR IN EITHER REPO,
+> NO VECTOR BYTE, PIN UNMOVED, NO SPEC BYTE, NO PINCH POINT, NO BLOCKER FILED OR CLOSED, NO MACHINE
+> CHANGE, NO SCHEDULE TOUCHED, RELAY NOT CONTACTED.** `:core:test` **not run** this iteration. Terra
+> **COMPLETE, files claimed: none** — no collision.
 >
 > ## ▶ RUN 99 — 2026-08-25. **An inherited "cannot" was only ever "cannot from bash" — and the trigger that watches for a human had never been read.**
 >
