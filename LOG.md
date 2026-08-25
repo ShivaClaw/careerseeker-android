@@ -17732,3 +17732,76 @@ Gmail, **no secret read, printed or echoed**, no `.appdata`. **No machine change
 `2026-08-12T20:28:36-06:00` — **no collision**, right-of-way unused. Files written this run:
 `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in
 the engine repo.
+
+## Run 101 — 2026-08-25 (Linux cloud sandbox). The sixty-sixth assignment of a built slice, declined — and the one verification this sandbox can actually execute was executed rather than cited
+
+**Milestone 0 — rule one.** `git fetch --all --prune` in both checkouts before any count. The
+android tree again arrived detached at `ebfaf81`; the work branch is `claude/android-a0-probe`.
+Every number below is post-fetch.
+
+**Milestone 1 — ground state, in one command (C-101-1, C-101-2).** `scripts/run-zero.sh
+../careerseeker` → **`NOTHING MOVED`, exit 0**. The three S5 commits `8575539` / `22b028e` /
+`7328a0b` are still `off-main`; the pin is **`7328a0b`**, the vendored corpus **29/29
+byte-identical**, and `generate.mjs --check` prints `OK: 29 vector files match the generator.`
+Both mains unmoved (engine `aac05f3`, android `ebfaf81`). All three guards green. **The assigned
+slice is built, and this is the sixty-sixth run assigned it.** The prompt's two known-stale facts —
+pin `679a317` and *"S5 … NOT STARTED"* — are both still stale.
+
+**Milestone 2 — the four notification triggers, all four checked (C-101-3).** Following run 99's
+correction that `gh ABSENT` means the binary and not the session, both queries went through the
+GitHub MCP server: **22 open in `careerseeker`, 6 in `careerseeker-android`, every row
+`draft:true`**, newest `merged_at` anywhere still **#44, 2026-08-13**. Neither main moved, nothing
+merged or undrafted, the stored prompt is unchanged. **All four negative.**
+
+**Milestone 3 — `:core:test`, run rather than inherited (C-101-4).** This is the one thing run 100
+left on the table and the only slice-relevant verification this sandbox can execute. Run 100
+correctly refused to carry run 97's number forward; this run produced its own. After the install
+`core-probe.sh` prescribes in its own error message, the probe reports **`BUILD SUCCESSFUL`** and
+**`core-probe: 348 tests, 0 failed, 0 skipped, across 22 classes`**, exit **0** — matching the
+recorded baseline exactly. That covers `EntitlementAckTest`, `EntitlementVectorsTest`,
+`ProtocolVectorsTest` and `VectorCorpusCoverageTest`, i.e. the phone-side consumers of the very
+vectors the assigned slice added. **It is one of five tasks and is reported as that and nothing
+more; no gate ran and none is claimed.** The red-on-arrival JDK 21 / `jvmToolchain(17)` condition
+is **not** a finding — **B-27** is the withdrawn entry that already says so, and it was re-read
+*before* this paragraph was written, which is the discipline run 97 paid for.
+
+**Milestone 4 — no candidate slice was manufactured, and no sixth notification was sent
+(C-101-5).** Runs 96–100 derived nine candidates between them and the standing precondition
+rejected all nine. This run derived none: with `NOTHING MOVED`, all four triggers negative, and the
+one executable check matching baseline, there is no honest slice here. **Nor was a sixth message
+sent.** Five have gone out — run 86 first, then 91, 99, 100 — all with the same correct
+recommendation, all producing zero repo events. The records' own policy is that *"a notification
+per firing would train the channel to be ignored"*, and B-18 needs that channel to work on the day
+something genuinely changes. Withholding a message that carries no new information is the way to
+keep it working. **The problem is not unreported; it is reported, in `RETURN-DAY.md` and in five
+messages. This run declines to report it a sixth time.**
+
+**Milestone 5 — deliberate brevity, as the direct consequence of C-100-4.** Run 100 measured that
+these records grew **+21,016 lines across 53 runs** and now stand at **46,140 lines wrapping a
+445-line handoff**, and concluded the firings add landing cost rather than idling. An entry of the
+recent ~400-line norm would have made that finding worse while agreeing with it. This entry is
+roughly a tenth of it. **On an exhausted lane the correct output is small, and writing less is the
+only lever this session actually controls.**
+
+**Prohibition — what this run did not touch.** **No rung moved and no rung slice was taken.** **Not
+one byte of production source in either repository** — no `.kt`, `.cs`, `.ts`, `.kts`, `.ps1`,
+`.mjs` or workflow file. **No vector byte written; the pin stays `7328a0b`** and `generate.mjs` was
+run **`--check` only**. **No spec byte**: `docs/Sync-Protocol.md` was read only. **No gate was run
+and none is claimed** — `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` and `gh`
+all ABSENT, `ANDROID_HOME` UNSET; `:core:test` is one of five tasks and the other four still need
+the Android SDK (**B-7**). **Zero landing cost added: no new branch and no new PR in either
+repository**; the boards stand unchanged at **22 engine drafts and 6 android drafts**. The engine
+checkout was **read-only** (`fetch`, `log`, `show`). **No pinch point touched** —
+`$ExpectedOfflineTotal`, the count-reporting docs and `Host.cs` unmodified. Nothing merged, closed,
+undrafted, force-pushed, rebased or deleted; **no CI job re-run**; **no test skipped, disabled or
+quarantined**; `jvmToolchain(17)` **not** relaxed. **No blocker filed and none closed.** **No
+schedule created, modified or deleted**, and B-18 attempt 2 was **not** re-tested — run 99 settled
+it with `CronList` and the records say do not repeat it. No deploys of any kind; **the production
+relay was not contacted at all**, not even `GET /v1/health`. No Play/Google/OAuth console, no
+accounts, no purchases, no Gmail, **no secret read, printed or echoed**, no `.appdata`. **One
+machine change, logged as the mission requires:** `openjdk-17-jdk-headless` into this **ephemeral**
+container only — nothing outside it, nothing in either repo, and it does not persist. Terra's
+`autonomy/codex-state` was **read before any write**: **COMPLETE, files claimed: none**, heartbeat
+`2026-08-12T20:28:36-06:00` — **no collision**. Files written this run: `LOG.md`,
+`AUDIT-REQUEST.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the engine repo.
+**`BLOCKED.md` is deliberately unchanged: nothing new blocked this run.**
