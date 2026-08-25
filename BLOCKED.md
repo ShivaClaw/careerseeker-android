@@ -5113,3 +5113,51 @@ engine repo** and took **no rung slice**, so none of them could move. **B-7 was 
 than retested**: the toolchain table in `run-zero.sh` §5 records `dotnet`, `pwsh`, `sdkmanager`,
 `avdmanager`, `emulator`, `adb` and `gh` all ABSENT, which is why no gate is claimed anywhere in
 this run's records.
+
+---
+
+### B-18 status 2026-08-25 (ninety-ninth run) — the sixty-fourth firing; attempt 2 tested at last, and attempt 4 taken a fifth time on new grounds
+
+**Unchanged as a blocker.** The scheduled prompt assigned S5's spec half again — **sixty-four
+consecutive assignments across sixteen days** — and it was declined again, re-derived in one command
+via `scripts/run-zero.sh` (**C-99-4**, verdict `NOTHING MOVED`, exit 0) rather than by hand.
+
+**Attempt 2 — "fix the prompt: not possible from here" — was finally given a command** (**C-99-2**).
+It has been asserted since run 48 and carried through fifty-one runs on nobody's evidence. This
+session has scheduler tools, so the premise was testable: `CronList` → **`No scheduled jobs.`** The
+tool lists only jobs created **in-session**; the recurring routine is account-level scheduler
+configuration and is not reachable from here. **The premise holds, and is no longer an assumption.**
+Nothing was created, modified or deleted. Recording this so the next run does not re-test it: the
+answer is no, and the command that says so is one line.
+
+**Attempt 4 taken a fifth time, and the grounds are new** (**C-99-3**). Runs 53, 81, 86 and 91 sent
+*stop the schedule* and produced **no repo event**. Runs 96, 97 and 98 then withheld, correctly, on
+the ground that they carried no fact those four did not. **This run found one, and it is about the
+evidence for the silence rather than about the ladder.** Run 82's standing trigger set has four
+positions; the one that would detect a human touching the board — *a PR merged or undrafted* — has
+been reported negative for runs on end **without ever being read**, because `run-zero.sh` correctly
+declares it MANUAL and `gh` is absent. It was read this run through the GitHub MCP server
+(**C-99-1**): **22 engine + 6 android open, every row `draft:true`, 0 merged since 2026-08-13**. The
+silence is now **measured**. Ninety-nine firings, four of them on this date alone, thirteen days
+since the owner's last commit anywhere in either repository, seven days past the stated return date.
+
+**A cost this file should state plainly, because it is the actual harm.** Every firing consumes paid
+model capacity to re-derive a conclusion first written at run 47. Attempt 5 lowered the per-firing
+cost; it cannot lower the count, and the count is now rising by roughly **four per day**. Nothing on
+the board can move without a Windows gate, an emulator (**B-4**), a relay deploy, or a decision only
+Brandon can make (`RETURN-DAY.md` §5).
+
+**Smallest human unblock — unchanged, and now seventeen days overdue.** Either **turn the routine
+off**, or replace its "YOUR SLICE THIS ITERATION" section with *read `RETURN-DAY.md` §5 and pick
+from the human queue what a Linux sandbox can actually advance*. **Do not leave it pointed at S5's
+spec half.**
+
+### B-1, B-2, B-4, B-5, B-6, B-7, B-8, B-9, B-12–B-17, B-19–B-26 — untouched this run
+
+Not exercised. This run wrote **no production code**, ran **no gate**, opened **no new PR in the
+engine repo**, wrote **no vector byte** and took **no rung slice**, so none of them could move.
+**B-7 was re-confirmed rather than retested** — `run-zero.sh` §5's toolchain table again reports
+`dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` and `gh` ABSENT — with one
+clarification now recorded against it in **C-99-1**: `gh` ABSENT is a fact about the **binary on
+PATH**, and does **not** by itself establish that a session has no GitHub API path. B-7's denial set
+(`dl.google.com`, `api.foojay.io`) is unchanged and untested this run.

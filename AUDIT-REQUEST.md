@@ -18629,3 +18629,92 @@ This run adds no fact those three did not carry: the same state, a larger firing
 banner restating it would spend the channel rather than inform it, and **B-18 is the one blocker
 that cannot afford a channel taught to be ignored.** `run-zero.sh` is this run's answer instead —
 it lowers the cost of the firings that keep happening, which is the only lever available from here.
+
+---
+
+## Run 99 — 2026-08-25 (Linux cloud sandbox)
+
+### C-99-1 — `gh ABSENT` meant "not from bash", not "unanswerable": both MANUAL triggers closed via the GitHub MCP server
+
+`scripts/run-zero.sh` §6 has carried two notification triggers as MANUAL since run 98, on the
+stated ground that `gh` is absent (**C-97-7**). That ground is correct about the **binary** and was
+read for three runs as though it were about the **session**. It is not: this session reached the
+GitHub API through the **MCP server**, which needs no `gh` on PATH.
+
+```
+# in a session with the GitHub MCP server attached (no gh required):
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all perPage=100
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all perPage=100
+```
+
+*Observed, 2026-08-25:* **22 open in `careerseeker`** (#26, #32–#39, #45–#57), **every row
+`draft:true`**; **6 open in `careerseeker-android`** (#1–#6), **every row `draft:true`**. Newest
+`merged_at` anywhere is **engine #44, 2026-08-13T02:28:21Z** — nothing merged since run 95's
+baseline. This **matches** `BASE_ENGINE_DRAFTS=22`, `BASE_ANDROID_DRAFTS=6`,
+`BASE_MERGED_SINCE_RUN95=0` exactly; the constants stand and were not edited.
+
+**Why this is a finding and not a rediscovery** (run 97's test, applied before the write-up): the
+records say the opposite of it. `run-zero.sh`'s header said the triggers "need the GitHub API and
+`gh` is absent"; B-18 attempt 5 says the script prints them "because `gh` is absent"; **C-98-7**'s
+trigger-2 row states the 22/6/none-merged counts **as evidence** while its own command block routes
+the reader to an API the run reported it could not reach. The numbers were right — this run
+verified them — but the citation was thinner than the file's own standard, and no run had tried the
+path that closes it. §6 is amended in this commit to say `gh ABSENT` narrowly and to tell the next
+firing to **try the queries before deferring**.
+
+**What it is not:** the section stays MANUAL and stays **out of the verdict**. A shell script cannot
+call an MCP server, so `run-zero.sh` still cannot answer these itself, and folding them in would be
+the overclaim run 98 deliberately avoided.
+
+### C-99-2 — B-18 attempt 2's "the sandbox cannot reach the schedule": tested, not inherited — and it holds
+
+B-18 records *"Fix the prompt. Not possible from here… nothing in either checkout can edit it, and
+the sandbox has no access to the schedule."* Asserted at run 48 and carried through fifty-one runs
+without a command. This session has scheduler tools, so the premise was testable:
+
+```
+CronList        # scheduler tool, this session
+```
+
+*Observed:* **`No scheduled jobs.`** The tool's own contract is *"list all cron jobs scheduled via
+CronCreate **in this session**"* — an in-memory, session-scoped store. The recurring routine is
+account-level scheduler configuration and does **not** appear. **B-18 attempt 2 stands, now with
+evidence rather than an assumption behind it.** No schedule was created, modified, or deleted.
+
+### C-99-3 — the notification test, applied; all four triggers negative, and for the first time all four were *checked*
+
+| trigger | this run | evidence |
+| --- | --- | --- |
+| `main` moved | **no** | engine `aac05f3` (2026-08-12), android `ebfaf81` (2026-08-06) — `run-zero.sh` §4, exit 0 |
+| a PR merged or undrafted | **no** | **checked this run, not carried** — 22 + 6 open, every row `draft:true`, newest merge #44 on 2026-08-13 (**C-99-1**) |
+| the stored prompt changed | **no** | same text; still pin `679a317`, still "S5 … NOT STARTED" — both stale against §1/§2 |
+| a gate result | **no** | no gate reachable (`dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` ABSENT); none ran, none claimed |
+
+```bash
+cd <android> && scripts/run-zero.sh <engine>; echo "exit=$?"   # triggers 1 and 4
+# trigger 2: the two list_pull_requests queries in C-99-1
+```
+
+**Notification sent — the first since run 91, and it is not a restatement of runs 81/86/91.** Those
+three said *stop the schedule* and produced no repo event; runs 96, 97 and 98 then chose silence on
+the correct reasoning that they carried no fact the three did not. **This run does carry one, and it
+is about the channel itself rather than the ladder:** run 82's trigger set has now been *fully*
+checked for the first time — including the trigger that detects a human touching the board — and it
+is negative in every position. Sixty-four assignments, ninety-nine firings, four firings on
+2026-08-25 alone, thirteen days since the last commit by the owner anywhere in either repository,
+and seven days past the stated return date. The silence is now a **measured** silence, not an
+assumed one, and that is the fact that makes a fourth message worth its cost. **The recommendation
+is unchanged and one line long: stop the schedule.**
+
+### C-99-4 — `run-zero.sh` still green, and its verdict path unchanged by this edit
+
+```bash
+cd <android> && bash -n scripts/run-zero.sh && scripts/run-zero.sh <engine>; echo "exit=$?"
+```
+
+*Observed:* syntax OK; sections 0–6 run; pin `7328a0b`, `OK: 29 vector files match the generator.`,
+vendored corpus byte-identical, citations green, `fleet-probe.sh plan` ROT 0 / UNPLANNED 2, both
+`main`s unmoved; verdict **"NOTHING MOVED on every check this sandbox can run, and all three guards
+are green."**, **exit 0**. The edit touches §6's prose, the header comment and the verdict's
+narrative only — **no baseline constant, no check, and no exit path was altered**, which is why the
+run before and after this commit reports the same verdict and the same exit code.

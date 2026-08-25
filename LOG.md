@@ -17563,3 +17563,90 @@ installed; the JDK 17 run 97 installed does not persist and was not needed. Terr
 `2026-08-12T20:28:36-06:00` — **no collision**, right-of-way unused because there was nothing to
 collide over. Files written this run: `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`,
 `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the engine repo.
+
+---
+
+## Run 99 — 2026-08-25 (Linux cloud sandbox). An inherited "cannot" turned out to be a "cannot from bash", and the trigger that watches for a human had never actually been read
+
+**Assigned slice: S5's spec half. Declined for the sixty-fourth time.** Built since 2026-08-09 —
+`8575539` (§4.3 body + PQ-A2-1 + PQ-A2-2), `22b028e` (both ack vectors), `7328a0b`
+(`invalid-unknown-field`, PQ-A2-3) — all three still off `main`, all three confirmed this run by
+`run-zero.sh` §1. The prompt's `679a317` pin and its "S5 … NOT STARTED" remain stale, as they have
+been since 2026-08-12. Rebuilding it would produce a competing §4.3 amendment and risk the vendored
+corpus the prompt itself classes as a cross-repo drift event.
+
+**Milestone 1 — run 98's probe was used as intended, and it worked.** `scripts/run-zero.sh
+../careerseeker` → **`NOTHING MOVED on every check this sandbox can run, and all three guards are
+green.`, exit 0** (**C-99-4**). Rule-one fetch in both trees; the three slice commits off `main`;
+pin `7328a0b` with `OK: 29 vector files match the generator.` and the vendored corpus
+byte-identical; citations green; `fleet-probe.sh plan` ROT 0 / UNPLANNED 2; both `main`s on their
+baselines. Attempt 5 did what it was built to do: the ground state was established in one command
+instead of a ninth hand derivation, and this run spent itself on what the probe **could not** do.
+
+**Milestone 2 — the finding: `gh ABSENT` had been read as "unanswerable" for three runs, and it only
+ever meant "not from bash"** (**C-99-1**). `run-zero.sh` §6 carries two of run 82's four
+notification triggers as MANUAL because `gh` is not on PATH. True of the binary — and this session
+reached the GitHub API anyway, through the **MCP server**, which needs no `gh`. Both queries
+answered: **22 open in `careerseeker`, 6 in `careerseeker-android`, every row `draft:true`**, newest
+`merged_at` anywhere **engine #44, 2026-08-13**. The pinned constants (22 / 6 / 0) **match exactly**
+and were not edited.
+
+**This passes run 97's novelty test, which is why it is written up as a finding.** Run 97's lesson
+was that in an exhausted lane a rediscovery looks like a discovery, so novelty needs its command
+*before* the write-up. Here the records state the **opposite** of the observation: the script header
+said the triggers "need the GitHub API and `gh` is absent", B-18 attempt 5 repeats it, and
+**C-98-7**'s trigger-2 row asserts the 22/6/none-merged counts as *evidence* while its own command
+block points at an API that same run reported it could not reach. **The counts were right — this run
+measured them and they hold — but the citation was thinner than this file's standard, and the
+cheapest possible check had gone untried for three runs.** §6 now reads `gh ABSENT` narrowly and
+tells the next firing to **try the queries before deferring**; the section stays MANUAL and stays
+**out of the verdict**, because a shell script genuinely cannot call an MCP server.
+
+**Milestone 3 — B-18 attempt 2, tested rather than inherited** (**C-99-2**). *"The sandbox has no
+access to the schedule"* has been carried since run 48 with no command behind it. This session has
+scheduler tools, so it was testable: `CronList` → **`No scheduled jobs.`** The tool lists only jobs
+created **in-session**; the recurring routine is account-level configuration and does not appear.
+**The premise holds** — and now on evidence. No schedule was created, modified or deleted. Two runs
+in a row have now re-read an inherited premise: run 97 found its own observation already written
+down, this one found an inherited assertion that was never checked. **Both directions are worth the
+minute they cost.**
+
+**Milestone 4 — the notification, and why this run breaks three runs of silence** (**C-99-3**). All
+four of run 82's triggers are negative, and for the first time **all four were checked** rather than
+three checked and one carried. Runs 81, 86 and 91 sent *stop the schedule* and produced no repo
+event; runs 96, 97 and 98 then chose silence, correctly, on the ground that they carried no fact
+those three did not. **This run carries one, and it is about the channel rather than the ladder.**
+The trigger that would detect a human touching the board — a PR merged or undrafted — had never
+actually been read in any of those six runs. It has been read now, and it is negative: **0 merged
+since 2026-08-13, every one of the 28 open PRs still a draft.** The silence is a **measured**
+silence. Against ninety-nine firings, sixty-four assignments of a completed slice, four firings on
+this date alone, thirteen days since the owner's last commit anywhere and seven days past the stated
+return date, that measurement is what makes a fourth message worth its cost. The recommendation is
+unchanged and one line: **stop the schedule.**
+
+**What an external auditor should attack first.** (a) **The novelty claim in C-99-1** — the strongest
+attack is that MCP access is a property of *this* session's configuration and may simply not have
+existed at runs 96–98, in which case those runs were not negligent and the "untried" framing is
+unfair to them. That is a fair hit and the entry should be read with it: what is certainly true is
+that the *records* stated a limit more broadly than it holds, and that §6 now scopes it correctly;
+what is **not** claimed is that any prior run had the path and ignored it. (b) **C-99-3's decision to
+notify** — three prior messages produced nothing, and "we finally measured what we had assumed" is
+thin grounds for spending a channel B-18 itself warns must not be taught to be ignored. Judge it
+against the compounding cost on the other side. (c) The edit to `run-zero.sh` touches a probe whose
+trustworthiness is the whole point of it: verify against **C-99-4** that no baseline constant, no
+check and no exit path moved, and that the verdict is byte-for-byte the same decision it was before.
+
+**Prohibition paragraph — what this run did not touch.** **No rung moved.** No production code, in
+either repository. **No gate was run and none is claimed** — `dotnet`, `pwsh`, `sdkmanager`,
+`avdmanager`, `emulator`, `adb` and `gh` are all ABSENT here, so neither `Verify-Alpha.ps1` nor the
+five-task android command was reachable; `:core:test` was not run either. **No vector byte was
+written**; `generate.mjs` was run `--check` only and the pin `7328a0b` is untouched. **No new branch
+and no new PR in the engine repo**; the engine checkout was read-only (`fetch`, `log`, `show`,
+`grep`, `generate.mjs --check`). **No spec byte** — `docs/Sync-Protocol.md` is unmodified. **No
+pinch point touched**: `$ExpectedOfflineTotal`, the count-reporting docs and `Host.cs` are
+unmodified. **No blocker filed** and no blocker closed. **No machine change.** **No schedule created,
+modified or deleted** — `CronList` was a read. **No merge anywhere**, no force-push, no history
+rewrite, no branch deleted, no deploy, no contact with the production relay, no Google/Play/OAuth
+console, no accounts, no purchases, no Gmail, no secret read or printed. Terra's state was read
+before any write: **COMPLETE, files claimed: none** — no collision, and its right-of-way was not
+exercised against.
