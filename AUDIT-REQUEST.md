@@ -19498,3 +19498,130 @@ class as C-106-6 one level down: a fixed number standing in for a thing that mov
 green: `scripts/check-citations.sh` → **977 definitions / 978 cited / 1 documented-absent**, exit 0,
 re-run **after** every append in this run. `scripts/run-zero.sh ../careerseeker` → exit 0 likewise.
 **Those are local results and are not a substitute for the runner's.**
+
+### C-107-1 — the assigned S5 slice is built; declined for the seventy-second time, verified from the spec text
+
+```bash
+cd ../careerseeker && git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md > /tmp/spec.md
+grep -n "acknowledged_at\|order_id\|product_id" /tmp/spec.md | head    # 4.3.3 body, order_id OPTIONAL
+grep -n "1 MiB\|decrypt_failed"                /tmp/spec.md | head    # PQ-A2-1 cap, PQ-A2-2 code
+git ls-tree -r 7328a0b --name-only -- docs/sync-vectors/v1/ | grep -E 'unknown-field|entitlement-ack'
+```
+
+*Observed run 107:* §4.3.3 at `:307-320` carries `{product_id, acknowledged_at, order_id?}` with
+`order_id` **OPTIONAL** at `:320`; the cap is on **decoded** ciphertext bytes at `:112` with the
+amendment recorded at `:132`/`:656`; `decrypt_failed` covers structural rejection at `:103` and
+`:601`; `invalid-unknown-field.json`, `entitlement-ack.json` and `entitlement-ack-no-order-id.json`
+all exist at the pin. **All four assigned gates (PQ-A6-1, PQ-A2-1/-2/-3) are already closed.** Read
+from the spec, not from these records. The prompt's `679a317` and its "S5 … NOT STARTED" remain stale.
+
+### C-107-2 — ground state in one command
+
+```bash
+scripts/run-zero.sh ../careerseeker; echo "EXIT=$?"
+```
+
+*Observed run 107:* **`NOTHING MOVED`, exit 0.** Pin `7328a0b`, `OK: 29 vector files match the
+generator.`, vendored corpus 29/29 byte-identical, citations 978/979/1, landing plan **ROT 0 /
+UNPLANNED 2**, engine `origin/main` `aac05f3` and android `main` `ebfaf81` both unmoved.
+
+### C-107-3 — the board, through the GitHub MCP server
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Observed run 107:* **22 engine + 6 android open, every row `draft:true`**, newest `merged_at`
+anywhere still **#44, 2026-08-13** — fourteen days. Matches the pinned baseline exactly.
+
+### C-107-4 — the schedule is still not reachable from here
+
+```
+CronList
+```
+
+*Observed run 107:* **`No scheduled jobs.`** The tool reports only jobs created in-session; the
+routine is account-level configuration. **B-18's premise holds and its smallest human unblock is
+unchanged: a human stops the schedule.** Re-tested, not inherited from C-99-2.
+
+### C-107-5 — C-106-8's assigned check, executed: run 106's head was RED, and not for anything run 106 did
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android \
+  resource_id=ci.yml workflow_runs_filter='{"branch":"claude/android-a0-probe","event":"push"}'
+get_job_logs owner=ShivaClaw repo=careerseeker-android run_id=32992889207 failed_only=true
+```
+
+*Observed run 107:* run **267**, head **`72508c5`**, conclusion **`failure`** —
+`ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab`,
+`androidx.compose.ui.test.ComposeTimeoutException at ScreensFromFixtureTest.kt:72`,
+`35 tests completed, 1 failed, 3 skipped`. That is **B-22**, in the post-fix timeout mode already
+recorded at `LOG.md:16374`. Run 106's commits were **records-only** and cannot reach `:app` by any
+causal path. **The standing practice fired and returned a real result** — the first predecessor-tip
+check to come back red.
+
+### C-107-6 — the tip carries NO verdict, and the newest completed verdict belongs to an ANCESTOR
+
+```bash
+git merge-base --is-ancestor 72508c5 269e72f && echo "72508c5 is an ancestor of the tip"
+grep -n -A3 '^concurrency:' .github/workflows/ci.yml
+```
+
+*Observed run 107:* the arrival tip **`269e72f`** is run **265** — `completed` / **`cancelled`**, so
+it has **no verdict at all**. Run 266 (`dc1a340`) was cancelled too. The newest *completed* verdict,
+run **267**, is on **`72508c5`**, which `git merge-base --is-ancestor` proves is an **ancestor** of
+the tip.
+
+**This refines C-106-8 rather than restating it.** That entry told run 107 to check the predecessor's
+tip *as a ref*, which was the right correction to naming a sha. But `ci.yml:17-19` sets
+`cancel-in-progress: true` on a group keyed by `github.ref`, so a run that pushes its records as
+several quick commits leaves its own tip's job **cancelled**, and the surviving verdict can belong to
+an **older** commit. **A cancelled run is not a green and not a red; and the newest completed run on
+a branch is not necessarily the tip's result.** A future run must check the conclusion **and** the
+`head_sha`, and treat `cancelled` as *no evidence* rather than reading the next result down as though
+it were the tip's.
+
+### C-107-7 — the CI failure window, partitioned by mode; the candidate was a REDISCOVERY and was rejected
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android resource_id=ci.yml \
+  workflow_runs_filter='{"branch":"claude/android-a0-probe","event":"push"}'
+get_job_logs ... run_id=<each failure> failed_only=true
+grep -rn "storage quota\|ComposeTimeout" LOG.md BLOCKED.md AUDIT-REQUEST.md
+```
+
+*Observed run 107,* over the 30 returned runs (2026-08-23T21:08Z → 2026-08-26T17:13Z, all after the
+B-22 patch `30908de`): **18 success, 6 failure, 6 cancelled** — i.e. **6 failures in 24 decisive
+runs**. Partitioned by reading each failing job's log rather than by assuming one cause:
+
+| run | head | mode |
+| --- | --- | --- |
+| 242 | `cda9a58` | artifact storage quota |
+| 243 | `7908b12` | citation guard — undefined `C-91-5` at `AUDIT-REQUEST.md:17138` |
+| 245 | `ebadeca` | artifact storage quota |
+| 246 | `1b42adc` | artifact storage quota |
+| 262 | `501f6e5` | B-22 — `ComposeTimeoutException at :72` |
+| 267 | `72508c5` | B-22 — `ComposeTimeoutException at :72` |
+
+**Three distinct modes, and none of them is new.** The quota is recorded from `LOG.md:16637` with
+its one-item human unblock; the post-fix timeout mode is recorded at `LOG.md:16374-16386` and
+`BLOCKED.md:4570`; the citation failure is the guard working and is since green (C-107-2). **The
+quota also self-cleared**: runs **263** and **264** (2026-08-26 13:15Z/13:27Z) completed
+`success` *including* the artifact upload, consistent with the error's own "recalculated every 6-12
+hours" and the 14-day retention.
+
+**This was drafted as this run's finding and withdrawn before it stood**, on C-97-8's rule that
+novelty is a claim needing its own command *before* the write-up. What survives is a **measurement**
+— the first mode-partitioned reading of a CI window in these records — not a defect. **Thirteenth
+candidate rejected across runs 96–107.**
+
+### C-107-8 — no eleventh message
+
+*Observed run 107:* the **ESCALATION LEDGER** stands at **10** (runs 53, 57, 60, 65, 73, 81, 86, 91,
+99, 100). Run 82's four state triggers are **all negative** (C-107-2, C-107-3). Trigger 5, as
+C-106-7 restated it, requires a finding **about the product, the protocol or the board** *and* one
+not already written down: this run's candidate is about the board but is a **rediscovery**
+(C-107-7), so it fails the second half. **Nothing sent.** B-22 firing again is not new grounds — it
+is a known intermittent whose blocker is already filed and whose unblock is already in the human
+queue.
