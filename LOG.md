@@ -18047,3 +18047,89 @@ scratch, removed at end of run, and `git status --porcelain` on its `main` is em
 `autonomy/codex-state` was **read before any write**: **COMPLETE, files claimed: none** — **no
 collision**. Files written this run: `LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`, and the
 `autonomy/claude-state` heartbeat in the engine repo.
+
+---
+
+## RUN 105 — 2026-08-26 · fourth firing of the day · **NOTHING MOVED, ZERO FINDINGS**
+
+*Short record by design. All five of **C-103-7**'s inherited trigger conditions were evaluated
+against evidence gathered this run and **all five are negative**, so the test the records handed
+forward returns *short record and silence*, and this run followed it rather than re-arguing it.*
+
+**Milestone 1 — the assigned slice is built, re-derived from the spec text** (**C-105-1**). Both
+checkouts fetched first (`git fetch --all --prune`, RULE ONE), and every count below is post-fetch.
+All three commits resolve and all three report **OFF `main`**: `8575539`, `22b028e`, `7328a0b` —
+dated **2026-08-09/-12**, now **seventeen days** old. Read out of `git show 7328a0b:docs/Sync-Protocol.md`
+rather than out of these records: §4.3.3 prints the `{product_id, acknowledged_at, order_id?}` body
+with `order_id` marked **OPTIONAL** (**PQ-A6-1**); `:111-112` states the **1 MiB cap is measured on
+the decoded ciphertext** (**PQ-A2-1**); `:103` states structural rejection reports **`decrypt_failed`**
+with no `malformed` code added (**PQ-A2-2**); and `invalid-unknown-field.json` is in the corpus
+(**PQ-A2-3**). **All four assigned gates are already closed. Declined for the seventieth time.**
+The prompt's vendored pin **`679a317` is stale** — the real pin is **`7328a0b`** — and its
+"S5 … NOT STARTED" is stale with it.
+
+**Milestone 2 — ground state in one command** (**C-105-2**). `scripts/run-zero.sh ../careerseeker`
+→ **`NOTHING MOVED on every check this sandbox can run, and all three guards are green.`**, exit 0.
+Corpus **29 vendored / 29 at pin, byte-identical**; citations **963 defs / 964 cited / 1
+documented-absent**; landing plan **ROT 0**; both `main`s unmoved (`aac05f3` / `ebfaf81`).
+
+**Milestone 3 — the vector check, run and not cited** (**C-105-3**). At the pin, in a transient
+worktree: **29** vector files, and `node docs/sync-vectors/generate.mjs --check` →
+**`OK: 29 vector files match the generator.`**, exit 0. **No vector byte written; the pin did not
+move**; `generate.mjs` was invoked `--check` only, never to regenerate.
+
+**Milestone 4 — `:core:test`, run rather than inherited, and it is the one thing this run added**
+(**C-105-4**). Runs **102, 103 and 104 each skipped it**; run 101 was the last to execute it. A
+check unrun for three firings is the one place a real regression could have hidden where the cheap
+guards would not see it, so it was run rather than carried forward. After the JDK 17 install
+`core-probe.sh` prescribes in its own error message (the sandbox ships JDK 21; `:core` pins
+`jvmToolchain(17)`; **B-27** is the withdrawn entry that already says this is not a finding, re-read
+before this paragraph was written), the probe reports **`BUILD SUCCESSFUL`** and
+**`core-probe: 348 tests, 0 failed, 0 skipped, across 22 classes`**, exit **0** — **matching the
+run-101 baseline exactly**. That covers `EntitlementAckTest`, `EntitlementVectorsTest`,
+`ProtocolVectorsTest` and `VectorCorpusCoverageTest`, the phone-side consumers of the very vectors
+the assigned slice added. **It is one of five gate tasks and is reported as that and nothing more;
+no gate ran and none is claimed.** A green re-verification is **not** a finding — it is the
+falsification that did not happen, and it is logged as such.
+
+**Milestone 5 — all five inherited triggers, answered and negative** (**C-105-5**). (1) `run-zero.sh`
+exit **0**. (2) Board re-read through the GitHub MCP server: **22 engine + 6 android open, every row
+`draft:true`**, newest merge anywhere **engine #44, 2026-08-13** — **thirteen days** without a merge,
+and nothing has left `draft`. (3) **No owner activity after 2026-08-13** distinguishable from this
+routine's own: `list_commits since=2026-08-13` returns only the #40/#42/#43/#44 merge traffic **of
+that day**, and the freshest comment in either repo — **#36, 2026-08-24** — was read in full and is
+**this routine's own run-94 increment**, signed with the Claude Code footer. It was checked rather
+than assumed, because a routine mistaking its own output for a reply is exactly how a dead lane
+looks alive. (4) The stored prompt is **unchanged** — it still carries both facts known stale. (5)
+**No candidate survived the novelty test; none was manufactured.** **Twelve candidates now rejected
+across runs 96–105.**
+
+**Milestone 6 — no twenty-ninth draft, and no sixth notification** (**C-105-6**). None of the **28**
+open drafts has merged in **thirteen days**, so more work product carries negative marginal value
+while the gate that would land it cannot be run here. **Five** notifications have gone out (runs
+**86, 91, 99, 100**), all carrying the same correct recommendation, all producing **zero repo
+events**. This run found nothing a prior run had not, and all five of C-103-7's conditions are
+negative, so a sixth is **withheld deliberately** — silence about a *repetition*, not about a
+problem. **C-103-7's five conditions carry forward unchanged as the standing test for run 106.**
+**B-18's smallest human unblock is unchanged: a human stops the schedule.**
+
+**Prohibitions — what this run did NOT touch.** **No rung moved. No production code, C# or Kotlin**
+— the prompt forbids the appliers and this machine cannot compile them. **No gate was run and none
+is claimed**: `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` and `gh` are ABSENT,
+`ANDROID_HOME` UNSET; neither `Verify-Alpha.ps1` nor the five-task android command was reachable.
+**`:core:test` DID run this iteration** — via `scripts/core-probe.sh`, reported as one of five tasks
+and nothing more. **No vector byte written; the vendored pin `7328a0b` is untouched.** **No spec
+byte written**; `docs/Sync-Protocol.md` is unmodified in both repositories. **No new branch and no
+new PR in either repository**; only PR **#6** is refreshed. **No pinch point touched** —
+`$ExpectedOfflineTotal`, the count-reporting docs and `Host.cs` are unmodified, and **no restack was
+attempted**. **Nothing merged, closed, undrafted, force-pushed, rebased or deleted**; no history
+rewritten; no CI job re-run; no test skipped, disabled or quarantined. **No blocker filed and none
+closed** — nothing new blocked this run, so `BLOCKED.md` is deliberately unchanged. **No schedule
+created, modified or deleted.** No deploys; **the production relay was not contacted at all**, not
+even `GET /v1/health`. No Play/Google/OAuth console, no accounts, no purchases, no Gmail; **no
+secret read, printed or echoed**, no `.appdata`. The one system change is an **`apt-get install
+openjdk-17-jdk-headless`** inside this ephemeral container, which `core-probe.sh` itself prescribes;
+it touches no repository byte. The engine checkout was **read-only** — one transient `git worktree`
+under scratch, removed at end of run. Terra's `autonomy/codex-state` was **read before any write**:
+**COMPLETE, files claimed: none** — **no collision**. Files written this run: `LOG.md`,
+`AUDIT-REQUEST.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the engine repo.
