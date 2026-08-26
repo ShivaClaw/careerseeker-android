@@ -18219,7 +18219,8 @@ workflow run was still **264 / `d54c8d4`**; none had been created for `72508c5`.
 confirmed by `git ls-remote`. **This gap cannot be closed for oneself** — a run pushes its records as
 its final act, so its own head is always younger than any CI result it could read. That makes
 C-106-5's move a **standing practice** rather than a one-off: **each run checks its predecessor's
-tip.** Locally, `check-citations.sh` → **978/979/1**, exit 0, re-run after every append, and
+tip** — named as a **ref**, never a sha: the first draft of C-106-8 named `72508c5`, and the commit
+that recorded it moved the tip past it, which is C-106-6's defect one level down. Locally, `check-citations.sh` → **978/979/1**, exit 0, re-run after every append, and
 `run-zero.sh` → exit 0; **those are local results and not the runner's.**
 
 **Milestone 7 — no eleventh message, and no twenty-ninth draft** (**C-106-7**). Ten messages have

@@ -19490,8 +19490,11 @@ it could read. The regress is structural, not negligence. **The discipline that 
 therefore the one C-106-5 used: each run checks its PREDECESSOR's tip**, not its own — which makes
 this a standing practice rather than a one-off observation.
 
-**Run 107: the head to check is `72508c5`** (or whatever `origin/claude/android-a0-probe` carries on
-arrival, if a later run intervened). The local half of what CI's step 6 re-checks was run here and is
+**Run 107: the head to check is whatever `origin/claude/android-a0-probe` carries on arrival** —
+named as a **ref, not a sha**, deliberately. The first draft of this entry named `72508c5`, and the
+very commit that recorded the entry moved the tip past it. **An entry that names its own head is
+stale the moment it is committed;** the ref is the only form that survives. That is the same defect
+class as C-106-6 one level down: a fixed number standing in for a thing that moves. The local half of what CI's step 6 re-checks was run here and is
 green: `scripts/check-citations.sh` → **977 definitions / 978 cited / 1 documented-absent**, exit 0,
 re-run **after** every append in this run. `scripts/run-zero.sh ../careerseeker` → exit 0 likewise.
 **Those are local results and are not a substitute for the runner's.**
