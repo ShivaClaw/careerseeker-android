@@ -17881,3 +17881,94 @@ One correction against my own hand: an exploratory `git checkout 7328a0b -- .` b
 `autonomy/codex-state` was **read before any write**: **COMPLETE, files claimed: none**, heartbeat
 `2026-08-12T20:28:36-06:00` — **no collision**. Files written this run: `LOG.md`,
 `AUDIT-REQUEST.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the engine repo.
+
+---
+
+## RUN 103 — 2026-08-26 04:59Z · second firing of the day · **NOTHING MOVED, ZERO FINDINGS**
+
+**Milestone 0 — rule one, both trees** (**C-103-1**). `git fetch --all --prune` in both checkouts
+before any count below. Engine `main` **`aac05f3`**, android `main` **`ebfaf81`** — both on their
+recorded baselines, both `0 0` against their local refs.
+
+**Milestone 1 — the assigned slice, re-derived rather than inherited** (**C-103-1**). The prompt
+assigns S5's spec half and calls S5 *"NOT STARTED"*. All three commits resolve, and each is **off
+`main`**:
+
+```
+$ for c in 8575539 22b028e 7328a0b; do git merge-base --is-ancestor $c origin/main && echo YES || echo NO; done
+NO
+NO
+NO
+```
+
+`8575539` *(define the entitlement_ack body, and say what the size cap actually measures)*,
+`22b028e` *(pin section 4.3.3 with two entitlement_ack vectors)*, `7328a0b` *(add the
+invalid-unknown-field vector, closing PQ-A2-3 and B-6)* — dated **2026-08-09/-12**, seventeen days
+ago. The slice is **built and unlanded**, not unbuilt. **Declined for the sixty-eighth time.** The
+prompt's vendored pin `679a317` is stale; the real pin is **`7328a0b`**.
+
+**Milestone 2 — ground state in one command** (**C-103-2**). `scripts/run-zero.sh ../careerseeker`
+→ **`NOTHING MOVED on every check this sandbox can run, and all three guards are green.`**, exit 0.
+Corpus **29 vendored / 29 at pin, byte-identical**; citations **951 defs / 952 cited / 1
+documented-absent**; landing plan **ROT 0**.
+
+**Milestone 3 — the one executable check, run and not cited** (**C-103-3**).
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 26 vector files match the generator.`**,
+exit 0 on engine `main`; **`OK: 29 vector files match the generator.`** at the pin via `run-zero`.
+The delta of 3 is exactly the S5 branches' vectors. **No vector byte written; the pin did not move.**
+
+**Milestone 4 — all four notification triggers, answered and negative** (**C-103-4**). Read through
+the GitHub MCP server: **22 engine + 6 android open, every row `draft:true`**, newest merge anywhere
+**engine #44, 2026-08-13** — **thirteen days** without a merge. `main` unmoved in both; the stored
+prompt unchanged (it still carries the two facts known stale); no gate reachable. Run 82's standing
+test does not fire.
+
+**Milestone 5 — one candidate derived, then refuted by this repo's own novelty test** (**C-103-5**).
+`fleet-probe.sh plan ../careerseeker RETURN-DAY.md` reports **`plan rows: 6  leaves now: 8  ROT: 0
+UNPLANNED: 2`**, and the probe's own text says *"Check them against the open-PR set"* — which reads
+like an unperformed check. It was performed against the live board: **`p4-entitlement`** is a leaf
+whose PR **#8 is closed and genuinely unmerged**, and **`s6-resume-reconciliation`** is PR **#53**,
+the **H1** design decision §3's landing plan deliberately excludes. Both are expected; the plan has
+not rotted. **Both were already resolved by name in the records** — `C-89-4`, `C-98-5`, and
+`AUDIT-REQUEST.md:18402` state the same two answers. **Logged as a rejected candidate, not a
+finding.** Ten now rejected across runs 96–103. *In an exhausted lane a rediscovery looks like a
+discovery; the test is what tells them apart, and it earned its keep again.*
+
+**Milestone 6 — B-18 attempt 2 re-tested against the records' own advice** (**C-103-6**). Run 102
+recorded *"B-18 attempt 2 was not re-tested (run 99 settled it; the records say do not repeat it)"*.
+This run repeated it anyway, because deriving beats inheriting and the cost is one call:
+`CronList` → **`No scheduled jobs.`** The tool reports only jobs created in-session, so this
+session **cannot see or stop the schedule firing it**. The premise holds. **This is a re-test
+confirming a settled result, not a new one** — and having now cost two runs, it should not be run a
+third time.
+
+**Milestone 7 — no new draft, and no sixth notification** (**C-103-7**). A twenty-ninth draft on a
+board where **none of twenty-eight has merged in thirteen days** adds landing cost and helps nobody;
+only PR **#6** is refreshed. Five notifications have gone out (runs **86**, **91**, **99**,
+**100**), all with the same correct recommendation, all producing **zero repo events**. This run's
+only candidate was **refuted from the records**, so it found nothing a prior run had not. A sixth
+message would spend the one channel **B-18** depends on for the day something genuinely changes.
+**Withheld deliberately** — silence about a *repetition*, not about a problem. The condition that
+*should* trigger a sixth is written into **C-103-7** so the next run inherits a test rather than a
+judgement call.
+
+**Prohibitions — what this run did NOT touch.** **No rung moved. No production code, C# or Kotlin,
+was written** — the prompt forbids the appliers and this machine could not compile them anyway. **No
+gate was run and none is claimed**: `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`
+and `gh` are all ABSENT and `ANDROID_HOME` is UNSET, so neither `Verify-Alpha.ps1` nor the five-task
+android command was reachable; **`:core:test` was not run this iteration** and no count for it is
+claimed. **No vector byte was written and the vendored pin `7328a0b` is untouched** — `generate.mjs`
+was invoked `--check` only, never to regenerate. **No spec byte written**; `docs/Sync-Protocol.md`
+is unmodified in both repositories. **No new branch and no new PR in either repository.** **No pinch
+point touched** — `$ExpectedOfflineTotal`, the count-reporting docs and `Host.cs` are unmodified.
+**Nothing merged, closed, undrafted, force-pushed, rebased or deleted**; no history rewritten; no CI
+job re-run; no test skipped, disabled or quarantined. **No blocker filed and none closed** — nothing
+new blocked this run, so `BLOCKED.md` is deliberately unchanged. **No schedule created, modified or
+deleted** (`CronList` reports none to touch). No deploys of any kind; **the production relay was not
+contacted at all**, not even `GET /v1/health`. No Play/Google/OAuth console, no accounts, no
+purchases, no Gmail; **no secret read, printed or echoed**, no `.appdata`. **No engine working tree
+was dirtied** — every engine-side read this run was `git log`/`git merge-base`/`generate.mjs` against
+an unmodified checkout, and `git status --porcelain` there is empty. Terra's `autonomy/codex-state`
+was **read before any write**: **COMPLETE, files claimed: none** — **no collision**. Files written
+this run: `LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the
+engine repo.
