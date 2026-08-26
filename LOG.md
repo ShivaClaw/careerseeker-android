@@ -18113,12 +18113,32 @@ negative, so a sixth is **withheld deliberately** — silence about a *repetitio
 problem. **C-103-7's five conditions carry forward unchanged as the standing test for run 106.**
 **B-18's smallest human unblock is unchanged: a human stops the schedule.**
 
+**Milestone 7 — CI ran the gate this sandbox cannot, and it is green on this run's own head**
+(**C-105-7**). Job `98191236138`, head `099598c`, concluded **`success`** at 2026-08-26T13:22:34Z.
+Every one of the thirteen real steps passed, and two of them are the tasks **B-4 puts out of reach
+here**: *Assemble debug APK* (`:app:assembleDebug`) and *Lint* (`:app:lintDebug`), plus *Unit tests
+(:app, Robolectric)* — so **B-22's intermittent `ComposeTimeoutException` did not fire this run**.
+Step **6**, *Assert every cited C-/B- id resolves*, passed on this head, which is an **independent
+confirmation of C-105-2's citation guard**: the six new `C-105-*` ids added by this run resolve in
+CI as well as under `run-zero.sh`. Step **8**, *Assert vendored sync vectors match the pinned
+main-repo commit*, passed — **no cross-repo drift event**. Step **14**, *Upload debug APK*, was
+**`skipped`**, exactly as run 93's `if: github.event_name == 'workflow_dispatch'` intended, so
+**B-25's gating half still holds**; the quota half remains the owner's and is untouched.
+
+**Read this precisely, because it is the easiest sentence in this file to overstate.** *I* did not
+run the gate — **GitHub's runner did**, on a push, as it does for every commit on this branch. This
+is **not** a `Verify-Alpha.ps1` result (the engine gate needs Windows and .NET and did not run), and
+it does not retire **B-4**: no `sdkmanager`, `avdmanager`, `emulator` or `adb` exists in this
+sandbox, and nothing about an emulator was exercised. What it does establish is narrow and real:
+**this run's records-only head does not break the android build, its lint, or its tests.**
+
 **Prohibitions — what this run did NOT touch.** **No rung moved. No production code, C# or Kotlin**
 — the prompt forbids the appliers and this machine cannot compile them. **No gate was run and none
 is claimed**: `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` and `gh` are ABSENT,
 `ANDROID_HOME` UNSET; neither `Verify-Alpha.ps1` nor the five-task android command was reachable.
 **`:core:test` DID run this iteration** — via `scripts/core-probe.sh`, reported as one of five tasks
-and nothing more. **No vector byte written; the vendored pin `7328a0b` is untouched.** **No spec
+and nothing more; the other four ran **only in CI**, on the runner, and are reported as that
+(C-105-7) and never as a gate this session executed. **No vector byte written; the vendored pin `7328a0b` is untouched.** **No spec
 byte written**; `docs/Sync-Protocol.md` is unmodified in both repositories. **No new branch and no
 new PR in either repository**; only PR **#6** is refreshed. **No pinch point touched** —
 `$ExpectedOfflineTotal`, the count-reporting docs and `Host.cs` are unmodified, and **no restack was

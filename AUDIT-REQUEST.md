@@ -19290,3 +19290,28 @@ conditions are negative (C-105-5), so the inherited test returns *short record a
 run followed it. **Withheld deliberately** — silence about a *repetition*, not about a problem.
 **C-103-7's five conditions carry forward unchanged as the standing test for run 106.** B-18's
 smallest human unblock is unchanged: **a human stops the schedule.**
+
+### C-105-7 — CI ran the four gate tasks this sandbox cannot, green on this run's own head
+
+```bash
+# via the GitHub MCP server (no gh binary in this sandbox)
+actions_get method=get_workflow_job owner=ShivaClaw repo=careerseeker-android \
+  resource_id=98191236138
+```
+
+*Expected, and **observed**:* head **`099598c`**, conclusion **`success`**, completed
+2026-08-26T13:22:34Z. All thirteen real steps passed, including **step 6** *Assert every cited C-/B-
+id resolves* (an independent confirmation of C-105-2's guard — the six new `C-105-*` ids resolve in
+CI too), **step 8** *Assert vendored sync vectors match the pinned main-repo commit* (**no
+cross-repo drift**), **step 10** *Unit tests (:app, Robolectric)* (**B-22 did not fire**), **step
+11** *Assemble debug APK* and **step 12** *Lint*. **Step 14** *Upload debug APK* is **`skipped`** —
+run 93's `if: github.event_name == 'workflow_dispatch'` still holds, so **B-25's gating half
+remains closed** and its quota half remains the owner's.
+
+**Do not read this as a gate this session ran.** The runner ran it, on a push, as it does for every
+commit on this branch. It is **not** `Verify-Alpha.ps1` (Windows + .NET; did not run) and it does
+**not** retire **B-4** — no `sdkmanager`, `avdmanager`, `emulator` or `adb` exists here and no
+emulator behaviour was exercised. The claim is narrow: **this run's records-only head does not break
+the android build, its lint, or its tests.** To re-verify the *step* that matters after any future
+red, read which step failed before calling it a regression — B-25 makes that the only reliable
+signal on this repo.
