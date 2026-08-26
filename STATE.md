@@ -6,8 +6,8 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty-eight** runs
-> have now been assigned it (count refreshed at run 103). **The one-command check is now
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty-nine** runs
+> have now been assigned it (count refreshed at run 104). **The one-command check is now
 > `scripts/run-zero.sh <engine>`** — it re-derives this whole banner from both repositories in
 > seconds and prints `NOTHING MOVED` or the thing that changed, so you need not read further to know
 > which. **Run 91
@@ -18,6 +18,42 @@
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
 >
+> ## ▶ RUN 104 — 2026-08-26. **Nothing moved. Zero findings — the candidate was a real measurement of the whole board, and it resolved to a class the records already named.**
+
+**Heartbeat:** 2026-08-26, **one hundred and fourth** cloud iteration (Linux sandbox), and the
+**third firing of this calendar day**. **Assigned slice declined for the sixty-ninth time**
+(**C-104-1**) — and verified this run **from the spec text, not from these records**: §4.3.3's
+`{product_id, acknowledged_at, order_id?}` block with `order_id` **OPTIONAL**, the **decoded**-bytes
+cap at `:112`, `decrypt_failed` at `:601`, and `invalid-unknown-field.json` in the corpus. All four
+assigned gates are **already closed**; all three commits resolve and are **off `main`**. **The
+prompt's `679a317` and its "S5 … NOT STARTED" remain stale.** Ground state in one command —
+`run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0** (**C-104-2**). The one executable check
+was **run, not cited**: `generate.mjs --check` at the pin → **`OK: 29 vector files match the
+generator.`**, exit 0. Board via MCP: **22 engine + 6 android open, every row `draft:true`, 0 merged
+since #44 (2026-08-13)** (**C-104-3**).
+
+**THE CANDIDATE WAS A MEASUREMENT, AND IT STILL DID NOT SURVIVE** (**C-104-4**). Of the **22** open
+engine drafts, **7 conflict against `main` and 15 merge clean** — all seven on the same five files
+including the `Verify-Alpha.ps1` pinch point. That reads like the stack decaying. It is not:
+**C-RST-3** recorded the same partition and **C-RST-4** its mechanism (a branch conflicts **iff** it
+carries a pin sweep); the only delta is that the recorded sweep predates PR **#49**. This run adds
+**coverage of the current full board**, not a defect. **Eleven candidates now rejected across runs
+96–104.** One thing worth carrying: the two engine PR comments dated **2026-08-24** look like fresh
+review and are **this routine's own** — checked, not assumed, because a routine mistaking its output
+for a reply is how a dead lane looks alive.
+
+**NO TWENTY-NINTH DRAFT, AND NO SIXTH NOTIFICATION** (**C-104-5**). Run 103 left **five conditions**
+rather than an opinion; this run evaluated each and **all five are negative**, so the inherited test
+returns *short record and silence* and this run followed it instead of re-arguing it. Five messages
+have gone out (runs 86, 91, 99, 100), all correct, all producing zero repo events. **C-103-7's
+conditions carry forward unchanged as the standing test for run 105.**
+
+**NO RUNG MOVED, NO PRODUCTION CODE, NO GATE RUN OR CLAIMED, NO NEW BRANCH OR PR IN EITHER REPO, NO
+VECTOR BYTE, PIN UNMOVED, NO SPEC BYTE, NO PINCH POINT, NO RESTACK ATTEMPTED, NO BLOCKER FILED OR
+CLOSED, NO SCHEDULE TOUCHED, RELAY NOT CONTACTED.** `:core:test` **not run** this iteration. One
+transient `git worktree` under scratch, removed at end of run. Terra re-read before any write:
+**COMPLETE, files claimed: none** — no collision.
+
 > ## ▶ RUN 103 — 2026-08-26. **Nothing moved. Zero findings — the one candidate this run derived was refuted by the records' own novelty test, and the second firing of the day changed nothing but the count.**
 
 **Heartbeat:** 2026-08-26 04:59Z, **one hundred and third** cloud iteration (Linux sandbox), and the
