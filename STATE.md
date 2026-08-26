@@ -6,8 +6,8 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty-seven** runs
-> have now been assigned it (count refreshed at run 102). **The one-command check is now
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty-eight** runs
+> have now been assigned it (count refreshed at run 103). **The one-command check is now
 > `scripts/run-zero.sh <engine>`** — it re-derives this whole banner from both repositories in
 > seconds and prints `NOTHING MOVED` or the thing that changed, so you need not read further to know
 > which. **Run 91
@@ -18,6 +18,43 @@
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
 >
+> ## ▶ RUN 103 — 2026-08-26. **Nothing moved. Zero findings — the one candidate this run derived was refuted by the records' own novelty test, and the second firing of the day changed nothing but the count.**
+
+**Heartbeat:** 2026-08-26 04:59Z, **one hundred and third** cloud iteration (Linux sandbox), and the
+**second firing of this calendar day** (run 102 ran 01:05Z). **Assigned slice declined for the
+sixty-eighth time** (**C-103-1**) — re-verified by hand, not inherited: all three commits
+`8575539`/`22b028e`/`7328a0b` resolve, and `git merge-base --is-ancestor` reports **NO** against
+`origin/main` for each. **The prompt's `679a317` and its "S5 … NOT STARTED" remain stale.** Ground
+state in one command — `scripts/run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**
+(**C-103-2**). The one executable check was **run, not cited**: `generate.mjs --check` → **`OK: 26
+vector files match the generator.`** on `main` and **`OK: 29`** at the pin, both exit 0
+(**C-103-3**). Board re-read via MCP: **22 engine + 6 android open, every row `draft:true`, 0 merged
+since #44 (2026-08-13)** — **all four of run 82's triggers negative** (**C-103-4**).
+
+**THE RESULT IS ZERO FINDINGS, AND THE NOVELTY TEST IS WHY** (**C-103-5**). One candidate was
+derived independently: `fleet-probe.sh plan` reports **`UNPLANNED: 2`**, and the probe's own output
+says *"check them against the open-PR set"* — a check that reads unperformed. It was performed:
+`p4-entitlement` is a leaf whose PR **#8 is closed and genuinely unmerged**, and
+`s6-resume-reconciliation` is **#53**, the **H1** decision §3 deliberately excludes. Both are
+expected; **ROT: 0**. **And both were already resolved by name** — `C-89-4`, `C-98-5`,
+`AUDIT-REQUEST.md:18402`. **So it is logged as a rejected candidate, not a finding.** Ten candidates
+now rejected across runs 96–103. **B-18 attempt 2 was re-tested against the records' advice not to**
+(`CronList` → **`No scheduled jobs.`**, **C-103-6**): the premise holds, the cost was one call, and
+deriving beats inheriting — but it is a **re-test, not a new result**.
+
+**NO TWENTY-NINTH DRAFT, AND NO SIXTH NOTIFICATION** (**C-103-7**). None of the **28** open drafts
+has merged in **thirteen days**, so more work product carries negative marginal value while the gate
+that lands it cannot be run; only PR **#6** is refreshed. Five notifications have gone out (runs 86,
+91, 99, 100), all correct, all producing zero repo events. **This run found nothing a prior run had
+not** — its own candidate was refuted from the records — so a sixth is **withheld deliberately**:
+silence about a *repetition*, not about a problem. **The condition that should trigger a sixth is
+named in C-103-7**, so the next run need not re-derive the judgement.
+
+**NO RUNG MOVED, NO PRODUCTION CODE, NO GATE RUN OR CLAIMED, NO NEW BRANCH OR PR IN EITHER REPO, NO
+VECTOR BYTE, PIN UNMOVED, NO SPEC BYTE, NO PINCH POINT, NO BLOCKER FILED OR CLOSED, NO SCHEDULE
+TOUCHED, RELAY NOT CONTACTED.** `:core:test` **not run** this iteration. Terra re-read before any
+write: **COMPLETE, files claimed: none** — no collision.
+
 > ## ▶ RUN 102 — 2026-08-26. **Nothing moved. The slice was re-verified as built by hand, and the return date this whole handoff was written for is now eight days past.**
 
 **Heartbeat:** 2026-08-26, **one hundred and second** cloud iteration (Linux sandbox). **Assigned
