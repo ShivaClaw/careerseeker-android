@@ -18906,3 +18906,84 @@ four triggers negative and nothing this run found that a prior run had not, a si
 carry no new information and would spend the one channel B-18 depends on. **It was withheld
 deliberately.** This is not silence about a problem: the problem is fully recorded here and in
 `RETURN-DAY.md`; it is silence about a *repetition*.
+
+---
+
+## Run 102 — 2026-08-26
+
+### C-102-1 — the assigned slice is built, and the prompt's premise is stale on both counts
+
+```bash
+cd <engine> && git fetch --all --prune
+git log --oneline --all --not origin/main --grep='^S5' -- docs/Sync-Protocol.md docs/sync-vectors/
+git show 7328a0b:docs/Sync-Protocol.md | grep -n 'entitlement_ack body\|1 MiB\|decrypt_failed'
+git diff --stat aac05f3...7328a0b -- docs/sync-vectors/
+```
+
+*Expected, and **observed** this run:* the three slice commits `8575539`, `22b028e`, `7328a0b`, all
+**off `main`**. All four assigned gates already answered **in the spec text itself** at `7328a0b`:
+§4.3.3 `entitlement_ack body = {product_id, acknowledged_at, order_id?}` (`:307`, `:317`);
+PQ-A2-1's cap on **decoded ciphertext** (`:112`, amendment row `:656`); PQ-A2-2's structural
+rejection reporting `decrypt_failed` (`:103`, `:601`, amendment row `:657`); PQ-A2-3's
+`invalid-unknown-field.json`. The stored prompt's pin **`679a317`** and its **"S5 … NOT STARTED"**
+are both **stale** — the real pin is `7328a0b`. **Sixty-seventh** assignment of a completed slice.
+
+### C-102-2 — ground state in one command
+
+```bash
+cd <android> && scripts/run-zero.sh ../careerseeker; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* **`NOTHING MOVED`, exit 0.** Three slice commits still off `main`;
+pin `7328a0b`; vendored corpus **29/29 byte-identical**; all three guards green (citations
+**945 defs / 946 cited / 1 documented-absent**; plan **6 rows, 8 leaves, ROT 0**); engine `main`
+`aac05f3` and android `main` `ebfaf81`, both unmoved.
+
+### C-102-3 — the generator check, executed rather than cited
+
+```bash
+cd <engine> && git worktree add /tmp/pin 7328a0b && cd /tmp/pin \
+  && node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* `OK: 29 vector files match the generator.`, **exit 0**. Run by hand
+this iteration, not inherited. **No vector byte was written**, and the pin was not moved.
+
+### C-102-4 — all four of run 82's notification triggers, negative
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all   # via GitHub MCP
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected, and **observed**:* **22 engine + 6 android open, every row `draft:true`.** Newest merge
+anywhere is **engine #44, merged 2026-08-13** — **thirteen days** with zero merges. Trigger 1
+(`main` moved) negative per C-102-2; trigger 2 (a PR merged or undrafted) negative; trigger 3 (the
+stored prompt changed) negative — it still carries the two facts known stale in C-102-1; trigger 4
+(a gate result) negative — no gate is reachable here.
+
+### C-102-5 — the return date has passed, and the human queue is human-only
+
+```bash
+cd <android> && sed -n '1,8p' RETURN-DAY.md          # "For: Brandon, on return 2026-08-18"
+awk '/^## 5\./,/^## 6\./' RETURN-DAY.md              # H1-H8
+```
+
+*Expected, and **observed**:* the closing handoff was written **for return on 2026-08-18**; today is
+**2026-08-26**, **eight days past** it, with no owner activity in either repository. Every row of
+§5's queue needs the owner: **H1** and **H8** are decisions; **H2** and **H7** need
+`Verify-Alpha.ps1` on Windows + .NET; **H4** and **H6** need hardware/tooling installs; **H5** is an
+embargoed deploy. **No row is advanceable from a Linux sandbox**, which is why no rung moved.
+
+### C-102-6 — no sixth notification, and it is a decision rather than an omission
+
+```bash
+cd <android> && grep -c 'NOTIFICATION SENT' STATE.md
+```
+
+*Expected, and **observed**:* five messages already sent (runs **86**, **91**, **99**, **100**), all
+carrying the same correct recommendation, all producing **zero repo events** (C-101-3). This run
+found **nothing a prior run had not**: every check above reproduces run 101's. A sixth message would
+carry no new information and would spend the one channel B-18 depends on for the day something
+genuinely changes. **Withheld deliberately** — silence about a *repetition*, not about a problem;
+the problem is recorded in `RETURN-DAY.md` and five times over in `STATE.md`.
