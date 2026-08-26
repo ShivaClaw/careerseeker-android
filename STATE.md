@@ -6,8 +6,8 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty-six** runs
-> have now been assigned it (count refreshed at run 101). **The one-command check is now
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty-seven** runs
+> have now been assigned it (count refreshed at run 102). **The one-command check is now
 > `scripts/run-zero.sh <engine>`** — it re-derives this whole banner from both repositories in
 > seconds and prints `NOTHING MOVED` or the thing that changed, so you need not read further to know
 > which. **Run 91
@@ -18,7 +18,41 @@
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
 >
-> ## ▶ RUN 101 — 2026-08-25. **Nothing moved. The one check this sandbox can execute was executed rather than cited, no candidate was manufactured, and no sixth notification was sent.**
+> ## ▶ RUN 102 — 2026-08-26. **Nothing moved. The slice was re-verified as built by hand, and the return date this whole handoff was written for is now eight days past.**
+
+**Heartbeat:** 2026-08-26, **one hundred and second** cloud iteration (Linux sandbox). **Assigned
+slice declined for the sixty-seventh time** (**C-102-1**) — re-verified, not inherited: the three
+commits `8575539`/`22b028e`/`7328a0b`, and all four assigned gates as they read **in
+`docs/Sync-Protocol.md` itself** (body block `:307`/`:317` with `order_id` OPTIONAL; the *decoded
+ciphertext* cap `:112`; `decrypt_failed` at `:103`/`:601`; `invalid-unknown-field.json` in the
+corpus). **The prompt's `679a317` and its "S5 … NOT STARTED" remain stale.** Ground state in one
+command — `scripts/run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0** (**C-102-2**). The one
+executable check was **run, not cited**: `generate.mjs --check` → **`OK: 29 vector files match the
+generator.`, exit 0** (**C-102-3**). Board re-read via MCP: **22 engine + 6 android open, every row
+`draft:true`, 0 merged since #44 (2026-08-13)** — **all four of run 82's triggers negative**
+(**C-102-4**).
+
+**THE ONE THING THIS RUN ADDED IS A DATE** (**C-102-5**). `RETURN-DAY.md` opens *"For: Brandon, on
+return **2026-08-18**."* Today is **2026-08-26** — **eight days past** it, with no owner activity in
+either repository since **2026-08-13**. Read against that, §5's human queue is not merely stalled but
+**addressed entirely to someone who has not returned**: **H1**/**H8** are decisions, **H2**/**H7**
+need `Verify-Alpha.ps1` on Windows + .NET, **H4**/**H6** need absent tooling, **H5** is an embargoed
+deploy. **Not one row is advanceable from a Linux sandbox.** That — not exhausted effort — is why no
+rung moved. **No candidate was manufactured**; nine were derived and rejected across runs 96–100, and
+with `NOTHING MOVED` there is no honest slice here.
+
+**NO TWENTY-NINTH DRAFT, AND NO SIXTH NOTIFICATION** (**C-102-6**). None of the **28** open drafts has
+merged in **thirteen days**, so more work product carries negative marginal value while the gate that
+lands it cannot be run; only PR **#6** is refreshed. Five notifications have gone out (runs 86, 91,
+99, 100), all correct, all producing zero repo events; nothing this run found was unknown to a prior
+run, so a sixth is **withheld deliberately** — silence about a *repetition*, not about a problem.
+
+**NO RUNG MOVED, NO PRODUCTION CODE, NO GATE RUN OR CLAIMED, NO NEW BRANCH OR PR IN EITHER REPO, NO
+VECTOR BYTE, PIN UNMOVED, NO SPEC BYTE, NO PINCH POINT, NO BLOCKER FILED OR CLOSED, NO SCHEDULE
+TOUCHED, RELAY NOT CONTACTED.** `:core:test` **not run** this iteration. One transient `git worktree`
+under scratch, removed at end of run. Terra **COMPLETE, files claimed: none** — no collision.
+
+## ▶ RUN 101 — 2026-08-25. **Nothing moved. The one check this sandbox can execute was executed rather than cited, no candidate was manufactured, and no sixth notification was sent.**
 >
 > **Heartbeat:** 2026-08-25, **one hundred and first** cloud iteration (Linux sandbox). **Assigned
 > slice declined for the sixty-sixth time** (**C-101-1**). Ground state in one command —
