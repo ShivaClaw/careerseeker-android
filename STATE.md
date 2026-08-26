@@ -35,7 +35,9 @@
 > than recorded. **Trigger 5 now requires a finding about the product, the protocol, or the board;
 > a records-hygiene finding is filed, never sent** (**C-106-7**). Triggers 1–4 unchanged, all four
 > negative (**C-106-2**, **C-106-4**). CI green on the tip `d54c8d4`, the one commit run 105 could
-> not have observed (**C-106-5**). **B-18's smallest human unblock is unchanged: a human stops the
+> not have observed (**C-106-5**) — and **no CI result is claimed for run 106's own head**, which is
+> structural: a run pushes its records last, so its final commit is always younger than any CI it
+> could read. **Each run checks its PREDECESSOR's tip. Run 107: check `72508c5`** (**C-106-8**). **B-18's smallest human unblock is unchanged: a human stops the
 > schedule.**
 >
 > ## ▶ RUN 105 — 2026-08-26. **Nothing moved. Zero findings — and the one check three firings had skipped was run rather than inherited, and came back green at baseline.**

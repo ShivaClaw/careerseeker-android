@@ -18214,7 +18214,15 @@ relay answering `decrypt_failed` for a misroute. So trigger 5 now reads: a findi
 the product, the protocol, or the board** to be sent; **a records-hygiene finding is filed, never
 sent.** Triggers 1–4 are unchanged and **all four are negative this run** (C-106-2, C-106-4).
 
-**Milestone 6 — no eleventh message, and no twenty-ninth draft** (**C-106-7**). Ten messages have
+**Milestone 6 — CI on this run's own head is NOT claimed** (**C-106-8**). At close of run the newest
+workflow run was still **264 / `d54c8d4`**; none had been created for `72508c5`. The push itself is
+confirmed by `git ls-remote`. **This gap cannot be closed for oneself** — a run pushes its records as
+its final act, so its own head is always younger than any CI result it could read. That makes
+C-106-5's move a **standing practice** rather than a one-off: **each run checks its predecessor's
+tip.** Locally, `check-citations.sh` → **978/979/1**, exit 0, re-run after every append, and
+`run-zero.sh` → exit 0; **those are local results and not the runner's.**
+
+**Milestone 7 — no eleventh message, and no twenty-ninth draft** (**C-106-7**). Ten messages have
 gone out, all carrying the same correct recommendation, all producing **zero repo events**. Nothing
 has left `draft` in **thirteen days** and none of the **28** open PRs has merged, so more work
 product carries negative marginal value while the gate that would land it cannot run here.

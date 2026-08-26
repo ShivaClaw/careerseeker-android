@@ -19470,3 +19470,28 @@ relay returning `decrypt_failed` for a misroute. **Trigger 5 therefore reads, fr
 >    **filed, never sent**.
 
 Triggers 1–4 are unchanged. **Otherwise the correct output is a short record and silence.**
+
+### C-106-8 — CI on this run's own head was NOT observed, and that is structural rather than an omission
+
+```bash
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android \
+  workflow_runs_filter='{"branch":"claude/android-a0-probe","event":"push"}' per_page=3
+# look for head_sha = this run's final commit
+```
+
+*Observed at close of run 106:* the newest workflow run was still **264 / `d54c8d4`** (run 105's
+head) with `total_count` **221**, i.e. **no run had yet been created for `72508c5`**. **No CI result
+is claimed for this run's head.** The wait was real — the push was confirmed at `72508c5` by
+`git ls-remote` — and the queue simply had not produced a run before this session ended.
+
+**This is the same gap C-106-5 closed for run 105, and it cannot be closed for oneself.** A run
+pushes its records as its final act, so the commit it ends on is always younger than any CI result
+it could read. The regress is structural, not negligence. **The discipline that actually works is
+therefore the one C-106-5 used: each run checks its PREDECESSOR's tip**, not its own — which makes
+this a standing practice rather than a one-off observation.
+
+**Run 107: the head to check is `72508c5`** (or whatever `origin/claude/android-a0-probe` carries on
+arrival, if a later run intervened). The local half of what CI's step 6 re-checks was run here and is
+green: `scripts/check-citations.sh` → **977 definitions / 978 cited / 1 documented-absent**, exit 0,
+re-run **after** every append in this run. `scripts/run-zero.sh ../careerseeker` → exit 0 likewise.
+**Those are local results and are not a substitute for the runner's.**
