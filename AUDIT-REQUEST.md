@@ -18987,3 +18987,117 @@ found **nothing a prior run had not**: every check above reproduces run 101's. A
 carry no new information and would spend the one channel B-18 depends on for the day something
 genuinely changes. **Withheld deliberately** — silence about a *repetition*, not about a problem;
 the problem is recorded in `RETURN-DAY.md` and five times over in `STATE.md`.
+
+---
+
+## Run 103 — 2026-08-26 04:59Z (second firing of the day)
+
+Every claim below carries the exact command that re-verifies it. `<android>` is this checkout;
+`<engine>` is a `ShivaClaw/careerseeker` checkout. **Run `git fetch --all --prune` in both first** —
+every count is taken after that fetch.
+
+### C-103-1 — the assigned S5 slice is built, and all three commits are still off `main`
+
+```bash
+cd <engine> && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do
+  git log --oneline -1 $c
+  git merge-base --is-ancestor $c origin/main && echo "  ON MAIN" || echo "  off-main"
+done
+```
+
+*Expected, and **observed**:* all three resolve — `8575539` *(define the entitlement_ack body…)*,
+`22b028e` *(pin section 4.3.3 with two entitlement_ack vectors…)*, `7328a0b` *(add the
+invalid-unknown-field vector, closing PQ-A2-3 and B-6)* — and **each prints `off-main`**. Dated
+2026-08-09/-12. The prompt's *"S5 … NOT STARTED"* and its pin `679a317` are **both stale**; the real
+pin is **`7328a0b`**. Sixty-eighth assignment, declined.
+
+### C-103-2 — ground state in one command: nothing moved
+
+```bash
+cd <android> && scripts/run-zero.sh <engine>; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`NOTHING MOVED on every check this sandbox can run, and all three
+guards are green.`**, **exit 0**. Engine `main` **`aac05f3`**, android `main` **`ebfaf81`**, both on
+baseline; corpus **29 vendored / 29 at pin**, byte-identical; citations **951 definitions / 952
+cited / 1 documented-absent**; landing plan **ROT 0**.
+
+### C-103-3 — the vector generator agrees with the corpus, on `main` and at the pin
+
+```bash
+cd <engine> && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`OK: 26 vector files match the generator.`**, **exit 0** on
+`origin/main`. At pin `7328a0b` (via `run-zero.sh` section 2) the same command reports **`OK: 29
+vector files match the generator.`**, exit 0. **The delta of 3 is exactly the vectors the S5
+branches add** — which is why `main` reads 26 and the vendored corpus reads 29. Invoked `--check`
+only; **no vector byte was written and the pin did not move**.
+
+### C-103-4 — all four notification triggers, answered and negative
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all   # GitHub MCP
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected, and **observed**:* **22 engine + 6 android open, every row `draft:true`**; newest merge
+anywhere is **engine #44, `merged_at` 2026-08-13T02:28:21Z** — **thirteen days** with zero merges.
+Trigger 1 (`main` moved) negative per C-103-2; trigger 2 (a PR merged or undrafted) negative;
+trigger 3 (the stored prompt changed) negative — it still carries the two facts stale in C-103-1;
+trigger 4 (a gate result) negative — no gate is reachable here. Use `merged_at` or the commit graph,
+never the rows' `merged` field (**C-89-2**).
+
+### C-103-5 — the run's one candidate, and the records that refute it
+
+```bash
+cd <android> && scripts/fleet-probe.sh plan <engine> RETURN-DAY.md; echo "exit=$?"
+grep -n "C-89-4\|C-98-5" AUDIT-REQUEST.md | head
+```
+
+*Expected, and **observed**:* **`plan rows: 6   leaves now: 8   ROT: 0   UNPLANNED: 2`**, **`PLAN
+STILL NAMES LEAVES.`**, **exit 0**. The probe's own text says *"Check them against the open-PR
+set"*, which reads like an unperformed check; performed against the live board, the two UNPLANNED
+leaves are **`p4-entitlement`** (PR **#8**, `state: closed`, genuinely unmerged) and
+**`s6-resume-reconciliation`** (PR **#53**, the **H1** decision §3's plan deliberately excludes).
+Both expected; the plan has not rotted. **Both answers already exist in the records** — `C-89-4`,
+`C-98-5`, and `AUDIT-REQUEST.md:18402` — so this is a **rejected candidate, not a finding**. Ten
+rejected across runs 96–103.
+
+### C-103-6 — this session cannot see or stop the schedule firing it
+
+```
+CronList          # Claude Code tool; no shell equivalent — `gh` and cron are absent here
+```
+
+*Expected, and **observed**:* **`No scheduled jobs.`** The tool reports only jobs created **in this
+session**, so the routine's own schedule is **outside this session's reach**. B-18's premise holds
+and its smallest human unblock is unchanged: **a human stops the schedule.** Run 99 settled this;
+run 103 re-tested it because deriving beats inheriting. **It is now confirmed twice and should not
+be run a third time.**
+
+### C-103-7 — no sixth notification, and the test that should trigger one
+
+```bash
+cd <android> && grep -c 'NOTIFICATION SENT' STATE.md
+```
+
+*Expected, and **observed**:* five messages already sent (runs **86**, **91**, **99**, **100**), all
+carrying the same correct recommendation, all producing **zero repo events**. This run's only
+candidate was **refuted from the records** (C-103-5), so it found nothing a prior run had not; a
+sixth would spend the one channel B-18 depends on. **Withheld deliberately** — silence about a
+*repetition*, not about a problem.
+
+**So the next run inherits a test rather than a judgement call, send the sixth message if and only
+if any of these is true:**
+
+1. `run-zero.sh` exits **non-zero** — something moved.
+2. Either `main` advances, or **any** PR in either repo leaves `draft:true`, or anything merges
+   after engine **#44** (**C-103-4**'s query).
+3. **Any owner activity appears** in either repository after **2026-08-13** — a commit, comment,
+   review or push not authored by this routine or by Terra.
+4. The stored prompt changes — in particular if it stops saying `679a317` / *"S5 … NOT STARTED"*.
+5. A finding survives the novelty test: something true, material, and **not** already written down.
+
+Otherwise the correct output is a short record and **silence**.
