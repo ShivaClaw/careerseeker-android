@@ -19191,3 +19191,102 @@ lone candidate was refuted as C-RST-3's known class. The inherited test therefor
 record and silence*, and this run **follows it rather than re-litigating it**. **Withheld
 deliberately** — silence about a *repetition*, not about a problem. **C-103-7's five conditions
 carry forward unchanged**; they are the standing test for run 105.
+
+---
+
+## RUN 105 — 2026-08-26 (fourth firing of the calendar day)
+
+### C-105-1 — the assigned slice is built, re-derived from the spec text itself
+
+```bash
+cd <engine> && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do
+  git merge-base --is-ancestor $c origin/main && echo "$c ON MAIN" || echo "$c OFF main"; done
+git show 7328a0b:docs/Sync-Protocol.md | sed -n '307,323p'          # §4.3.3 body block
+git show 7328a0b:docs/Sync-Protocol.md | grep -n 'decoded\|decrypt_failed' | head
+git show 7328a0b --stat -- docs/sync-vectors/v1/invalid-unknown-field.json
+```
+
+*Expected, and **observed**:* all three commits resolve; all three report **OFF main**. §4.3.3
+prints `{product_id, acknowledged_at, order_id?}` with `order_id` **OPTIONAL** (PQ-A6-1). `:111-112`
+states the 1 MiB cap is measured on the **decoded ciphertext** (PQ-A2-1); `:103` states structural
+rejection is reported as **`decrypt_failed`**, and that v1 deliberately does **not** add a
+`malformed` code (PQ-A2-2). `invalid-unknown-field.json` is present (PQ-A2-3). **All four assigned
+gates are already closed. Declined for the seventieth time.** The prompt's `679a317` is stale; the
+real pin is **`7328a0b`**.
+
+### C-105-2 — ground state in one command
+
+```bash
+cd <android> && bash scripts/run-zero.sh ../careerseeker; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`NOTHING MOVED on every check this sandbox can run, and all three
+guards are green.`**, **exit 0**. Corpus 29 vendored / 29 at pin, byte-identical; citations **963
+definitions / 964 cited / 1 documented-absent**; plan **ROT 0**; engine `main` `aac05f3`, android
+`main` `ebfaf81`, both unmoved.
+
+### C-105-3 — the vector check, run rather than cited
+
+```bash
+cd <engine> && git worktree add -q --detach /tmp/wt-pin 7328a0b && cd /tmp/wt-pin \
+  && ls docs/sync-vectors/v1/ | wc -l \
+  && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **29** vector files, and **`OK: 29 vector files match the
+generator.`**, **exit 0**. Invoked `--check` only; no vector byte written and the pin did not move.
+
+### C-105-4 — `:core:test`, run after three firings had skipped it
+
+```bash
+cd <android>
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+timeout 1200 bash scripts/core-probe.sh; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`BUILD SUCCESSFUL`** and **`core-probe: 348 tests, 0 failed, 0
+skipped, across 22 classes`**, **exit 0** — **matching the run-101 baseline exactly**. The JDK 17
+install is what `core-probe.sh` prescribes in its own error text (sandbox ships JDK 21; `:core` pins
+`jvmToolchain(17)`; `api.foojay.io` is denied by the same egress policy as `dl.google.com`, B-7).
+**That red-on-arrival condition is NOT a finding — B-27 is the withdrawn entry that says so**, and
+it was re-read before the claim was written. This is **one of five gate tasks**; the other four need
+the Android SDK. **No gate result is claimed on the strength of it.** Runs **102, 103 and 104 each
+skipped this check**; run 101 was the last to run it.
+
+### C-105-5 — all five of C-103-7's triggers, answered and negative
+
+```bash
+# (1) ground state
+cd <android> && bash scripts/run-zero.sh ../careerseeker; echo "exit=$?"
+# (2) board — via the GitHub MCP server (no gh binary in this sandbox)
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+# (3) owner activity after the last merge
+list_commits owner=ShivaClaw repo=careerseeker since=2026-08-13
+pull_request_read method=get_comments owner=ShivaClaw repo=careerseeker pullNumber=36
+```
+
+*Expected, and **observed**:* (1) **exit 0**. (2) **22 engine + 6 android open, every row
+`draft:true`**; newest merge anywhere **engine #44, `merged_at` 2026-08-13T02:28:21Z** — **thirteen
+days**, and nothing has left `draft`. Use `merged_at`, **not** the rows' `merged` field (C-89-2).
+(3) `list_commits` returns only the #40/#42/#43/#44 merge traffic **of 2026-08-13 itself**; the
+freshest comment in either repository, **#36 at 2026-08-24T17:22:31Z**, is **this routine's own
+run-94 increment** — it opens *"Run 94 increment — `6700078`"* and carries the Claude Code footer.
+Note `author_association` reads **OWNER** on this routine's own comments too, so it does **not**
+discriminate; read the body. (4) The stored prompt still says `679a317` and *"S5 … NOT STARTED"* —
+**unchanged**. (5) No candidate survived the novelty test and none was manufactured. **All five
+negative.**
+
+### C-105-6 — no sixth notification, and C-103-7's test is what decided it
+
+```bash
+cd <android> && grep -c 'NOTIFICATION SENT' STATE.md
+```
+
+*Expected, and **observed**:* **five** messages already sent (runs **86, 91, 99, 100**), all
+carrying the same correct recommendation, all producing **zero repo events**. All five of C-103-7's
+conditions are negative (C-105-5), so the inherited test returns *short record and silence* and this
+run followed it. **Withheld deliberately** — silence about a *repetition*, not about a problem.
+**C-103-7's five conditions carry forward unchanged as the standing test for run 106.** B-18's
+smallest human unblock is unchanged: **a human stops the schedule.**
