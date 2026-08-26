@@ -19315,3 +19315,158 @@ emulator behaviour was exercised. The claim is narrow: **this run's records-only
 the android build, its lint, or its tests.** To re-verify the *step* that matters after any future
 red, read which step failed before calling it a regression — B-25 makes that the only reliable
 signal on this repo.
+
+---
+
+## RUN 106 — 2026-08-26 (fifth firing of the calendar day)
+
+### C-106-1 — the assigned slice is built, declined for the seventy-first time
+
+```bash
+cd <engine> && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do
+  git merge-base --is-ancestor $c origin/main && echo "$c ON MAIN" || echo "$c OFF main"
+  git log -1 --format='  %ad  %s' $c
+done
+```
+
+*Expected, and **observed**:* all three resolve, all three **OFF `main`** — `8575539` (2026-08-09,
+spec only, +114/−3), `22b028e` (2026-08-09, both ack vectors **and** `generate.mjs`), `7328a0b`
+(2026-08-12, `invalid-unknown-field.json`). **All four gates named in the recurring prompt —
+PQ-A6-1, PQ-A2-1, PQ-A2-2, PQ-A2-3 — are already closed.** The prompt's vendored pin `679a317` is
+**stale** (real pin **`7328a0b`**) and its *"S5 … NOT STARTED"* is stale with it. **Seventy-first
+assignment; declined.**
+
+### C-106-2 — ground state in one command
+
+```bash
+cd <android> && bash scripts/run-zero.sh ../careerseeker; echo "exit=$?"
+```
+
+*Expected, and **observed**:* verdict **`NOTHING MOVED on every check this sandbox can run, and all
+three guards are green.`**, **exit 0**. Both `main`s unmoved (engine `aac05f3`, android `ebfaf81`);
+corpus 29 vendored / 29 at pin, byte-identical; landing plan **ROT 0**.
+
+### C-106-3 — the vector generator, run rather than cited
+
+```bash
+cd <engine> && git checkout -B s5-check origin/claude/s5-entitlement-ack-emitter
+node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`OK: 29 vector files match the generator.`**, **exit 0**, `node
+v22.22.2`. Invoked **`--check` only**, never to regenerate. **No vector byte written; the pin did
+not move.**
+
+### C-106-4 — triggers 2 and 3 of the standing test, answered negative
+
+```bash
+# via the GitHub MCP server (no gh binary in this sandbox)
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+cd <engine>  && git log --all --since=2026-08-13 --format='%an' | sort | uniq -c
+cd <android> && git log --all --since=2026-08-13 --format='%an' | sort | uniq -c
+```
+
+*Expected, and **observed**:* **22 engine + 6 android open, every row `draft:true`**; newest
+`merged_at` anywhere still **engine #44, 2026-08-13T02:28:21Z** — **thirteen days**, and nothing has
+left `draft`. Use `merged_at`, **not** the rows' `merged` field (C-89-2). The author sweep returns
+**only `Claude` and its session-name variants** in both repositories — 109/5/5/4/3/1/1/1/1 engine,
+202/14/7/5/5/3/3/2/2 android — **no human owner commit**. Note the routine commits under
+`brandongkirksey@gmail.com` on some variants, so **the email does not discriminate; read the display
+name.** **Triggers 2 and 3 negative.**
+
+### C-106-5 — CI is green on the branch tip, which run 105 could not have checked
+
+```bash
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android \
+  workflow_runs_filter='{"branch":"claude/android-a0-probe"}' per_page=8
+```
+
+*Expected, and **observed**:* run **264**, id `32974298464`, head **`d54c8d4`** — the commit run 105
+pushed *after* observing CI on its parent `099598c` — conclusion **`success`**, completed
+2026-08-26T13:34:38Z. Run 105's C-105-7 necessarily reported on `099598c`; **this closes the one
+commit that had no CI observation.** **A green re-verification is not a finding** — it is the
+falsification that did not happen, and it is logged as that. It is **not** a gate this session ran,
+it is **not** `Verify-Alpha.ps1`, and it does **not** retire **B-4**.
+
+### C-106-6 — THE FINDING: the escalation ledger under-reports by half, and its command counts the wrong thing
+
+The standing test (**C-103-7**, carried forward verbatim by **C-105-6**) decides whether the owner
+is contacted. Its instrument is one line, and the instrument is wrong twice.
+
+```bash
+cd <android>
+grep -c 'NOTIFICATION SENT'    STATE.md    # naive instrument
+grep -c 'NO NOTIFICATION SENT' STATE.md    # how much of it is the NEGATIVE form
+grep -o '[A-Z ]*NOTIFICATION SENT' STATE.md | sort | uniq -c
+```
+
+*Expected, and **observed**:* the naive command returns **10**, while C-105-6 states its expected
+value as *"**five** messages already sent (runs **86, 91, 99, 100**)"* — a figure that names **four**
+runs for five messages. Of the 10 matches, **5 are `NO NOTIFICATION SENT`** — the marker for a
+*deliberate silence*, i.e. the exact opposite of what the count is read as. The remaining 5 are **3
+distinct events** (`FIRST NOTIFICATION SENT` ×2, `NOTIFICATION SENT` ×3) **double-counted** between
+the banner prose and the heartbeat table.
+
+**The number is not the send count, and it never was.** Worse, it **diverges upward on every future
+run that so much as discusses notifying**. Measured this run: the command read **10** on arrival and
+reads **13** after this run's own records were appended (`NO NOTIFICATION SENT` matches rose 5 → 7),
+while the true send count **did not move at all**. The prediction written into the first draft of this
+entry was *+1, so run 107 reads 11*; the measurement said **13**, and the measured value is what
+stands. **The drift is faster than the obvious model of it.**
+
+The true ledger, mapped from `LOG.md` by enclosing run heading rather than by grep count:
+
+```bash
+cd <android>
+awk '
+  /^## / { hdr=$0 }
+  /push notification WAS sent|A push notification was sent|reached Brandon.s phone|message that leaves the repository|NOTIFICATION SENT/ {
+    if ($0 ~ /[Nn]o push notification was sent|NO NOTIFICATION SENT|[Nn]o notification was sent|no sixth notification|No fourth notification/) next
+    printf "L%-6d | %s\n", FNR, hdr
+  }' LOG.md
+sed -n '11416p;15266p' LOG.md
+```
+
+*Expected, and **observed**:* **ten** distinct runs have sent a message — **53, 57, 60, 65, 73, 81,
+86, 91, 99, 100**. `LOG.md:11416` pins run 57 (*"the finding went to Brandon **by push
+notification**"*); `LOG.md:10842` pins run 53 as *"the first message that leaves the repository"*;
+`LOG.md:15266` pins run 81. **Two different quantities were being conflated under one label:** sends
+*since the notification policy began at run 86* (**86, 91, 99, 100 = four**) and sends *ever*
+(**ten**). Neither is five.
+
+**Why this is material and not cosmetic.** The standing test's cost/benefit rests on the sentence
+*"five messages, all producing zero repo events."* The real figure is **ten** — the channel has been
+spent **twice as heavily** as the test believes, against the same zero response. That does not weaken
+the case for silence; **it strengthens it**, which is why this finding changes no decision this run
+and is recorded rather than acted on. The hazard is the coincidence: the broken command returns
+**10**, which happens to equal the true *lifetime* total, so it reads plausible while measuring
+something else entirely. **A probe trusted and wrong is worse than no probe** (run 98's lesson,
+`scripts/run-zero.sh`).
+
+**Corrected instrument for run 107 and after** — read the ledger, do not count markers:
+
+```bash
+cd <android> && grep -n 'ESCALATION LEDGER' STATE.md   # single canonical line, updated on send
+```
+
+### C-106-7 — the standing test, corrected and carried forward for run 107
+
+**C-103-7's triggers 1–4 are unchanged and all four are negative this run** (C-106-2, C-106-4, and
+the stored prompt still carries `679a317` and *"S5 … NOT STARTED"*).
+
+**Trigger 5 is the one that needed sharpening.** As written — *"a finding survives the novelty test:
+something true, material, and not already written down"* — **C-106-6 satisfies it literally**, and
+notifying on it would have been wrong: it is a correction to *this routine's own bookkeeping*, whose
+entire practical consequence is *"the owner has been messaged ten times, not five, with no reply."*
+A message reporting that would spend the channel to say the channel is more spent than recorded.
+
+Trigger 5's founding precedent (run 86) was **a measured, field-visible defect in the product** — the
+relay returning `decrypt_failed` for a misroute. **Trigger 5 therefore reads, from run 107 onward:**
+
+> 5. A finding survives the novelty test **and is about the product, the protocol, or the board** —
+>    not about these records, their guards, or their bookkeeping. A records-hygiene finding is
+>    **filed, never sent**.
+
+Triggers 1–4 are unchanged. **Otherwise the correct output is a short record and silence.**
