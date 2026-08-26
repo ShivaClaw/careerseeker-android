@@ -5198,3 +5198,42 @@ alone (**C-100-5**), against twelve straight days of 11–29 commits/day, none o
 **Smallest human unblock — unchanged, and the only thing that clears this.** A human **stops the
 schedule**. The work waiting behind it needs the same human anyway: a Windows `Verify-Alpha.ps1`
 gate, an emulator (**B-4**), a relay deploy, and the two design decisions in `RETURN-DAY.md` §5.
+
+### B-22 status 2026-08-26 (one hundred and seventh run) — it FIRED TWICE, and the frequency is now measured against a partitioned window
+
+**Still open, and the run-79 patch `30908de` did not close it.** Two firings in one day, both with
+the identical post-fix signature — `theProvenanceBannerIsShownOnEveryTab`,
+`androidx.compose.ui.test.ComposeTimeoutException at ScreensFromFixtureTest.kt:72`,
+`35 tests completed, 1 failed, 3 skipped` — on CI runs **262** (`501f6e5`) and **267** (`72508c5`).
+Line 72 is inside `awaitText`, which *is* the mitigation: the 5,000 ms `waitUntil` now expires rather
+than the old bare `assertIsDisplayed()` racing. **The synchronization seam was moved, not removed.**
+
+**Frequency, re-measured and partitioned** (**C-107-7**). Across the 30 runs GitHub returns for
+`claude/android-a0-probe` (2026-08-23T21:08Z → 2026-08-26T17:13Z, all after the patch): 18 success,
+6 failure, 6 cancelled. Of the **6 failures**, only **2 are B-22** — the others are 3 artifact
+storage-quota failures and 1 citation-guard failure. **So B-22 is 2 in 24 decisive runs (~8%), which
+is the same rate run 75 measured before the patch.** That is the honest reading, and it is worse than
+it looks: the patch changed the *failure mode* without changing the *rate*. Earlier drafts of this
+entry read 6/24 (~25%) by attributing the whole failure column to B-22 — **the partition is the
+point, and a failure count is a symptom, not a cause.**
+
+**Not re-attempted this run, and deliberately so.** A second patch would be another uncompilable
+`:app` edit: **B-7** means no cloud session can run `:app:test`, so the only way to know whether a
+fix works is to push it and read CI — which is how the current mode arrived. **No re-run was spent
+and no test was skipped, disabled or quarantined.**
+
+**Smallest human unblock, unchanged and now better evidenced:** one `./gradlew :app:test
+--rerun-tasks` loop on a machine with the Android SDK, to confirm whether migrating
+`ScreensFromFixtureTest` to `androidx.compose.ui.test.junit4.v2.createComposeRule` — the replacement
+the build's own deprecation warning names on every run — removes the race rather than relocating it.
+
+### B-22's neighbour, recorded here because it changes how every CI claim in these records is read
+
+A **cancelled** workflow run is **not a verdict** (**C-107-6**). `ci.yml:17-19` sets
+`cancel-in-progress: true` on a group keyed by `github.ref`, so a run that pushes its records as
+several quick commits cancels the job for its own tip. At the close of run 106 the tip `269e72f` had
+**no CI result at all**, while the newest *completed* result belonged to `72508c5` — an **ancestor**.
+**Reading "the newest completed run on the branch" as "the tip's result" is therefore wrong**, and
+this run would have mis-attributed a red to `269e72f` had it not checked `head_sha` alongside
+`conclusion`. Not fixed here: changing the workflow is a production edit that cannot be gate-verified
+from this sandbox.
