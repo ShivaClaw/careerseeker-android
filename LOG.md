@@ -18153,3 +18153,91 @@ it touches no repository byte. The engine checkout was **read-only** — one tra
 under scratch, removed at end of run. Terra's `autonomy/codex-state` was **read before any write**:
 **COMPLETE, files claimed: none** — **no collision**. Files written this run: `LOG.md`,
 `AUDIT-REQUEST.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the engine repo.
+
+---
+
+## RUN 106 — 2026-08-26 · fifth firing of the day · **one finding, filed and deliberately not sent**
+
+*The inherited test (C-103-7) returns silence, and this run followed it — but not trivially. Its
+trigger 5 fired on the letter and was refused on the purpose, and the refusal is this run's slice.*
+
+**Milestone 1 — rule one, then the slice, declined for the seventy-first time** (**C-106-1**).
+`git fetch --all --prune` in **both** checkouts before any count; the android tree again arrived
+**detached at `ebfaf81`**, the trap C-FETCH-1 records. All three slice commits resolve and all three
+are **OFF `main`**: `8575539`, `22b028e`, `7328a0b`, now **seventeen days** old. All four assigned
+gates — PQ-A6-1, PQ-A2-1, PQ-A2-2, PQ-A2-3 — are **already closed**. The prompt's pin `679a317` is
+**stale** (real pin **`7328a0b`**), and its *"S5 … NOT STARTED"* with it.
+
+**Milestone 2 — ground state, and the vector check run rather than cited** (**C-106-2**,
+**C-106-3**). `run-zero.sh ../careerseeker` → **`NOTHING MOVED`**, exit 0; corpus 29/29
+byte-identical, landing plan **ROT 0**, both `main`s unmoved. At the pin,
+`node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the generator.`**,
+exit 0, `--check` only. **No vector byte written; the pin did not move.**
+
+**Milestone 3 — the one commit that had no CI observation** (**C-106-5**). Run 105 reported CI on
+`099598c` and then pushed `d54c8d4`; a run cannot observe CI on the commit it is about to create, so
+the tip was necessarily unchecked. It is checked now: run **264**, head **`d54c8d4`**, conclusion
+**`success`**. **A green re-verification is not a finding.** The runner ran it, not this session; it
+is not `Verify-Alpha.ps1` and it does not retire **B-4**.
+
+**Milestone 4 — the finding: the ledger that governs contacting the owner under-reports by half**
+(**C-106-6**). The standing test's instrument is `grep -c 'NOTIFICATION SENT' STATE.md`, whose stated
+expectation is *"five messages (runs 86, 91, 99, 100)"* — **four runs named for five messages**. The
+command returns **10**, and **half of those matches are `NO NOTIFICATION SENT`**, the marker for a
+deliberate *silence*. The other five are **three distinct events double-counted** between the banner
+prose and the heartbeat table. Mapped properly — by enclosing run heading, not by marker count —
+**ten** runs have sent a message: **53, 57, 60, 65, 73, 81, 86, 91, 99, 100**. Two quantities were
+conflated: sends *since the policy began at run 86* (**four**) and sends *ever* (**ten**). **Neither
+is five.**
+
+The hazard is the coincidence. The broken command returns **10**, which happens to equal the true
+lifetime total, **so it reads plausible while measuring something else entirely** — and it diverges
+by **+1 on every future silence**, this run's own record included, so run 107 reads **11** against a
+count that has not moved. That is run 98's lesson in a new place: *a probe trusted and wrong is worse
+than no probe.* A canonical **`ESCALATION LEDGER`** line now carries the number in `STATE.md`, and
+the corrected instrument reads that line rather than counting markers.
+
+**And the drift was measured rather than predicted, which corrected this entry's own first draft.**
+It was written as *+1 per silence, so run 107 reads 11*. Re-running the command after these records
+were appended returned **13** — this run's write-up alone moved it **10 → 13** while the true send
+count stayed **10**. The model was too slow: the counter tracks *how much a run talks about
+notifying*, not how often one notifies. **A claim about a number is still a claim, and it gets its
+command before it is written down.**
+
+**Milestone 5 — trigger 5 fired on the letter and was refused on the purpose** (**C-106-7**). As
+written, trigger 5 sends a message for any finding *"true, material, and not already written down"*,
+and **C-106-6 is all three**. It was still wrong to send. The whole practical consequence of the
+finding is *"the owner has been messaged ten times, not five, and has not replied"* — a message
+carrying that would spend the channel in order to report that the channel is more spent than
+recorded. Trigger 5's founding precedent (run 86) was a **field-visible defect in the product**: the
+relay answering `decrypt_failed` for a misroute. So trigger 5 now reads: a finding must be **about
+the product, the protocol, or the board** to be sent; **a records-hygiene finding is filed, never
+sent.** Triggers 1–4 are unchanged and **all four are negative this run** (C-106-2, C-106-4).
+
+**Milestone 6 — no eleventh message, and no twenty-ninth draft** (**C-106-7**). Ten messages have
+gone out, all carrying the same correct recommendation, all producing **zero repo events**. Nothing
+has left `draft` in **thirteen days** and none of the **28** open PRs has merged, so more work
+product carries negative marginal value while the gate that would land it cannot run here.
+**B-18's smallest human unblock is unchanged: a human stops the schedule.**
+
+**Prohibition — what this run did NOT touch.** **No rung moved.** **Not one byte of production
+source in either repository** — no `.kt`, `.cs`, `.ts`, `.kts`, `.ps1`, `.mjs` or workflow file; the
+prompt forbids the appliers and this machine cannot compile them. **No gate was run and none is
+claimed**: `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` and `gh` are **ABSENT**,
+`ANDROID_HOME` **UNSET**; neither `Verify-Alpha.ps1` nor the five-task android command was reachable,
+and **`:core:test` did NOT run this iteration** — run 105's `348/0/22` is **not** carried forward as
+this run's. **No vector byte written; the vendored pin `7328a0b` is untouched** and `generate.mjs`
+was invoked **`--check` only**. **No spec byte**: `docs/Sync-Protocol.md` was read only, in both
+repositories. **No pinch point touched** — `$ExpectedOfflineTotal`, the count-reporting docs and
+`Host.cs` are unmodified, and **no restack was attempted**. **No new branch and no new PR in either
+repository**; only PR **#6** is refreshed. **Nothing merged, closed, undrafted, force-pushed,
+rebased or deleted**; no history rewritten; no CI job re-run; no test skipped, disabled or
+quarantined. **No blocker filed and none closed** — nothing new blocked this run, so `BLOCKED.md` is
+deliberately unchanged. **No schedule created, modified or deleted.** No deploys; **the production
+relay was not contacted at all**, not even `GET /v1/health`. No Play/Google/OAuth console, no
+accounts, no purchases, no Gmail; **no secret read, printed or echoed**, no `.appdata`. **No machine
+change** — no package was installed this run. The engine checkout was **read-only** apart from one
+local throwaway branch `s5-check` for C-106-3, which was never pushed. Terra's `autonomy/codex-state`
+was **read before any write**: **COMPLETE, files claimed: none** — **no collision**. Files written
+this run: `LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the
+engine repo.
