@@ -6,8 +6,8 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **sixty-nine** runs
-> have now been assigned it (count refreshed at run 104). **The one-command check is now
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **seventy** runs
+> have now been assigned it (count refreshed at run 105). **The one-command check is now
 > `scripts/run-zero.sh <engine>`** — it re-derives this whole banner from both repositories in
 > seconds and prints `NOTHING MOVED` or the thing that changed, so you need not read further to know
 > which. **Run 91
@@ -18,6 +18,47 @@
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
 >
+> ## ▶ RUN 105 — 2026-08-26. **Nothing moved. Zero findings — and the one check three firings had skipped was run rather than inherited, and came back green at baseline.**
+
+**Heartbeat:** 2026-08-26, **one hundred and fifth** cloud iteration (Linux sandbox), and the
+**fourth firing of this calendar day**. **Assigned slice declined for the seventieth time**
+(**C-105-1**) — verified this run **from the spec text, not from these records**: §4.3.3's
+`{product_id, acknowledged_at, order_id?}` block with `order_id` **OPTIONAL**, the **decoded**-bytes
+cap at `:111-112`, `decrypt_failed` at `:103`, and `invalid-unknown-field.json` in the corpus. All
+four assigned gates are **already closed**; all three commits resolve and are **off `main`**. **The
+prompt's `679a317` and its "S5 … NOT STARTED" remain stale.** Ground state in one command —
+`run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0** (**C-105-2**). Vector check run, not
+cited: `generate.mjs --check` at the pin → **`OK: 29 vector files match the generator.`**, exit 0
+(**C-105-3**). Board via MCP: **22 engine + 6 android open, every row `draft:true`, 0 merged since
+#44 (2026-08-13)** (**C-105-5**).
+
+**THE ONE THING THIS RUN ADDED IS A CHECK, NOT AN ARGUMENT** (**C-105-4**). Runs **102, 103 and 104
+each skipped `:core:test`**; run 101 was the last to execute it. A check unrun for three firings is
+the one place a real regression could hide where the cheap guards would not see it — so it was run
+rather than carried forward: **`core-probe: 348 tests, 0 failed, 0 skipped, across 22 classes`**,
+exit 0, **matching the run-101 baseline exactly**. It covers `EntitlementAckTest`,
+`EntitlementVectorsTest`, `ProtocolVectorsTest` and `VectorCorpusCoverageTest` — the phone-side
+consumers of the very vectors the assigned slice added. **One of five gate tasks, reported as that
+and nothing more.** A green re-verification is **not** a finding; it is the falsification that did
+not happen. **Twelve candidates now rejected across runs 96–105.**
+
+**NO TWENTY-NINTH DRAFT, AND NO SIXTH NOTIFICATION** (**C-105-6**). Run 103 left **five conditions**
+rather than an opinion; this run evaluated each against evidence gathered here and **all five are
+negative** — including the one that could most easily have been assumed: the freshest comment in
+either repo (**#36, 2026-08-24**) was **read in full** and is **this routine's own run-94
+increment**, not owner activity. `author_association` reads **OWNER** on this routine's comments
+too, so it does not discriminate — read the body. Five messages have gone out (runs 86, 91, 99,
+100), all correct, all producing zero repo events. **C-103-7's conditions carry forward unchanged as
+the standing test for run 106.**
+
+**NO RUNG MOVED, NO PRODUCTION CODE, NO GATE RUN OR CLAIMED, NO NEW BRANCH OR PR IN EITHER REPO, NO
+VECTOR BYTE, PIN UNMOVED, NO SPEC BYTE, NO PINCH POINT, NO RESTACK ATTEMPTED, NO BLOCKER FILED OR
+CLOSED, NO SCHEDULE TOUCHED, RELAY NOT CONTACTED.** `:core:test` **DID run** this iteration, via
+`scripts/core-probe.sh`. One transient `git worktree` under scratch, removed at end of run; one
+`apt-get install openjdk-17-jdk-headless` inside this ephemeral container, which `core-probe.sh`
+itself prescribes and which touches no repository byte. Terra re-read before any write:
+**COMPLETE, files claimed: none** — no collision.
+
 > ## ▶ RUN 104 — 2026-08-26. **Nothing moved. Zero findings — the candidate was a real measurement of the whole board, and it resolved to a class the records already named.**
 
 **Heartbeat:** 2026-08-26, **one hundred and fourth** cloud iteration (Linux sandbox), and the
