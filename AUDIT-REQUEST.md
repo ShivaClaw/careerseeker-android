@@ -19949,3 +19949,133 @@ refinement, not a product finding: filed, never sent** (**C-106-7**).
 STARTED"; a gate result — **no**, none reachable and none claimed. Trigger 5 per **C-106-7** needs
 a finding about the product, the protocol or the board: **C-110-3 is a green** (a negative result,
 not a finding) and **C-110-4 is records hygiene**. **Nothing sent; eleventh message withheld.**
+
+---
+
+## RUN 111 — 2026-08-27 (fourth firing of the calendar day)
+
+Every claim below is re-verifiable by the command printed with it. A claim with no command is a bug
+in this document. `<engine>` is a `careerseeker` checkout, `<android>` a `careerseeker-android`
+checkout; **run `git fetch --all --prune` in both before any of them** — every count here was taken
+after that fetch (rule one).
+
+### C-111-1 — ground state, in one command: NOTHING MOVED
+
+```bash
+cd <android> && scripts/run-zero.sh <engine>; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* **`NOTHING MOVED` and exit `0`.** Section by section: pin
+**`7328a0bc043335491cd96a67d634e8eea2a13af9`** equals the target pin and is **NOT an ancestor of
+`origin/main`** (off-main, per `VECTORS.lock`); generator check at the pin →
+**`OK: 29 vector files match the generator.`**; **vendored 29 / at-pin 29**, byte-identical;
+citations **1002 defined / 1003 cited / 1 documented-absent**, every cited `C-`/`B-` id resolving;
+`fleet-probe.sh plan` → **ROT 0 / UNPLANNED 2**, plan still names leaves; engine `origin/main`
+**`aac05f3`** (2026-08-12) and android `origin/main` **`ebfaf81`** (2026-08-06) **both unmoved**.
+Toolchain: `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` **ABSENT**; `node`,
+`git`, `java`, `gradle` **PRESENT**; `ANDROID_HOME` **UNSET**. **No gate is reachable from here.**
+
+The android checkout arrives **detached at the docs-only `main`**, which is stale — confirm before
+trusting any android count:
+
+```bash
+cd <android> && git rev-list --left-right --count origin/main...origin/claude/android-a0-probe
+```
+
+*Expected, and **observed**:* **`10   405`** — `main` 10 ahead, the work branch **405** ahead of it.
+Take every android count on `claude/android-a0-probe`, never on `main`.
+
+### C-111-2 — the assigned S5 slice is built, read out of the spec at the pin, not out of these records
+
+```bash
+cd <engine> && git worktree add --detach /tmp/wt-111 7328a0b
+cd /tmp/wt-111 && sed -n '100,135p;305,340p' docs/Sync-Protocol.md
+ls docs/sync-vectors/v1/ | grep -E 'invalid-unknown-field|entitlement-ack'
+node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+cd <engine> && git worktree remove /tmp/wt-111
+```
+
+*Expected, and **observed**, gate by gate:*
+
+| gate | assigned text | what the spec at `7328a0b` already says |
+| --- | --- | --- |
+| **PQ-A6-1** | define `entitlement_ack` = `{product_id, acknowledged_at, order_id?}` | §4.3.3 exists: `entitlement_ack body = { "product_id", "acknowledged_at", "order_id" }`, `order_id` **OPTIONAL**, headed *"Decided 2026-08-07 (gate PQ-A6-1, default-proceed)"* |
+| **PQ-A2-1** | amend §3.1 — the 1 MiB cap is measured on the **ciphertext** | §3.1: *"The **decoded ciphertext** … MUST NOT exceed **1 MiB**"*, closing *"Amended in S5 (PQ-A2-1)"*; the relay's `1,398,102`-char conversion declared **normative** |
+| **PQ-A2-2** | state in §3 that structural rejection reports `decrypt_failed` | §3: *"Every **structural** rejection … is reported as `decrypt_failed`"*, *"v1 deliberately does **not** add a `malformed` code"*, closing *"Amended in S5 (PQ-A2-2)"* |
+| **PQ-A2-3** | add the `invalid-unknown-field` vector | `docs/sync-vectors/v1/invalid-unknown-field.json` **present at the pin**, with `entitlement-ack.json` and `entitlement-ack-no-order-id.json` |
+
+And the generator: **`OK: 29 vector files match the generator.`**, exit **0**, **29** files on disk
+— **run this iteration, in the worktree, not quoted from a prior run.** The three commits carrying
+the work are `8575539`, `22b028e`, `7328a0b`, all **off `main`** on the `claude/s5-*` drafts in the
+**engine** repo:
+
+```bash
+cd <engine> && for c in 8575539 22b028e 7328a0b; do \
+  git merge-base --is-ancestor $c origin/main && echo "on-main  $c" || echo "off-main $c"; done
+```
+
+*Expected, and **observed**:* **`off-main` for all three.** **Seventy-sixth assignment of this
+slice; declined.** The stored prompt's vendored pin **`679a317`** and its **"S5 … NOT STARTED"**
+are both **measurably stale** — compare against this entry, not against the prompt.
+
+### C-111-3 — the board: 28 open, every row draft, nothing merged in fourteen days
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all   # GitHub MCP server
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected, and **observed**:* **22 engine open** (#26, #32–#39, #45–#57) **+ 6 android open**
+(#1–#6) = **28**, **every row `draft:true`**. Newest merge anywhere is engine **#44**, `merged_at`
+**`2026-08-13T02:28:21Z`** — **fourteen days**. PR **#32**, the assigned slice's own draft, open
+since **2026-08-09**. **Read `merged_at` or the commit graph, never the rows' `merged` field**,
+which reads `false` even for PRs that demonstrably merged (**C-89-2**). `gh` is ABSENT from this
+container; that bounds the **shell**, not the **session** — the MCP server needs no `gh`
+(**C-99-1**). Try the queries before deferring them.
+
+### C-111-4 — the predecessor tip is green, four times running; B-22 stays intermittent
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android \
+  workflow_runs_filter={"branch":"claude/android-a0-probe","status":"completed"}
+```
+
+*Expected, and **observed**:* run number **271**, `head_sha` **`c7f4ad94f2425d18dcc3fa761be93ee1e4522960`**
+— **run 110's own head** — `status` `completed`, `conclusion` **`success`**. With **270**
+(`7687fc3`), **269** (`c38c854`) and **268** (`aef82f7`) also `success`, that is **four consecutive
+greens** after run 107's red at **267**. Match on `head_sha`, read `conclusion`, and treat
+**`cancelled` as *no evidence*, never as the tip's result** (**C-107-6**); name the **ref**, never a
+sha (**C-106-8**). This is **one more sample of C-107-7's partition, not a new finding**: **B-22 is
+intermittent at the rate run 75 measured — not a regression and not a decaying gate.** **No CI
+result is claimable for the current run's own head**, structurally: a run pushes its records last,
+so every firing hands exactly one unread verdict to its successor. This entry is that verdict, read.
+
+### C-111-5 — no sixteenth candidate, and no eleventh message
+
+```bash
+cd <android> && grep -n 'ESCALATION LEDGER' STATE.md | head -1
+```
+
+*Expected, and **observed**:* the ledger line reads **Messages sent: 10** — runs **53, 57, 60, 65,
+73, 81, 86, 91, 99, 100** — all carrying the same correct recommendation, all producing **zero repo
+events**. Count the ledger line; **do not count markers**. Run 82's four state triggers, each
+**checked this run rather than carried**: `main` moving — **no** (C-111-1); a PR merged or
+undrafted — **no** (C-111-3); the stored prompt changing — **no**, same text, same stale
+`679a317`, same *"S5 … NOT STARTED"*; a gate result — **no**, none reachable and none claimed.
+Trigger 5 per **C-106-7** needs a finding about the product, the protocol or the board **and** one
+not already written down: **C-111-4 is a green** — a negative result, and one more sample of an
+already-recorded partition. **Nothing sent; twelfth message withheld.** Runs 96–110 derived
+**fifteen** candidate slices between them and the standing precondition rejected all fifteen; no
+sixteenth was manufactured, because manufacturing one is the failure mode those rejections
+document. **B-18's smallest human unblock is unchanged: a human stops the schedule.**
+
+### C-111-6 — no collision with Terra
+
+```bash
+cd <engine> && git show origin/autonomy/codex-state:STATE.md | head -12
+```
+
+*Expected, and **observed**:* **Current rung: COMPLETE**, *"no active implementation worktree or
+branch is claimed"*, **Files claimed: none**, fresh integration base `origin/main` = `aac05f3`.
+Read **before** any write, per right-of-way. **No collision:** this run wrote no engine file except
+the `autonomy/claude-state` heartbeat, which is docs-only and never merged.
