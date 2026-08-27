@@ -18533,3 +18533,85 @@ transient `git worktree` under scratch at the pin, **removed at end of run**. Te
 `autonomy/codex-state` was **read before any write**: **COMPLETE, files claimed: none** — **no
 collision**; right-of-way respected. Files written this run: `LOG.md`, `AUDIT-REQUEST.md`,
 `STATE.md`, and the `autonomy/claude-state` heartbeat in the engine repo.
+
+## RUN 110 — 2026-08-27. Nothing moved. The assigned slice is built for the seventy-fifth time; the one thing this firing added is that B-18's premise is now a tool-contract fact rather than an inference from an empty result.
+
+**Heartbeat:** 2026-08-27, **one hundred and tenth** cloud iteration (Linux sandbox), **third
+firing of this calendar day**. Rule one first: `git fetch --all --prune` in **both** checkouts
+before any count below was taken. The android checkout again arrived **detached at `main`**, which
+is **stale** — `claude/android-a0-probe` is **398 ahead / 10 behind** it — so every android count
+here is taken on the work branch, never on `main`.
+
+**Milestone 1 — ground state in one command, then the assigned slice re-derived from the spec text**
+(**C-110-1**). `scripts/run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**: pin
+**`7328a0b`** unchanged and still off `main`, corpus **29/29** byte-identical to the pin, citations
+**998 defined / 999 cited / 1 documented-absent**, `fleet-probe.sh plan` **ROT 0 / UNPLANNED 2**,
+both `main`s unmoved (engine **`aac05f3`**, android **`ebfaf81`**). The assigned S5 spec slice was
+then verified **from `docs/Sync-Protocol.md` itself, not from these records**, and is **already
+built — for the seventy-fifth time it has been assigned**: §4.3's `entitlement_ack` block reads
+`{product_id, acknowledged_at, order_id?}` with **`order_id` OPTIONAL** (`:318-320`, `:334`);
+PQ-A2-1's cap is measured on the **decoded ciphertext** (`:111-112`), explicitly **"Amended in S5
+(PQ-A2-1)"** (`:132`); PQ-A2-2's structural rejection reports **`decrypt_failed`** with **no
+`malformed` code added** (`:103-105`); PQ-A2-3's **`invalid-unknown-field.json`** is present on
+`claude/s5-engine-wire-parser` (PR **#37**, whose title says *"closes B-6 / PQ-A2-3"*). The one
+executable check was **run, not cited**: `node docs/sync-vectors/generate.mjs --check` in a
+transient worktree → **`OK: 29 vector files match the generator.`**, exit **0**. **The prompt's
+`679a317` pin and its "S5 … NOT STARTED" both remain measurably stale.**
+
+**Milestone 2 — the board, through the GitHub MCP server** (**C-110-2**). **22 engine open**
+(#26, #32–#39, #45–#57) **+ 6 android open** (#1–#6) = **28**, **every row `draft:true`**. Newest
+merge anywhere is still engine **#44**, `merged_at` **2026-08-13T02:28:21Z** — **fourteen days**.
+Nothing merged, nothing undrafted, nothing closed since. PR **#32** is the assigned slice's own
+draft and has stood open since **2026-08-09**.
+
+**Milestone 3 — the predecessor tip, the one verdict this firing could learn and its predecessor
+structurally could not** (**C-110-3**). Checked at C-107-6's refinement — match `head_sha`, read
+`conclusion`, treat `cancelled` as *no evidence* — and named as the **ref**
+`origin/claude/android-a0-probe`, per C-106-8. The predecessor tip **`7687fc3`**, which is **run
+109's own head**, is CI run **270**, `completed`, **`success`**. That is the **third consecutive
+green** (268 `aef82f7`, 269 `c38c854`, 270 `7687fc3`) after run 107's red at 267, and it is further
+evidence for **C-107-7's partition**: **B-22 is intermittent at the rate run 75 measured — not a
+regression, and not a decaying gate.** **No CI result is claimed for this run's own head**: a run
+pushes its records last, so its tip's CI is always younger than anything that run can read.
+
+**Milestone 4 — B-18's premise, upgraded from an empty result to a tool contract** (**C-110-4**).
+Runs 99 and 108 tested "the sandbox cannot reach the schedule" by calling `CronList` and reading
+**`No scheduled jobs.`** That result was **necessary but not sufficient**, and the gap is worth
+naming: an empty listing is *ambiguous on its own* — it reads identically whether the schedule is
+out of reach or whether no schedule exists anywhere. This run re-tested the command (**`No
+scheduled jobs.`**, unchanged) and then closed the ambiguity from the **tool's own contract**: the
+`CronList` description reads *"List all cron jobs scheduled via **CronCreate in this session**"*,
+and `CronDelete`'s reads *"Cancel a cron job previously scheduled with CronCreate… removes it from
+the **in-memory session store**"*. So the empty result is **conclusive, not merely consistent**:
+the tools address a per-session store, the firing schedule was created outside this session, and
+**no agent-side call can enumerate or cancel it.** B-18 attempt 2 is not "untested" and not
+"inconclusive" — it is **closed as impossible from here**, on the tool contract rather than on an
+inference. This is a **records-side refinement, not a product finding**, and is therefore **filed,
+never sent** (**C-106-7**).
+
+**No slice was taken, and that is the run's substantive judgement.** Doing the assigned slice would
+produce a duplicate §4.3 amendment competing with `8575539`, and re-running the generator to "add"
+vectors that exist risks touching the corpus the android repo vendors at **`7328a0b`** — which the
+prompt itself classes as a **cross-repo drift event**. No sixteenth candidate was manufactured
+either: runs 96–109 derived fifteen between them and the standing precondition rejected all
+fifteen. **The correct response to "build the thing that is built" is to prove it is built and
+stop.** **NO NOTIFICATION SENT** — all four of run 82's state triggers are negative and C-110-4 is
+a records-hygiene refinement; **eleventh message withheld**, ledger stays at **10**.
+
+**What this run did NOT touch.** **No merge, in either repository** — the engine's merge policy is
+conditional on a full local `Verify-Alpha.ps1` this sandbox cannot run, and the android repo is
+**never-self-merge**. **No gate was run and none is claimed**: neither `Verify-Alpha.ps1` nor the
+five-task android command; `:core:test` was **not** run this firing (run 109 executed it green at
+baseline — **348 tests, 0 failed** — and no result is inherited or restated as this run's).
+**Nothing merged, closed, undrafted, force-pushed, rebased or deleted** in either repo; **no
+history rewritten**. **No vector byte written**; the pin `7328a0b` is untouched and `generate.mjs`
+was invoked **read-only**. **No spec byte**: `docs/Sync-Protocol.md` was read only. **No blocker
+filed and none closed** — nothing new blocks, and a phantom blocker costs the next session a hunt.
+**No schedule created, modified or deleted.** **No deploys of any kind; the production relay was
+not contacted at all**, not even `GET /v1/health`. No Play/Google/OAuth console, no accounts, no
+purchases, no Gmail; **no secret read, printed or echoed**, no `.appdata`. **No machine change this
+run** — nothing was installed. One transient `git worktree` under scratch, **removed at end of
+run**. Terra's `autonomy/codex-state` was **read before any write**: **COMPLETE, files claimed:
+none** — **no collision**; right-of-way respected. Files written this run: `LOG.md`,
+`AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the
+engine repo.
