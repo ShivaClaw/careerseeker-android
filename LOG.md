@@ -18615,3 +18615,105 @@ run**. Terra's `autonomy/codex-state` was **read before any write**: **COMPLETE,
 none** — **no collision**; right-of-way respected. Files written this run: `LOG.md`,
 `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the
 engine repo.
+
+## RUN 111 — 2026-08-27 (fourth firing of the calendar day). Nothing moved. The assigned slice is built for the seventy-sixth time; the one thing this firing observed is the verdict its predecessor structurally could not — CI run 271, and B-22's fourth consecutive green.
+
+**Heartbeat:** 2026-08-27, **one hundred and eleventh** cloud iteration (Linux sandbox), **fourth
+firing of this calendar day**. Rule one first: `git fetch --all --prune` in **both** checkouts
+before any count below was taken. The android checkout again arrived **detached at `main`**, which
+is stale — `claude/android-a0-probe` is **405 ahead / 10 behind** it — so every android count here
+is taken on the work branch, never on `main`.
+
+**Milestone 1 — ground state in one command** (**C-111-1**). `scripts/run-zero.sh ../careerseeker`
+→ **`NOTHING MOVED`, exit 0**. Pin **`7328a0b`** unchanged and still **not an ancestor of
+`origin/main`**; vendored corpus **29 files**, byte-identical to the pin; citations **1002 defined
+/ 1003 cited / 1 documented-absent**, all resolving; `fleet-probe.sh plan` **ROT 0 / UNPLANNED 2**;
+engine `origin/main` **`aac05f3`** (2026-08-12) and android `origin/main` **`ebfaf81`**
+(2026-08-06) **both unmoved against their recorded baselines**. Toolchain re-stated so no claim can
+be misread: `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` all **ABSENT**;
+`ANDROID_HOME` **UNSET**. **No gate is reachable from here and none is claimed.**
+
+**Milestone 2 — the assigned slice, re-derived from the spec text rather than from these records**
+(**C-111-2**). The standing precondition is *re-verify the item before taking it*, and it is what
+this milestone is. All four assigned gates were read **out of `docs/Sync-Protocol.md` at the pin**,
+in a transient worktree, not quoted from LOG.md:
+
+- **PQ-A6-1** — §4.3.3 exists and reads `entitlement_ack body = { "product_id", "acknowledged_at",
+  "order_id" }` with `order_id` marked **OPTIONAL**, headed *"Decided 2026-08-07 (gate PQ-A6-1,
+  default-proceed)"*. That is the body this run was assigned to define, already defined, with the
+  same default-proceed disposition the prompt names.
+- **PQ-A2-1** — §3.1 reads *"The **decoded ciphertext** — the AEAD output including its 16-byte
+  tag, after base64url decoding — MUST NOT exceed **1 MiB**"*, and closes *"Amended in S5
+  (PQ-A2-1)"*. The cap is measured on the ciphertext, as assigned; the relay's `1,398,102`-char
+  conversion is declared **normative** in the same section.
+- **PQ-A2-2** — §3 reads *"Every **structural** rejection … is reported as `decrypt_failed`"* and
+  *"v1 deliberately does **not** add a `malformed` code"*, closing *"Amended in S5 (PQ-A2-2)"*.
+- **PQ-A2-3** — `docs/sync-vectors/v1/invalid-unknown-field.json` is **present at the pin**,
+  alongside `entitlement-ack.json` and `entitlement-ack-no-order-id.json`. Seventeen `invalid-*` /
+  `entitlement-*` vectors in total.
+
+**The one executable check was run, not cited:** `node docs/sync-vectors/generate.mjs --check` in
+the transient worktree at `7328a0b` → **`OK: 29 vector files match the generator.`**, exit **0**,
+`29` files on disk. **The prompt's vendored pin `679a317` and its "S5 … NOT STARTED" both remain
+measurably stale.** **Seventy-sixth assignment of a slice completed 2026-08-09 — declined.**
+
+**Milestone 3 — the board, through the GitHub MCP server** (**C-111-3**). **22 engine open + 6
+android open = 28**, **every row `draft:true`**. Newest merge anywhere is still engine **#44**,
+`merged_at` **2026-08-13T02:28:21Z** — **fourteen days**. Nothing merged, undrafted or closed
+since. PR **#32**, the assigned slice's own draft, has stood open since **2026-08-09**. Read
+`merged_at`, never the rows' `merged` field, per **C-89-2**.
+
+**Milestone 4 — the verdict every firing inherits unobserved, observed** (**C-111-4**). A run
+pushes its records last, so its own tip's CI is always younger than anything that run can read;
+each firing therefore hands exactly one unread verdict to its successor. Run 110's head
+**`c7f4ad9`** is CI run **271**, `completed`, **`success`** — matched on `head_sha`, conclusion
+read from the runner's own field, on the ref `origin/claude/android-a0-probe` per C-106-8. That is
+the **fourth consecutive green** (268 `aef82f7`, 269 `c38c854`, 270 `7687fc3`, 271 `c7f4ad9`) after
+run 107's red at **267**. It is **one more sample of C-107-7's partition, not a new one**: **B-22
+remains intermittent at the rate run 75 measured — not a regression, and not a decaying gate.** No
+CI result is claimed for **this** run's own head.
+
+**Milestone 5 — no sixteenth candidate, and no eleventh message** (**C-111-5**). Runs 96–110
+derived fifteen candidate slices between them and the standing precondition rejected all fifteen;
+manufacturing a sixteenth to have something to do is the failure mode those fifteen rejections
+document, not a remedy for it. Run 82's four state triggers were each **checked this run rather
+than carried**: `main` moving — **no**, both unmoved (C-111-1); a PR merged or undrafted — **no**,
+28 open and every row draft (C-111-3); the stored prompt changing — **no**, same text, same stale
+`679a317`, same *"S5 … NOT STARTED"*; a gate result — **no**, none reachable and none claimed.
+C-106-7's fifth condition needs a finding about the product, the protocol or the board **and** one
+not already written down: this run's only new datum is **C-111-4, a green** — a negative result and
+one more sample of a recorded partition. **Nothing sent; twelfth message withheld.** The
+**ESCALATION LEDGER** stands at **10** (runs 53, 57, 60, 65, 73, 81, 86, 91, 99, 100), all carrying
+the same correct recommendation, all producing **zero repo events**. **B-18's smallest human
+unblock is unchanged: a human stops the schedule.**
+
+**Why no slice was taken, stated as a judgement rather than an absence.** Building the assigned
+slice would push a second §4.3 amendment competing with `8575539`, and re-running the generator to
+"add" vectors that already exist risks writing bytes into the corpus the android repo vendors at
+`7328a0b` — which this prompt itself classes as a **cross-repo drift event**. The correct response
+to *"build the thing that is built"* is to prove it is built, from primary sources, and stop.
+
+**Prohibition — what this run did NOT touch.** **No rung moved.** **Not one byte of production
+source in either repository** — no `.kt`, `.cs`, `.ts`, `.kts`, `.ps1`, `.mjs` or workflow file.
+The prompt forbids the C# and Kotlin appliers and **this machine cannot compile either**, so they
+are **left for a local session**, exactly as instructed. **No gate was run and none is claimed**:
+neither `scripts\Verify-Alpha.ps1` nor the five-task android command was reachable, and
+`:core:test` was **not** run this firing — run 109's green (348 tests, 0 failed) is **not**
+restated as this run's. Every CI result cited here was **read out of the runner's own fields**, not
+produced here; **no CI job was re-run**, and **no test was skipped, disabled or quarantined** —
+B-22 is left exactly as it is. **No vector byte was written and the pin `7328a0b` is untouched**;
+`generate.mjs` was invoked **read-only** (`--check`, twice: once by `run-zero.sh`, once by hand at
+the pin) and **not edited**. **No spec byte**: `docs/Sync-Protocol.md` was read only, in both
+repositories. **No pinch point touched** — `$ExpectedOfflineTotal`, the count-reporting docs and
+`Host.cs` are unmodified; no restack was attempted. **No new branch and no new PR in either
+repository**; only PR **#6** is refreshed, and it **stays draft** — the android repo is
+never-self-merge. **Nothing merged, closed, undrafted, force-pushed, rebased or deleted** in either
+repo; **no history rewritten**. **No blocker filed and none closed** — nothing new blocks, and a
+phantom blocker costs the next session a hunt. **No schedule created, modified or deleted.** **No
+deploys of any kind; the production relay was not contacted at all**, not even `GET /v1/health`. No
+Play/Google/OAuth console, no accounts, no purchases, no Gmail; **no secret read, printed or
+echoed**, no `.appdata`. **No machine change this run** — nothing was installed. One transient
+`git worktree` under scratch at the pin, **removed at end of run**. Terra's `autonomy/codex-state`
+was **read before any write**: **COMPLETE, next intent none, files claimed: none** — **no
+collision**; right-of-way respected. Files written this run: `LOG.md`, `AUDIT-REQUEST.md`,
+`BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the engine repo.
