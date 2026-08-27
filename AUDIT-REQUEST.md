@@ -19860,3 +19860,92 @@ STARTED"; a gate result — **no**, none reachable and none claimed. Trigger 5 a
 restated it needs a finding about the product, the protocol or the board **and** one not already
 written down: this run's candidate is a **rediscovery** (C-109-5), and **C-109-3 and C-109-4 are
 both greens — negative results, not findings**. **Nothing sent; twelfth message withheld.**
+
+### C-110-1 — ground state, and the assigned slice re-derived from the spec text (seventy-fifth decline)
+
+```bash
+cd <android> && git fetch --all --prune && git -C <engine> fetch --all --prune
+git checkout -B claude/android-a0-probe origin/claude/android-a0-probe   # main is STALE
+bash scripts/run-zero.sh <engine>                        # expect: NOTHING MOVED, exit 0
+cd <engine>
+git show origin/claude/s5-entitlement-ack-spec:docs/Sync-Protocol.md \
+  | grep -n 'product_id\|acknowledged_at\|order_id\|MiB\|ciphertext\|decrypt_failed'
+git diff --stat origin/main...origin/claude/s5-entitlement-ack-spec
+git ls-tree origin/claude/s5-engine-wire-parser docs/sync-vectors/v1/ --name-only \
+  | grep -i 'unknown-field\|entitlement-ack'
+git worktree add /tmp/s5wp origin/claude/s5-engine-wire-parser \
+  && cd /tmp/s5wp && node docs/sync-vectors/generate.mjs --check
+```
+
+*Expected, and **observed**:* `run-zero.sh` → **`NOTHING MOVED`, exit 0**; corpus **29/29**
+byte-identical to pin **`7328a0b`**; citations **998 defined / 999 cited / 1 documented-absent**;
+`fleet-probe.sh plan` **ROT 0 / UNPLANNED 2**; engine `main` **`aac05f3`**, android `main`
+**`ebfaf81`**, both unmoved. §4.3 reads `{product_id, acknowledged_at, order_id?}` at **`:318-320`**
+with `order_id` **OPTIONAL** (**`:334`**, *"optional because it is Play correspondence data, not
+authorisation"*); the 1 MiB cap is on the **decoded ciphertext** at **`:111-112`** and says
+**"Amended in S5 (PQ-A2-1)"** at **`:132`**; structural rejection reports **`decrypt_failed`** at
+**`:103`**, with v1 **deliberately not** adding a `malformed` code (**`:103-105`**);
+**`invalid-unknown-field.json`** is present on `claude/s5-engine-wire-parser` and **absent from
+`main`**. `--check` → **`OK: 29 vector files match the generator.`**, exit **0**. **The assigned
+slice is built; declined for the seventy-fifth time.** The prompt's pin `679a317` and its
+"S5 … NOT STARTED" are **both stale**.
+
+*Note for the next session:* the android checkout arrives **detached at `main`**, and `main` is
+**stale** — verify with
+`git rev-list --left-right --count origin/claude/android-a0-probe...origin/main` → **398 10**.
+Take every android count on the work branch.
+
+### C-110-2 — the board, unmoved
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected, and **observed**:* **22 engine open** (#26, #32–#39, #45–#57) **+ 6 android open**
+(#1–#6) = **28**, **every row `draft:true`**. Newest merge anywhere is engine **#44**, `merged_at`
+**2026-08-13T02:28:21Z** — **fourteen days** to 2026-08-27. PR **#32** ("S5 (first half): the
+`entitlement_ack` body, PQ-A2-1/-2…") is the assigned slice's own draft, open since **2026-08-09**.
+Use `merged_at` or the commit graph, **never** the rows' `merged` field (**C-89-2**).
+
+### C-110-3 — the predecessor tip is GREEN, for the third consecutive firing
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android \
+  resource_id=ci.yml workflow_runs_filter={"branch":"claude/android-a0-probe"} per_page=6
+```
+
+*Expected, and **observed**:* the newest run is **270**, `head_sha` **`7687fc3`** — **run 109's own
+head** — `status` `completed`, `conclusion` **`success`**. With **269** (`c38c854`) and **268**
+(`aef82f7`) also `success`, that is **three consecutive greens** after run 107's red at **267**,
+supporting **C-107-7's partition** (**B-22 intermittent at run 75's rate, not a decaying gate**).
+Match on `head_sha` and read `conclusion`; treat **`cancelled` as *no evidence*, never as the tip's
+result** (**C-107-6**). Name the **ref**, never a sha (**C-106-8**) — the commit recording a sha
+moves the tip past it. **No CI result is claimable for the current run's own head**, structurally.
+
+### C-110-4 — B-18 attempt 2 is closed as impossible from here, on the tool contract
+
+```
+CronList          # expect: "No scheduled jobs."
+```
+Then read the tool descriptions themselves (they ship with the harness, not the repo):
+`CronList` — *"List all cron jobs scheduled via **CronCreate in this session**."*
+`CronDelete` — *"Cancel a cron job previously scheduled with CronCreate. Removes it from the
+**in-memory session store**."*
+
+*Expected, and **observed**:* **`No scheduled jobs.`**, unchanged from runs 99 and 108. **The
+refinement is what makes that result load-bearing.** An empty listing is **ambiguous alone** — it
+reads identically whether the schedule is out of reach or whether none exists anywhere. The two
+descriptions remove the ambiguity: the tools address a **per-session, in-memory** store, the firing
+schedule was created **outside** this session, and therefore **no agent-side call can enumerate or
+cancel it**. B-18 attempt 2 is thus **not "untested" and not "inconclusive" — it is impossible from
+here**, established on the contract rather than inferred from a negative. **Records-side
+refinement, not a product finding: filed, never sent** (**C-106-7**).
+
+*Observed run 110:* the **ESCALATION LEDGER** stands at **10** (runs 53, 57, 60, 65, 73, 81, 86,
+91, 99, 100), all producing **zero repo events**. Run 82's four state triggers: `main` moving —
+**no**, both unmoved (C-110-1); a PR merged or undrafted — **no**, 28 open and all draft
+(C-110-2); the stored prompt changing — **no**, same text, same stale `679a317`, same "S5 … NOT
+STARTED"; a gate result — **no**, none reachable and none claimed. Trigger 5 per **C-106-7** needs
+a finding about the product, the protocol or the board: **C-110-3 is a green** (a negative result,
+not a finding) and **C-110-4 is records hygiene**. **Nothing sent; eleventh message withheld.**
