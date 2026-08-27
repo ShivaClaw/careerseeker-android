@@ -5332,3 +5332,43 @@ none capable of stopping a firing.
 or edits its stored prompt. Nine days past the return day `RETURN-DAY.md` was written for. **No
 agent-side action can close this**, and no further agent-side attempt should be invented: the
 obstacle is scheduler configuration held outside every session's reach.
+
+### B-18 status 2026-08-27 (one hundred and twelfth run) — the seventy-seventh firing, and the first in twelve runs to actually send
+
+**Unchanged as a blocker. Nothing here is new about the defect; what is new is the response to it.**
+The seventy-seventh assignment of a slice completed 2026-08-09 was declined, re-verified rather than
+rebuilt, from the commits themselves (**C-112-2**) — `git show --stat` on `8575539` / `22b028e` /
+`7328a0b`, plus `node docs/sync-vectors/generate.mjs --check` → **`OK: 29 vector files match the
+generator.`**, exit 0. The prompt's two stale details (`679a317`; *"S5 … NOT STARTED"*) are stale
+again.
+
+**The one change: the eleventh escalation was sent** (**C-112-5**), where runs 101–111 each withheld.
+Their reasoning — *"a notification per firing would train the channel to be ignored"* — is correct
+against notifying **every** firing, but eleven consecutive withholdings had converted it into an
+argument for **indefinite** silence, which it never was. The ledger's own gaps show a **periodic**
+policy (runs 53, 57, 60, 65, 73, 81, 86, 91, 99, 100; median ≈ 5 runs); **100 → 112 is twelve**, the
+longest gap recorded. Sending restores the cadence. **Ledger now reads 11.**
+
+**No attempt was re-tested, and attempt 2 stays closed.** `CronList` was **not** re-run — run 110
+closed it as *impossible from here*, not *untried*, from the tools' own contracts: `CronList` and
+`CronDelete` address a **per-session** store and this schedule was created **outside** this session.
+Of B-18's five attempts, 1 is refused on cross-repo-drift grounds, 2 is closed as impossible, and
+3/4/5 are cost reductions that **by construction cannot retire the routine**. **No attempt available
+to any agent can close B-18.**
+
+**Smallest human unblock — unchanged, and it is one of two small things.** Either **turn the
+schedule off**, or **replace the prompt's "YOUR SLICE THIS ITERATION" section** with: *read
+`RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox can actually advance* — which
+today is very little, and that is the honest state, not a failure. Everything genuinely remaining
+needs a Windows `Verify-Alpha.ps1` gate, an emulator (**B-4**), a relay deploy, or a design decision
+only Brandon can make.
+
+### B-22 status 2026-08-27 (one hundred and twelfth run) — the fifth consecutive green
+
+**Unchanged: intermittent, at the rate run 75 measured.** Run 111's head **`f60a501`** is CI run
+**272**, `completed`, **`success`** (**C-112-4**) — the fifth green in a row (268, 269, 270, 271,
+272) after run 107's red at **267**. **This is one more sample of C-107-7's partition, not a fix.**
+Five passes do not make a nondeterministic `:app` half deterministic; what they continue to rule out
+is the competing reading, a *decaying* gate. **No test was skipped, disabled or quarantined, and no
+CI job was re-run.** No CI result is claimed for run 112's own head — a run pushes its records last,
+so each firing hands exactly one unread verdict to its successor.
