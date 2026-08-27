@@ -18337,3 +18337,91 @@ change** — no package installed this run. The engine checkout was **read-only*
 branch was created in it. Terra's `autonomy/codex-state` was **read before any write**: **COMPLETE,
 files claimed: none** — **no collision**. Files written this run: `LOG.md`, `AUDIT-REQUEST.md`,
 `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the engine repo.
+
+---
+
+## Run 108 — 2026-08-27 (Linux cloud sandbox). Nothing moved — and the predecessor tip that came back red at run 107 came back green at the next observation
+
+**Rule one first.** `git fetch --all --prune` in both checkouts before any count; every number below
+is post-fetch. The android tree again arrived **detached at the docs-only `main`** (`ebfaf81`), 395
+commits behind the work branch.
+
+**Milestone 1 — ground state, and the assigned slice declined for the seventy-third time**
+(**C-108-1**). `scripts/run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**: pin **`7328a0b`**
+unchanged and still off `main`, `OK: 29 vector files match the generator.`, corpus **29/29**
+byte-identical, citations **986/987/1**, `fleet-probe.sh plan` **ROT 0 / UNPLANNED 2**, both `main`s
+unmoved. The slice was then **re-derived by hand rather than cited**: `8575539` (spec only,
+**+114/−3**), `22b028e` (both ack vectors + `index.json` + `generate.mjs`), `7328a0b`
+(`invalid-unknown-field.json`); `--check` on the branch that carries them → **`OK: 29 …`, exit 0**;
+`diff -r` against the vendored corpus → **no output, exit 0, 29 files**. The prompt's pin `679a317`
+and its "S5 … NOT STARTED" are **both still stale**. **Board unmoved** (**C-108-2**): **22 engine +
+6 android open, every row `draft:true`**, newest merge anywhere still **#44, 2026-08-13** —
+**fourteen days**.
+
+**Milestone 2 — the one thing this run learned that no prior run could have** (**C-108-3**). Run 107
+ended on the first **red** predecessor-tip check in these records and an open question underneath it:
+was the gate decaying? C-106-8's assigned check, run here at C-107-6's refinement — match `head_sha`,
+read `conclusion`, treat `cancelled` as *no evidence* — answers it. The predecessor tip
+**`aef82f7`**, which is run 107's own head, is CI run **268**, `completed`, **`success`**. Runs 265
+and 266 stay `cancelled`; 267 (`72508c5`) stays `failure`.
+
+**This is new information for a structural reason, not a lucky one.** A run pushes its records last,
+so its own tip's CI is always younger than anything that run can read — run 107 **could not** have
+seen this, and each firing inherits exactly one unobserved verdict from its predecessor. The green
+does not refute run 107: it is the second data point **C-107-7**'s partition predicted, consistent
+with **B-22 firing intermittently at about the rate run 75 measured**, and it is the reason a red
+predecessor tip must not be written up as a regression on one reading. **No CI result is claimed for
+this run's own head.**
+
+**Milestone 3 — B-18's premise, tested with this run's own hands** (**C-108-4**). `CronList` →
+**`No scheduled jobs.`** The tool sees only jobs created in-session; this routine is account-level
+configuration and is not reachable from here. The premise holds and **the smallest human unblock is
+unchanged: a human stops the schedule.** Re-run rather than cited, deliberately — C-99-2's whole
+finding was that this claim had been asserted for fifty runs with no command behind it.
+
+**Milestone 4 — a candidate, and the precondition that killed it** (**C-108-5**). `fleet-probe.sh
+plan` prints **`UNPLANNED: 2`** and asks the reader to check the rows against the open-PR set. The
+two rows are **not** the same case: `p4-entitlement`'s PR #8 is closed, but
+**`s6-resume-reconciliation` has an open draft PR, #53** — a leaf carrying live engine work that the
+landing plan does not name, which reads like a real gap in RETURN-DAY §3. **Two commands withdrew
+it.** RETURN-DAY §3's **Step 0 is titled "decide PR #53"** and recommends it be **closed or reduced**
+— the plan does not fail to name that leaf, it **deliberately excludes** it, which is precisely the
+case the guard's own output calls expected. And **run 98 had already opened both rows**
+(**C-98-5**, against **C-89-4**/**C-89-5**). **Fourteenth candidate rejected across runs 96–108.**
+An exhausted lane is exactly the condition under which a rediscovery looks like a finding
+(**C-97-8**), and the standing precondition is what catches it.
+
+**Milestone 5 — no eleventh message** (**C-108-6**). The ledger stands at **10** (runs 53, 57, 60,
+65, 73, 81, 86, 91, 99, 100), all with the same correct recommendation, all producing **zero repo
+events**. Run 82's four state triggers are **all negative**, each checked this run rather than
+carried. Trigger 5 as **C-106-7** restated it requires a finding about the product, the protocol or
+the board *and* one not already written down — this run's candidate is a rediscovery, and
+**C-108-3 is a green, which is a negative result and not a finding**. **Nothing sent; twelfth
+message withheld.** The channel is the one thing B-18 cannot afford to spend on an unchanged fact.
+
+**Prohibition — what this run did NOT touch.** **No rung moved.** **Not one byte of production
+source in either repository** — no `.kt`, `.cs`, `.ts`, `.kts`, `.ps1`, `.mjs` or workflow file; the
+prompt forbids the two appliers and this machine cannot compile them, so they are left for a local
+session, exactly as the prompt instructs. **No gate was run and none is claimed**: `dotnet`, `pwsh`,
+`sdkmanager`, `avdmanager`, `emulator`, `adb` and `gh` are **ABSENT** and `ANDROID_HOME` is
+**UNSET**; neither `scripts\Verify-Alpha.ps1` nor the five-task android command was reachable, and
+**`:core:test` did NOT run this iteration** — run 101's `348/0/22` is **not** carried forward as this
+run's. Every CI result cited here was **read out of the runner's own fields**, not produced here.
+**No CI job was re-run, and no test was skipped, disabled or quarantined** — B-22 was left exactly as
+it is. **No vector byte was written and the pin `7328a0b` is untouched**; `generate.mjs` was
+**invoked read-only** (`--check`, twice: once by `run-zero.sh` and once by hand) and **not edited**.
+**No spec byte**: `docs/Sync-Protocol.md` was read only, in both repositories. **No pinch point
+touched** — `$ExpectedOfflineTotal`, the count-reporting docs and `Host.cs` are unmodified; no
+restack was attempted. **No new branch and no new PR in either repository**; only PR **#6** is
+refreshed, and it **stays draft** — the android repo is never-self-merge. **Nothing merged, closed,
+undrafted, force-pushed, rebased or deleted** in either repo; no history rewritten. **No blocker
+filed and none closed** — `BLOCKED.md` is deliberately unchanged, because nothing new blocks and a
+phantom blocker costs the next session a hunt. **No schedule created, modified or deleted** —
+`CronList` was a read. **No deploys of any kind; the production relay was not contacted at all**, not
+even `GET /v1/health`. No Play/Google/OAuth console, no accounts, no purchases, no Gmail; **no secret
+read, printed or echoed**, no `.appdata`. **No machine change** — no package was installed this run.
+The engine checkout was **read-only** apart from the local throwaway ref `s5-check`, which was never
+pushed and exists only in this ephemeral container. Terra's `autonomy/codex-state` was **read before
+any write**: **COMPLETE, files claimed: none** — **no collision**. Files written this run:
+`LOG.md`, `AUDIT-REQUEST.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the engine
+repo.
