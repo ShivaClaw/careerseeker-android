@@ -19745,3 +19745,118 @@ result — **no**, no gate is reachable here and none is claimed. Trigger 5 as C
 needs a finding about the product, the protocol or the board **and** one not already written down:
 this run's candidate is a **rediscovery** (C-108-5), and **C-108-3 is a green — a negative result,
 not a finding**. **Nothing sent; twelfth message withheld.**
+
+---
+
+## Run 109 — 2026-08-27
+
+### C-109-1 — ground state, and the assigned slice re-derived from the spec text
+
+```bash
+cd <android> && git fetch --all --prune && git -C <engine> fetch --all --prune
+bash scripts/run-zero.sh <engine>                       # expect: NOTHING MOVED, exit 0
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  git rev-parse --verify $c^{commit}
+  git merge-base --is-ancestor $c origin/main && echo "ON MAIN" || echo "off main"
+done
+git show 7328a0b:docs/Sync-Protocol.md | sed -n '307,345p'   # PQ-A6-1 body
+git show 7328a0b:docs/Sync-Protocol.md | grep -n 'MiB'       # PQ-A2-1  -> :112 :132 :656
+git show 7328a0b:docs/Sync-Protocol.md | grep -n decrypt_failed  # PQ-A2-2 -> :103 :601 :657
+git worktree add --detach /tmp/s5pin 7328a0b && cd /tmp/s5pin \
+  && node docs/sync-vectors/generate.mjs --check           # PQ-A2-3 corpus
+```
+
+*Expected, and **observed**:* `run-zero.sh` → **`NOTHING MOVED`, exit 0**; corpus **29/29**
+byte-identical to pin `7328a0b`; citations **992 defined / 993 cited / 1 documented-absent**;
+`fleet-probe.sh plan` **ROT 0 / UNPLANNED 2**; engine `main` **`aac05f3`**, android `main`
+**`ebfaf81`**, both unmoved. All three commits **resolve**; all three print **`off main`**. §4.3.3
+reads `{product_id, acknowledged_at, order_id?}` with **`order_id` OPTIONAL** and "**There is no
+negative form**". The cap is on the **decoded ciphertext**. Structural rejection reports
+**`decrypt_failed`**, with **no `malformed` code added**. `--check` → **`OK: 29 vector files match
+the generator.`**, exit **0**. **The assigned slice is built; declined for the seventy-fourth
+time.** The prompt's pin `679a317` and its "S5 … NOT STARTED" are **both stale**.
+
+*Note for the next session:* the android checkout arrives **detached at `main`**, and `main` is
+**stale** — `claude/android-a0-probe` is **398 ahead / 10 behind** it. Verify with
+`git rev-list --left-right --count origin/claude/android-a0-probe...origin/main`. Take every
+android count on the work branch.
+
+### C-109-2 — the board, unmoved
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected, and **observed**:* **22 engine open** (#26, #32–#39, #45–#57) + **6 android open**
+(#1–#6) = **28**, **every row `draft:true`**. Newest merge anywhere is engine **#44**, `merged_at`
+**2026-08-13T02:28:21Z** — **fourteen days** to 2026-08-27. Use `merged_at` or the commit graph,
+**never** the rows' `merged` field (**C-89-2**).
+
+### C-109-3 — the predecessor tip is GREEN, for the second consecutive firing
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android \
+  resource_id=ci.yml workflow_runs_filter={"branch":"claude/android-a0-probe"}
+```
+
+*Expected, and **observed**:* run **269**, `head_sha` **`c38c854`** — run 108's own head, and the
+tip of the ref `origin/claude/android-a0-probe` as fetched at the start of run 109 — `completed`,
+**`success`**. Run **268** (`aef82f7`) `success`; **267** (`72508c5`) `failure` (B-22); **265**/**266**
+`cancelled`.
+
+**Read this the way C-107-6 says.** Match on **`head_sha`**, read **`conclusion`**, and treat
+**`cancelled` as *no evidence*** — never as the tip's verdict. Name the **ref**, never a sha
+(**C-106-8**): the commit that records a sha moves the tip past it. Two greens in a row after 267's
+red is the second data point **C-107-7**'s partition predicted — **B-22 intermittent, not a
+regression**. **No CI result is claimed for run 109's own head**, which is structural: a run pushes
+its records last.
+
+### C-109-4 — `:core:test`, run rather than inherited after three firings skipped it
+
+```bash
+cd <android>
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+bash scripts/core-probe.sh --rerun
+grep -n 'core-probe\|core:test' LOG.md | tail -25      # shows 106/107/108 each skipped it
+```
+
+*Expected, and **observed**:* **`BUILD SUCCESSFUL`**, then
+**`core-probe: 348 tests, 0 failed, 0 skipped, across 22 classes`**, exit **0** — **matching the
+run-101 and run-105 baselines exactly**. Covers `EntitlementAckTest`, `EntitlementVectorsTest`,
+`ProtocolVectorsTest`, `VectorCorpusCoverageTest` and `SyncCryptoTest`.
+
+**This is ONE of the android gate's five tasks.** `checkCoreIsAndroidFree`, `:app:test`,
+`:app:assembleDebug` and `:app:lintDebug` did **not** run and **no result is claimed** for them. Do
+not report a gate result on the strength of this line — `core-probe.sh`'s own header says so.
+
+### C-109-5 — the fifteenth candidate, withdrawn by the script's own error message
+
+```bash
+sed -n '60,78p' scripts/core-probe.sh
+```
+
+*The draft:* `apt-get install -y openjdk-17-jdk-headless` on a fresh container **fails**, exit
+**100**, **`404 Not Found`** on `openjdk-17-jre-headless` and `openjdk-17-jdk-headless` — a stale
+index naming a superseded version. `apt-get update` first, then the same install, → exit **0**.
+Since Milestone 4 is the only gate-fragment this environment can still reach, a broken remediation
+on its one prerequisite reads like a real defect.
+
+*Withdrawn, by the one command beside it:* **`scripts/core-probe.sh:70-74` already prescribes**
+`apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless`, and
+already carries the parenthetical **"(apt-get install alone may 404 against a stale index; the
+update is not optional.)"** A prior run found this and wrote it down. **Not new. Fifteenth
+candidate rejected across runs 96–109.** The procedural lesson is the part worth keeping: this run
+improvised an install **before reading the message the script prints for exactly that failure**.
+
+### C-109-6 — no eleventh message
+
+*Observed run 109:* the **ESCALATION LEDGER** stands at **10** (runs 53, 57, 60, 65, 73, 81, 86,
+91, 99, 100), all producing **zero repo events**. Run 82's four state triggers: `main` moving —
+**no**, both unmoved (C-109-1); a PR merged or undrafted — **no**, 28 open and all draft
+(C-109-2); the stored prompt changing — **no**, same text, same stale `679a317`, same "S5 … NOT
+STARTED"; a gate result — **no**, none reachable and none claimed. Trigger 5 as **C-106-7**
+restated it needs a finding about the product, the protocol or the board **and** one not already
+written down: this run's candidate is a **rediscovery** (C-109-5), and **C-109-3 and C-109-4 are
+both greens — negative results, not findings**. **Nothing sent; twelfth message withheld.**
