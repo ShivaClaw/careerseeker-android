@@ -20079,3 +20079,134 @@ cd <engine> && git show origin/autonomy/codex-state:STATE.md | head -12
 branch is claimed"*, **Files claimed: none**, fresh integration base `origin/main` = `aac05f3`.
 Read **before** any write, per right-of-way. **No collision:** this run wrote no engine file except
 the `autonomy/claude-state` heartbeat, which is docs-only and never merged.
+
+---
+
+## Run 112 (2026-08-27) — re-verification commands
+
+Every command below is to be run **after** `git fetch --all --prune` in **both** checkouts. That is
+rule one; a count taken before it is stale by construction.
+
+### C-112-1 — ground state in one command: NOTHING MOVED
+
+```bash
+cd <android> && bash scripts/run-zero.sh <engine>; echo "exit=$?"
+```
+
+*Expected, and **observed** this run:* final line **`NOTHING MOVED on every check this sandbox can
+run, and all three guards are green.`**, `exit=0`. Within it: pin **`7328a0b`**, **NOT an ancestor
+of `origin/main`**; **`OK: 29 vector files match the generator.`**; `vendored: 29 files    at pin: 29
+files` and the byte-identical assertion; citations **1008 defined / 1009 cited / 1
+documented-absent**; `ROT: 0   UNPLANNED: 2`; engine main **`aac05f3`** and android main
+**`ebfaf81`**, both **unmoved**; and the toolchain block showing `dotnet`, `pwsh`, `sdkmanager`,
+`avdmanager`, `emulator`, `adb`, `gh` **ABSENT**, `ANDROID_HOME` **UNSET**.
+
+**Why this command and not the records:** it re-derives the whole banner from both repositories in
+seconds. If it prints `NOTHING MOVED`, no claim in this section needs re-reading to be trusted.
+
+### C-112-2 — the assigned slice is built, for the seventy-seventh consecutive run
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  echo "== $c =="; git log -1 --format='%ad  %s' $c
+  git show --stat --format='' $c
+done
+```
+
+*Expected, and **observed**:* `8575539` (2026-08-09) touches **`docs/Sync-Protocol.md` only,
+`1 file changed, 114 insertions(+), 3 deletions(-)`**; `22b028e` (2026-08-09) shows
+`4 files changed, 117 insertions(+), 1 deletion(-)` across `generate.mjs`,
+`v1/entitlement-ack.json`, `v1/entitlement-ack-no-order-id.json`, `v1/index.json`; `7328a0b`
+(2026-08-12) shows `3 files changed, 60 insertions(+)` across `generate.mjs`, `v1/index.json`,
+`v1/invalid-unknown-field.json`.
+
+That the vectors are **generator output** rather than hand-written is the load-bearing half, and it
+is checked on the branch that **carries** them, never on `main`, which has none of them:
+
+```bash
+cd <engine> && git worktree add /tmp/s5-check 7328a0b
+cd /tmp/s5-check && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+cd <engine> && git worktree remove /tmp/s5-check
+```
+
+*Expected, and **observed**:* **`OK: 29 vector files match the generator.`**, `exit=0`.
+
+**This is a re-verification, not a build instruction.** The work is **unmerged, not unwritten**:
+
+```bash
+cd <engine> && git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l   # -> 26
+```
+
+26 on `main` + the 3 added off-main = the 29 above. The 28 open PRs are unmerged because the merge
+condition is a full local `Verify-Alpha.ps1`, which no cloud session can run (**C-LAND-7**,
+**C-ENV-1**). **Building it again would duplicate `8575539` and put a regenerated corpus next to the
+one the android repo vendors at `7328a0b` — a cross-repo drift event by the prompt's own definition.**
+
+### C-112-3 — the board: 28 open, every row draft, nothing merged in fourteen days
+
+Through the GitHub MCP server (no `gh` binary exists in this container; that is **not** the same as
+having no API path — see **C-99-1**):
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all perPage=100
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=open perPage=30
+```
+
+*Expected, and **observed**:* **22 engine open + 6 android open = 28**, **every row `draft:true`**.
+Newest `merged_at` anywhere is engine **#44** at **`2026-08-13T02:28:21Z`**. PR **#32**
+(`claude/s5-entitlement-ack-spec`) — the assigned slice's own draft — open with
+`updated_at` **`2026-08-09T21:15:59Z`**.
+
+**Read `merged_at`, never the rows' `merged` field** (**C-89-2**): the list rows report
+`merged:false` even for PRs that demonstrably merged.
+
+### C-112-4 — the inherited verdict: run 111's head is green, the fifth consecutively
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android
+             per_page=6 workflow_runs_filter={"branch":"claude/android-a0-probe"}
+```
+
+*Expected, and **observed**:* the newest row has `head_sha` **`f60a50184376027ff2a1a1b7f13243dd5b52b6e2`**
+(run 111's own head), `run_number` **272**, `status` **`completed`**, `conclusion` **`success`**.
+
+Match on **`head_sha`**, and read `conclusion` from the runner's own field — not from a PR summary.
+This is the **fifth consecutive green** (268, 269, 270, 271, 272) after run 107's red at **267**, and
+it is **one more sample of C-107-7's partition, not a new finding**: **B-22 is intermittent at the
+rate run 75 measured**, neither a regression nor a decaying gate. **Five greens are not a fix.**
+**No CI result is claimed for run 112's own head** — a run pushes its records last, so every firing
+hands exactly one unread verdict to its successor.
+
+### C-112-5 — the eleventh escalation was sent, and the ledger reads 11
+
+The ledger is **canonical on the line, not countable from markers**:
+
+```bash
+cd <android> && grep -n 'Messages sent:' STATE.md | head -3
+```
+
+*Expected, and **observed** after this run's push:* the newest banner reads **`Messages sent: 11.`**
+with runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112**.
+
+**What is verifiable here and what is not.** That the message was **sent** is verifiable only from
+this run's transcript and this ledger line; a notification leaves no repo artifact, and **a sent
+notification is not a read one** (the standing caveat, first recorded at run 81). What **is**
+independently checkable is the **premise** — that ten prior messages produced no repo event:
+
+```bash
+cd <engine> && git log -1 --format='%ad' origin/main    # -> 2026-08-12, unmoved
+cd <android> && git log -1 --format='%ad' origin/main   # -> 2026-08-06, unmoved
+```
+
+Both mains unmoved across the ledger's whole span, with the board still 28 open drafts (**C-112-3**),
+is the evidence that no escalation has yet produced an event.
+
+**The reasoning is recorded as a judgement, not a discovery.** Runs 101–111 withheld on *"a
+notification per firing would train the channel to be ignored"* — sound against **every** firing,
+not an argument for **indefinite** silence. The ledger's own gaps show the intended policy was
+**periodic** (median ≈ 5 runs); **100 → 112 is twelve**, the longest gap in it. Sending restores that
+cadence. **B-18 is unchanged and no attempt was re-tested** — in particular `CronList` was **not**
+re-run: run 110 closed that attempt as **impossible from here** from the tools' own contracts
+(`CronList`/`CronDelete` address a **per-session** store; this schedule was created outside this
+session). **Do not re-test it hoping for a different answer.**
