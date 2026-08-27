@@ -20210,3 +20210,151 @@ cadence. **B-18 is unchanged and no attempt was re-tested** — in particular `C
 re-run: run 110 closed that attempt as **impossible from here** from the tools' own contracts
 (`CronList`/`CronDelete` address a **per-session** store; this schedule was created outside this
 session). **Do not re-test it hoping for a different answer.**
+
+---
+
+## Run 113 (2026-08-27) — re-verification commands
+
+Every command below is to be run **after** `git fetch --all --prune` in **both** checkouts. That is
+rule one; a count taken before it is stale by construction.
+
+### C-113-1 — ground state in one command: NOTHING MOVED
+
+```bash
+cd <android> && bash scripts/run-zero.sh <engine>; echo "exit=$?"
+```
+
+*Expected, and **observed** this run:* final line **`NOTHING MOVED on every check this sandbox can
+run, and all three guards are green.`**, `exit=0`. Within it: pin **`7328a0b`**, **NOT an ancestor
+of `origin/main`**; **`OK: 29 vector files match the generator.`**; `vendored: 29 files    at pin: 29
+files` and the byte-identical assertion; citations **1013 defined / 1014 cited / 1
+documented-absent**; `ROT: 0   UNPLANNED: 2`; engine main **`aac05f3`** and android main
+**`ebfaf81`**, both **unmoved**; and the toolchain block showing `dotnet`, `pwsh`, `sdkmanager`,
+`avdmanager`, `emulator`, `adb`, `gh` **ABSENT**, `ANDROID_HOME` **UNSET**.
+
+**Why this command and not the records:** it re-derives the whole banner from both repositories in
+seconds. If it prints `NOTHING MOVED`, no claim in this section needs re-reading to be trusted.
+
+**Note on the citation counts.** They move whenever a run appends records that cite ids. `1013 /
+1014 / 1` is this run's *pre-append* reading; a later run will read a higher pair. The guard's
+assertion — *every cited id resolves* — is what is load-bearing, not the absolute numbers.
+
+### C-113-2 — the assigned slice is built, for the seventy-eighth consecutive run
+
+Read from the spec text on the branches that carry it, not from these records. `main` has none of
+it, so every command names a branch:
+
+```bash
+cd <engine>
+git grep -n "4.3.3 Entitlement acknowledgement body" origin/claude/s5-entitlement-ack-spec -- docs/Sync-Protocol.md
+git grep -n "PQ-A6-1\|PQ-A2-1\|PQ-A2-2" origin/claude/s5-entitlement-ack-spec -- docs/Sync-Protocol.md
+git grep -n "PQ-A2-3" origin/claude/s5-engine-wire-parser -- docs/Sync-Protocol.md
+git ls-tree -r --name-only origin/claude/s5-engine-wire-parser -- docs/sync-vectors/v1/ | grep -E "entitlement-ack|invalid-unknown-field"
+```
+
+*Expected, and **observed**:* §4.3.3 at **line 307** with the body at **line 317**, carrying
+*"Decided 2026-08-07 (gate PQ-A6-1, default-proceed)"* and
+`{product_id, acknowledged_at, order_id?}` with `order_id` **OPTIONAL** — **PQ-A6-1 closed**;
+**line 132** *"Amended in S5 (PQ-A2-1)"*, the 1 MiB cap on the **decoded ciphertext** — **PQ-A2-1
+closed**; **line 106** *"Amended in S5 (PQ-A2-2)"*, structural rejection reporting **`decrypt_failed`**
+with **no `malformed` code added** — **PQ-A2-2 closed**; **line 705** *"Added in S5 (PQ-A2-3)"* and
+the file `docs/sync-vectors/v1/invalid-unknown-field.json` present in the tree — **PQ-A2-3 closed,
+B-6 closed**. The listing also returns `entitlement-ack.json` and `entitlement-ack-no-order-id.json`.
+
+**All four gates the recurring prompt assigns are therefore already closed**, on commits pushed
+2026-08-09 (`8575539`, `22b028e`) and 2026-08-12 (`7328a0b`).
+
+That the vectors are **generator output** rather than hand-written is the load-bearing half, and it
+is checked on the branch that **carries** them:
+
+```bash
+cd <engine> && git worktree add --detach /tmp/s5-check 7328a0b
+cd /tmp/s5-check && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+cd <engine> && git worktree remove /tmp/s5-check
+```
+
+*Expected, and **observed** with this run's own hands:* **`OK: 29 vector files match the
+generator.`**, `exit=0`. **`--check` only; the generator was never invoked in write mode**, so no
+vector byte moved and the corpus this repository vendors at `7328a0b` is untouched.
+
+**The two stale details in the stored prompt, checkable in one line each:**
+
+```bash
+cd <android> && grep -n "679a317" VECTORS.lock scripts/run-zero.sh | head   # real pin is 7328a0b
+```
+
+*Expected:* the prompt's `679a317` matches nothing that governs the corpus; the pin of record is
+**`7328a0b`** (C-113-1). The prompt's *"S5 … NOT STARTED"* is refuted by every command above.
+
+### C-113-3 — the board: 28 open, every row draft, nothing merged in fourteen days
+
+`run-zero.sh` §6 prints these as MANUAL because a shell script cannot reach the GitHub MCP server.
+It is explicit that this is the **script's** limit and not the session's, and instructs a run to try
+before deferring. This run tried:
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected, and **observed**:* **22 engine open** (#26, #32–#39, #45–#57) + **6 android open**
+(#1–#6) = **28**, **every row `draft:true`**. Newest merge anywhere is engine **#44**, `merged_at`
+**2026-08-13T02:28:21Z**. PR **#32** — the assigned slice's own draft — open since **2026-08-09**.
+
+**Read `merged_at`, never the rows' `merged` field**, per **C-89-2**: that field reads `false` even
+for PRs that demonstrably merged.
+
+### C-113-4 — the inherited verdict: run 112's head is CI 273, green, the sixth consecutive
+
+A run pushes its records last, so no run can observe CI on its own tip. Each firing hands exactly
+one unread verdict to its successor; this collects run 112's.
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android
+             workflow_runs_filter={"branch":"claude/android-a0-probe"} per_page=8
+```
+
+*Expected, and **observed**:* the row whose `head_sha` is **`eff711d5a0800926f1f2de9cdc57a48e8ddc9fe0`**
+— run 112's head — is `run_number` **273**, `status` **`completed`**, `conclusion` **`success`**,
+`created_at` **2026-08-27T17:04:03Z**. **Match on `head_sha`, never on position in the list.**
+
+Walking back gives the streak: **268 `aef82f7`, 269 `c38c854`, 270 `7687fc3`, 271 `c7f4ad9`,
+272 `f60a501`, 273 `eff711d`** — **six consecutive greens** after run 107's red at **267**.
+
+**What this is and is not.** It is **one more sample of C-107-7's partition**: **B-22 is intermittent
+at the rate run 75 measured.** It is **not** a fix and **not** a new finding — six greens on a
+nondeterministic `:app` half are six samples, and the competing reading they rule out is a *decaying*
+gate, nothing more. **The runner ran this, not this session**; it is not `Verify-Alpha.ps1`; it does
+not retire **B-4**. **No CI job was re-run and no test skipped, disabled or quarantined.**
+
+### C-113-5 — the twelfth escalation was withheld, and the ledger stays at 11
+
+**A withheld notification leaves no artifact**, so what is checkable here is the *premise*, not the
+absence. Each of run 82's four state triggers is re-checkable by a command already in this section,
+and trigger 5 by reading what the finding was:
+
+| trigger | command | observed |
+| --- | --- | --- |
+| 1 `main` moved | C-113-1 | **negative** — `aac05f3` / `ebfaf81`, both unmoved |
+| 2 PR merged or undrafted | C-113-3 | **negative** — 28 rows, all `draft:true`; newest merge 14 days old |
+| 3 stored prompt changed | C-113-2 | **negative** — same two stale details (`679a317`, "S5 … NOT STARTED") |
+| 4 a gate result | C-113-1 toolchain block | **negative** — no gate reachable; none claimed |
+| 5 a product/protocol/board finding not already written down | C-113-4 | **negative** — a green is a *negative result* on an already-recorded partition |
+
+**The ledger, and the one argument that is new this run:**
+
+```bash
+cd <android> && grep -n "ESCALATION LEDGER" STATE.md | head -3
+```
+
+*Expected:* **`Messages sent: 11.`** Runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112**.
+**Read this line; do not count markers** — `grep -c 'NOTIFICATION SENT'` counts `NO NOTIFICATION
+SENT` too and diverges upward on any run that discusses notifying (**C-106-6**).
+
+Run 112 sent at a gap of **twelve** runs against a recorded median of about **five**, on the
+reasoning that sending **restored** a periodic cadence. That reasoning stands and is not disturbed.
+**It argues against sending now:** the gap 112 → 113 is **one**, and a cadence argument that
+justifies a send at gap twelve cannot justify one at gap one. Run 112's message was sent about
+**three hours** before this firing and is **too young to have a result**, so there is nothing yet to
+escalate about its outcome. Two messages in one afternoon is exactly the channel fatigue the policy
+exists to prevent. **Withheld. Ledger unchanged at 11.**
