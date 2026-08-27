@@ -19625,3 +19625,123 @@ not already written down: this run's candidate is about the board but is a **red
 (C-107-7), so it fails the second half. **Nothing sent.** B-22 firing again is not new grounds — it
 is a known intermittent whose blocker is already filed and whose unblock is already in the human
 queue.
+
+---
+
+## Run 108 — 2026-08-27 (Linux cloud sandbox)
+
+### C-108-1 — ground state in one command, and the assigned slice re-derived by hand
+
+```bash
+cd <android> && git fetch --all --prune && bash scripts/run-zero.sh <engine>; echo "exit=$?"
+```
+
+*Expected, and **observed** run 108:* **`NOTHING MOVED`, exit 0**. Section by section: pin
+**`7328a0bc043335491cd96a67d634e8eea2a13af9`**, unchanged and **not an ancestor of `origin/main`**;
+`OK: 29 vector files match the generator.`; vendored corpus **29 files / 29 at pin**, byte-identical;
+citations **986 definitions / 987 cited / 1 documented-absent**; `fleet-probe.sh plan`
+**6 rows / 8 leaves / ROT 0 / UNPLANNED 2**, *PLAN STILL NAMES LEAVES*; engine `main` **`aac05f3`**
+(2026-08-12) and android `main` **`ebfaf81`** (2026-08-06) **both unmoved**; toolchain `dotnet`,
+`pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` **ABSENT**, `ANDROID_HOME` **UNSET**,
+`node`/`git`/`java`/`gradle` **PRESENT**.
+
+**The slice was re-derived with this run's own hands, not inherited** — `C-STOP-1`'s command block,
+re-run:
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do git log -1 --format='%ad  %s' $c; git show --stat --format='' $c; done
+git checkout -B s5-check origin/claude/s5-entitlement-ack-emitter
+node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Observed:* `8575539` (2026-08-09) touches **`docs/Sync-Protocol.md` only, +114/−3**; `22b028e`
+adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`, `index.json` **and** `generate.mjs`;
+`7328a0b` (2026-08-12) adds `invalid-unknown-field.json`. `--check` → **`OK: 29 vector files match
+the generator.`**, **exit 0**. **`C-STOP-3` re-run independently**: `diff -r` of the pin's
+`docs/sync-vectors/v1` against the vendored corpus → **no output, exit 0, 29 files**.
+
+**Seventy-third assignment of a slice built 2026-08-09, declined.** The prompt's pin `679a317` and
+its "S5 … NOT STARTED" are both **still stale** (**C-PIN-1**).
+
+### C-108-2 — the board, both repositories, via the MCP server
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected, and **observed**:* **22 open in `careerseeker`** (#26, #32–#39, #45–#57) and **6 open in
+`careerseeker-android`** (#1–#6), **every row `draft:true`**. Newest `merged_at` anywhere is **#44,
+2026-08-13** — **fourteen days**. Read `merged_at`, never the row's `merged` field (**C-89-2**).
+Matches `run-zero.sh`'s pinned constants exactly; nothing edited.
+
+### C-108-3 — the predecessor tip is GREEN, and run 107 could not have seen it
+
+This is C-106-8's assigned check, run at C-107-6's refinement — match on **`head_sha`**, read
+**`conclusion`**, and treat `cancelled` as *no evidence*.
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android
+             resource_id=ci.yml workflow_runs_filter={"branch":"claude/android-a0-probe"}
+# then: for each run, print run_number, head_sha, status, conclusion
+git rev-parse origin/claude/android-a0-probe    # the predecessor tip, named as a ref
+```
+
+*Expected, and **observed** run 108:* the predecessor tip **`aef82f7`** — run 107's own head — is CI
+run **268**, `status: completed`, **`conclusion: success`**, `2026-08-26T21:09:37Z`, `head_sha`
+matching the ref exactly. Runs **265** (`269e72f`) and **266** (`dc1a340`) remain **`cancelled`** —
+*no evidence*, per C-107-6 — and run **267** (`72508c5`) remains **`failure`**.
+
+**This is genuinely new information and not a rediscovery**, for a structural reason C-106-8 names:
+a run pushes its records last, so its own tip's CI is always younger than anything that run could
+read. Run 107 reported the first-ever **red** predecessor check and left open whether the gate was
+decaying; **the very next observation of the very next tip is green.** It does not refute run 107 —
+it is the second data point C-107-7's partition predicted, and it is consistent with **B-22 being
+intermittent at roughly the rate run 75 measured**, not a regression. **No CI result is claimed for
+run 108's own head.**
+
+### C-108-4 — B-18 attempt 2's premise, re-tested rather than inherited
+
+```
+CronList
+```
+
+*Expected, and **observed**:* **`No scheduled jobs.`** The tool enumerates only jobs created **in
+this session**; this routine is account-level configuration and is **not reachable from here**.
+**B-18's premise holds, and its smallest human unblock is unchanged: a human stops the schedule.**
+Nothing was created, modified or deleted. Re-run every firing rather than citing this line — the
+whole point of C-99-2 was that the claim had been asserted for fifty runs with no command behind it.
+
+### C-108-5 — the fourteenth candidate, derived and withdrawn before it stood
+
+```bash
+cd <android> && bash scripts/fleet-probe.sh plan <engine> RETURN-DAY.md
+sed -n '86,99p' RETURN-DAY.md
+grep -n 's6-resume-reconciliation' LOG.md AUDIT-REQUEST.md STATE.md BLOCKED.md RETURN-DAY.md
+```
+
+*The draft:* the guard prints **`UNPLANNED: 2`** and tells the reader to check the rows against the
+open-PR set. The two rows are **`p4-entitlement`** and **`s6-resume-reconciliation`**, and they are
+**not** the same case — `p4-entitlement`'s PR #8 is **closed**, while `s6-resume-reconciliation`
+**has an open draft PR, #53**. A leaf with live work that the landing plan does not name reads like
+a real gap in RETURN-DAY §3.
+
+*Withdrawn, by the two commands beside it:* **RETURN-DAY.md §3 Step 0 is titled "decide PR #53
+(`claude/s6-resume-reconciliation`)"** and **recommends it be closed or reduced** — so the plan does
+not merely fail to name it, it **deliberately excludes** it, which is exactly the case the guard's
+own output calls expected. And **run 98 already opened both rows** (**C-98-5**), against
+`LOG.md:16316-16322` (**C-89-4**, **C-89-5**). **Not new. Fourteenth candidate rejected across runs
+96–108**, and the standing precondition — *re-verify the item before taking it* — earned its keep
+again.
+
+### C-108-6 — no eleventh message
+
+*Observed run 108:* the **ESCALATION LEDGER** stands at **10** (runs 53, 57, 60, 65, 73, 81, 86, 91,
+99, 100), all producing **zero repo events**. Run 82's four state triggers: `main` moving — **no**,
+both unmoved (C-108-1); a PR merged or undrafted — **no**, 28 open and all draft (C-108-2); the
+stored prompt changing — **no**, same text, same stale `679a317`, same "S5 … NOT STARTED"; a gate
+result — **no**, no gate is reachable here and none is claimed. Trigger 5 as C-106-7 restated it
+needs a finding about the product, the protocol or the board **and** one not already written down:
+this run's candidate is a **rediscovery** (C-108-5), and **C-108-3 is a green — a negative result,
+not a finding**. **Nothing sent; twelfth message withheld.**
