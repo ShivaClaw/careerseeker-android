@@ -5237,3 +5237,49 @@ several quick commits cancels the job for its own tip. At the close of run 106 t
 this run would have mis-attributed a red to `269e72f` had it not checked `head_sha` alongside
 `conclusion`. Not fixed here: changing the workflow is a production edit that cannot be gate-verified
 from this sandbox.
+
+### B-18 status 2026-08-27 (one hundred and tenth run) — the seventy-fifth firing; attempt 2 closed as impossible from here, on the tool contract rather than on a negative
+
+**Unchanged as a blocker. The smallest human unblock is unchanged: a human stops the schedule.**
+
+**Symptom, restated with today's count.** The stored prompt again assigned S5's spec half — amend
+§4.3 with the `entitlement_ack` body, add the vector via `generate.mjs`, close PQ-A2-1/-2/-3. That
+work has existed since **2026-08-09** (`8575539`, `22b028e`, `7328a0b`). This is the **seventy-fifth**
+assignment of it. It was verified built **from `docs/Sync-Protocol.md` itself, not from these
+records** (**C-110-1**), and declined. The prompt's two stale details are also unchanged: the
+vendored pin is **`7328a0b`**, not `679a317`, and "S5 … NOT STARTED" is false in both halves.
+
+**What this run adds, and it is about attempt 2 rather than the ladder** (**C-110-4**). Attempt 2 was
+*"fix the prompt / reach the schedule from here"*, refused at run 48 as *"not possible from here"* —
+an assertion. Runs 99 and 108 upgraded it to a **test**: call `CronList`, observe `No scheduled
+jobs.` **That was still short of a proof, and naming the gap is this entry's point.** An empty
+listing is **ambiguous on its own**: it reads exactly the same whether the schedule is beyond reach
+or whether no schedule exists at all — and the second reading, if true, would mean the loop had
+already stopped and every run since was hallucinating its own trigger. The ambiguity is closed not by
+re-running the command but by the **tools' own contracts**: `CronList` lists jobs *"scheduled via
+CronCreate **in this session**"*, and `CronDelete` removes one from the *"**in-memory session
+store**"*. Both address a **per-session** store; the firing schedule was created **outside** this
+session. Therefore **no agent-side call can enumerate or cancel it**, and the empty result is
+**conclusive rather than merely consistent**.
+
+**Attempt 2 is therefore closed — as impossible from here, not as untried and not as inconclusive.**
+That is a real narrowing of B-18's search space: of the five attempts on record, **1** (do the slice
+anyway) is refused on cross-repo-drift grounds, **2** is now closed on the tool contract, and
+**3/4/5** (banner, leave-the-repo escalation, make-each-firing-cheap) are all **cost reductions that
+by construction cannot retire the routine**. **No attempt available to any agent can close B-18.**
+The next session should not re-test `CronList` hoping for a different answer, and should not read
+attempt 2's refusal as unexamined — it is examined and settled; the citation is **C-110-4**.
+
+**Escalation.** Ledger stands at **10** (runs 53, 57, 60, 65, 73, 81, 86, 91, 99, 100); **zero repo
+events** have followed any of them. **Run 110 sent nothing — eleventh message withheld.** All four of
+run 82's state triggers are negative (**C-110-1**, **C-110-2**), and trigger 5 as **C-106-7**
+restated it requires a finding about the product, the protocol or the board; **C-110-4 is
+records-side**, so it is **filed, never sent**. Spending an eleventh message to report that ten went
+unanswered would train the channel to be ignored, which is the one thing B-18 cannot afford.
+
+**Smallest human unblock — unchanged, and now the only one left.** Turn the routine off, or repoint
+it. Mission §7's stop condition was crossed at run **45** and executed at run **47**
+(`RETURN-DAY.md`); it is now run **110**, and **nine days past the 2026-08-18 return day** the
+handoff was written for. If the routine is meant to keep running, replace "YOUR SLICE THIS
+ITERATION" with: *read `RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox can
+actually advance* — which today is very little, and that is the honest state, not a failure.
