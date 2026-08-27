@@ -6,8 +6,8 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **seventy-six** runs
-> have now been assigned it (count refreshed at run 111). **The one-command check is now
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **seventy-seven** runs
+> have now been assigned it (count refreshed at run 112). **The one-command check is now
 > `scripts/run-zero.sh <engine>`** — it re-derives this whole banner from both repositories in
 > seconds and prints `NOTHING MOVED` or the thing that changed, so you need not read further to know
 > which. **Run 91
@@ -17,6 +17,54 @@
 > **The prompt's vendored pin `679a317` is stale too: it is
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
+>
+> ## ▶ RUN 112 — 2026-08-27. **Nothing moved. The assigned slice is built for the seventy-seventh time. This firing broke the eleven-run notification silence: the eleventh escalation was SENT.**
+>
+> **Heartbeat:** 2026-08-27, **one hundred and twelfth** cloud iteration (Linux sandbox), **fifth
+> firing of this calendar day**. Both checkouts fetched first, per rule one; every count below was
+> taken after that fetch. The android checkout again arrived **detached at `main`**, which is stale —
+> every android count here is taken on the work branch. **No rung's status changed.**
+>
+> **ESCALATION LEDGER — the canonical count, updated on send. Read this line; do not count markers.**
+> **Messages sent: 11.** Runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112**. Zero repo events
+> followed any of the first ten; run 112's is too young to have a result.
+>
+> **WHY THIS RUN SENT WHERE ELEVEN PREDECESSORS WITHHELD (C-112-5).** Runs 101–111 each withheld on
+> the reasoning that *"a notification per firing would train the channel to be ignored"*. That
+> argument is sound against notifying **every** firing; it is not an argument for **indefinite**
+> silence, and eleven consecutive withholdings had quietly converted the first into the second. The
+> established policy was **periodic** escalation — runs 53, 57, 60, 65, 73, 81, 86, 91, 99, 100, a
+> median gap of about five runs. The gap 100 → 112 is **twelve**, the longest in the ledger. Sending
+> here restores the recorded cadence rather than breaking it. The countervailing cost is real and is
+> named: ten prior messages produced **zero** repo events, so an eleventh may too. It was sent anyway
+> because the routine otherwise fires **four to five times a calendar day, indefinitely, against
+> completed work**, and the notification is the only channel that reaches the one party who can stop
+> it. **This is a judgement, not a new finding** — B-18 is unchanged and no attempt was re-tested.
+>
+> **THE ASSIGNED SLICE, RE-DERIVED FROM PRIMARY SOURCES THIS RUN (C-112-2).** Not inherited from
+> these records. `scripts/run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**. The three
+> commits were read with `git show --stat`: **`8575539`** (2026-08-09, `docs/Sync-Protocol.md` only,
+> **+114/−3**) = PQ-A6-1's §4.3.3 body + PQ-A2-1 + PQ-A2-2; **`22b028e`** (2026-08-09) = both ack
+> vectors, `index.json` **and** `generate.mjs`, generated not hand-written; **`7328a0b`**
+> (2026-08-12) = `invalid-unknown-field.json`, PQ-A2-3. **The one executable check this sandbox has
+> was run, not cited:** `node docs/sync-vectors/generate.mjs --check` at the pin → **`OK: 29 vector
+> files match the generator.`**, exit **0**; vendored corpus **29 files**, byte-identical to the pin.
+> **The prompt's `679a317` and its "S5 … NOT STARTED" are both still measurably stale.**
+>
+> **THE BOARD, VERIFIED THROUGH THE GITHUB MCP SERVER (C-112-3).** **22 engine open + 6 android open
+> = 28**, **every row `draft:true`**. Newest merge anywhere is engine **#44**, `merged_at`
+> **2026-08-13T02:28:21Z** — **fourteen days**. PR **#32**, the assigned slice's own draft, has stood
+> open since **2026-08-09**. Read `merged_at`, never the rows' `merged` field, per **C-89-2**.
+>
+> **THE INHERITED VERDICT, OBSERVED (C-112-4).** Run 111's head **`f60a501`** is CI run **272**,
+> `completed`, **`success`** — matched on `head_sha`. That is the **fifth consecutive green** (268,
+> 269, 270, 271, 272) after run 107's red at **267**. It remains **one more sample of C-107-7's
+> partition**: **B-22 is intermittent at the rate run 75 measured — not a regression, not a decaying
+> gate.** Five greens are not a fix. **No CI result is claimed for run 112's own head.**
+>
+> **NO SIXTEENTH CANDIDATE WAS MANUFACTURED.** Runs 96–111 derived fifteen candidate slices between
+> them and the standing precondition rejected all fifteen. Manufacturing a sixteenth to have
+> something to do is the failure mode those rejections document, not a remedy for it.
 >
 > ## ▶ RUN 111 — 2026-08-27. **Nothing moved. The assigned slice is built for the seventy-sixth time. The one thing this firing observed is the verdict its predecessor structurally could not: CI run 271, B-22's fourth consecutive green.**
 >
