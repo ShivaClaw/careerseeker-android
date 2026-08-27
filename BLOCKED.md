@@ -5283,3 +5283,52 @@ it. Mission §7's stop condition was crossed at run **45** and executed at run *
 handoff was written for. If the routine is meant to keep running, replace "YOUR SLICE THIS
 ITERATION" with: *read `RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox can
 actually advance* — which today is very little, and that is the honest state, not a failure.
+
+---
+
+### B-22 status 2026-08-27 (run 111) — fourth consecutive green; the partition holds
+
+**Not a new blocker and not a closure.** Run 110's head **`c7f4ad9`** is CI run **271**,
+`completed`, **`success`** (**C-111-4**) — read out of the runner's own `conclusion` field, matched
+on `head_sha`. That makes **268 `aef82f7`, 269 `c38c854`, 270 `7687fc3`, 271 `c7f4ad9`** four
+consecutive greens after run 107's red at **267**.
+
+**What this changes:** nothing about the blocker, and that is the point of recording it. **B-22 is
+intermittent at the rate run 75 measured** — one sample in roughly the same neighbourhood as the
+`592afa4` red/green pair and the run-177 failure on the same test class. Four greens are **not** a
+fix and **must not** be read as one: the `:app` half of the gate is still nondeterministic, and
+every "CI green" in these records is still **one sample**. What four greens do rule out is the
+competing reading — a **decaying** gate, failing more often over time — which **C-107-7** put on
+the table and which this sample does not support.
+
+**Smallest human unblock — unchanged.** Run the five-task android gate locally, repeatedly, on a
+byte-identical `:app` tree, and pin `ScreensFromFixtureTest`'s ordering assumption. Neither half is
+reachable from a Linux sandbox: `ANDROID_HOME` is UNSET and `sdkmanager`/`avdmanager`/`emulator`/
+`adb` are all ABSENT (**C-111-1**). **No CI job was re-run this iteration and no test was skipped,
+disabled or quarantined.**
+
+### B-18 status 2026-08-27 (run 111) — the seventy-sixth firing of a slice finished 2026-08-09
+
+**Nothing new to attempt, and that is now established rather than assumed.** Of B-18's five
+attempts: **1** is refused on cross-repo-drift grounds (rebuilding the slice would write bytes into
+the corpus the android repo vendors at `7328a0b`); **2** was closed at run 110 **on the tool
+contract** — `CronList` lists jobs *"scheduled via CronCreate in this session"* and `CronDelete`
+removes one from the *"in-memory session store"*, so a schedule created outside this session is
+provably beyond any agent-side call; **3, 4 and 5** are cost reductions that **by construction
+cannot retire the routine**. This run tested nothing new against it and manufactured no sixth
+attempt.
+
+**Symptom.** The stored prompt assigns S5's spec half — §4.3 `entitlement_ack`, the ack vectors,
+PQ-A2-1/-2/-3 — which was completed **2026-08-09** on `8575539`, `22b028e`, `7328a0b`. Verified
+built again this run **from the spec text at the pin**, not from these records (**C-111-2**). The
+prompt also carries two facts now measurably stale: the vendored pin **`679a317`** (real:
+`7328a0b`) and **"S5 … NOT STARTED"**.
+
+**Attempts.** Ten escalations — runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100** — all carrying the
+same correct recommendation, **all producing zero repo events**. Five in-repo attempts, all landed,
+none capable of stopping a firing.
+
+**Smallest human unblock — unchanged, and it is not a code change.** **A human stops the schedule**,
+or edits its stored prompt. Nine days past the return day `RETURN-DAY.md` was written for. **No
+agent-side action can close this**, and no further agent-side attempt should be invented: the
+obstacle is scheduler configuration held outside every session's reach.
