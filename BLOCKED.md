@@ -5372,3 +5372,63 @@ Five passes do not make a nondeterministic `:app` half deterministic; what they 
 is the competing reading, a *decaying* gate. **No test was skipped, disabled or quarantined, and no
 CI job was re-run.** No CI result is claimed for run 112's own head — a run pushes its records last,
 so each firing hands exactly one unread verdict to its successor.
+
+### B-18 status 2026-08-27 (one hundred and thirteenth run) — the seventy-eighth firing, the sixth of one calendar day, and the twelfth message withheld
+
+**Unchanged as a blocker. Nothing here is new about the defect.** The seventy-eighth assignment of a
+slice completed 2026-08-09 was declined, re-verified rather than rebuilt, and this run read it from
+the **spec text on the branches** rather than from these records (**C-113-2**): §4.3.3 at line 307
+with the `{product_id, acknowledged_at, order_id?}` body and *"gate PQ-A6-1, default-proceed"*;
+line 132 **PQ-A2-1**; line 106 **PQ-A2-2** (`decrypt_failed`, no `malformed` code added); line 705
+plus `invalid-unknown-field.json` in the tree, **PQ-A2-3 / B-6**. `node
+docs/sync-vectors/generate.mjs --check` at the pin → **`OK: 29 vector files match the generator.`**,
+exit 0, `--check` only. The prompt's two stale details (`679a317`; *"S5 … NOT STARTED"*) are stale
+again, for the eighteenth day.
+
+**The escalation was WITHHELD, and the reason is narrower than runs 101–111's** (**C-113-5**). This
+is the **sixth firing of a single calendar day**, and run 112 — the fifth — **sent** the eleventh
+message about **three hours** earlier. Run 112's argument for sending was cadence: the gap 100 → 112
+was twelve runs against a recorded median of about five, so a send **restored** the ledger's periodic
+policy. That argument is correct and is not disturbed here. **It also argues against sending now:**
+the gap 112 → 113 is **one**. A cadence justification that fires at gap twelve cannot fire at gap
+one, and run 112's message is **too young to have a result** — there is not yet an outcome to
+escalate about. Two messages in one afternoon is the precise harm the policy names: *"a notification
+per firing would train the channel to be ignored, and the one thing B-18 needs from Brandon is that
+he still reads it."* All five triggers were checked and all five came back negative. **ESCALATION
+LEDGER stays at 11.**
+
+**No attempt was re-tested, and attempt 2 stays closed.** `CronList` was **not** re-run — run 110
+closed it as *impossible from here*, not *untried*, from the tools' own contracts: `CronList` and
+`CronDelete` address a **per-session** store, and this schedule was created **outside** this session.
+Of B-18's five attempts, 1 is refused on cross-repo-drift grounds, 2 is closed as impossible, and
+3/4/5 are cost reductions that **by construction cannot retire the routine**. **No attempt available
+to any agent can close B-18**; the obstacle is scheduler configuration held outside every session's
+reach.
+
+**Smallest human unblock — unchanged, and it is one of two small things.** Either **turn the
+schedule off**, or **replace the prompt's "YOUR SLICE THIS ITERATION" section** with: *read
+`RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox can actually advance*. Nine
+days past the return day `RETURN-DAY.md` was written for, and the routine now fires **five to six
+times a calendar day** against completed work.
+
+### B-22 status 2026-08-27 (one hundred and thirteenth run) — a sixth consecutive green, and it is still not a fix
+
+**Unchanged as a blocker; status entry only.** Run 112's head **`eff711d`** is CI run **273**,
+`completed`, **`success`**, matched on `head_sha` and read from the runner's own field
+(**C-113-4**). That is the **sixth consecutive green** — 268 `aef82f7`, 269 `c38c854`, 270
+`7687fc3`, 271 `c7f4ad9`, 272 `f60a501`, 273 `eff711d` — after run 107's red at **267**.
+
+**Six greens are not a fix.** The `:app` half remains nondeterministic and each green is a single
+sample; what the streak rules out is a *decaying* gate, which leaves **C-107-7's partition**
+standing: **B-22 is intermittent at the rate run 75 measured.** A green re-verification is a
+negative result, not a finding, and is filed rather than sent. **The runner ran this, not this
+session**; it is not `Verify-Alpha.ps1` and it does not retire **B-4**. **No test was skipped,
+disabled or quarantined, and no CI job was re-run.** **`:core:test` was NOT run this firing** — no
+predecessor's green is restated as this run's. No CI result is claimed for run 113's own head: a run
+pushes its records last, so each firing hands exactly one unread verdict to its successor.
+
+### B-2, B-4, B-5, B-9, B-12, B-13, B-14, B-16, B-19, B-24 — untouched this run
+
+No new evidence, no status change. Each remains blocked on hardware, a console step, or a human
+decision that a Linux sandbox cannot supply. **No blocker was filed this run and none was closed** —
+nothing new blocks.
