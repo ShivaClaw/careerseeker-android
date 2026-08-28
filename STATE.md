@@ -1,5 +1,15 @@
 # STATE — android tree
 
+> ## ⛔ IF YOUR FIRING IS EMPTY, DO NOT ADD A BANNER HERE — added at run 118 (2026-08-28)
+>
+> Run `scripts/run-zero.sh ../careerseeker`. If it says `NOTHING MOVED` and all five escalation
+> triggers are negative, your firing appends **one line** to [`FIRINGS.md`](FIRINGS.md) — generated
+> by `scripts/firing-line.sh`, never hand-written — and writes **nothing** to this file, `LOG.md`,
+> `BLOCKED.md` or `AUDIT-REQUEST.md`. **Do not add a RUN banner below.** Runs 111–117 each spent a
+> median of **355 lines** across those four records saying nothing had moved; `FIRINGS.md` carries
+> the measurement and the rule. If you find **anything** — a moved `main`, a PR merged or undrafted,
+> a changed prompt, an executed gate, a real new finding — the full house records apply as before.
+>
 > **READ [`RETURN-DAY.md`](RETURN-DAY.md) FIRST — it is the window's closing handoff, and the
 > mission's stop condition is already met.** Written at run 47; re-verified green at runs 48, 49,
 > **50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
