@@ -5432,3 +5432,57 @@ pushes its records last, so each firing hands exactly one unread verdict to its 
 No new evidence, no status change. Each remains blocked on hardware, a console step, or a human
 decision that a Linux sandbox cannot supply. **No blocker was filed this run and none was closed** —
 nothing new blocks.
+
+### B-18 status 2026-08-28 (run 114) — the seventy-ninth firing, and the first in a while with executed evidence attached
+
+**Unchanged as a blocker. No attempt was re-tested and no status moved.** The routine fired again
+against a slice completed **2026-08-09** (**C-114-2**); the recurring prompt still carries the two
+details measurably stale since 2026-08-12 (`679a317` for the pin, *"S5 … NOT STARTED"*). Attempt 2
+remains closed as impossible from here — the schedule is stored scheduler configuration created
+outside this session, and `CronList`/`CronDelete` address a per-session store.
+
+**What is new, and it is small and honest.** This firing was not spent re-deriving a conclusion for
+the ninth time: it executed the relay suite (**C-114-6**) and filed a dependency-posture finding
+(**C-114-7**). That is a **reduction in the cost of a firing**, which is the same class as attempts
+3 and 4 — a mitigation, **not** a fix. The loop still fires roughly four to five times a calendar
+day, indefinitely, against completed work.
+
+**Smallest human unblock — unchanged: a human stops the schedule, or repoints it.** If the routine
+is meant to keep running, replace the prompt's "YOUR SLICE THIS ITERATION" section with *read
+`RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox can actually advance*. Run
+114 is evidence that the honest answer to that is no longer strictly nothing — the relay lane is
+reachable — but it remains very little, and everything on the board still needs a Windows gate, an
+emulator (**B-4**), a relay deploy, or a decision only Brandon can make.
+
+**Escalation:** the twelfth message was **withheld** (**C-114-8**); the ledger stays at **11**. Run
+112 sent the standing B-18 message on 2026-08-27, one day and two runs ago, and **C-114-1** proves
+nothing has moved since.
+
+### B-22 status 2026-08-28 (run 114) — a third firing, and the rate is measured rather than sampled
+
+**Unchanged as a blocker, and NOT re-attempted** — the patch needs an `:app` compile this machine
+does not have, and a flake fix cannot be validated by a single green in any case.
+
+CI run **274** on head `d5e9b9b` failed `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab`
+with **`ComposeTimeoutException at ScreensFromFixtureTest.kt:72`**, `35 tests completed, 1 failed,
+3 skipped` (**C-114-4**). That is this blocker's **post-fix** mode — line 72 is inside `awaitText`'s
+`waitUntil(timeoutMillis = 5_000)`, so the bounded wait **expired** rather than an assertion racing
+ahead — and `d5e9b9b` is a **records-only** commit, which cannot reach `:app` by any causal path.
+
+**The reason this entry exists is the measurement, not the sample** (**C-114-5**). Run 274 ended a
+six-green streak (268–273), and a streak of that length invites the reading *"the gate is
+recovering"*. It is not. Across attempt-1 run numbers **245–274**, the failures partition by
+**C-107-7**'s modes into **245, 246 artifact quota** and **262, 267, 274 B-22**, with 250/265/266
+cancelled and carrying no evidence: **3 B-22 firings in 27 decisive runs ≈ 11%**, against run 75's
+**2 in 24 ≈ 8%**. **Materially unchanged — stable intermittent, not decaying, not regressing, and no
+new mode.** Six greens then a red is exactly the shape of a ~10% flake.
+
+**The standing consequence is undiminished:** every `:app` claim in these records — `assembleDebug`,
+`lintDebug`, `:app:test`, and each green cited above — is **one sample**. The vector-drift step,
+`checkCoreIsAndroidFree`, `:core:test` and lint remain deterministic; it is `:app:test`'s Compose-UI
+subset that is not.
+
+**Smallest human unblock — unchanged:** migrate `ScreensFromFixtureTest` off the deprecated
+`createComposeRule()` to `androidx.compose.ui.test.junit4.v2.createComposeRule`, on a machine that
+can compile `:app` and run the suite **many times** — a single green proves nothing against an ~11%
+intermittent, which is precisely why no cloud session should attempt this one.
