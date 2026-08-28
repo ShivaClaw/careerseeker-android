@@ -20358,3 +20358,173 @@ justifies a send at gap twelve cannot justify one at gap one. Run 112's message 
 **three hours** before this firing and is **too young to have a result**, so there is nothing yet to
 escalate about its outcome. Two messages in one afternoon is exactly the channel fatigue the policy
 exists to prevent. **Withheld. Ledger unchanged at 11.**
+
+---
+
+## RUN 114 — 2026-08-28. Two gates actually executed here, and one new finding about the relay's dependency posture.
+
+### C-114-1 — ground state in one command: NOTHING MOVED
+
+```bash
+cd <android> && scripts/run-zero.sh ../careerseeker; echo "EXIT=$?"
+```
+
+*Expected:* `NOTHING MOVED on every check this sandbox can run, and all three guards are green.`,
+**exit 0**. Pin **`7328a0b`** unchanged and still not an ancestor of `origin/main`; vendored corpus
+**29 files**, byte-identical to the pin; citations **1018 defined / 1019 cited / 1
+documented-absent**; `fleet-probe.sh plan` **ROT 0 / UNPLANNED 2**; engine `origin/main`
+**`aac05f3`**, android `origin/main` **`ebfaf81`**, both unmoved. Toolchain block: `dotnet`, `pwsh`,
+`sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` **ABSENT**; `node`, `git`, `java`, `gradle`
+**PRESENT**; `ANDROID_HOME` **UNSET**. Read that block **narrowly** — see **C-114-6**, which
+executed a real suite this run. Neither `Verify-Alpha.ps1` nor the five-task android command is
+reachable, and **neither is claimed**.
+
+### C-114-2 — the assigned slice is built, for the seventy-ninth consecutive run
+
+Re-derived this run from the **spec text on the branches**, not from these records:
+
+```bash
+cd <engine> && git fetch --all --prune
+git grep -n "entitlement_ack body\|4.3.3 Entitlement" origin/claude/s5-entitlement-ack-spec -- docs/Sync-Protocol.md
+git grep -n "Amended in S5 (PQ-A2-1)\|Amended in S5 (PQ-A2-2)" origin/claude/s5-entitlement-ack-spec -- docs/Sync-Protocol.md
+git ls-tree origin/claude/s5-engine-wire-parser docs/sync-vectors/v1/ | grep -E "invalid-unknown-field|entitlement-ack"
+```
+
+*Expected:* `docs/Sync-Protocol.md:307: ### 4.3.3 Entitlement acknowledgement body
+(entitlement_ack)` and `:317: entitlement_ack body = {` (**PQ-A6-1**, the exact
+`{product_id, acknowledged_at, order_id?}` this run was assigned to write); `:132` *"Amended in S5
+(PQ-A2-1)"*, the 1 MiB cap on the **decoded ciphertext**; `:106` *"Amended in S5 (PQ-A2-2)"*,
+structural rejection reported as **`decrypt_failed`**; and all three of
+`invalid-unknown-field.json`, `entitlement-ack.json`, `entitlement-ack-no-order-id.json` present in
+the tree (**PQ-A2-3**, closes **B-6**). All four assigned gates are **closed on branches pushed
+2026-08-09 and 2026-08-12**. The recurring prompt's vendored pin **`679a317`** and its
+*"S5 … NOT STARTED"* both remain **measurably stale** — the pin is `7328a0b` (**C-PIN-1**) and S5's
+spec half has been built for **nineteen days**. **Seventy-ninth assignment — declined.**
+
+### C-114-3 — the board: 28 open, every row draft, nothing merged in fifteen days
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected:* **22 engine open + 6 android open = 28**, every row `draft:true`. Newest merge anywhere
+is engine **#44**, `merged_at` **2026-08-13T02:28:21Z** — **fifteen** days as of this run. PR **#32**,
+the assigned slice's own draft, has stood open since **2026-08-09**. Read `merged_at`, never the
+rows' `merged` field (**C-89-2**).
+
+### C-114-4 — the inherited verdict: run 113's head is CI 274, RED, and the six-green streak is over
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android
+              workflow_runs_filter={"branch":"claude/android-a0-probe"}
+actions_list method=list_workflow_jobs owner=ShivaClaw repo=careerseeker-android resource_id=33116426903
+get_job_logs  owner=ShivaClaw repo=careerseeker-android job_id=98672127057 return_content=true
+```
+
+*Expected:* run 113's head **`d5e9b9b`** is CI run **274**, `completed`, **`failure`** — matched on
+`head_sha`, conclusion read from the runner's own field. The failing step is **10, "Unit tests
+(:app, Robolectric)"**; steps 6–9 (citation guard, `checkCoreIsAndroidFree`, vector drift,
+`:core:test`) all **`success`**; steps 11–14 **`skipped`**. The log reads
+`ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab FAILED`,
+`androidx.compose.ui.test.ComposeTimeoutException at ScreensFromFixtureTest.kt:72`,
+`35 tests completed, 1 failed, 3 skipped`.
+
+**This is B-22, not a new defect, and the identification is the claim worth checking.** Line 72 is
+inside `awaitText`'s `compose.waitUntil(timeoutMillis = 5_000)` — the *post-fix* mode already
+recorded at `LOG.md:16374` and `BLOCKED.md:4570`, not the pre-fix `AssertionError` of run 75.
+`d5e9b9b` is a **records-only** commit (`STATE.md`), which cannot affect `:app` by any causal path —
+the same argument B-22 makes about `0c4ca8f`. It ends the streak **268–273** at six.
+
+### C-114-5 — B-22 re-measured over a fresh 30-run window: stable, not decaying
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android
+              workflow_runs_filter={"branch":"claude/android-a0-probe","status":"completed"}
+```
+
+*Expected:* across attempt-1 run numbers **245–274** (30 runs): **3 cancelled** (250, 265, 266 — read
+`cancelled` as *no evidence*, never as a result, per C-107-6) and **5 failures**. The failures
+partition by the modes **C-107-7** established: **245, 246 = artifact storage quota**; **262, 267,
+274 = B-22**. So B-22 fired **3 times in 27 decisive runs ≈ 11%**, against run 75's measured
+**2 in 24 ≈ 8%**.
+
+**The rate is materially unchanged, and that is the finding.** Six consecutive greens followed by a
+red is exactly what an ~10% intermittent looks like; it is **not** evidence of a decaying gate, and
+**not** a regression. This closes, with a measurement, the "is the gate getting worse?" reading the
+streak invited. **No new mode appeared** — every failure in the window resolves to a mode already on
+the books.
+
+### C-114-6 — a gate that IS reachable from this sandbox: the relay suite, executed, 32/32
+
+The records have said "no gate is reachable from here" for many runs. That is true of
+`Verify-Alpha.ps1` and of the five-task android command. It is **not** true of the relay suite, and
+this run executed it rather than inheriting the general claim:
+
+```bash
+cd <engine>/relay && npm ci && npx vitest run; echo "EXIT=$?"
+```
+
+*Expected:* `npm ci` **exit 0**, then `Test Files  1 passed (1)`, `Tests  32 passed (32)`,
+**exit 0**, at engine `main` **`aac05f3`**. Two traps, both paid for this run: **`--reporter=basic`
+does not exist in vitest 4** (`Failed to load custom Reporter from basic`) — use the default
+reporter; and redirect to a file rather than piping, per the truncation trap in **C-S6C-2**.
+`relay/node_modules` is gitignored (`.gitignore:23`), so the install leaves the tree clean —
+`git status --short` is empty afterward.
+
+This is **executed evidence, produced here**, not a runner log read at second hand. It does not
+promote any rung: the relay suite is one component's tests, not the engine gate, and nothing in
+this run's records claims otherwise.
+
+### C-114-7 — NEW: all seven of the relay's npm advisories are dev-toolchain; the Worker ships zero runtime dependencies
+
+```bash
+cd <engine>/relay && npm audit --json | head -1
+node -e 'console.log(JSON.stringify(require("./package.json").dependencies||{}))'
+```
+
+*Expected:* `npm audit` reports **7 advisories — 1 moderate, 6 high**: `@cloudflare/vitest-pool-workers`
+and `wrangler` (**direct**), and `miniflare`, `sharp`, `undici`, `nanoid`, `postcss` (transitive).
+And `relay/package.json` declares **`dependencies: {}`** — the file has **no runtime dependency
+block at all**; all four declared packages are `devDependencies`.
+
+**The consequence, which is the finding:** a Cloudflare Worker bundles only its own source, and this
+one has **no npm runtime dependency to bundle**. So **none of the seven advisories reaches the
+deployed relay** — every one lives in the test/deploy toolchain (`vitest`, `miniflare`, `wrangler`
+and their trees). `sharp`'s libvips CVEs and `undici`'s response-desynchronisation advisory are the
+two that would matter most if they shipped, and neither does.
+
+**This is a positive property, and it was previously unrecorded** — `grep -ni "npm audit\|CVE-"` over
+`LOG.md`, `BLOCKED.md` and `AUDIT-REQUEST.md` returned **no supply-chain entry** before this run.
+It is filed because an external auditor asks it early, not because anything is wrong. **Scope it
+honestly:** it is a statement about the *relay's* dependency graph only. It says nothing about the
+engine's NuGet graph or the android app's Gradle graph, neither of which is resolvable from here.
+
+### C-114-8 — the twelfth escalation was withheld, and the ledger stays at 11
+
+```bash
+cd <android> && grep -n "ESCALATION LEDGER" STATE.md | head -3
+```
+
+*Expected:* **`Messages sent: 11.`** Runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112**. Read this
+line; do not count markers (**C-106-6**).
+
+Run 82's triggers, each **checked this run rather than carried**:
+
+| trigger | command | observed |
+| --- | --- | --- |
+| 1 `main` moved | C-114-1 | **negative** — `aac05f3` / `ebfaf81`, both unmoved |
+| 2 PR merged or undrafted | C-114-3 | **negative** — 28 rows, all `draft:true`; newest merge 15 days old |
+| 3 stored prompt changed | C-114-2 | **negative** — same two stale details (`679a317`, "S5 … NOT STARTED") |
+| 4 a gate result | C-114-6 | **POSITIVE — and green**: relay suite 32/32, exit 0 |
+| 5 a finding not already written down | C-114-7 | **POSITIVE — and reassuring**: nothing vulnerable ships |
+
+**Two triggers fired, and this run still withheld. That is the judgement, so it is stated plainly.**
+Both positives point the *same* direction: a suite that passes and a dependency graph that ships
+nothing vulnerable are **good news**. A notification exists to pull a person out of their day for
+something that needs them; neither of these does, and a channel used to deliver reassurance is a
+channel that gets muted before the message that matters arrives. The standing thing that *does* need
+Brandon is **B-18**, and run **112 sent exactly that message on 2026-08-27** — **one day and two
+runs ago**, against a recorded median gap of about five. **C-114-1 proves nothing has moved since
+it.** Re-sending an unchanged condition a day later is the fatigue the policy exists to prevent.
+**Withheld. Ledger unchanged at 11.**
