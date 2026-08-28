@@ -5592,3 +5592,62 @@ new mode. Two greens are the *expected* output of an 11% intermittent and carry 
 information; treating them as recovery is the error run 114 flagged for its successors. **No CI job
 was re-run this firing, and no test was skipped, disabled or quarantined**; the fix still needs an
 `:app` compile this sandbox does not have (**B-7**, **B-4**).
+
+### B-18 status 2026-08-28 (run 117) — the eighty-second firing, and the cadence rule corrected
+
+**Unchanged. Status entry only. Nothing new blocks.**
+
+**Symptom (unchanged).** The recurring prompt re-issues a slice that was completed **2026-08-09**
+and pushed to `claude/s5-*` in the **engine** repo (`8575539`, `22b028e`, `7328a0b`), and its
+reading list omits `RETURN-DAY.md`. It still carries two measurably stale facts: the vendored pin
+**`679a317`** (the real pin is **`7328a0b`**, moved 2026-08-12) and **"S5 … NOT STARTED"**. Both
+have now been stale for **twenty-one days**. This is the **eighty-second** assignment of that slice.
+
+**Attempts (unchanged; none can close this).** Attempt 1 (build it anyway) is refused for the reason
+it was first refused: it would push a duplicate §4.3 amendment competing with `8575539`, and
+re-running the generator to "add" existing vectors risks writing bytes into the corpus this repo
+vendors at `7328a0b` — which the prompt itself classes as a **cross-repo drift event** and instructs
+the session to stop on. Attempt 2 (fix the prompt) remains impossible from here: it is stored
+scheduler configuration, and run 99 tested rather than inherited that premise — `CronList` reports
+only jobs created in-session. Attempts 3–6 lowered the **cost** of a firing; `run-zero.sh` reached
+ground state in **one command** again this run. **None of them can lower the count.**
+
+**What this firing did instead.** It resolved the three commits and ran
+`node docs/sync-vectors/generate.mjs --check` with its own hands (**C-117-2**: `OK: 29 vector files
+match the generator.`, exit 0) rather than inheriting the conclusion; read the predecessor tip's CI
+verdict (**C-117-4**); and checked `RETURN-DAY.md`'s headline counts against the **live board**
+rather than against its own banner (**C-117-5** — §1's corrected **twenty-two** matches C-117-3's
+measured 22 exactly; no byte changed). **It ran no suite**, and did not re-run one to have a green to
+show. The structural statement of why the lane is exhausted, in one sentence: **every
+sandbox-reachable item already has an open draft PR.**
+
+**Smallest human unblock — unchanged: a human stops the schedule, or repoints it.** Mission §7's
+terminal instruction is *"clear the goal"*; the stop condition was crossed at run 45 and executed at
+run 47 as `RETURN-DAY.md`. This is run **117**, **ten days** past the return day that handoff was
+written for, and the routine fired **four times on this calendar day alone** against work completed
+on 2026-08-09. **If the routine is meant to keep running**, replace its "YOUR SLICE THIS ITERATION"
+section with: *read `RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox can
+actually advance* — which today is very little, and that is the honest state, not a failure.
+Everything genuinely left needs a Windows gate, an emulator (**B-4**), a relay deploy, or a decision
+only Brandon can make.
+
+**Escalation:** **withheld this run; the ledger stays at 11** (**C-117-6**). All five triggers
+negative. **Run 116's cadence note is declined and its rule corrected**: a median denominated in
+**runs** is not a cadence, because runs are not time — runs 114–117 are all **2026-08-28**, so five
+runs is under two days, and the interval would tighten exactly as the routine grew more wasteful.
+The predicate that replaces it: send on a **positive state trigger**, or on **five calendar days
+since the last send plus the standing condition still holding**. Run 112 sent on **2026-08-27** —
+**one day** ago, with nothing moved since — so the next date a repeat is defensible is **on or after
+2026-09-01**, not a run number.
+
+### B-22 status 2026-08-28 (run 117) — a third green, and the rate is unchanged
+
+**Unchanged. Status entry only.** Run 116's head `e9c5384` is check run **98805752767**,
+`completed`, **`success`** (**C-117-4**) — the third consecutive green after run 113's red at
+**274**. **This does not promote B-22 toward fixed.** It adds one denominator: **3 firings in 28
+decisive runs ≈ 11%** becomes **3 in 29 ≈ 10%** — the same partition, stable, not decaying, no new
+mode. Three greens are the *expected* output of a ~10% intermittent and carry almost no information;
+treating a run of them as recovery is the error runs 114, 115 and 116 each flagged for their
+successors, and it does not become true by being repeated a third time. **No CI job was re-run this
+firing, and no test was skipped, disabled or quarantined**; the fix still needs an `:app` compile
+this sandbox does not have (**B-7**, **B-4**).
