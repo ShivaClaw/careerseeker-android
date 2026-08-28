@@ -6,8 +6,8 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **eighty-one** runs
-> have now been assigned it (count refreshed at run 116). **The one-command check is now
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **eighty-two** runs
+> have now been assigned it (count refreshed at run 117). **The one-command check is now
 > `scripts/run-zero.sh <engine>`** — it re-derives this whole banner from both repositories in
 > seconds and prints `NOTHING MOVED` or the thing that changed, so you need not read further to know
 > which. **Run 91
@@ -17,6 +17,53 @@
 > **The prompt's vendored pin `679a317` is stale too: it is
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
+>
+> ## ▶ RUN 117 — 2026-08-28. **Nothing moved; the slice is built for the eighty-second time. One new measurement (the predecessor tip's CI verdict) and one new judgement: run 116's cadence rule is denominated in the wrong unit, and is corrected here.**
+>
+> **Heartbeat:** 2026-08-28, **one hundred and seventeenth** cloud iteration (Linux sandbox),
+> **fourth firing of this calendar day**. Both checkouts fetched first, per rule one; every count
+> below was taken after that fetch. The android checkout again arrived **detached at `main`**, which
+> is stale — the work branch is **430 ahead / 10 behind**. **No rung's status changed.** Ground state
+> `scripts/run-zero.sh ../careerseeker` → **`NOTHING MOVED`** (**C-117-1**): pin **`7328a0b`**
+> unchanged and still off `main`, corpus **29/29** byte-identical, citations **1039 / 1040 / 1**,
+> `fleet-probe.sh plan` **ROT 0 / UNPLANNED 2**, engine `origin/main` **`aac05f3`** and android
+> **`ebfaf81`** both unmoved.
+>
+> **THE SLICE WAS RESOLVED FROM THE COMMITS, NOT FROM THIS BANNER** (**C-117-2**). All three
+> commits resolve — `8575539` and `22b028e` (2026-08-09), `7328a0b` (2026-08-12) — and
+> `node docs/sync-vectors/generate.mjs --check` was run **by hand** at the pin →
+> **`OK: 29 vector files match the generator.`**, **exit 0**. The prompt's pin `679a317` and its
+> *"S5 … NOT STARTED"* are stale for the **twenty-first day**. **Declined for the eighty-second
+> time**: building it would push a second §4.3 amendment competing with `8575539` and risk a
+> **cross-repo drift event** the prompt itself says to stop on.
+>
+> **THE BOARD** (**C-117-3**). **22 engine + 6 android = 28 open, every row `draft:true`.** Newest
+> merge anywhere is engine **#44**, **2026-08-13** — **fifteen days**. PR **#32**, the assigned
+> slice's own draft, has stood open **nineteen days**.
+>
+> **WHAT THIS FIRING ADDS, and it is one measurement** (**C-117-4**). Run 116's head **`e9c5384`** is
+> check run **98805752767**, **`success`** — the **third consecutive green** after run 113's red.
+> **This is not recovery.** B-22 moves by one denominator only: **3 in 28 ≈ 11%** → **3 in 29 ≈
+> 10%**, the same partition, stable, not decaying. **No CI result is claimed for this run's head.**
+>
+> **THE HANDOFF WAS CHECKED AGAINST THE LIVE BOARD, NOT AGAINST ITSELF** (**C-117-5**).
+> `RETURN-DAY.md` §1's corrected **twenty-two** matches C-117-3's measured 22 exactly; §3's *"17
+> PRs"* is the landing-plan set, which `fleet-probe.sh plan`'s **ROT 0** guards. **Re-verification,
+> not a finding. No byte of `RETURN-DAY.md` changed.**
+>
+> **NO SUITE RAN, AND NONE IS CLAIMED.** Re-running `:core:test` or the relay suite would restate a
+> predecessor's green as this run's. **Nothing was run in order to have something to report.** The
+> one-sentence reason the lane is exhausted: **every sandbox-reachable item already has an open
+> draft PR.**
+>
+> **ESCALATION LEDGER — the canonical count, updated on send. Read this line; do not count markers.**
+> **Messages sent: 11.** Runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112**. **Run 117 withheld**
+> (**C-117-6**) — all five triggers negative. **And run 116's cadence note is DECLINED, its rule
+> corrected: runs are not time.** Runs 114–117 are **all 2026-08-28**, so a "median of five runs" is
+> a cadence of under two days, and it would tighten exactly as the routine grew more wasteful. Run
+> 112 sent on **2026-08-27** — **one day** ago, nothing moved since. **The replacement predicate:
+> send on a positive state trigger, or on five calendar days since the last send with the standing
+> condition still holding — so on or after 2026-09-01, NOT at a run number.**
 >
 > ## ▶ RUN 116 — 2026-08-28. **Nothing moved; the slice is built for the eighty-first time. This firing ran NO suite and claims none — its one new measurement is the predecessor tip's CI verdict.**
 >
