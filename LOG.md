@@ -19257,8 +19257,9 @@ invoked **read-only** and not edited. **No spec byte**: `docs/Sync-Protocol.md` 
 both repositories. **No pinch point touched** — `$ExpectedOfflineTotal`, the count-reporting docs and
 `Host.cs` are unmodified; no restack was attempted. **No new branch and no new PR in either
 repository**; only PR **#6** is refreshed, and it **stays draft**. The engine checkout was
-**read-only**; it was left detached at `7328a0b` for the generator check and **nothing was pushed
-from it** except the `autonomy/claude-state` heartbeat. **Nothing merged, closed, undrafted,
+**read-only for every claim above**: it was detached at `7328a0b` for the generator check, then
+moved to the docs-only `autonomy/claude-state` branch to write the heartbeat, which is **the only
+thing pushed from it**. No tracked file outside that branch's `STATE.md` was modified. **Nothing merged, closed, undrafted,
 force-pushed, rebased or deleted**; no history rewritten. **No blocker filed and none closed** —
 B-18 and B-22 received **status entries only**; nothing new blocks, and a phantom blocker costs the
 next session a hunt. **No package was installed into this sandbox this run** — no JDK step was
