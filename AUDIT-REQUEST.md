@@ -20951,3 +20951,139 @@ least **five calendar days** since the last send, and (b) `run-zero.sh` still re
 condition. Under that rule the next date at which a repeat is defensible is **on or after
 2026-09-01**, not a particular run number. The message to send, when one is due, is still the one in
 **C-112-5**.
+
+---
+
+## Run 118 — 2026-08-28 (one hundred and eighteenth cloud iteration, fifth firing of the day)
+
+Rule one first: `git fetch --all --prune` in both checkouts. Every count below was taken after it.
+
+### C-118-1 — The assigned S5 spec half is built, and this run read it at the pin, not from the records
+
+> **Claim.** At `7328a0b`, `docs/Sync-Protocol.md` §4.3.3 defines the `entitlement_ack` body as
+> `{product_id, acknowledged_at, order_id?}` with `order_id` **OPTIONAL** (PQ-A6-1); §3 measures the
+> 1 MiB cap on the **decoded ciphertext** (PQ-A2-1); §3 and §7.2 report structural rejection as
+> **`decrypt_failed`** with no `malformed` code (PQ-A2-2); and `invalid-unknown-field.json` exists
+> (PQ-A2-3). **Declined for the eighty-third time**, per B-18 attempt 1.
+
+```bash
+git -C <engine> worktree add -q --detach /tmp/pin 7328a0b
+sed -n '307,345p;100,120p;598,605p' /tmp/pin/docs/Sync-Protocol.md
+ls /tmp/pin/docs/sync-vectors/v1/ | grep -E 'entitlement-ack|invalid-unknown-field'
+```
+
+### C-118-2 — The generator agrees with the vendored corpus, run by this session's own hands
+
+> **Claim.** `OK: 29 vector files match the generator.`, **exit 0**, executed at the pin in an
+> isolated worktree — not inherited from `run-zero.sh`, which was also run and agrees.
+
+```bash
+git -C <engine> worktree add -q --detach /tmp/pin 7328a0b
+cd /tmp/pin && node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+```
+
+### C-118-3 — A no-change firing costs a median of 355 lines in the four records
+
+> **Claim.** Lines added per firing, runs 111–117: **327, 321, 380, 392, 336, 361, 355**; median
+> **355**. The four records stood at **50,862 lines** before this run. Five firings occurred on
+> 2026-08-28 (runs 114–118). **This is the first run to measure it**; attempts 3–6 all addressed
+> read cost instead. The table is reproduced in `FIRINGS.md`.
+
+```bash
+cd <android> && wc -l STATE.md LOG.md BLOCKED.md AUDIT-REQUEST.md
+git log --since=2026-08-26 --format='%h %ad %s' --date=short --numstat \
+  -- STATE.md LOG.md BLOCKED.md AUDIT-REQUEST.md |
+  awk '/^[0-9a-f]{7} /{if(h)print h" +"a; h=$0; a=0; next} /^[0-9]+\t/{a+=$1} END{if(h)print h" +"a}'
+```
+
+### C-118-4 — `firing-line.sh` derives its line from the probe, and refuses to invent the board counts
+
+> **Claim.** Every field but the two board counts comes from `run-zero.sh`'s own output; the board
+> counts are required arguments (the GitHub API is out of a shell script's reach, `run-zero.sh` §6);
+> the script exits **2** on missing or non-numeric arguments and prints its usage; it **prints** the
+> line rather than appending it.
+
+```bash
+cd <android>
+scripts/firing-line.sh;                                   echo "EXIT=$?"   # 2 + usage
+scripts/firing-line.sh 118 ../careerseeker twenty 6 11;   echo "EXIT=$?"   # 2 + refusal
+scripts/firing-line.sh 118 ../careerseeker 22 6 11 'declined: S5 spec half, 83rd'
+```
+
+### C-118-5 — Run 118's ledger line, as generated
+
+> **Claim.** The single line in `FIRINGS.md` is the verbatim output of C-118-4's third command:
+> `118 | 2026-08-28 | NOTHING MOVED | pin 7328a0b | corpus 29/29 | gen OK | mains
+> aac05f3/ebfaf81 | cites 1052/1053/1 | board 22+6 open | esc 11 | declined: S5 spec half, 83rd`.
+> The citation field is **1052/1053/1**, the count *after* this run's own writes, so that the `diff`
+> below reproduces on the committed branch; the pre-run count was **1045/1046/1** (**C-118-6**).
+> Board counts verified this run via the GitHub MCP server: **22 engine + 6 android open, every row
+> `draft:true`**, newest merge anywhere engine **#44**, **2026-08-13**.
+
+```bash
+cd <android> && diff <(scripts/firing-line.sh 118 ../careerseeker 22 6 11 'declined: S5 spec half, 83rd') \
+                     <(grep -m1 '^118 | ' FIRINGS.md) && echo IDENTICAL
+# board: list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+#        list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+### C-118-6 — Ground state, and the escalation withheld
+
+> **Claim.** `run-zero.sh` → **`NOTHING MOVED`**, exit 0: pin `7328a0b` unchanged and still off
+> `main`, corpus **29/29** byte-identical, citations **1045 / 1046 / 1** at entry and
+> **1052 / 1053 / 1** after this run's writes (both resolving), `fleet-probe.sh plan`
+> **ROT 0 / UNPLANNED 2**, engine `main` **`aac05f3`** and android `main` **`ebfaf81`** unmoved. All
+> five escalation triggers negative; **ledger held at 11**, next defensible send date **on or after
+> 2026-09-01** under run 117's corrected predicate, which this run adopts rather than re-litigates.
+
+```bash
+cd <android> && bash scripts/run-zero.sh ../careerseeker; echo "EXIT=$?"
+```
+
+| Trigger | Result |
+| --- | --- |
+| `main` moving | **negative** — both mains unmoved (**C-118-6**) |
+| a PR merged or undrafted | **negative** — 28 open, all `draft:true`, newest merge fifteen days old (**C-118-5**) |
+| the stored prompt changing | **negative** — it arrived with the same two measurably stale details (**C-118-1**) |
+| a gate result | **negative** — no gate is reachable here; **none was run and none is claimed** |
+| a new finding about product/protocol/board (**C-106-7**) | **negative** — C-118-3 is a finding about **the routine**, not about any of the three |
+
+### C-118-7 — What this run did NOT verify, stated so no claim is misread
+
+> **Claim.** No gate ran: not `Verify-Alpha.ps1` (no `dotnet`, no `pwsh`), not the five-task android
+> command (no Android SDK, `ANDROID_HOME` unset). **No suite ran** — `:core:test` was deliberately
+> not re-run, because restating a predecessor's green as this run's is the reporting-for-its-own-sake
+> this run argues against. **No CI check run was read, and no CI result is claimed** for any head.
+> Nothing was merged, force-pushed, deleted or deployed; the relay was not contacted at all.
+
+```bash
+cd <android> && bash scripts/run-zero.sh ../careerseeker | sed -n '/^== 5\./,/^== 6\./p'
+```
+
+### C-118-8 — This run's own write cost, measured rather than estimated
+
+> **Claim.** Run 118 added **279** lines across the four records (AUDIT +108, LOG +99, BLOCKED +62,
+> STATE +10), against the **355** median it argues down — a **21% saving on the introducing run**,
+> which is roughly break-even and is described that way in both `LOG.md` and `BLOCKED.md`. An
+> earlier draft of the LOG entry estimated "about 180"; that was wrong and was corrected before the
+> commit. The saving attempt 7 is actually for arrives in the *following* runs, at one line each.
+
+```bash
+cd <android> && git diff --numstat <run-118-parent> HEAD -- STATE.md LOG.md BLOCKED.md AUDIT-REQUEST.md |
+  awk '{a+=$1; print "  "$3": +"$1} END{print "  TOTAL: +"a}'
+```
+
+### C-118-9 — An error this run made in the engine checkout, and its full reversal
+
+> **Claim.** An early command intended as a read — `git checkout -q 7328a0b -- .` in the engine
+> working tree — staged **35 files** of pin content there. It was caught by the next `git status`
+> and reverted with `git reset --hard aac05f3`. The engine tree ended **clean at `aac05f3`**,
+> equal to `origin/main`. **Nothing was committed, nothing pushed, no vector byte survives.** The
+> generator check was then re-run properly in an isolated worktree (**C-118-2**). Recorded because
+> a records system that hides its own operator errors is worth less than one that does not.
+
+```bash
+git -C <engine> status --short          # expect: no output
+git -C <engine> rev-parse HEAD          # expect: aac05f3f93f0ca06cbc9dfa7884f74a126f078dc
+git -C <engine> rev-parse origin/main   # expect: the same sha
+```

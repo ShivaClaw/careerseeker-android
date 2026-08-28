@@ -5651,3 +5651,68 @@ treating a run of them as recovery is the error runs 114, 115 and 116 each flagg
 successors, and it does not become true by being repeated a third time. **No CI job was re-run this
 firing, and no test was skipped, disabled or quarantined**; the fix still needs an `:app` compile
 this sandbox does not have (**B-7**, **B-4**).
+
+### B-18 status 2026-08-28 (run 118) — attempt 7: the write cost, which no previous attempt touched
+
+**Unchanged as a blocker. Its smallest human unblock is unchanged: a human stops the schedule, or
+repoints it.** This is the **eighty-third** assignment of a slice completed on **2026-08-09**, and
+the prompt's two stale facts — the vendored pin `679a317` (real pin **`7328a0b`**) and *"S5 … NOT
+STARTED"* — are stale for the **twenty-second day**.
+
+**Attempt 1 (build it anyway) is refused for the reason it was first refused**, and this run
+re-derived that refusal from primary sources rather than from these records (**C-118-1**,
+**C-118-2**): §4.3.3 at the pin already carries `{product_id, acknowledged_at, order_id?}` with
+`order_id` OPTIONAL; §3 already measures the 1 MiB cap on the **decoded ciphertext** (PQ-A2-1); §3
+and §7.2 already report structural rejection as **`decrypt_failed`** with no `malformed` code
+(PQ-A2-2); `invalid-unknown-field.json` already exists (PQ-A2-3, closing B-6); and
+`node docs/sync-vectors/generate.mjs --check` at the pin returns **`OK: 29 vector files match the
+generator.`**, **exit 0**. Building it again would push a second §4.3 amendment competing with
+`8575539` and risk writing bytes into the corpus this repo vendors — a **cross-repo drift event**
+the prompt itself says to stop on. **Attempt 2 (fix the prompt) remains impossible from here.**
+
+**What is new, and it is the first new attempt since run 98.** Attempts 3–6 all lowered a firing's
+**READ** cost — the banner (run 48), the out-of-repo escalation (run 53), `run-zero.sh` (run 98).
+**None of them touched the WRITE cost, and until this run nobody had measured it** (**C-118-3**). A
+no-change firing adds a **median of 355 lines** to the four house records (runs 111–117: 327, 321,
+380, 392, 336, 361, 355), which stood at **50,862 lines**. The schedule fired **five times** on
+2026-08-28, so that is roughly **1,700 lines a day** restating a state unchanged since 2026-08-13.
+
+**The finding is that the two mitigations were working against each other.** Every 355 lines a
+firing writes lengthens the next session's read — the exact cost `run-zero.sh` was built to remove.
+Attempt 6 was being undone, once per firing, by the recording ritual that followed it.
+
+**Attempt 7 — `FIRINGS.md` and `scripts/firing-line.sh` (this run's deliverable).** An empty firing
+now appends **one generated line** to `FIRINGS.md` and writes **nothing** to the four records; the
+rule is stated at the top of `STATE.md` and of `docs/CLAUDE-ANDROID-MISSION.md`, the two files a
+fresh session reads first. Every field of the line is derived from `run-zero.sh`'s own output, so a
+line cannot claim a state the probe did not report, and the two board counts are required arguments
+the script refuses to invent (**C-118-4**, **C-118-5**).
+
+**What attempt 7 does NOT do, stated so no successor over-reads it.** It does **not** lower the
+firing **count** — only a human stopping the schedule does that. It does **not** make an empty
+firing useful. It is **not enforced**: a session that ignores the rule and writes a full banner
+anyway is not prevented from doing so. And this run itself spent **279** lines across the four
+records — measured, not estimated (`git diff --numstat`), against the median of 355 it is arguing
+down. That is a **21% saving in the run that introduces the mechanism**, not a large one; the saving
+is meant to arrive in the runs *after* it, where an empty firing should cost **one line**. A reader
+who wants the honest summary of attempt 7's cost-benefit on this run alone should read it as
+**roughly break-even**. If run 119 writes a RUN banner into `STATE.md`, the
+attempt failed and should be recorded as failed, exactly as run 54 recorded attempt 5's failure.
+
+**Escalation: withheld this run; the ledger stays at 11** (**C-118-6**). All five triggers negative.
+Run 117's corrected predicate — a **positive state trigger**, or **five calendar days** since the
+last send with the standing condition still holding — is adopted, not re-litigated: run 112 sent on
+**2026-08-27**, one day ago, nothing moved since, so the next defensible date is **on or after
+2026-09-01**. The measurement above is a finding about **the routine**, not about the product, the
+protocol or the board, and C-106-7's fifth trigger asks for the latter; it does not qualify, and a
+twelfth message carrying the same ask one day after the eleventh would not.
+
+### B-22 status 2026-08-28 (run 118) — untouched; no CI verdict is claimed for this run
+
+**Status entry only, and deliberately empty of measurement.** This run read **no** check run and
+claims **no** CI result, for its own head or its predecessor's. Runs 115, 116 and 117 each added one
+green to the same partition and each warned its successor not to read a run of greens as recovery;
+adding a fourth sample of a stable ~10% intermittent would be the reporting-for-its-own-sake this
+run is otherwise arguing against. The rate stands where run 117 left it: **3 in 29 ≈ 10%**. **No CI
+job was re-run, and no test was skipped, disabled or quarantined.** The fix still needs an `:app`
+compile this sandbox does not have (**B-7**, **B-4**).
