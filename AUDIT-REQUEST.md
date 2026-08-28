@@ -20669,3 +20669,151 @@ Brandon is **B-18**, and run **112 sent exactly that message on 2026-08-27**. Th
 nothing has moved in between. Re-sending an unchanged condition a day after it was sent is the
 channel fatigue the policy exists to prevent, and **eleven messages have produced zero repo events**
 — a twelfth changes that only if something changed, and nothing did. **Withheld.**
+
+---
+
+## RUN 116 — 2026-08-28 (third firing of the calendar day)
+
+Every claim below was measured in this iteration, after `git fetch --all --prune` in **both**
+checkouts. Nothing here is carried from a predecessor except where it says so explicitly.
+
+### C-116-1 — ground state in one command: NOTHING MOVED
+
+```bash
+cd <android> && bash scripts/run-zero.sh ../careerseeker
+```
+
+*Expected, and **observed**:* verdict **`NOTHING MOVED`**. Pin **`7328a0b`** unchanged and still
+**not** an ancestor of `origin/main`; vendored corpus **29 files**, byte-identical to the pin;
+citations **1033 defined / 1034 cited / 1 documented-absent**, all resolving; `fleet-probe.sh plan`
+**ROT 0 / UNPLANNED 2**; engine `origin/main` **`aac05f3`** and android `origin/main` **`ebfaf81`**
+both unmoved against their recorded baselines. Toolchain: `dotnet`, `pwsh`, `sdkmanager`,
+`avdmanager`, `emulator`, `adb`, `gh` all **ABSENT**; `ANDROID_HOME` **UNSET**. **Neither
+`Verify-Alpha.ps1` nor the five-task android command is reachable from here, and no result is
+claimed for either.**
+
+The android checkout again arrived **detached at `main`**, which is stale relative to the work
+branch. Every android count in this run was taken on `claude/android-a0-probe`, never on `main`.
+
+### C-116-2 — the assigned slice is built, re-derived from the engine repo and not from these records
+
+The recurring prompt assigns four gates: §4.3's `entitlement_ack` body, PQ-A2-1, PQ-A2-2, PQ-A2-3.
+**All four are already closed**, on branches pushed 2026-08-09 and 2026-08-12.
+
+```bash
+cd <engine> && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do git show --stat --oneline $c | head -8; done
+git show 8575539 -- docs/Sync-Protocol.md | grep -E '^\+' \
+  | grep -iE 'product_id|acknowledged_at|order_id|ciphertext|decrypt_failed|MiB'
+```
+
+*Expected, and **observed**:* `8575539` touches `docs/Sync-Protocol.md` **only**, **+114/−3**, and
+its added lines carry the exact `{product_id, acknowledged_at, order_id?}` body with `order_id`
+**OPTIONAL**, *"Amended in S5 (PQ-A2-1)"* with the 1 MiB cap measured on the **decoded ciphertext**,
+and structural rejection reported as **`decrypt_failed`** with **no `malformed` code added**
+(PQ-A2-2). `22b028e` adds both ack vectors **and** the generator stanza that emits them.
+`7328a0b` adds `invalid-unknown-field.json` (PQ-A2-3, closes **B-6**).
+
+```bash
+cd <engine> && git checkout 7328a0b && node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+ls docs/sync-vectors/v1/ | grep -E 'entitlement-ack|invalid-unknown-field'
+```
+
+*Expected, and **observed**:* **`OK: 29 vector files match the generator.`**, **`EXIT=0`**,
+`--check` only — **run in this iteration, not quoted from a predecessor**. The listing shows
+`entitlement-ack.json`, `entitlement-ack-no-order-id.json` and `invalid-unknown-field.json` present.
+`origin/main` carries **26** vectors; **26 + 3 = 29**.
+
+The prompt's vendored pin **`679a317`** and its **"S5 … NOT STARTED"** are **both measurably
+stale**, for the twentieth day. **Eighty-first assignment of a slice completed 2026-08-09 —
+declined.** The reason it is declined rather than rebuilt is in C-116-6.
+
+### C-116-3 — the board, answered through MCP rather than deferred
+
+`run-zero.sh` §6 marks these MANUAL because a shell script cannot reach the GitHub MCP server. That
+limit is the script's, not the session's.
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected, and **observed**:* **22 engine open + 6 android open = 28**, **every row `draft:true`**.
+Newest merge anywhere is still engine **#44**, `merged_at` **2026-08-13T02:28:21Z** — **sixteen
+days**, one more than run 115 measured. PR **#32** — the assigned slice's own draft — has stood open
+since **2026-08-09**, nineteen days. Read `merged_at`, never the rows' `merged` field (**C-89-2**).
+
+### C-116-4 — the predecessor tip's verdict: green, and the B-22 rate is unchanged by it
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android
+             workflow_runs_filter={"branch":"claude/android-a0-probe"} per_page=6
+```
+
+*Expected, and **observed**:* run 115's head **`849d8fe`** is CI run **276**, `run_attempt` **1**,
+`completed`, **`success`**, matched on `head_sha`. Read out of the runner's own fields; **no job was
+re-run**. This is the **second** consecutive green after run 113's red at **274** (275 green on run
+114's head, 276 green on run 115's).
+
+**It moves B-22's measured rate by one denominator and nothing else.** C-114-5 measured **3 firings
+in 27 decisive runs ≈ 11%**; this sample makes it **3 in 28 ≈ 11%** — the same partition, still
+stable and still not decaying. Two greens are exactly what an 11% intermittent produces most of the
+time, and reading them as recovery is the specific error run 114 warned its successors about. Every
+`:app` claim in these records remains **one sample**. **No CI result is claimed for this run's own
+head.**
+
+### C-116-5 — the landing-plan guard's two UNPLANNED rows: re-verified, and NOT a finding
+
+```bash
+cd <android> && bash scripts/fleet-probe.sh plan ../careerseeker RETURN-DAY.md
+```
+
+*Expected, and **observed**:* **plan rows 6, leaves now 8, ROT 0, UNPLANNED 2**, verdict **`PLAN
+STILL NAMES LEAVES`**. The probe's own output asks the reader to check the UNPLANNED rows against
+the open-PR set, so this run did:
+
+- **`p4-entitlement`** — PR **#8** is **closed**, superseded by **#30** (merged 2026-08-09). A leaf
+  with no open PR is the expected case the guard's text names.
+- **`s6-resume-reconciliation`** — PR **#53** is **open and draft**, but RETURN-DAY §3's **Step 0 is
+  titled "decide PR #53"** and recommends it be closed or reduced. The plan does not fail to name
+  that leaf; it **deliberately excludes** it pending that decision.
+
+**This is a re-verification, not a discovery.** Runs 98 and 108 opened and closed both rows already
+(**C-98-5**, **C-108-x**, against **C-89-4**/**C-89-5**). It is recorded as a re-verification
+precisely because an exhausted lane is the condition under which a rediscovery looks like a finding
+(**C-97-8**) — the guard is green and RETURN-DAY §3 is honest.
+
+### C-116-6 — the twelfth message withheld; the ledger stays at 11
+
+```bash
+grep -n 'ESCALATION LEDGER' <android>/STATE.md | head -3
+cd <android> && bash scripts/run-zero.sh ../careerseeker | tail -20
+```
+
+*Expected, and **observed**:* ledger **11**, runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112**.
+Run 82's four state triggers were **each checked this run, not carried**:
+
+| Trigger | Result |
+| --- | --- |
+| `main` moving | **negative** — both mains unmoved (**C-116-1**) |
+| a PR merged or undrafted | **negative** — 28 open, all `draft:true`, newest merge sixteen days old (**C-116-3**) |
+| the stored prompt changing | **negative** — it arrived with the same two measurably stale details (**C-116-2**) |
+| a gate result | **negative** — no gate is reachable here, and none was run |
+
+Trigger 5, as run 107 narrowed it, needs a finding **about the product, the protocol, or the board**
+that is not already written down. **C-116-4** is one more sample of a recorded partition and
+**C-116-5** is an explicit re-verification; neither qualifies. **All five negative.**
+
+**The argument, and it is arithmetic rather than judgement.** The condition that genuinely needs
+Brandon is **B-18**, and run **112 sent exactly that message on 2026-08-27**. The gap 112 → 116 is
+**four runs and about one day**, against a recorded median of about five. **C-116-1** proves nothing
+moved in between, so a twelfth message would carry **the same words as the eleventh, one day later**
+— which is the channel fatigue the policy exists to prevent, and eleven messages have already
+produced **zero repo events**. **Withheld.**
+
+**A note the successor should not have to re-derive.** By the recorded cadence, **run 117 is the
+first firing at which the gap reaches the median of five**. That is a signal about *timing only*: if
+run 117's five triggers are also negative, sending is defensible on cadence grounds alone, and the
+message to send is the one in **C-112-5** (three commits, the one-command check, the two stale
+prompt details, the 28-draft board, B-18's two-option unblock). If any trigger has gone **positive**
+by then, that is a different and stronger message.
