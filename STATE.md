@@ -6,8 +6,8 @@
 > 75, 76, 77, 78, 79 and 80** — and at run 73 its **§3 landing plan was replayed for real**, not just read: see the RUN 73
 > banner. If you are a session that was just told to build S5's spec half (§4.3 `entitlement_ack`,
 > the ack vectors, PQ-A2-1/-2/-3): **it is built** — commits `8575539`, `22b028e`, `7328a0b` on the
-> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **seventy-eight** runs
-> have now been assigned it (count refreshed at run 113). **The one-command check is now
+> `claude/s5-*` drafts, **in the `careerseeker` (engine) repo, not this one** — and **seventy-nine** runs
+> have now been assigned it (count refreshed at run 114). **The one-command check is now
 > `scripts/run-zero.sh <engine>`** — it re-derives this whole banner from both repositories in
 > seconds and prints `NOTHING MOVED` or the thing that changed, so you need not read further to know
 > which. **Run 91
@@ -17,6 +17,48 @@
 > **The prompt's vendored pin `679a317` is stale too: it is
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
+>
+> ## ▶ RUN 114 — 2026-08-28. **Nothing moved, and the slice is built for the seventy-ninth time — but this firing EXECUTED a gate that the records had written off, and filed one new finding.**
+>
+> **Heartbeat:** 2026-08-28, **one hundred and fourteenth** cloud iteration (Linux sandbox), first
+> firing of this calendar day. Both checkouts fetched first, per rule one. **No rung's status
+> changed.** Ground state `scripts/run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**
+> (**C-114-1**).
+>
+> **THE CORRECTION THIS RUN LEAVES, and it is the one worth carrying forward.** These records have
+> repeated *"no gate is reachable from here"* for many runs. That is true of `Verify-Alpha.ps1` and
+> of the five-task android command — and **false of the relay suite**, which this run executed:
+> `cd ../careerseeker/relay && npm ci && npx vitest run` → **`Tests  32 passed (32)`, exit 0**
+> (**C-114-6**). `npm ci` works; the proxy permits the registry. Two traps are written down so you
+> need not pay them again: **`--reporter=basic` no longer exists in vitest 4**, and output must be
+> redirected to a file, not piped. **This promotes no rung** — one component's tests are not the
+> engine gate — but the general claim was inherited rather than tested, and it was wrong.
+>
+> **ONE NEW FINDING, and it is good news** (**C-114-7**). `npm audit` in `relay/` reports **7
+> advisories (1 moderate, 6 high)** — but `relay/package.json` declares **`dependencies: {}`**, and a
+> Worker bundles only its own source. **None of the seven reaches the deployed relay**; all live in
+> the test/deploy toolchain (`vitest`, `miniflare`, `wrangler`). Previously unrecorded — an external
+> auditor asks this early, so it is now on the books. Scoped to the *relay's* graph only.
+>
+> **B-22 fired again, and the streak was luck** (**C-114-4**, **C-114-5**). Run 113's head `d5e9b9b`
+> is CI **274**, **`failure`** — `theProvenanceBannerIsShownOnEveryTab`, `ComposeTimeoutException at
+> :72`, ending the six-green streak 268–273. **That is B-22's post-fix mode**, on a records-only
+> commit that cannot reach `:app`. Re-measured over runs **245–274**: **3 B-22 firings in 27
+> decisive runs ≈ 11%** against run 75's **8%** — **stable, not decaying, not regressing, no new
+> mode.** Do not read a green streak here as recovery; every `:app` claim in these records is **one
+> sample**.
+>
+> **ESCALATION LEDGER — the canonical count, updated on send. Read this line; do not count markers.**
+> **Messages sent: 11.** Runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112**. **Run 114 withheld.**
+>
+> **WHY THIS RUN WITHHELD THOUGH TWO TRIGGERS FIRED (C-114-8).** Triggers 4 (a gate result) and 5 (a
+> finding not already written down) both came back **POSITIVE** this run — the first time in a long
+> while. **Both are green.** A passing suite and a dependency graph that ships nothing vulnerable are
+> *reassurance*, and a channel spent on reassurance is muted before the message that matters lands.
+> The standing item that genuinely needs Brandon is **B-18**, and run **112 sent exactly that
+> message on 2026-08-27** — one day and two runs ago, against a recorded median gap of about five —
+> with **C-114-1** proving nothing has moved since. Re-sending an unchanged condition a day later is
+> the fatigue the policy exists to prevent.
 >
 > ## ▶ RUN 113 — 2026-08-27. **Nothing moved. The assigned slice is built for the seventy-eighth time. This is the SIXTH firing of one calendar day, and the twelfth message was WITHHELD — three hours after run 112 sent the eleventh.**
 >
