@@ -20817,3 +20817,137 @@ run 117's five triggers are also negative, sending is defensible on cadence grou
 message to send is the one in **C-112-5** (three commits, the one-command check, the two stale
 prompt details, the 28-draft board, B-18's two-option unblock). If any trigger has gone **positive**
 by then, that is a different and stronger message.
+
+### C-117-1 — ground state in one command: `NOTHING MOVED`, taken after rule one
+
+```bash
+cd <android> && git fetch --all --prune && bash scripts/run-zero.sh ../careerseeker
+```
+
+*Expected, and **observed** (run 117, 2026-08-28, fourth firing of the calendar day):* verdict
+**`NOTHING MOVED on every check this sandbox can run, and all three guards are green.`** Pin
+**`7328a0bc043335491cd96a67d634e8eea2a13af9`** unchanged and still **NOT an ancestor of
+`origin/main`**; vendored corpus **29 files at pin / 29 vendored, byte-identical**; citations
+**1039 defined / 1040 cited / 1 documented-absent**, all resolving; `fleet-probe.sh plan`
+**rows 6 / leaves 8 / ROT 0 / UNPLANNED 2**; engine `origin/main` **`aac05f3`** (2026-08-12) and
+android `origin/main` **`ebfaf81`** (2026-08-06) **both unmoved**. Toolchain as recorded:
+`dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` **ABSENT**; `ANDROID_HOME`
+**UNSET**. **Neither `Verify-Alpha.ps1` nor the five-task android command is reachable, and neither
+is claimed.**
+
+### C-117-2 — the assigned slice, re-derived from the commits themselves and the generator run by hand
+
+```bash
+cd <engine> && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do git log -1 --format='%H %ad %s' --date=short $c; done
+git checkout 7328a0b && node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+```
+
+*Expected, and **observed**:* all three commits resolve —
+`85755390…` **2026-08-09** *"S5: define the entitlement_ack body, and say what the size cap actually
+measures"*; `22b028e3…` **2026-08-09** *"S5: pin section 4.3.3 with two entitlement_ack vectors,
+generated not hand-written"*; `7328a0bc…` **2026-08-12** *"S5: add the invalid-unknown-field vector,
+closing PQ-A2-3 and B-6"*. Generator: **`OK: 29 vector files match the generator.`**, **`EXIT=0`**,
+`--check` only. The four branches `claude/s5-entitlement-ack-spec`, `…-emitter`,
+`…-engine-wire-parser`, `s5-inbound-pump` all exist on `origin`.
+
+**This run did not take its own records' word for it** — it resolved the commits and ran the check
+with its own hands. The recurring prompt's vendored pin **`679a317`** and its **"S5 … NOT STARTED"**
+are therefore **both measurably stale, for the twenty-first day**. This is the **eighty-second**
+assignment of a slice completed **2026-08-09**. **Declined**, for the reason it was first declined:
+building it would push a **second §4.3 amendment competing with `8575539`**, and re-running the
+generator to "add" vectors that already exist risks writing bytes into the corpus this repo vendors
+at `7328a0b` — a **cross-repo drift event by the recurring prompt's own definition**, which the
+prompt instructs the session to stop on.
+
+### C-117-3 — the board, answered through the MCP server rather than deferred
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all  perPage=100
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=open perPage=30
+```
+
+*Expected, and **observed**:* **22 engine open + 6 android open = 28**, and **every row is
+`draft:true`**. Engine open set: **#57 #56 #55 #54 #53 #52 #51 #50 #49 #48 #47 #46 #45 #39 #38 #37
+#36 #35 #34 #33 #32 #26**. Android open set: **#6 #5 #4 #3 #2 #1**. Newest merge anywhere is engine
+**#44**, `merged_at` **2026-08-13T02:28:21Z** — **fifteen days**. PR **#32**, the assigned slice's
+own draft, has stood open since **2026-08-09** — **nineteen days**. Per **C-89-2**, the list rows'
+`merged` field is unreliable; `merged_at` was used.
+
+### C-117-4 — the predecessor tip's CI verdict, and this firing's only new measurement
+
+```
+pull_request_read method=get_check_runs owner=ShivaClaw repo=careerseeker-android pullNumber=6
+```
+
+*Expected, and **observed**:* run 116's head **`e9c5384`** → check run **98805752767**,
+*"Build and test"*, `status` **completed**, `conclusion` **`success`**
+(actions run **33158115604**, 2026-08-28T09:08:28Z → 09:15:43Z). This is the **third consecutive
+green** after run 113's red at **274**.
+
+**It does not promote B-22 toward fixed, and reading it as recovery is the error runs 114–116 each
+flagged.** It moves the measured rate by exactly one denominator: **3 firings in 28 decisive runs ≈
+11%** becomes **3 in 29 ≈ 10%** — the same partition, stable, not decaying, no new mode. Three
+greens are the *expected* output of a ~10% intermittent. **No CI job was re-run**, and **no CI
+result is claimed for this run's own head.**
+
+### C-117-5 — RETURN-DAY's headline counts, checked against the live board rather than against itself
+
+```bash
+sed -n '12,22p' <android>/RETURN-DAY.md
+grep -n '^## 3\.' <android>/RETURN-DAY.md
+```
+
+*Expected, and **observed**:* §1 reads **"~~Seventeen~~ **twenty-two** draft PRs are open"** and
+carries the run-87 correction banner naming **#54, #55, #56, #57** as the five opened since run 47,
+and flagging that **§3's step 2 is stale as a result: merge `#57`, not `#35`**. That **matches
+C-117-3's measured 22 exactly**. §3's heading still reads *"17 PRs, 7 merges, 3 stops"*, which is
+the **landing-plan set**, not the open-PR set — and `fleet-probe.sh plan`'s **ROT 0** (**C-117-1**)
+is the guard that keeps those two numbers from being confused.
+
+**Recorded as a re-verification, not a finding.** The handoff the human will actually read on return
+day is **current**, and this run checked it against the live board rather than against its own
+banner. **No byte of `RETURN-DAY.md` was changed.**
+
+### C-117-6 — the twelfth message withheld; the ledger stays at 11 — and the cadence rule is corrected
+
+```bash
+grep -n 'ESCALATION LEDGER' <android>/STATE.md | head -3
+cd <android> && bash scripts/run-zero.sh ../careerseeker | tail -20
+```
+
+*Expected, and **observed**:* ledger **11**, runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112**.
+Run 82's four state triggers, **each checked this run and not carried**:
+
+| Trigger | Result |
+| --- | --- |
+| `main` moving | **negative** — both mains unmoved (**C-117-1**) |
+| a PR merged or undrafted | **negative** — 28 open, all `draft:true`, newest merge fifteen days old (**C-117-3**) |
+| the stored prompt changing | **negative** — it arrived with the same two measurably stale details (**C-117-2**) |
+| a gate result | **negative** — no gate is reachable here, and none was run |
+
+Trigger 5 (**C-106-7**, as run 107 narrowed it) needs a finding **about the product, the protocol,
+or the board** not already written down. **C-117-4** is one more sample of a recorded partition and
+**C-117-5** is an explicit re-verification; neither qualifies. **All five negative.**
+
+**And the cadence argument run 116 left for this run is DECLINED, because its rule is denominated in
+the wrong unit.** C-116-6 recorded that "run 117 is the first firing at which the gap reaches the
+median of five" and that sending would then be "defensible on cadence grounds alone." **Runs are not
+time.** Runs 114, 115, 116 and this one are **all 2026-08-28** — the schedule is firing **four times
+in one calendar day**, so a median of "≈ five runs" is a cadence of **well under two days**. Applying
+it mechanically has a perverse consequence worth stating plainly: **the more often the routine
+fires, the more often it would notify about a condition that is by definition not changing** — the
+reminder interval tightens exactly as the routine becomes more wasteful. That is backwards.
+
+**The correct predicate is elapsed days plus a change test, not a run count.** Measured against it:
+run 112 sent this exact message on **2026-08-27**; today is **2026-08-28** — **one day** — and
+**C-117-1** proves **nothing moved in between**. A twelfth message would carry **the same words as
+the eleventh, one day later**, and eleven messages have already produced **zero repo events**.
+**Withheld.**
+
+**Successor note, and it replaces C-116-6's timing note rather than extending it.** Do **not** send
+on a run-count. Send when a **state trigger goes positive**, or when **both** of these hold: (a) at
+least **five calendar days** since the last send, and (b) `run-zero.sh` still reports the standing
+condition. Under that rule the next date at which a repeat is defensible is **on or after
+2026-09-01**, not a particular run number. The message to send, when one is due, is still the one in
+**C-112-5**.
