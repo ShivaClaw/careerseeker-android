@@ -19270,3 +19270,116 @@ echoed**, no `.appdata`. Terra's `autonomy/codex-state` was **read before any wr
 next intent none, files claimed: none** — **no collision**; right-of-way respected. Files written
 this run: `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state`
 heartbeat in the engine repo. **No notification sent** — the twelfth was withheld, per **C-116-6**.
+
+---
+
+## RUN 117 — 2026-08-28 (fourth firing of the calendar day). Nothing moved; the assigned slice is built for the eighty-second time. This firing's one new measurement is the predecessor tip's CI verdict, and its one new judgement is that run 116's cadence rule is denominated in the wrong unit.
+
+**Heartbeat:** 2026-08-28, **one hundred and seventeenth** cloud iteration (Linux sandbox), **fourth
+firing of this calendar day**. Rule one first: `git fetch --all --prune` in **both** checkouts before
+any count below was taken. The android checkout again arrived **detached at `main`**, which is stale
+— the work branch is **430 ahead / 10 behind** it — so every android count here is taken on the work
+branch, never on `main`.
+
+**Milestone 1 — ground state in one command** (**C-117-1**). `scripts/run-zero.sh ../careerseeker`
+→ **`NOTHING MOVED`**, all three guards green. Pin **`7328a0b`** unchanged and still not an ancestor
+of `origin/main`; vendored corpus **29 files, byte-identical to the pin**; citations **1039 defined /
+1040 cited / 1 documented-absent**, all resolving; `fleet-probe.sh plan` **ROT 0 / UNPLANNED 2**;
+engine `origin/main` **`aac05f3`** and android `origin/main` **`ebfaf81`** both unmoved. `dotnet`,
+`pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` and `gh` **ABSENT**; `ANDROID_HOME` **UNSET**.
+**Neither `Verify-Alpha.ps1` nor the five-task android command is reachable, and neither is claimed.**
+
+**Milestone 2 — the assigned slice, resolved from the commits and the generator run by hand**
+(**C-117-2**). This run did not inherit the conclusion from these records; it resolved the three
+commits in the engine checkout and ran the check itself. `8575539` **2026-08-09**, `22b028e`
+**2026-08-09**, `7328a0b` **2026-08-12** all resolve, on the four `claude/s5-*` branches;
+`node docs/sync-vectors/generate.mjs --check` at the pin → **`OK: 29 vector files match the
+generator.`**, **exit 0**, `--check` only. `origin/main` carries **26**; **26 + 3 = 29**. The
+prompt's vendored pin **`679a317`** and its **"S5 … NOT STARTED"** are **both measurably stale, for
+the twenty-first day**. **Eighty-second assignment of a slice completed 2026-08-09 — declined**,
+because building it would push a **second §4.3 amendment competing with `8575539`** and risk writing
+bytes into the corpus this repo vendors at `7328a0b`, which the prompt itself classes as a
+**cross-repo drift event** and instructs the session to stop on.
+
+**Milestone 3 — the board** (**C-117-3**). **22 engine open + 6 android open = 28**, every row
+`draft:true`. Newest merge anywhere is still engine **#44**, `merged_at` **2026-08-13T02:28:21Z** —
+**fifteen days**. PR **#32**, the assigned slice's own draft, has stood open **nineteen days**.
+Answered through the GitHub MCP server rather than deferred, because `run-zero.sh` §6 says the
+MANUAL limit is the script's and not the session's.
+
+**Milestone 4 — the predecessor tip, and the only new measurement this firing has** (**C-117-4**).
+Run 116's head **`e9c5384`** is check run **98805752767**, `completed`, **`success`** — the **third
+consecutive green** after run 113's red at **274**. **This is not a fix and it is not recovery.** It
+moves B-22's measured rate by one denominator: **3 in 28 ≈ 11%** becomes **3 in 29 ≈ 10%** — the
+same partition, stable, not decaying, no new mode. Three greens are the *expected* output of a ~10%
+intermittent, and each of runs 114, 115 and 116 warned its successor against reading exactly this as
+a fix. No CI job was re-run and **no CI result is claimed for this run's own head**.
+
+**Milestone 5 — the handoff checked against the live board rather than against itself**
+(**C-117-5**). `RETURN-DAY.md` is what the human actually reads on return day, and it was written at
+run 47, seventy runs ago; the cheap check is whether its headline counts still match a board measured
+today. They do: §1 reads **"~~Seventeen~~ twenty-two draft PRs are open"** with the run-87 banner
+naming **#54–#57** and flagging that §3's step 2 became stale (**merge #57, not #35**) — and
+**twenty-two is exactly what C-117-3 measured**. §3's *"17 PRs"* is the **landing-plan set**, not the
+open set, and `fleet-probe.sh plan`'s **ROT 0** is the guard that keeps the two from being confused.
+**Re-verification, not a finding; no byte of `RETURN-DAY.md` was changed.**
+
+**Milestone 6 — no seventeenth candidate manufactured, and no suite run to have something to show.**
+Runs 96–116 derived sixteen candidate slices between them and the standing precondition rejected all
+sixteen; this run did not invent a seventeenth. It also did not re-run `:core:test` or the relay
+suite: both are green in the records at predecessors' hands, no *new* gate became reachable, and
+re-running one to have a green to show would restate a predecessor's measurement as this run's, which
+the house style forbids. **Nothing was run in order to have something to report.** The structural
+reason the lane is exhausted is worth one sentence, because it is not laziness: **every
+sandbox-reachable item already has an open draft PR**, which is the same sentence as "28 drafts are
+open and none can land without a Windows gate."
+
+**Milestone 7 — the escalation withheld, and run 116's cadence rule corrected** (**C-117-6**). Run
+82's four state triggers were **each checked and each negative**; trigger 5 needs a finding not
+already written down, and this run's two measurements are a recorded partition's next sample and an
+explicit re-verification. **The twelfth message is withheld and the ESCALATION LEDGER stays at 11.**
+
+Run 116 left this run a note that sending would be *"defensible on cadence grounds alone"* once the
+gap reached a median of **five runs**. **That note is declined, and the rule behind it is wrong in a
+way worth fixing rather than following.** Runs are not time: runs 114, 115, 116 and this one are
+**all 2026-08-28**, so the schedule is firing **four times in one calendar day** and a five-*run*
+median is a cadence of well under two days. The consequence is perverse — **the more often the
+routine fires, the more often it would notify about a condition that by definition is not changing**;
+the reminder interval tightens exactly as the routine becomes more wasteful. The right predicate is
+**elapsed days plus a change test**. Measured against it: run 112 sent this exact message on
+**2026-08-27**, **one day** ago, and **C-117-1** proves nothing moved in between, so a twelfth would
+carry the eleventh's words one day later — and eleven messages have already produced **zero repo
+events**. The successor rule is written down at **C-117-6**: send on a **positive state trigger**, or
+on **five calendar days plus the standing condition** — **on or after 2026-09-01**, not at a run
+number.
+
+**Prohibition — what this run did NOT touch.** **No rung moved**; the ladder table is unchanged in
+status. **Not one byte of production source in either repository** — no `.kt`, `.cs`, `.ts`, `.kts`,
+`.ps1`, `.mjs` or workflow file was written. The C# applier and the Kotlin applier are **left for a
+local session**, as the prompt instructs, because this machine can compile neither. **No merge, in
+either repository** — the engine's merge policy is conditional on a full local `Verify-Alpha.ps1`
+this sandbox cannot run, and the android repo is **never-self-merge**. **No Windows gate and no
+android gate ran, and neither is claimed**; like run 116 and unlike runs 114 and 115, this firing ran
+**no suite at all** — the only executed check that produces a pass/fail is the vector generator's
+`--check` (`OK: 29 …`, exit 0, read-only), which is **not** one of the android gate's five tasks.
+Every CI result cited was **read out of the runner's own fields**; **no CI job was re-run**, and **no
+test was skipped, disabled or quarantined** — B-22 is left exactly as it is, and its patch still
+needs an `:app` compile this machine does not have. **No vector byte was written**, the pin
+**`7328a0b`** is untouched, and `generate.mjs` was invoked **read-only** and not edited. **No spec
+byte**: `docs/Sync-Protocol.md` was read only, in both repositories. **No byte of `RETURN-DAY.md`**,
+which was read and checked but not edited (**C-117-5**). **No pinch point touched** —
+`$ExpectedOfflineTotal`, the count-reporting docs and `Host.cs` are unmodified; no restack was
+attempted. **No new branch and no new PR in either repository**; only PR **#6** is refreshed, and it
+**stays draft**. The engine checkout was **read-only for every claim above**: it was detached at
+`7328a0b` for the generator check, then moved to the docs-only `autonomy/claude-state` branch to
+write the heartbeat, which is **the only thing pushed from it**. **Nothing merged, closed, undrafted,
+force-pushed, rebased or deleted**; no history rewritten. **No blocker filed and none closed** —
+B-18 and B-22 received **status entries only**; nothing new blocks, and a phantom blocker costs the
+next session a hunt. **No package was installed into this sandbox this run** — no JDK step was needed
+because no Kotlin was compiled. **No schedule was created, modified or deleted.** **No deploys of any
+kind; the production relay was not contacted at all**, not even `GET /v1/health`. No Play, Google or
+OAuth console, no accounts, no purchases, no Gmail; **no secret read, printed or echoed**, no
+`.appdata`. Terra's `autonomy/codex-state` was **read before any write**: **COMPLETE, next intent
+none, files claimed: none** — **no collision**; right-of-way respected. Files written this run:
+`LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in
+the engine repo. **No notification sent** — the twelfth was withheld, per **C-117-6**.
