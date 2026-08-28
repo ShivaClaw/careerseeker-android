@@ -5486,3 +5486,54 @@ subset that is not.
 `createComposeRule()` to `androidx.compose.ui.test.junit4.v2.createComposeRule`, on a machine that
 can compile `:app` and run the suite **many times** — a single green proves nothing against an ~11%
 intermittent, which is precisely why no cloud session should attempt this one.
+
+### B-18 status 2026-08-28 (run 115) — the eightieth firing, and the second of one calendar day
+
+**Unchanged as a blocker. Status entry only; nothing new blocks.**
+
+The scheduled prompt assigned S5's spec half again — §4.3's `entitlement_ack` body, the vector via
+`generate.mjs`, PQ-A2-1/-2/-3. **That work has existed since 2026-08-09** and this run re-derived it
+from the spec text rather than from these records (**C-115-2**): `docs/Sync-Protocol.md:307`/`:317`
+for the body, `:132` for the ciphertext cap, `:103`/`:601` for `decrypt_failed`, and
+`invalid-unknown-field.json` in the tree, with `node docs/sync-vectors/generate.mjs --check` →
+**`OK: 29 vector files match the generator.`**, exit 0. **Eightieth consecutive assignment.** The
+prompt's two stale details are stale for the **nineteenth day**: the vendored pin is **`7328a0b`**,
+not `679a317` (**C-115-3**, and `VECTORS.lock` records the 2026-08-12 move), and S5 is not "NOT
+STARTED" — its spec half and its emitter are both built.
+
+**Attempts — no new one this run, and that is the honest report.** Attempt 1 (do it anyway) stays
+refused for the reason it was first refused: it would push a duplicate §4.3 amendment competing with
+`8575539`, and re-running the generator to "add" existing vectors risks writing bytes into the
+corpus this repo vendors at `7328a0b` — which the prompt itself classes as a **cross-repo drift
+event** and instructs the session to stop on. Attempt 2 (fix the prompt) remains impossible from
+here: it is stored scheduler configuration, and run 99 tested rather than inherited that premise —
+`CronList` reports only jobs created in-session. Attempts 3–6 lowered the **cost** of a firing;
+run 96's `run-zero.sh` lowered it furthest, and this run reached ground state in **one command**.
+**None of them can lower the count.**
+
+**What this firing did instead, so the entry is not empty.** It executed **`:core:test`**
+(**C-115-4**: 348 tests, 0 failed, 0 skipped, 22 classes, exit 0) — one of the android gate's five
+tasks, which runs 113 and 114 both correctly declined to claim. That is a real green on this head,
+and it is still **not a gate**.
+
+**Smallest human unblock — unchanged: a human stops the schedule, or repoints it.** Mission §7's
+terminal instruction is *"clear the goal"*; the stop condition was crossed at run 45 and executed at
+run 47 as `RETURN-DAY.md`. This is run **115**, **ten days** past the return day that handoff was
+written for, and the routine is firing several times a calendar day against completed work. **If the
+routine is meant to keep running**, replace its "YOUR SLICE THIS ITERATION" section with: *read
+`RETURN-DAY.md` §5 and pick from the human queue what a Linux sandbox can actually advance* — which
+today is very little, and that is the honest state, not a failure. Everything genuinely left needs a
+Windows gate, an emulator (**B-4**), a relay deploy, or a decision only Brandon can make.
+
+**Escalation:** **withheld this run; the ledger stays at 11** (**C-115-7**). Run 112 sent this exact
+message on 2026-08-27, three runs and about a day ago, and nothing has moved since (**C-115-1**).
+
+### B-22 status 2026-08-28 (run 115) — one green, and it is one sample
+
+**Unchanged. Status entry only.** Run 114's head `80a4da0` is CI run **275**, `completed`,
+**`success`** (**C-115-6**) — green immediately after run 113's red at **274**. **This does not
+promote B-22 toward fixed.** C-114-5's re-measurement stands: **3 firings in 27 decisive runs ≈ 11%**
+over runs 245–274, stable, not decaying, no new mode. A single green is the *most likely* single
+outcome of an 11% intermittent and carries almost no information. **No CI job was re-run this
+firing, and no test was skipped, disabled or quarantined**; the fix still needs an `:app` compile
+this sandbox does not have (**B-7**, **B-4**).
