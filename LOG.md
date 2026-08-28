@@ -18929,3 +18929,127 @@ Terra's `autonomy/codex-state` was **read before any write**: **COMPLETE, next i
 claimed: none** — **no collision**; right-of-way respected. Files written this run: `LOG.md`,
 `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`, and the `autonomy/claude-state` heartbeat in the
 engine repo. **No notification sent** — the twelfth was withheld, per C-113-5.
+
+## RUN 114 — 2026-08-28 (first firing of a new calendar day). Nothing moved; the assigned slice is built for the seventy-ninth time. Two gates were EXECUTED here, and one new finding is filed about the relay's dependency posture.
+
+**Heartbeat:** 2026-08-28, **one hundred and fourteenth** cloud iteration (Linux sandbox), first
+firing of this calendar day. Rule one first: `git fetch --all --prune` in **both** checkouts before
+any count below was taken. The android checkout again arrived **detached at `main`**, which is
+stale, so every android count here is taken on the work branch, never on `main`.
+
+**Milestone 1 — ground state in one command** (**C-114-1**). `scripts/run-zero.sh ../careerseeker`
+→ **`NOTHING MOVED`, exit 0**. Pin **`7328a0b`** unchanged and still not an ancestor of
+`origin/main`; vendored corpus **29 files**, byte-identical to the pin; citations **1018 defined /
+1019 cited / 1 documented-absent**; `fleet-probe.sh plan` **ROT 0 / UNPLANNED 2**; engine
+`origin/main` **`aac05f3`** and android `origin/main` **`ebfaf81`** both unmoved against their
+recorded baselines. `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` and `gh` are
+**ABSENT**; `ANDROID_HOME` **UNSET**. **Neither `Verify-Alpha.ps1` nor the five-task android
+command is reachable, and neither is claimed.**
+
+**Milestone 2 — the assigned slice, re-derived from the spec text rather than from these records**
+(**C-114-2**). All four gates the recurring prompt names are **already closed**, on branches pushed
+2026-08-09 and 2026-08-12: on `origin/claude/s5-entitlement-ack-spec`, `docs/Sync-Protocol.md:307`
+*"### 4.3.3 Entitlement acknowledgement body (`entitlement_ack`)"* and `:317` *"entitlement_ack body
+= {"*, carrying the exact `{product_id, acknowledged_at, order_id?}` body this run was told to write
+(**PQ-A6-1**); `:132` *"Amended in S5 (PQ-A2-1)"*, the 1 MiB cap re-stated on the **decoded
+ciphertext**; `:106` *"Amended in S5 (PQ-A2-2)"*, structural rejection reported as **`decrypt_failed`**;
+and on `origin/claude/s5-engine-wire-parser`, `docs/sync-vectors/v1/invalid-unknown-field.json`
+present in the tree alongside both ack vectors (**PQ-A2-3**, closes **B-6**). The prompt's vendored
+pin `679a317` and its *"S5 … NOT STARTED"* both remain **measurably stale**. **Seventy-ninth
+assignment of a slice completed 2026-08-09 — declined.**
+
+**Milestone 3 — the board** (**C-114-3**). **22 engine open + 6 android open = 28**, every row
+`draft:true`. Newest merge anywhere is still engine **#44**, `merged_at` **2026-08-13T02:28:21Z** —
+**fifteen days**. PR **#32**, the assigned slice's own draft, has stood open since **2026-08-09**.
+
+**Milestone 4 — the inherited verdict, and it is the first red in seven** (**C-114-4**). Run 113's
+head **`d5e9b9b`** is CI run **274**, `completed`, **`failure`** — the streak **268–273** ends at
+six. The failing step is **10, "Unit tests (:app, Robolectric)"**; the citation guard,
+`checkCoreIsAndroidFree`, the vector-drift step and `:core:test` all passed before it.
+The log reads `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab FAILED`,
+**`ComposeTimeoutException at ScreensFromFixtureTest.kt:72`**, `35 tests completed, 1 failed, 3
+skipped`. **This is B-22 and not a new defect**: line 72 is inside `awaitText`'s
+`waitUntil(timeoutMillis = 5_000)` — the *post-fix* mode already recorded at `LOG.md:16374` — and
+`d5e9b9b` is a **records-only** commit, which cannot reach `:app` by any causal path.
+
+**Milestone 5 — B-22 re-measured, because six greens then a red invites the wrong reading**
+(**C-114-5**). Across attempt-1 CI run numbers **245–274**: 3 cancelled (250, 265, 266) and 5
+failures, partitioning by **C-107-7**'s established modes — **245, 246 artifact quota**; **262, 267,
+274 B-22**. That is **3 B-22 firings in 27 decisive runs ≈ 11%**, against run 75's **2 in 24 ≈ 8%**.
+**Materially unchanged.** Six greens followed by a red is precisely what a ~10% intermittent looks
+like: **not a decaying gate, not a regression, and no new mode.** The streak was luck, and reading it
+as recovery would have been the error this measurement forecloses.
+
+**Milestone 6 — a gate this sandbox CAN run, executed rather than assumed** (**C-114-6**). The
+records have carried "no gate is reachable from here" for many runs. It is true of
+`Verify-Alpha.ps1` and of the five-task android command; it is **not** true of the relay suite, and
+this run tested the general claim instead of inheriting it. `npm ci` in `relay/` → **exit 0** (the
+proxy permits the registry), then `npx vitest run` → **`Test Files  1 passed (1)`,
+`Tests  32 passed (32)`, exit 0**, at engine `main` `aac05f3`. Two traps were paid for and are
+written down so the next run does not pay them again: **`--reporter=basic` no longer exists in
+vitest 4**, and the output must be redirected to a file rather than piped (**C-S6C-2**'s truncation
+trap). `relay/node_modules` is gitignored, so the tree is clean afterward. **This promotes no rung**
+— one component's tests are not the engine gate — but it is **executed evidence produced here**,
+which this lane has been short of.
+
+**Milestone 7 — the one genuinely new finding, and it is good news** (**C-114-7**). Running the
+suite surfaced `npm`'s advisory count, so it was scoped rather than repeated as a number.
+`npm audit` reports **7 advisories (1 moderate, 6 high)**: `@cloudflare/vitest-pool-workers` and
+`wrangler` direct, `miniflare`, `sharp`, `undici`, `nanoid` and `postcss` transitive. But
+`relay/package.json` declares **`dependencies: {}`** — it has **no runtime dependency block at
+all** — and a Cloudflare Worker bundles only its own source. **Therefore none of the seven reaches
+the deployed relay**; all seven live in the test/deploy toolchain. `sharp`'s libvips CVEs and
+`undici`'s response-desynchronisation advisory are the two that would matter most if they shipped,
+and neither does. **Previously unrecorded**: `grep -ni "npm audit\|CVE-"` over the three record
+files returned no supply-chain entry before this run. **Scoped honestly** — this is a statement
+about the *relay's* graph only, and says nothing about the engine's NuGet graph or the app's Gradle
+graph, neither of which resolves from here.
+
+**Milestone 8 — two triggers fired and the twelfth message was still withheld** (**C-114-8**). Run
+82's five triggers were each checked, not carried: `main` moving — **negative**; a PR merged or
+undrafted — **negative**; the stored prompt changing — **negative**; **a gate result — POSITIVE**
+(C-114-6); **a finding not already written down — POSITIVE** (C-114-7). **Both positives point the
+same way: they are green.** A passing suite and a dependency graph that ships nothing vulnerable are
+reassurance, and a channel spent on reassurance is muted before the message that matters lands. The
+standing item that genuinely needs Brandon is **B-18** — and run **112 sent exactly that message on
+2026-08-27**, one day and two runs ago, against a recorded median gap of about five, with
+**C-114-1 proving nothing has moved since**. Re-sending an unchanged condition a day later is the
+fatigue the policy exists to prevent. **Twelfth message withheld; the ESCALATION LEDGER stays at
+11.**
+
+**No candidate slice was manufactured, and this run did not need to decline one twice.** Runs 96–113
+derived fifteen candidates and the standing precondition rejected all fifteen; the enumerated
+remainder is spent (PQ-S2-3 is PR **#36**, PQ-S6-1's engine half is PR **#52**). This run's work was
+instead the two things a sandbox can honestly do with the lane exhausted: **execute a gate that was
+wrongly believed out of reach, and measure a blocker whose streak was inviting a false reading.**
+
+**Prohibition — what this run did NOT touch.** **No rung moved**; the ladder table is unchanged in
+status. **Not one byte of production source in either repository** — no `.kt`, `.cs`, `.ts`,
+`.kts`, `.ps1`, `.mjs` or workflow file was written. The C# applier and the Kotlin applier are
+**left for a local session**, as the prompt instructs, because this machine can compile neither.
+**No merge, in either repository** — the engine's merge policy is conditional on a full local
+`Verify-Alpha.ps1` this sandbox cannot run, and the android repo is **never-self-merge**. **No
+Windows gate and no android gate ran, and neither is claimed**; the only suites executed here were
+the **relay vitest suite** (32/32, **C-114-6**) and the **vector generator's `--check`** (`OK: 29
+vector files match the generator.`, exit 0), both stated as exactly what they are. Every CI result
+cited was **read out of the runner's own fields**; **no CI job was re-run**, and **no test was
+skipped, disabled or quarantined** — B-22 is left exactly as it is, and its patch still needs an
+`:app` compile this machine does not have. **No vector byte was written**, the pin **`7328a0b`** is
+untouched, and `generate.mjs` was invoked **read-only** and not edited. **No spec byte**:
+`docs/Sync-Protocol.md` was read only, in both repositories. **No pinch point touched** —
+`$ExpectedOfflineTotal`, the count-reporting docs and `Host.cs` are unmodified; no restack was
+attempted. **No new branch and no new PR in either repository**; only PR **#6** is refreshed, and it
+**stays draft**. **Nothing merged, closed, undrafted, force-pushed, rebased or deleted**; no history
+rewritten. **No blocker filed and none closed** — B-18 and B-22 received **status entries only**;
+nothing new blocks, and a phantom blocker costs the next session a hunt. **No dependency was
+installed into either repository's tracked tree** — `relay/node_modules` is gitignored and the
+engine checkout's `git status --short` is **empty**; **nothing was upgraded, pinned or `audit
+fix`ed**, and the seven advisories are left exactly where they were found. **No schedule was
+created, modified or deleted.** **No deploys of any kind; the production relay was not contacted at
+all**, not even `GET /v1/health` — the suite ran against **miniflare, locally**. No Play, Google or
+OAuth console, no accounts, no purchases, no Gmail; **no secret read, printed or echoed**, no
+`.appdata`. **No machine change persisted** to either repository. Terra's `autonomy/codex-state` was
+**read before any write**: **COMPLETE, next intent none, files claimed: none** — **no collision**;
+right-of-way respected. Files written this run: `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`,
+`STATE.md`, and the `autonomy/claude-state` heartbeat in the engine repo. **No notification sent** —
+the twelfth was withheld, per **C-114-8**.
