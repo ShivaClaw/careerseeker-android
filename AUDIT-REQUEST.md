@@ -20528,3 +20528,144 @@ Brandon is **B-18**, and run **112 sent exactly that message on 2026-08-27** —
 runs ago**, against a recorded median gap of about five. **C-114-1 proves nothing has moved since
 it.** Re-sending an unchanged condition a day later is the fatigue the policy exists to prevent.
 **Withheld. Ledger unchanged at 11.**
+
+### C-115-1 — ground state at run 115: nothing moved, and one command says so
+
+Run after `git fetch --all --prune` in **both** trees, or the counts are stale — that is rule one.
+
+```bash
+cd <android> && bash scripts/run-zero.sh ../careerseeker; echo "exit=$?"
+```
+
+*Expected, and **observed** this run:* **`NOTHING MOVED on every check this sandbox can run, and all
+three guards are green.`**, **exit 0**. Pin **`7328a0b`** unchanged and still not an ancestor of
+`origin/main`; vendored corpus **29 files**, byte-identical to the pin; citations **1026 defined /
+1027 cited / 1 documented-absent**; `fleet-probe.sh plan` **ROT 0 / UNPLANNED 2**; engine
+`origin/main` **`aac05f3`** (2026-08-12) and android `origin/main` **`ebfaf81`** (2026-08-06) both
+unmoved against their recorded baselines. Toolchain, stated so no claim can be misread: `dotnet`,
+`pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` **ABSENT**, `ANDROID_HOME` **UNSET**.
+**Neither `Verify-Alpha.ps1` nor the five-task android command is reachable, and neither is claimed.**
+
+### C-115-2 — the assigned slice is built, for the eightieth run, read from the spec text
+
+Not inherited from these records. Read on the branches that carry it, not on `main`, which has none
+of it.
+
+```bash
+cd <engine>
+for c in 8575539 22b028e 7328a0b; do
+  echo "== $c =="; git log -1 --format='%ad  %s' $c; git show --stat --format='' $c
+done
+git checkout -B s5-check origin/claude/s5-entitlement-ack-emitter
+grep -n 'entitlement_ack\|Amended in S5' docs/Sync-Protocol.md | head -20
+node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l
+```
+
+*Expected, and **observed**:* `8575539` (**Sun Aug 9 2026**) touches **`docs/Sync-Protocol.md` only**,
+**+114/−3**; `22b028e` (**Aug 9**) adds `entitlement-ack.json`, `entitlement-ack-no-order-id.json`,
+`index.json` **and `generate.mjs`** — **+117/−1**, generated not hand-written; `7328a0b` (**Aug 12**)
+adds `invalid-unknown-field.json` **+60**. In the file: **`docs/Sync-Protocol.md:307`** *"### 4.3.3
+Entitlement acknowledgement body (`entitlement_ack`)"* and **`:317`** *"entitlement_ack body = {"*,
+the exact `{product_id, acknowledged_at, order_id?}` body this run was told to write (**PQ-A6-1**,
+*"Decided 2026-08-07 … default-proceed"* at `:309`); **`:111-112`** the 1 MiB cap measured on the
+**decoded ciphertext** with **`:132`** *"Amended in S5 (PQ-A2-1)"*; **`:103`** and **`:601`**
+structural rejection reported as **`decrypt_failed`** with **no `malformed` code added**
+(**PQ-A2-2**, recorded at `:657`); **`invalid-unknown-field.json`** in the tree (**PQ-A2-3**, closes
+**B-6**). `--check` → **`OK: 29 vector files match the generator.`**, **exit 0**. `origin/main`
+carries **26**; **26 + 3 = 29** reconciles the two. **All four gates named in the recurring prompt
+are already closed. Eightieth assignment — declined.**
+
+### C-115-3 — the corpus drift scan, run by hand and independent of `run-zero.sh`
+
+`run-zero.sh` performs this check itself; this run also did it separately, so the guard and the
+claim are not the same code path.
+
+```bash
+cd <engine>; n=0; d=0
+for f in $(cd <android>/core/src/test/resources/sync-vectors/v1 && ls *.json); do
+  n=$((n+1))
+  a=$(git show 7328a0b:docs/sync-vectors/v1/$f | sha256sum | cut -d' ' -f1)
+  b=$(sha256sum <android>/core/src/test/resources/sync-vectors/v1/$f | cut -d' ' -f1)
+  [ "$a" != "$b" ] && { echo "DRIFT: $f"; d=$((d+1)); }
+done; echo "compared=$n drift=$d"
+```
+
+*Expected, and **observed**:* **`compared=29 drift=0`** — every vendored vector byte-identical to
+pin `7328a0bc043335491cd96a67d634e8eea2a13af9`. **No cross-repo drift event.** The prompt's stated
+pin `679a317` is **stale**; `core/src/test/resources/sync-vectors/VECTORS.lock` names the real one
+and records the 2026-08-12 move.
+
+### C-115-4 — `:core:test` EXECUTED green this firing, and the JDK the sandbox lacks
+
+Runs 113 and 114 did not run it; no predecessor's green is restated as this run's. This is **one of
+the android gate's five tasks** and nothing more.
+
+```bash
+cd <android>
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+timeout 1500 bash scripts/core-probe.sh; echo "exit=$?"
+```
+
+*Expected, and **observed**:* **`BUILD SUCCESSFUL`**, **`core-probe: 348 tests, 0 failed, 0 skipped,
+across 22 classes`**, **exit 0** — matching the count recorded at run 109 and after, so `:core` and
+the vendored corpus are green together on this head. **The install is not optional and is not new**:
+the image ships **JDK 21**, `:core` pins `jvmToolchain(17)`, `api.foojay.io` is denied by the same
+egress policy as `dl.google.com` (**B-7**), and `core-probe.sh:70-74` prescribes this exact command
+in its own error text. `apt-get update` first — the bare install 404s against a stale index, and two
+PPAs (`deadsnakes`, `ondrej/php`) 403 through the proxy and are ignored harmlessly.
+
+**What this licenses, and nothing more:** the sentence *":core:test, via `scripts/core-probe.sh`,
+348 tests, 0 failed"*. It is **not** a gate result. `checkCoreIsAndroidFree`, `:app:test`,
+`:app:assembleDebug` and `:app:lintDebug` did **not** run, and the fused android tree has still
+never been built in this sandbox.
+
+### C-115-5 — the board, answered rather than deferred
+
+`run-zero.sh` §6 states this limit is **the script's, not the session's** — a shell script cannot
+reach the GitHub MCP server, and this session can.
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Expected, and **observed**:* **22 engine open + 6 android open = 28**, **every row `draft:true`**.
+Newest merge anywhere is still engine **#44**, `merged_at` **2026-08-13T02:28:21Z** — **fifteen
+days**. PR **#32**, the assigned slice's own draft, has stood open since **2026-08-09**. Read
+`merged_at`, never the rows' `merged` field (**C-89-2**).
+
+### C-115-6 — the predecessor tip's verdict: green, and it is one sample
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android
+             resource_id=ci.yml workflow_runs_filter={"branch":"claude/android-a0-probe"}
+```
+
+*Expected, and **observed**:* run 114's head **`80a4da0`** is CI run **275**, `completed`,
+**`success`** — a green immediately after run 113's red at **274**. Read out of the runner's own
+fields; **no job was re-run**. **This is not evidence that B-22 is fixed.** C-114-5 measured it at
+**3 firings in 27 decisive runs ≈ 11%** and called it stable-not-decaying; a single green is exactly
+what an 11% intermittent produces most of the time. No CI result is claimed for this run's own head.
+
+### C-115-7 — the twelfth message withheld; the ledger stays at 11
+
+```bash
+grep -n 'ESCALATION LEDGER' <android>/STATE.md | head -3
+cd <android> && bash scripts/run-zero.sh ../careerseeker | tail -20
+```
+
+*Expected, and **observed**:* ledger **11**, runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112**.
+Run 82's four state triggers **each checked, not carried**: `main` moving — **negative**, both
+unmoved (**C-115-1**); a PR merged or undrafted — **negative**, 28 open all draft, newest merge
+fifteen days old (**C-115-5**); the stored prompt changing — **negative**, it still says pin
+`679a317` and *"S5 … NOT STARTED"*, both stale for the nineteenth day; a gate result — **C-115-4 is
+one of five tasks and it is green**, and C-106-7's fifth trigger needs a finding **not already
+written down**, which a matching count is not.
+
+**The argument, and it is run 114's rather than a new one.** The condition that genuinely needs
+Brandon is **B-18**, and run **112 sent exactly that message on 2026-08-27**. The gap 112 → 115 is
+**three runs and about one day**, against a recorded median of about five, with **C-115-1** proving
+nothing has moved in between. Re-sending an unchanged condition a day after it was sent is the
+channel fatigue the policy exists to prevent, and **eleven messages have produced zero repo events**
+— a twelfth changes that only if something changed, and nothing did. **Withheld.**
