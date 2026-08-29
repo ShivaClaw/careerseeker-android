@@ -12,8 +12,12 @@ only, and it must never become a place to record a real one cheaply.
 Generate the line; do not hand-write it:
 
 ```bash
-scripts/firing-line.sh <run> ../careerseeker <engine-open> <android-open> <esc-ledger> '<note>' >> FIRINGS.md
+scripts/firing-line.sh <run> ../careerseeker <engine-open> <android-open> <esc-ledger> '<note>'
 ```
+
+The line belongs **inside the fenced ledger block at the end of this file**, under the last run.
+A bare `>> FIRINGS.md` appends *after* the closing fence and drops the line out of the block —
+run 122 did exactly that and had to undo it. Print the line, read it, then insert it.
 
 Every field except the two board counts is derived from `run-zero.sh`'s own output, so a line
 cannot claim a state the probe did not report. The board counts come from the GitHub API, which no

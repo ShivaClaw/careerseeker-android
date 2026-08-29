@@ -43,8 +43,10 @@
 # EXAMPLE
 #   scripts/firing-line.sh 118 ../careerseeker 22 6 11 'declined: S5 spec half, 83rd'
 #
-# It PRINTS the line and does not append it. Read it, then append it yourself:
-#   scripts/firing-line.sh ... >> FIRINGS.md
+# It PRINTS the line and does not append it. Read it, then insert it yourself —
+# INSIDE the fenced ledger block at the end of FIRINGS.md, under the last run.
+# Do NOT use a bare `>> FIRINGS.md`: that appends after the closing ``` fence and
+# drops the line out of the block. Run 122 did exactly that and had to undo it.
 
 set -uo pipefail
 
