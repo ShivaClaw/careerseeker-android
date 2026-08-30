@@ -71,4 +71,5 @@ would be exactly the fabrication these records exist to prevent. Their write cos
 124 | 2026-08-29 | NOTHING MOVED | pin 7328a0b | corpus 29/29 | gen OK | mains aac05f3/ebfaf81 | cites 1054/1055/1 | board 22+6 open | esc 11 | declined: S5 spec half, 89th; slice re-verified from the three commits diffs
 125 | 2026-08-29 | NOTHING MOVED | pin 7328a0b | corpus 29/29 | gen OK | mains aac05f3/ebfaf81 | cites 1054/1055/1 | board 22+6 open | esc 11 | declined: S5 spec half, 90th; slice re-verified from the spec body + both A2 amendments
 126 | 2026-08-30 | NOTHING MOVED | pin 7328a0b | corpus 29/29 | gen OK | mains aac05f3/ebfaf81 | cites 1054/1055/1 | board 22+6 open | esc 11 | declined: S5 spec half, 91st; slice re-verified by running generate.mjs --check at the pin
+127 | 2026-08-30 | NOTHING MOVED | pin 7328a0b | corpus 29/29 | gen OK | mains aac05f3/ebfaf81 | cites 1054/1055/1 | board 22+6 open | esc 11 | declined: S5 spec half, 92nd; board re-verified via MCP (28 open, all draft, newest merge still #44 2026-08-13)
 ```
