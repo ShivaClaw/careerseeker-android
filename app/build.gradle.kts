@@ -64,6 +64,19 @@ android {
             isIncludeAndroidResources = true
         }
     }
+
+    sourceSets {
+        getByName("debug") {
+            // MigrationTestHelper loads the exported schema JSON through the asset manager, and
+            // under Robolectric that resolves against the app-under-test's merged assets — the
+            // `test` source set is not on that path, so the schemas have to ride the debug variant.
+            // DEBUG only: release assets are untouched and the schema JSON never ships, the same
+            // arrangement already used for the Compose test manifest below.
+            // Pointing at the directory KSP writes means the migration test always validates
+            // against the real exported schema rather than a copy that could drift from it.
+            assets.srcDirs("$projectDir/schemas")
+        }
+    }
 }
 
 ksp {
@@ -93,6 +106,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
+    // MigrationTestHelper. Robolectric already gives these tests real Android SQLite on the JVM,
+    // so the v1->v2->v3 migrations are exercised in CI without an emulator.
+    testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.test.core.ktx)
     testImplementation(libs.kotlinx.coroutines.test)
     // Compose screen tests under Robolectric (no emulator). The test-manifest artifact adds

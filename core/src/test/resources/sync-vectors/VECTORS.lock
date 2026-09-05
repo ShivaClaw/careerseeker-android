@@ -1,10 +1,75 @@
 # Shared sync-protocol test vectors, vendored from the public main repo.
 #
 # Source: ShivaClaw/careerseeker  docs/sync-vectors/v1/
-# Pinned commit: fff4bce9790788217d72be882f776b882993d640
+# Pinned commit: 7328a0bc043335491cd96a67d634e8eea2a13af9
 # Generator:     docs/sync-vectors/generate.mjs (Node, deterministic)
 #
 # These are consumed unmodified by ProtocolVectorsTest. They must stay byte-identical to
-# the main repo -- that identity is what makes cross-repo protocol drift a CI failure
-# rather than a field bug. CI re-fetches this commit's vectors and diffs (see ci.yml).
-# To update: bump the pin, re-vendor, and expect the C# SyncHarness to move in lockstep.
+# THE PINNED COMMIT NAMED ABOVE -- that identity is what makes cross-repo protocol drift a
+# CI failure rather than a field bug. CI re-fetches this commit's vectors and diffs
+# (see ci.yml). To update: bump the pin, re-vendor, and expect the C# SyncHarness to move
+# in lockstep.
+#
+# Until 2026-08-17 this said "byte-identical to the main repo". That is a WIDER claim than
+# anything either repo checks, and it is measurably false today -- see the 2026-08-17 note
+# at the foot of this file. The guarantee is "the phone matches the pin", never "the phone
+# matches the engine".
+#
+# ---------------------------------------------------------------------------------------
+# 2026-08-12: pin moved 679a317 -> 7328a0b, and the new pin is NOT on main. Read this.
+#
+# 7328a0b sits on the unmerged draft stack (PR #38 -> #37 -> #32). It was chosen over the
+# branch tip deliberately: it is the last commit that touches docs/sync-vectors/, so later
+# work on that branch cannot move the pin's content, and the SHA stays fetchable for CI's
+# per-file `?ref=` lookup regardless of where the branch head goes next.
+#
+# The pin was already off-main before this change -- 679a317 is not an ancestor of main
+# either -- so this is the same posture, not a new one. What makes it safe to rely on is
+# not the branch: it is that `node docs/sync-vectors/generate.mjs --check` reports
+# "OK: 29 vector files match the generator" at this commit, so the content is anchored to a
+# deterministic generator rather than to a mutable ref. The 26 files that were already
+# vendored are byte-identical across 679a317, origin/main, and 7328a0b -- verified by
+# `diff -r`, not assumed -- so this re-vendor ADDED three files and changed no existing
+# vector byte.
+#
+# 2026-08-16, forty-fifth run: the sentence above is one word too strong, and the precise
+# version is worth having in the file that the guarantee rests on. Re-measured blob-to-blob:
+# 25 of those 26 are byte-identical across all three commits. The twenty-sixth is index.json,
+# which is a MANIFEST, not a payload -- it necessarily changed when the three vectors were
+# added, and it changed on every branch that added them. So: three payloads added, zero
+# existing PAYLOADS modified, one manifest updated. That is the claim that carries the
+# safety guarantee, and it holds. Re-verify: AUDIT-REQUEST C-PIN-2.
+#
+# ACTION WHEN PR #38's STACK MERGES: re-pin to the merge commit on main and re-run the
+# diff. Nothing breaks if this is forgotten -- CI still verifies against 7328a0b -- but the
+# lock stops describing where the vectors actually live.
+#
+# ---------------------------------------------------------------------------------------
+# 2026-08-17, fifty-fourth run: the header's "byte-identical to the main repo" is retired,
+# because it is false in BOTH directions and a returning reader could act on it.
+#
+# Measured this run against a freshly fetched origin/main (aac05f3), file-by-file, blob
+# hashes not eyeball -- re-verify with AUDIT-REQUEST C-LOCK-1:
+#
+#   main's docs/sync-vectors/v1/ .......... 26 files
+#   this vendored directory ............... 29 files
+#   present here, ABSENT on main .......... entitlement-ack.json
+#                                          entitlement-ack-no-order-id.json
+#                                          invalid-unknown-field.json
+#   present on main, absent here .......... (none)
+#   shared files whose bytes differ ....... index.json
+#
+# So for these three vectors the phone is AHEAD of main, not behind: the pin sits on the
+# unmerged S5 draft stack and main has never carried them. index.json differs for exactly
+# that reason -- it is the manifest, and it lists them. Nothing here is drift; the corpus is
+# byte-identical to its pin (C-STOP-3, re-run this run: no output, exit=0, 29 files).
+#
+# The opposite direction is the one that bites, and it is coming: when RETURN-DAY.md §3's
+# six merges land, main gains pairing-high-bit-confirm.json and the phone will be BEHIND by
+# one file, with no check firing (B-16 status 2026-08-17, H7). That is why this line had to
+# stop implying the two trees are equal -- the word "main" in it was doing the job of a
+# guarantee nobody verifies.
+#
+# NOT decided here. B-16 offers three options for closing that gap (advisory job / compare
+# against main once the stack lands / accept and document). Correcting a false sentence is
+# not choosing among them: H3 is still open and still Brandon's.

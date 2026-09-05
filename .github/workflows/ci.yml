@@ -43,6 +43,22 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
+      # These records sell one property: every claim has a command that re-verifies it.
+      # The mechanism is a citation -- "(C-76-3)" in LOG.md, looked up in AUDIT-REQUEST.md.
+      # A citation pointing at nothing reads exactly like one that works, so it spends the
+      # reader's trust and returns nothing.
+      #
+      # Run 75 shipped two of them and caught it by luck: B-22, C-75-11 and C-75-12 were
+      # appended with a bare relative path after the shell's cwd had reset, so they landed
+      # outside the repository while the pushed commit already cited them as filed. A
+      # silent `cat >>` would have closed that iteration green. Nothing checked it; now
+      # this does. It needs no toolchain, which is the point -- the hazard lands in
+      # records-only commits, exactly the ones that look too cheap to gate.
+      - name: Assert every cited C-/B- id resolves
+        run: |
+          ./scripts/check-citations.sh --self-test
+          ./scripts/check-citations.sh
+
       - name: Assert :core has no Android dependency
         run: ./gradlew checkCoreIsAndroidFree
 
@@ -50,6 +66,22 @@ jobs:
       # re-fetches the pinned commit's copies and diffs, so a hand-edited vector -- which
       # would silently desynchronise the phone from the engine -- fails here rather than in
       # someone's hands. The pin lives in VECTORS.lock.
+      #
+      # The comparison is a SET comparison, in both directions, and that is deliberate.
+      # Until the forty-fifth run this step iterated the vendored side only, so it could
+      # see a vector that was modified, but was structurally blind to one present at the
+      # pin and absent locally: the loop never enumerated a name it did not already have.
+      # That gap is reachable whenever the pin is bumped and the re-vendor is partial --
+      # copy two of three new files and this step used to pass.
+      #
+      # READ THIS BEFORE TRUSTING THE STEP: it compares the vendored set against the PIN,
+      # not against upstream HEAD, and that is by design -- the pin is what makes the
+      # corpus reproducible. So a pin that has fallen BEHIND upstream is invisible here,
+      # and always was. That is the actual shape of the S5 gap: for ~4 days the phone
+      # lacked entitlement-ack, entitlement-ack-no-order-id and invalid-unknown-field,
+      # and this step was correctly green throughout, because the vendored set matched
+      # the pin exactly and the pin was the stale thing. Nothing in CI detects that.
+      # See BLOCKED.md B-16.
       - name: Assert vendored sync vectors match the pinned main-repo commit
         env:
           # The API is authenticated only to raise the anonymous rate limit; the main repo
@@ -75,17 +107,75 @@ jobs:
           }
 
           drift=0
+
+          # Enumerate the upstream directory at the pin so the two sides can be compared as
+          # sets. 29 files is far inside the contents API's 1000-entry page limit, so no
+          # pagination is needed today.
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+                 -H "Accept: application/vnd.github+json" \
+                 "https://api.github.com/repos/ShivaClaw/careerseeker/contents/docs/sync-vectors/v1?ref=$PIN" \
+                 -o /tmp/listing.json; then break; fi
+            echo "retry $attempt for the upstream listing"; sleep 5
+            [ "$attempt" = 5 ] && { echo "::error::cannot list upstream vectors at $PIN"; exit 1; }
+          done
+
+          jq -r '.[] | select(.type == "file") | .name' /tmp/listing.json | sort > /tmp/upstream.names
+          ls core/src/test/resources/sync-vectors/v1 | sort > /tmp/vendored.names
+
+          # If that directory ever outgrows one page, the listing truncates silently.
+          # Truncation is not invisible -- the vendored-only branch below fires, because
+          # every dropped name then looks like a vendored file absent upstream -- but it
+          # reports the wrong cause, and a reader would go hunting for a vendoring error
+          # that does not exist. This assertion names the real cause first.
+          #
+          # The comment this replaces claimed a count assertion already sat here. It did
+          # not. Measured 2026-08-16 (C-CI-6) by truncating the listing to 10 of 29 names
+          # against the real vendored tree: the step failed, and the only diagnosis it
+          # emitted was "::error::vendored vector(s) absent upstream at $PIN".
+          upstream_count=$(wc -l < /tmp/upstream.names)
+          if [ "$upstream_count" -ge 1000 ]; then
+            echo "::error::the upstream listing returned $upstream_count entries and is probably paginated;"
+            echo "::error::this step must follow pages before its set comparison can be trusted"
+            exit 1
+          fi
+
+          # Upstream-only == under-vendored: the engine ships a vector the phone has never
+          # seen. Vendored-only == a local invention, or a file deleted upstream.
+          missing=$(comm -23 /tmp/upstream.names /tmp/vendored.names)
+          extra=$(comm -13 /tmp/upstream.names /tmp/vendored.names)
+          if [ -n "$missing" ]; then
+            echo "::error::upstream has vector(s) that were never vendored: $(echo $missing | tr '\n' ' ')"
+            echo "::error::re-vendor them and bump the pin in VECTORS.lock"
+            drift=1
+          fi
+          if [ -n "$extra" ]; then
+            echo "::error::vendored vector(s) absent upstream at $PIN: $(echo $extra | tr '\n' ' ')"
+            drift=1
+          fi
+
+          # Content equality, for every file the two sides share.
           for f in core/src/test/resources/sync-vectors/v1/*.json; do
             name=$(basename "$f")
+            grep -qxF "$name" /tmp/upstream.names || continue   # already reported as extra
             fetch "$name" /tmp/upstream.json || { echo "::error::cannot fetch upstream $name at $PIN"; drift=1; continue; }
             if ! diff -q "$f" /tmp/upstream.json >/dev/null; then
               echo "::error::vendored $name differs from the pinned main-repo copy"; drift=1
             fi
           done
-          [ "$drift" -eq 0 ] && echo "OK: all vendored vectors match $PIN" || exit 1
+
+          [ "$drift" -eq 0 ] && echo "OK: $(wc -l < /tmp/vendored.names) vendored vectors match $PIN, and the sets agree" || exit 1
 
       - name: Unit tests (:core)
         run: ./gradlew :core:test
+
+      # The Room replica, the envelope applier, and the screens are all exercised by
+      # Robolectric on the JVM -- no emulator needed -- so there is no reason for them to
+      # sit outside CI. They did until A0 found it: the workflow gated :core:test,
+      # assembleDebug and lint, but never ran :app:test, leaving the applier's
+      # demo/real boundary and every screen assertion ungated on every push.
+      - name: Unit tests (:app, Robolectric)
+        run: ./gradlew :app:test
 
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug
@@ -107,7 +197,42 @@ jobs:
           fi
           echo "OK: no analytics or tracking SDKs on the release classpath."
 
+      # B-25. This step -- and only this step -- is what has been concluding `Build and
+      # test` as `failure` on this branch. It is not a gate: on each observed run every
+      # check above it passed, and this failed in about one second with
+      #
+      #   Failed to CreateArtifact: Artifact storage quota has been hit.
+      #
+      # The quota is ACCOUNT-WIDE and this lane is its whole consumer -- the engine repo
+      # uploads nothing at all (C-93-4). Measured rather than estimated (C-93-3): one
+      # `app-debug` is 12,741,138 bytes, and 11 successful uploads landed in the 2.16 days
+      # ending 2026-08-24T09:23Z, about 5.1 a day. At `retention-days: 14` the steady state
+      # is ~71 artifacts, ~0.9 GB -- past GitHub's 500 MB private-repo allowance on the
+      # Free plan on this workflow's own.
+      #
+      # WHY GATED RATHER THAN SHORTENED OR DELETED, since all three would clear the red:
+      #
+      #   - Retention stays at 14 days. An APK that IS produced keeps exactly the evidence
+      #     life it always had. Run 92 declined to shrink it and was right to: nobody in a
+      #     sandbox should be quietly reducing how long the owner's build survives.
+      #   - `workflow_dispatch` KEEPS the capability the artifact exists for. B-4 records
+      #     that the owner's machine has no `sdkmanager`, so CI may be the only route to an
+      #     installable APK. That route is preserved and is one click -- Actions -> CI ->
+      #     Run workflow -- instead of running on every push.
+      #   - What stops is the ~5/day records-only refill, which is the entire waste. Most
+      #     runs on this branch change `.md` files and nothing else, and each was still
+      #     shipping a 12 MB APK.
+      #
+      # `main` is deliberately NOT in this condition. When RETURN-DAY.md §3's six merges
+      # land, those pushes must not go red on a quota error at the exact moment the owner
+      # is finally landing them. Dispatch is always available on any ref, `main` included.
+      #
+      # THIS IS NOT A WEAKENED GATE. No test, lint, assertion or build step is touched;
+      # `if-no-files-found: error` is kept, so when the step does run it still fails the job
+      # on a missing APK. Freeing the already-consumed quota remains the owner's one-time
+      # action (B-25); this only stops it refilling behind them.
       - name: Upload debug APK
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: app-debug

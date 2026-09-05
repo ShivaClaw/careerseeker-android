@@ -24,6 +24,15 @@ sealed interface ApplyResult {
 
     /** The plaintext did not parse as the expected payload shape. Nothing changed. */
     data object Malformed : ApplyResult
+
+    /**
+     * A `delta` arrived before any full `snapshot`. Nothing changed, and the caller should ask
+     * the engine to re-publish from seq 0 (`pull_request`, §4.3).
+     *
+     * This is not an error — it is the honest response to arriving mid-stream. See
+     * [SyncStateRow.snapshotSeen].
+     */
+    data object AwaitingSnapshot : ApplyResult
 }
 
 /**
@@ -69,6 +78,20 @@ class EnvelopeApplier(private val db: ReplicaDb) {
                 "evidence" -> parseEvidence(body)
                 else -> return@withTransaction ApplyResult.Ignored(kind)
             } ?: return@withTransaction ApplyResult.Malformed
+
+            // A delta is the recent WINDOW, not the pipeline (§4.3.1). Applied to a replica
+            // that has never held a snapshot, it would present a handful of rows as the whole
+            // truth. The phone genuinely can arrive mid-stream -- it pulls from seq 0 and the
+            // relay's TTL may already have purged the snapshot -- so the snapshot is awaited,
+            // never reconstructed from deltas. The caller asks for one with `pull_request`.
+            //
+            // Placed AFTER validation so a malformed delta is still reported as malformed
+            // (rejecting for the wrong reason hides the real defect), and BEFORE the demo wipe
+            // so a refused delta leaves fixture rows and their honest label exactly as they
+            // were -- see the note on the wipe below.
+            if (parsed is Parsed.Delta && !(state?.snapshotSeen ?: false)) {
+                return@withTransaction ApplyResult.AwaitingSnapshot
+            }
 
             // Demo/real boundary (Codex audit finding, 2026-07-24): fixture data must never mix
             // with or masquerade as engine data. The FIRST applied real payload of any kind wipes
@@ -121,6 +144,10 @@ class EnvelopeApplier(private val db: ReplicaDb) {
                         ?: (body["cycle"]?.jsonPrimitive?.longOrNull ?: state?.lastCycle),
                     demoMode = false, // real engine data replaces any fixture claim
                     auditOk = auditOk,
+                    // Latches on the first snapshot and never clears: once a full state has
+                    // been received, later deltas are legitimately incremental. The demo
+                    // fixture does NOT set it — fixture rows are not a snapshot.
+                    snapshotSeen = (kind == "snapshot") || (state?.snapshotSeen ?: false),
                 ),
             )
             ApplyResult.Applied(kind)
@@ -183,6 +210,11 @@ class EnvelopeApplier(private val db: ReplicaDb) {
         title = o["title"]?.jsonPrimitive?.contentOrNull ?: return null,
         score = o["score"]?.jsonPrimitive?.intOrNull ?: return null,
         updatedSeq = seq,
+        // Absent means "no outcome", never malformed (§4.3.1) — a non-Pro engine simply omits
+        // it, and a snapshot from one must still parse. Carried as an opaque display string:
+        // the engine's vocabulary is a superset of what the phone may set, and validating it
+        // against the phone's narrower enum here would drop legitimate desktop-set values.
+        outcome = o["outcome"]?.jsonPrimitive?.contentOrNull,
     )
 
     private fun jobOf(o: JsonObject, seq: Long): JobRow? = JobRow(

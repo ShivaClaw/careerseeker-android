@@ -66,6 +66,68 @@ class EnvelopeApplierTest {
         """{"kind":"evidence","body":{"audit_ok":$auditOk,"event_count":42,"events":[{"seq":1,"ts":"2026-07-23T09:00:11Z","actor":"engine","kind":"scout_ingest","entity":"scout","entity_id":"b41f"},{"seq":2,"ts":"2026-07-23T09:00:14Z","actor":"engine","kind":"application_created","entity":"application","entity_id":"app_1"}]}}"""
             .toByteArray()
 
+    // ---------------------------------------------------------------- awaiting the snapshot
+
+    @Test
+    fun deltaBeforeAnySnapshotIsAwaitedNotApplied() = runTest {
+        // Arriving mid-stream is a real path: the phone pulls from seq 0 and the relay's TTL
+        // may already have purged the snapshot. Applying the delta anyway would render its
+        // two applications as the user's entire pipeline.
+        val result = applier.apply(5, "2026-07-23T12:00:00Z", "delta", deltaJson())
+
+        assertEquals(ApplyResult.AwaitingSnapshot, result)
+        assertTrue("no rows may be invented from a delta", db.dao().applicationsNow().isEmpty())
+        assertTrue(db.dao().jobsNow().isEmpty())
+        assertNull("counters must not appear either", db.dao().countersNow())
+        // The seq must NOT advance: the engine will re-publish from here, and a burned seq
+        // would make the eventual snapshot look stale and get skipped.
+        assertNull(db.dao().syncStateNow())
+    }
+
+    @Test
+    fun deltaIsAppliedOnceASnapshotHasBeenSeen() = runTest {
+        applier.apply(1, "2026-07-23T12:00:00Z", "snapshot", snapshotJson())
+        assertTrue(db.dao().syncStateNow()!!.snapshotSeen)
+
+        assertEquals(
+            ApplyResult.Applied("delta"),
+            applier.apply(2, "2026-07-23T12:01:00Z", "delta", deltaJson()),
+        )
+        assertEquals(2, db.dao().applicationsNow().size)
+    }
+
+    @Test
+    fun aHeartbeatDoesNotCountAsASnapshot() = runTest {
+        // The reason snapshotSeen is stored rather than inferred from the seq high-water mark:
+        // a heartbeat advances that mark while carrying no applications or jobs at all.
+        applier.apply(1, "2026-07-23T12:00:00Z", "heartbeat", heartbeatJson())
+        val state = db.dao().syncStateNow()!!
+        assertEquals(1L, state.highestAppliedE2pSeq)
+        assertTrue("a heartbeat is not a snapshot", !state.snapshotSeen)
+
+        assertEquals(
+            ApplyResult.AwaitingSnapshot,
+            applier.apply(2, "2026-07-23T12:01:00Z", "delta", deltaJson()),
+        )
+        assertTrue(db.dao().applicationsNow().isEmpty())
+    }
+
+    @Test
+    fun snapshotSeenLatchesAcrossLaterPayloads() = runTest {
+        applier.apply(1, "2026-07-23T12:00:00Z", "snapshot", snapshotJson())
+        applier.apply(2, "2026-07-23T12:01:00Z", "heartbeat", heartbeatJson())
+        applier.apply(3, "2026-07-23T12:02:00Z", "evidence", evidenceJson())
+
+        assertTrue(
+            "once a full state has been received, later deltas are legitimately incremental",
+            db.dao().syncStateNow()!!.snapshotSeen,
+        )
+        assertEquals(
+            ApplyResult.Applied("delta"),
+            applier.apply(4, "2026-07-23T12:03:00Z", "delta", deltaJson()),
+        )
+    }
+
     @Test
     fun snapshotProjectsFullState() = runTest {
         val result = applier.apply(seq = 1, envelopeTs = "2026-07-23T12:00:00Z", kind = "snapshot", plaintext = snapshotJson())
@@ -242,20 +304,53 @@ class EnvelopeApplierTest {
     // fixture-populated table and the fixture's audit claim.
 
     @Test
-    fun firstRealDeltaWipesDemoDataInsteadOfMergingIntoIt() = runTest {
+    fun firstRealDeltaIsRefusedOutrightRatherThanMergedIntoDemoData() = runTest {
+        // AMENDED IN A3 — read this before assuming it was weakened.
+        //
+        // The Codex audit invariant is "fixture data must never mix with, or masquerade as,
+        // engine data". This test used to prove it by asserting that a first real DELTA wiped
+        // the fixture and applied itself. A3 makes the applier refuse a delta outright until a
+        // snapshot has been seen, because a delta is the recent window and applying one to an
+        // empty replica presents a handful of rows as the entire pipeline.
+        //
+        // The invariant is therefore held MORE strictly, not less: the delta never lands, so
+        // it cannot mix with anything. What changed is the mechanism, and the demo rows now
+        // survive carrying their honest "not a live engine" label instead of being replaced by
+        // a partial window presented as real.
+        //
+        // The wipe-on-first-real-payload defense itself is untouched and still proven for the
+        // kinds that legitimately arrive first — see firstRealSnapshotAlsoClearsDemoEvidence-
+        // AndDocuments and firstRealHeartbeatWipesDemoRowsRatherThanRelabelingThem.
         DemoFixture.seed(db)
         val result = applier.apply(1, "2026-07-23T12:00:00Z", "delta", deltaJson())
-        assertEquals(ApplyResult.Applied("delta"), result)
+        assertEquals(ApplyResult.AwaitingSnapshot, result)
 
-        // Only the delta's rows remain — no demo application/job survives to masquerade as real.
-        assertEquals(listOf("app_1", "app_2"), db.dao().applicationsNow().map { it.id })
-        assertEquals(listOf("job_2"), db.dao().jobsNow().map { it.id })
-        assertTrue(db.dao().evidenceEventsNow().isEmpty())
+        // Nothing from the delta landed, and nothing of the fixture was destroyed.
+        assertEquals(6, db.dao().applicationsNow().size)
+        assertTrue(db.dao().applicationsNow().none { it.id == "app_1" || it.id == "app_2" })
+        assertTrue(db.dao().jobsNow().none { it.id == "job_2" })
+
+        val state = db.dao().syncStateNow()!!
+        assertEquals(true, state.demoMode) // still labelled demo on every screen
+        assertEquals(0L, state.highestAppliedE2pSeq) // seq not burned; the snapshot still fits
+        assertTrue(!state.snapshotSeen)
+    }
+
+    @Test
+    fun aSnapshotAfterARefusedDeltaStillWipesTheDemoFixture() = runTest {
+        // The other half of the amendment above: refusing the delta must not strand the
+        // replica in demo mode. The snapshot that follows performs the wipe as it always did.
+        DemoFixture.seed(db)
+        applier.apply(1, "2026-07-23T12:00:00Z", "delta", deltaJson())
+
+        applier.apply(2, "2026-07-23T12:01:00Z", "snapshot", snapshotJson())
+
+        assertEquals(listOf("app_1"), db.dao().applicationsNow().map { it.id })
         assertTrue(db.dao().documentsNow("app_demo_1").isEmpty())
-
         val state = db.dao().syncStateNow()!!
         assertEquals(false, state.demoMode)
         assertNull(state.auditOk) // the fixture's auditOk=true was never engine-reported
+        assertTrue(state.snapshotSeen)
     }
 
     @Test

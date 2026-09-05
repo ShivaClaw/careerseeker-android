@@ -1,0 +1,93 @@
+# MISSION — Sync + Android ladder (S0–S8), unattended window Aug 7–18
+
+> ## ⛔ STATUS BANNER — added at run 48 (2026-08-16). The mission below is unchanged; this is state, not law.
+>
+> **§7's stop condition is MET.** It fires at 45 iterations logged; **47 are logged**, and the final
+> handoff was written at run 47 as [`../RETURN-DAY.md`](../RETURN-DAY.md). **Read that first** — it
+> carries the ladder table, the landing plan for the 17 open draft PRs, and the human queue.
+>
+> **If your prompt just assigned you S5's spec half** — amend §4.3 with the `entitlement_ack` body,
+> add the vector via `generate.mjs`, close PQ-A2-1/-2/-3 — **stop and verify before building it.**
+> It has been built since **2026-08-09**: `8575539` (body + PQ-A2-1 + PQ-A2-2), `22b028e` (both ack
+> vectors), `7328a0b` (`invalid-unknown-field`, PQ-A2-3), all on the `claude/s5-*` draft branches.
+> **Thirteen runs have now been assigned it.** The one-command check is **C-STOP-1** in
+> [`../AUDIT-REQUEST.md`](../AUDIT-REQUEST.md). It is unbuilt only in the sense that it is **not on
+> `main`** — the 17 PRs are unmerged because the merge condition is a Windows gate no cloud session
+> can run, and that is a *landing* problem, not a *building* one.
+>
+> Two other details in the recurring prompt are **stale, measurably**: the vendored vector pin moved
+> `679a317` → **`7328a0b`** on 2026-08-12 (**C-PIN-1**), and S5 is not "NOT STARTED" — its emitter
+> landed too. Re-derive from the repo, never from the prompt's summary; the prompt itself says so.
+>
+> **What actually remains needs a human** — see `RETURN-DAY.md` §5: a Windows gate, an emulator
+> (**B-4**), a relay deploy, and two design decisions. Recorded as **B-18**.
+>
+> **HOW TO RECORD AN EMPTY FIRING — house law from run 118, and it overrides §1's "continue the
+> house records exactly as found" for this one case.** If `scripts/run-zero.sh ../careerseeker`
+> says `NOTHING MOVED` and all five escalation triggers are negative, you append **one line** to
+> [`../FIRINGS.md`](../FIRINGS.md) via `scripts/firing-line.sh` and write **nothing** to `STATE.md`,
+> `LOG.md`, `BLOCKED.md` or `AUDIT-REQUEST.md`. Runs 111–117 each added a median of **355 lines** to
+> those four records to say nothing had moved; they stood at **50,862 lines** and the schedule fired
+> five times on 2026-08-28. If you find **anything** — a moved `main`, a PR merged or undrafted, a
+> changed prompt, an executed gate, a real new finding — write the full entry as before. `FIRINGS.md`
+> is for empty firings only.
+
+You are the Claude Code agent for the CareerSeeker Android program. Brandon is out until 2026-08-18. You have two working trees: this session's root `C:\Users\bkirk\Documents\careerseeker-android` (private repo, currently on `claude/android-a0-probe` — the A0→A7 alpha ladder ran here 2026-07-30: 99/0 tests, debug APK builds, HANDOFF-Android-Alpha.md at root), and `C:\Users\bkirk\Documents\careerseeker-sync` — YOUR dedicated clone of `ShivaClaw/careerseeker` for the engine-side sync track. **Never touch `Documents\CareerSeeker`** — that working tree belongs to the Codex agent running the beta track in parallel.
+
+**First action of every iteration: `git fetch --all --prune` in BOTH trees.** The stale-refs incident of 2026-08-06 (a session nearly opened an empty PR off unfetched refs, and missed that main had moved 33 commits) is why this is rule one.
+
+## 1. Standing law
+- The android repo's working rules are unchanged: derive state before acting; secrets by name only; evidence = "ran it and saw it" with output cited; small reviewable commits; **draft PRs, never self-merge, external audit before merges; gates are Brandon's alone.** Continue the house records exactly as found: `LOG.md` (evidence, milestone by milestone), `BLOCKED.md` (symptom / attempts / smallest human unblock), `AUDIT-REQUEST.md` (every claim with its re-verification command).
+- Engine-compatible interpretation rule: where `docs/Sync-Protocol.md` is ambiguous, match the engine, ship that, record the question in `docs/protocol-questions.md`. A phone "more correct" than the engine is a field bug.
+- Versions are verified against artifact repositories and live policy pages at decision time, never copied from specs. Standing pins: AGP 9.3.0 (built-in Kotlin — never apply `org.jetbrains.kotlin.android`), Gradle 9.6.1, Kotlin 2.4.10, JDK 17, compile/targetSdk 37, minSdk 26, **Ktor 3.1.3** (3.2.0 ships a spaces-in-SimpleName field that D8 rejects below DEX 040 / minSdk 30 — raising minSdk is a product decision, not a build fix; the A6.5 LOG entry is the precedent).
+- Verification command of record (android): `./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:test :app:assembleDebug :app:lintDebug --rerun-tasks` — always `--rerun-tasks` when claiming, or you're reading a cache. In `careerseeker-sync`, the main repo's `CLAUDE.md` governs: invariants, `scripts\Verify-Alpha.ps1` ritual, the `$ExpectedOfflineTotal` drift trap, secrets rules.
+- Main repo merge policy for THIS window (Brandon, 2026-08-07): your sync-track PRs in `careerseeker` may be merged by you after rebase onto latest `origin/main` + full local gate (`Verify-Alpha.ps1 -IncludePublish -IncludePackage`) + CI green. The android repo stays never-self-merge: stack draft PRs, each carrying a written self-audit section (what an external auditor should attack first).
+
+## 2. Gates answered 2026-08-07 (Brandon) — now law
+1. **P2-KEYSTORE-FALLBACK = fall back, visibly.** No hardware-backed key → pair with a software key, persistent "software-backed key" indicator in the UI, downgrade recorded in the audit trail. Update `docs/P2-Runbook.md` §4's gate record accordingly.
+2. **PQ-A6-1 default-proceed** (unless Brandon's first message says `HOLD S5`): `entitlement_ack` body = `{product_id, acknowledged_at, order_id?}`. §4.3 amendment + shared vector + engine applier + phone applier move as one coordinated change (S5).
+3. **PQ-A2-1 = option (a):** amend §3.1 prose — the 1 MiB cap is measured on the ciphertext; both implementations stand. **PQ-A2-2:** state in §3 that structural rejection reports `decrypt_failed`. **PQ-A2-3:** add the `invalid-unknown-field` vector via `generate.mjs`.
+4. Room stays. `applicationId` stays PROVISIONAL. Play floor: targetSdk 36 from 2026-08-31 — re-verify against live Play docs when you cut the release bundle (S7), per house rule.
+
+## 3. Embargoes
+No deploys (Cloudflare/Workers/relay/site/Pages). The production relay may be contacted only as a client on `GET /v1/health`. No Google/Play/OAuth console, no accounts, no purchases, no Play Billing code beyond the signed test vectors, no email or Gmail anything, no cert-store or MSIX actions, no reboots, no force-push, no history rewrite, no secrets (existence only), no `.appdata` originals, no edits to `Desktop\site-v2`, no self-merge in the android repo, no scope beyond `gmail.compose` anywhere.
+
+**Newly allowed, explicitly:** (a) `sdkmanager` system-image install + AVD creation for emulator testing (log it as a machine change in LOG.md); (b) generating an **upload keystore** at `%USERPROFILE%\.careerseeker-signing\upload-keystore.jks` with a README (passwords in a sibling file readable only by you two, referenced by path, NEVER committed, NEVER printed) — Play App Signing makes upload keys rotatable, so this is low-risk; (c) pushing branches and opening draft PRs in both repos; merging in `careerseeker` only, per §1.
+
+## 4. Coordination bus (shared main repo)
+Maintain branch `autonomy/claude-state` in `careerseeker` containing `STATE.md`: current rung, exact files claimed this iteration, heartbeat timestamp, next intent, and a one-line android heartbeat (rung id + green/blocked only — program details stay in the private repo). Push directly; docs-only branch, never merged. Each iteration start, read `autonomy/codex-state:STATE.md`; if your claims collide with Terra's, take a different slice this iteration. **Terra has right-of-way: you rebase.** Your engine-side territory: `relay/`, `src/Sync/`, `docs/Sync-Protocol.md`, `docs/sync-vectors/`, `tests/SyncHarness`, the `/pair` dashboard page, `Program.cs`'s `BuildSyncBridge` seam, funnel-board surfaces from PR #8. Pinch points (`Verify-Alpha.ps1`'s `$ExpectedOfflineTotal`, count-reporting docs, `Host.cs`): claim before touching; a pin conflict is always resolved by re-running the verifier and writing the measured number, syncing every count-reporting doc in the same commit.
+
+## 5. Iteration protocol (one rung-slice per iteration)
+fetch both trees → read both STATE files → pick topmost workable rung → one coherent slice → verify (full android command and/or full main-repo gate, as touched) → record executed evidence (LOG.md entry + AUDIT-REQUEST.md re-verification command for every new claim) → push branch, open/refresh draft PR (self-audit section required in android PRs) → merge only in `careerseeker`, only per §1 → update STATE.md heartbeat + HUMAN-QUEUE.md → stop the slice. Two failed attempts at one obstacle → BLOCKED.md entry → next rung. If `/loop` is nearing its 7-day expiry, note it in STATE.md — the daily backstop continues the drumbeat regardless. If usage pressure forces model downgrade mid-window, prefer finishing mechanical rungs (S1, S8) before design-heavy ones (S2, S5).
+
+## 6. The S-ladder
+
+### S0 — Re-entry + derivation (first, in full)
+In both trees: fetch, inventory branches/PRs, and write `docs/S-Ladder.md` + `STATE.md` (android root) recording derived truth. Expect but verify: android `main` is docs-only while code lives on `claude/p2-replica` → `p4-pro` → `p5-store` lineage (the two-lineage merge hazard in HANDOFF §5 — flag, don't resolve; merge policy is Brandon's); `claude/android-a0-probe` tip ~`d839e48` (HANDOFF recorded A6 artifact at `26b9aee`); android PRs #4/#5 are stacked drafts mid-review — leave them draft, note conflicts `p5-store` will cause (HomeScreen/ApplicationsScreen/ApplicationDetailScreen). Push `a0-probe` + open its draft PR if not already — that runs CI's vendored-vector drift step (BLOCKED B-3's expected-not-verified pass becomes verified or a finding). Remove the stale worktree: `git -C C:\Users\bkirk\Documents\careerseeker-android worktree remove ..\careerseeker-android-p5` (only if `git status` there is clean). In `careerseeker-sync`: derive the state of PRs #5 (relay bind, 3 commits), #6 (P1 pairing+relay+protocol+vectors, 6), #7 (snapshot-retry fix, 13), #8 (P4 outcomes/entitlement/funnel, 21) — verify the expected stacked ancestry 5⊂6⊂7⊂8, all ~58 behind `main`. Note gate P0-BASE ("target `claude/alpha-finish`") is superseded: the alpha train landed in `main` long ago — new base is `origin/main`, record the supersession. Commit this mission as `docs/CLAUDE-ANDROID-MISSION.md` (android repo). Create `autonomy/claude-state`.
+
+### S1 — Rebase and land the engine sync track (main repo)
+Rebase in order 5 → 6 → 7 → 8 onto fresh `origin/main` (each PR re-cut, conflicts resolved, semantics preserved — #7's "failed first snapshot is retried, never demoted to delta" invariant must survive verbatim; SyncLiveSmoke's counts re-derived, `$ExpectedOfflineTotal` bumped with the full drift-trap sweep). Full local gate + CI green each; merge sequentially per policy. The vendored-vector pin in the android repo is `679a317` — if rebasing changes vector file CONTENT (it shouldn't; rebases move commits, not bytes), stop: that's a cross-repo drift event, BLOCKED, human unblock.
+
+### S2 — Close BLOCKED B-2: engine publishes for real
+The gap recorded engine-side: `Program.cs::BuildSyncBridge` is a seam with no `RelayClient`-backed sink, `--sync` honors the flag but no-ops, and the desktop `/pair` page doesn't exist. Build: the `/pair` page in the local dashboard (pairing-code + QR display, feeding `PairingManager`), the publisher sink behind `--sync` (default OFF — opt-in per the Autonomy Contract; consent copy exists in the android repo's `docs/Sync-Consent-Copy.md`, awaiting-review status noted), and an end-to-end proof against a LOCAL relay (`relay/` under miniflare/vitest — never a deploy). The live Worker still self-reports `{"ok":true,"protocol":1,"phase":"p1"}` — it predates P2/P4; add to HUMAN-QUEUE: "`npx wrangler deploy --config relay/wrangler.jsonc` (~5 min) then re-run SyncLiveSmoke live" for return day.
+
+### S3 — Pairing screen (gate now answered)
+Keystore-backed ECDSA device key with the decided fallback chain (StrongBox → TEE → software **with persistent indicator + audit-trail entry**); CameraX + ML Kit QR scan; confirm-code screen; `CAMERA` permission + `<uses-feature android:required="false">`. Robolectric can't model Keystore: set up the emulator lane (§3a allowance) and verify key behavior there honestly; screens compile-only claims are forbidden — label exactly what ran where. Feeds on `PairingSession` (already vector-proven, 8 tests).
+
+### S4 — Transport loop
+Wire what exists but isn't connected: pull-on-open through `EnvelopeReceiver.receiveWire`; `ApplyResult.AwaitingSnapshot` → send `pull_request` (currently returned and ignored); add the Ktor engine dependency to `:app` (3.1.3); then the WSS live route. Prove E2E on one machine: engine (`careerseeker-sync` build) ↔ local relay ↔ emulator (`10.0.2.2`). This is A5 closed honestly — snapshot, delta, heartbeat, provenance banner flipping off demo data.
+
+### S5 — Entitlement ack: the Pro loop (skip only if Brandon said HOLD S5)
+One coordinated change, both repos, per PQ-A6-1's default-proceed body: §4.3 amendment + `generate.mjs` vector + engine applier answering `entitlement_ack` after `GoogleSignedPayloadVerifier` accepts + phone applier branch calling `ProState.afterEngineAck` + Overview free-vs-Pro surface. Close PQ-A2-1/-2/-3 in the same window (§2.3). The phone remains a courier — a local ACCEPTED verdict still unlocks nothing (PQ-A2-4 boundary is load-bearing).
+
+### S6 — Outcome marking, phone side
+Device-signed outcome envelopes (needs S3's key): mark applied/replied/interview/offer/rejected/no_reply from the application detail screen; engine side + funnel board arrive with rebased #8. `OutcomeBadge` display half already done. E2E on the S4 rig.
+
+### S7 — Play-readiness pack (repo-only; Console is human)
+Release `.aab`: minified R8 build signed with the §3b upload keystore; version scheme (`versionCode` monotonic plan recorded); re-verify Play target floor live. `store/` folder in the android repo: listing copy per `docs/Monetization-Decision.md` (Dashboard $4.99 one-time; Pro $2.99 INAPP `pro_unlock`; free-forever Windows promise protected), data-safety worksheet derived from `docs/Sync-Consent-Copy.md` (no accounts, no analytics, E2E relay, what leaves the device and why), privacy-policy delta, screenshots captured on the emulator, feature-graphic spec, pre-launch checklist (Console steps ordered for return day: D-U-N-S/business verification status → app create → Play App Signing enrollment with upload key → listing → internal testing track). Draft the pricing-page rewrite (P6 blocker per Monetization-Decision §1-2) as `docs/Pricing-Page-Rewrite.md` — deploy is Brandon's.
+
+### S8 — Hardening
+`MigrationTestHelper` coverage for Room v1→v2→v3 (currently defined, honestly-uncovered); the roadmap spec §6 backlog; lint zero-warning hold; CI green across the stack; bundle refresh convention maintained (`Desktop\careerseeker-android-*.bundle`).
+
+## 7. Stop conditions & handoff
+All rungs DONE/BLOCKED, or 45 iterations logged → final LOG.md handoff entry (ladder table, evidence index, PR stack order with self-audits, HUMAN-QUEUE, boundary paragraph: what was never touched) → clear the goal. Unexpected commits from Brandon in either repo → re-derive first. Every LOG entry ends with its prohibition paragraph, as A6.7 did.

@@ -74,7 +74,34 @@ private fun ApplicationCard(app: ApplicationRow, onOpen: (String) -> Unit) {
             }
             Text(app.title, style = MaterialTheme.typography.titleMedium)
             Text(app.company, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Absent means the engine never reported one (§4.3.1) — render nothing rather
+            // than "no outcome", which would read as a reported observation.
+            app.outcome?.let { OutcomeBadge(it) }
         }
+    }
+}
+
+/**
+ * The Pro outcome, as reported by the engine.
+ *
+ * Renders any string the engine sends, including `no_reply`, which is a desktop-set
+ * observation the phone may display but may never set (§4.3.1). Display-only text: this is a
+ * badge, not a control, and A6 ships no control — see BLOCKED.md B-1.
+ */
+@Composable
+internal fun OutcomeBadge(outcome: String, modifier: Modifier = Modifier) {
+    val container = when (outcome) {
+        "offer" -> MaterialTheme.colorScheme.primaryContainer
+        "rejected" -> MaterialTheme.colorScheme.errorContainer
+        "no_reply" -> MaterialTheme.colorScheme.surfaceVariant
+        else -> MaterialTheme.colorScheme.tertiaryContainer
+    }
+    androidx.compose.material3.Surface(color = container, shape = MaterialTheme.shapes.extraSmall, modifier = modifier) {
+        Text(
+            "outcome: $outcome",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
 }
 
