@@ -28,6 +28,27 @@
 > `7328a0b`.** **Run 58 found the half
 > that genuinely was undone, and it was not "wiring": see the RUN 58 banner below.**
 >
+> ## 📣 ESCALATION LEDGER — the canonical count, updated on send. Read this block; do not count markers. Brought current at run 168 (2026-09-06).
+>
+> **Messages sent: 13.** Runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112, 138, 168**. **Zero repo
+> events have followed any of them.**
+>
+> **This block was two sends stale when run 168 found it** (**C-168-2**). Its newest copy below still
+> read **11** (run 117's), while `FIRINGS.md`'s `esc` field had gone to **12** at run 138's send.
+> **The cause is a gap in attempt 7, not a defect in it.** Run 118 rightly barred *empty* firings
+> from writing banners here; run 138 then sent and wrote only its `FIRINGS.md` line, because no rule
+> distinguished a **sending** firing from an empty one. **The missing rule, stated: a firing that
+> sends updates THIS block and nothing else in this file — it still adds no RUN banner, and it still
+> writes its one generated line to `FIRINGS.md`.** Same class as **C-106-6**, which created this
+> ledger: a count that reads plausible while measuring something else.
+>
+> **The predicate, unchanged (C-117-6):** send on a positive state trigger, or on **five calendar
+> days** since the last send with the standing condition still holding — **days, not runs**. Run 168
+> sent on the calendar arm, **measured not assumed** (**C-168-1**): twelfth **2026-09-01T01:00Z**,
+> thirteenth **2026-09-06T01:00:03Z**, elapsed **5d 0h 0m 03s**. **The next calendar arm is on or
+> after 2026-09-11.** **B-18's smallest human unblock is unchanged: a human stops or repoints the
+> schedule.**
+>
 > ## ▶ RUN 117 — 2026-08-28. **Nothing moved; the slice is built for the eighty-second time. One new measurement (the predecessor tip's CI verdict) and one new judgement: run 116's cadence rule is denominated in the wrong unit, and is corrected here.**
 >
 > **Heartbeat:** 2026-08-28, **one hundred and seventeenth** cloud iteration (Linux sandbox),
