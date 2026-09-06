@@ -21087,3 +21087,51 @@ git -C <engine> status --short          # expect: no output
 git -C <engine> rev-parse HEAD          # expect: aac05f3f93f0ca06cbc9dfa7884f74a126f078dc
 git -C <engine> rev-parse origin/main   # expect: the same sha
 ```
+
+### C-168-1 — The thirteenth B-18 message was sent, and its five-calendar-day arm was measured rather than assumed
+
+> **Claim.** Run 168 sent the thirteenth B-18 escalation. The predicate is **C-117-6**'s: a positive
+> state trigger, or **five calendar days** since the last send with the standing condition still
+> holding. Run 138 sent the twelfth at **2026-09-01T01:00Z**; this firing began at
+> **2026-09-06T01:00:03Z**, an elapsed **5d 0h 0m 03s**, so the arm was met by three seconds and was
+> **computed, not inherited**. All five triggers were independently negative: `run-zero.sh` →
+> `NOTHING MOVED` exit 0 (both mains unmoved, pin `7328a0b`, corpus 29/29, `OK: 29 vector files
+> match the generator.`); board via the GitHub MCP server reading `merged_at` not `merged`
+> (**C-89-2**) → **22 engine + 6 android open, every row `draft:true`**, newest merge anywhere still
+> engine **#44, 2026-08-13** — **24 days**; the stored prompt unchanged, carrying the same three
+> stale facts; **no gate ran and none is claimed**. Runs **164, 165, 166 and 167** each named this
+> firing, by UTC slot, as the one that must send — run 165 having corrected run 164's off-by-two.
+> **Zero repo events have followed any of the twelve prior sends.**
+
+```bash
+cd <android> && git fetch --all --prune && scripts/run-zero.sh ../careerseeker   # expect: NOTHING MOVED, exit 0
+python3 -c "from datetime import datetime,timezone; \
+print(datetime(2026,9,6,1,0,3,tzinfo=timezone.utc)-datetime(2026,9,1,1,0,tzinfo=timezone.utc))"   # expect: 5 days, 0:00:03
+grep -o 'esc 1[0-9]' FIRINGS.md | tail -3                                        # expect: esc 12 ... esc 13
+# board, via the GitHub MCP server (no gh in this sandbox):
+#   list_pull_requests owner=ShivaClaw repo=careerseeker         state=all fields=[number,state,draft,merged_at]
+#   list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all fields=[number,state,draft,merged_at]
+```
+
+### C-168-2 — The canonical escalation ledger was two sends stale, and a send is not an empty firing
+
+> **Claim.** `STATE.md`'s **ESCALATION LEDGER** block instructs the reader *"the canonical count,
+> updated on send. Read this line; do not count markers."* Its newest copy — run 117's, at roughly
+> `STATE.md:69-70` on arrival — still read **`Messages sent: 11`**, while `FIRINGS.md`'s `esc` field
+> had advanced to **12** at run 138's send. So the one instrument that decides whether the owner is
+> contacted **under-reported by two** and had diverged from the ledger that supersedes it.
+> **The cause is a gap in attempt 7, not a defect in it.** Run 118 correctly barred *empty* firings
+> from writing banners into `STATE.md`; run 138 then sent a message and wrote only its `FIRINGS.md`
+> line, because **no rule distinguished a sending firing from an empty one**. This is the same class
+> of defect as **C-106-6**, which created this ledger: the count reads plausible while measuring
+> something other than what it claims. Run 168 brings the block current to **13** and states the
+> missing rule inside it — **a sending firing updates the ledger block and nothing else in
+> `STATE.md`, and still adds no RUN banner.** Per **C-106-7** this is a records-hygiene finding: it
+> is **filed, never sent**, and it is not the reason this run notified (**C-168-1** is).
+
+```bash
+cd <android> && grep -n 'Messages sent:' STATE.md | head -1   # expect: the run-168 block, 13
+git log --format='%h %s' -1 -- FIRINGS.md                     # run 138's send touched FIRINGS.md only
+git show $(git log --format=%H --grep='run 138' -1) --name-only --format='%s'   # expect: FIRINGS.md alone
+scripts/check-citations.sh                                     # expect: exit 0, every cited id resolves
+```
