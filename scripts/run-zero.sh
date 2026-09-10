@@ -61,10 +61,20 @@ set -uo pipefail
 ENGINE=${1:-../careerseeker}
 ANDROID=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
-# ---- recorded state, as of run 98 (2026-08-25) -----------------------------
-BASE_ENGINE_MAIN=aac05f3f93f0ca06cbc9dfa7884f74a126f078dc   # 2026-08-12
+# ---- recorded state, as of run 198 (2026-09-10) ----------------------------
+# 2026-09-10, run 198: a MERGE CASCADE is in progress -- 7 merges in the 4 minutes this run
+# was writing (#32, #34, #35, #54, #55, #56, #57). This baseline is the tip MEASURED at
+# 23:01Z; it may well be stale by the next firing, and that is the script working, not failing.
+# A MOVED report here means re-derive, not that this constant is wrong.
+BASE_ENGINE_MAIN=cffe2b78319595cbe18e37d42b7abb573d108606   # 2026-09-10 — merge cascade (run 198)
 BASE_ANDROID_MAIN=ebfaf8108e635551c3beac851424a4407c5a8fdd  # 2026-08-06
 SLICE_COMMITS="8575539 22b028e 7328a0b"                     # the assigned S5 slice
+# Run 198 (2026-09-10): a human merged PR #32, so two of the three are now ON main and will
+# stay there. Before this, section 1 flagged ANY landing as a change -- correct while nothing
+# had landed, but from now on it would fire forever on a permanent condition, which is the
+# same signal-destroying staleness the BASE_ENGINE_MAIN comment describes. So record which
+# ones are EXPECTED on main; section 1 now flags only a DEVIATION from this expectation.
+SLICE_LANDED="8575539 22b028e"                              # expected ancestors of origin/main
 BASE_ENGINE_DRAFTS=22
 BASE_ANDROID_DRAFTS=6
 BASE_MERGED_SINCE_RUN95=0
@@ -115,11 +125,21 @@ for c in $SLICE_COMMITS; do
     continue
   fi
   desc=$(git -C "$ENGINE" log -1 --format='%h %ad %s' --date=short "$c")
+  expected_landed=no
+  for l in $SLICE_LANDED; do [ "$l" = "$c" ] && expected_landed=yes; done
   if git -C "$ENGINE" merge-base --is-ancestor "$c" origin/main 2>/dev/null; then
-    note "MERGED  $desc"
-    bad "$c is now an ancestor of origin/main — THE SLICE LANDED. This is a change."
+    if [ "$expected_landed" = yes ]; then
+      note "on main (expected)  $desc"
+    else
+      note "MERGED  $desc"
+      bad "$c is now an ancestor of origin/main — THE SLICE LANDED. This is a change."
+    fi
   else
-    note "off-main  $desc"
+    if [ "$expected_landed" = yes ]; then
+      bad "$c was expected ON main and is NOT — main may have been rewritten. Re-derive."
+    else
+      note "off-main  $desc"
+    fi
   fi
 done
 
@@ -191,8 +211,13 @@ cat <<EOF
     list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
     list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
 
-  Last VERIFIED (run 99, 2026-08-25, MCP): ${BASE_ENGINE_DRAFTS} engine + ${BASE_ANDROID_DRAFTS} android open, ALL
-  draft:true, ${BASE_MERGED_SINCE_RUN95} merged since — newest merge anywhere is engine #44, 2026-08-13.
+  Last VERIFIED (run 198, 2026-09-10, MCP): a MERGE CASCADE is under way, and the
+  run-99 line this replaces ("${BASE_ENGINE_DRAFTS} engine + ${BASE_ANDROID_DRAFTS} android open, ALL draft:true,
+  ${BASE_MERGED_SINCE_RUN95} merged since, newest merge #44 2026-08-13") was true for 162 firings
+  and is now FALSE. Seven engine PRs merged between 22:57:28Z and 23:01:31Z --
+  #32, #34, #35, #54, #55, #56, #57 -- ending a 29-day gap. Only NON-DRAFT PRs
+  are landing: #33 stayed draft:true and was not swept up. RE-QUERY; do not
+  quote either number. The board is moving and any count here ages in minutes.
   Note that the list rows' 'merged' field reads false even for PRs that
   demonstrably merged (C-89-2) — use merged_at or the commit graph, not that field.
 

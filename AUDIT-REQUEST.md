@@ -21367,3 +21367,64 @@ echo "ANDROID_HOME=${ANDROID_HOME:-UNSET}"
 run here"* is a **per-firing measurement, not a property of the program**, and no firing may quote
 another's toolchain line. A draft of run 200's LOG entry asserted `dotnet` absent **before** this
 command was run — right answer, wrong method, and the method is the part that has to hold.
+### C-198-10 — the two `run-zero.sh` constants the cascade invalidated, and why leaving them was the expensive option
+
+> **Claim.** `scripts/run-zero.sh` is updated in two places by a firing concurrent with run 198's.
+> `BASE_ENGINE_MAIN` moves `aac05f3` → **`cffe2b78319595cbe18e37d42b7abb573d108606`**, and a new
+> `SLICE_LANDED="8575539 22b028e"` records which slice commits are **expected** on `main` so §1 flags
+> only deviations. §6's *"0 merged since — newest merge anywhere is engine #44"* is retired as false.
+> The android baseline `ebfaf81` was correct and is untouched.
+
+```bash
+cd careerseeker-android && grep -n "BASE_ENGINE_MAIN\|BASE_ANDROID_MAIN\|SLICE_LANDED" scripts/run-zero.sh
+scripts/run-zero.sh ../careerseeker >/dev/null; echo "exit=$?"
+```
+
+*Expected:* the new constants, and **`exit=0`**. Before the fix the same command exited **1** on two
+independent flags — `!! engine main MOVED aac05f3 -> …` and `!! 8575539 is now an ancestor of
+origin/main — THE SLICE LANDED`.
+
+**Why this is not cosmetic.** Both flags were correct exactly once. Left in place they become
+**permanent**, so every subsequent firing takes the full-records path on a stale constant rather than
+on a fact — converting attempt 7's one-line saving back into the ~355 lines a firing that
+`FIRINGS.md` measured and exists to end. The script's own header states the rule this follows:
+*"When something legitimately moves, the run that records the move updates the constant in the same
+commit."*
+
+**What would falsify it:** if `run-zero.sh` exits 0 while `origin/main` is **not** `cffe2b7`, the
+baseline is being compared wrongly. If a later firing reports `MOVED` again, **`main` genuinely moved
+again** — the cascade was still running when this was written — and the correct response is to
+re-derive and move the constant, not to assume this one is wrong.
+
+### C-198-11 — a fabricated SHA, caught inside the run, recorded rather than quietly fixed
+
+> **Claim.** Setting C-198-10's baseline, this firing first wrote a **full 40-hex SHA it had never
+> measured**, having read only the short `cffe2b7` from the script's own output. It was caught before
+> the commit and replaced with the real value from `git rev-parse origin/main`.
+
+```bash
+cd careerseeker && git rev-parse origin/main    # while main is still at this tip
+cd ../careerseeker-android && grep -n BASE_ENGINE_MAIN scripts/run-zero.sh
+```
+
+*Expected:* the two 40-hex values are identical. **Why it is in this file at all:** a plausible SHA
+is precisely the fabrication these records exist to refuse, and this one would have pointed every
+future `run-zero.sh` comparison at a commit that does not exist — failing open, silently, on the one
+guard the firing was repairing. **Expand short hashes with `rev-parse`; never type the rest.**
+
+### C-198-12 — what this addendum did NOT do
+
+> **Claim.** It sent **no notification** (run 198 already sent the escalation on the same trigger —
+> `main` moved / a PR merged — and a second message would spend the channel on a fact its owner
+> already has). It ran **no gate**: `:core:test` not run, `generate.mjs` **not invoked at all**, no CI
+> result claimed for any head. It **did not repeat** run 198's narrative — that banner stands as the
+> record. **Nothing was merged, closed, reopened, undrafted, retargeted, force-pushed or deleted** in
+> either repository; **PR #33 was not touched**, and it was open every time this firing read it.
+
+```bash
+cd careerseeker-android && git show --stat HEAD
+```
+
+*Expected:* `scripts/run-zero.sh`, `STATE.md`, `AUDIT-REQUEST.md` only — **no `.kt`, `.cs`, `.ts`,
+`.mjs`, no vector byte, no `docs/Sync-Protocol.md`, and no `FIRINGS.md` line** (this firing was not
+empty, and that file is for empty firings only).

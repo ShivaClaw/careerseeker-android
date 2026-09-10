@@ -176,6 +176,46 @@
 > SDK (**`ANDROID_HOME UNSET`**); `:core:test` was not run and nothing in `:core` moved. No deploy,
 > no relay contact, no Google/Play console, no secret read. Re-verify: **C-198-1…7**.
 >
+> ## ▶ RUN 198 — ADDENDUM (concurrent firing). **The two `run-zero.sh` constants the cascade invalidated, fixed — without them every future firing takes the expensive path forever on a stale constant.**
+>
+> **Written by a second firing that ran concurrently with the one above and reached the same two
+> conclusions independently** (the cascade; the wake being false). **Its prose is not repeated here** —
+> the banner above stands as the record, and duplicating it would be exactly the restatement
+> `FIRINGS.md` exists to prevent. This addendum keeps only what that firing left unclaimed, which is
+> a code fix rather than a narrative.
+>
+> **Corroboration worth one line:** the two firings were woken by *different* PRs — this one by
+> **#33**, the one above by **#37** — with the identical `closed without merging` payload, and both
+> are open. **The false close is a pattern across the cascade's stacked PRs, not a one-off**: when a
+> base branch is deleted on merge, GitHub closes and then retargets every PR stacked on it. Treat any
+> `pull_request.closed` wake during a cascade as a claim about a moment, and re-derive.
+>
+> **THE FIX** (**C-198-10**). `scripts/run-zero.sh` carried two constants that were correct until the
+> cascade and are now permanently wrong:
+> 1. `BASE_ENGINE_MAIN=aac05f3` — four weeks stale. Every future firing would print
+>    `!! engine main MOVED` **forever**, on a constant rather than on a fact.
+> 2. §1 flagged *any* slice commit landing as `THE SLICE LANDED. This is a change.` — true once,
+>    now a permanent condition that would fire on every run.
+>
+> Both would have converted attempt 7's one-line saving **back into ~355 lines a firing**, which is
+> the precise failure mode `firing-line.sh` was built to end. Baseline moved to **`cffe2b7`**; a new
+> `SLICE_LANDED` records which commits are *expected* on `main` so §1 flags only **deviations** —
+> including the reverse case, a commit expected on `main` and absent, which would mean `main` was
+> rewritten. §6's `0 merged since … newest merge #44` is retired as false. **`run-zero.sh` exits 0
+> again**, and the android baseline `ebfaf81` was correct and is untouched.
+>
+> **ONE FABRICATION, CAUGHT IN-RUN** (**C-198-11**). Setting that baseline, this firing first wrote a
+> full 40-hex SHA it had **never measured** — expanded from the short `cffe2b7` by invention. Caught
+> before the commit and replaced with `git rev-parse origin/main`. **Recorded rather than quietly
+> fixed**: a plausible-looking SHA is the exact failure these records exist to refuse, and it would
+> have pointed every future `run-zero.sh` at a commit that does not exist. **Expand short hashes;
+> never type the rest.**
+>
+> **No notification sent** — the firing above already sent the escalation on this same trigger
+> (`main` moved / a PR merged). A second message hours later would spend the channel on a fact its
+> owner already has. **No gate ran, `:core:test` was not run, `generate.mjs` was not invoked, and no
+> CI result is claimed here.**
+>
 > ## ▶ RUN 117 — 2026-08-28. **Nothing moved; the slice is built for the eighty-second time. One new measurement (the predecessor tip's CI verdict) and one new judgement: run 116's cadence rule is denominated in the wrong unit, and is corrected here.**
 >
 > **Heartbeat:** 2026-08-28, **one hundred and seventeenth** cloud iteration (Linux sandbox),
