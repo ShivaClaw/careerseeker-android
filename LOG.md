@@ -19485,3 +19485,54 @@ none there). Files written this run, all in the android repo: **`FIRINGS.md`** a
 `docs/CLAUDE-ANDROID-MISSION.md` — plus the `autonomy/claude-state` heartbeat in the engine repo,
 which is the only thing pushed from that checkout. **No notification sent** — the twelfth was
 withheld.
+
+---
+
+# RUN 200 — 2026-09-10. **Two corrections the merge records left behind: the open board is 16, not 22, and the toolchain is not the same from one firing to the next.**
+
+**Almost all of this run's draft was DISCARDED as duplicate, and that is the headline.** Run 198
+(`0b98161`), run 199 (`9c3a59e`) and the two addenda (`4e42831`, `1fd1c33`) already own this event:
+the merge of #32, the refutation of the #37 wake event, #37's reopening and its five count-reporting
+conflict files, the fourteenth escalation, **and the seven-merge landing** — `4e42831` states that
+last one thirteen times over. **None of it is repeated here.** A draft carrying it was written and
+thrown away, following run 199's precedent on this branch forty minutes earlier. Two findings
+survived the cull.
+
+**Finding 1 — the open board is 16, not 22, and every record on this branch still says 22**
+(**C-200-3**). Measured this run by MCP, `state=open`: **16 engine PRs, all `draft:true`** —
+`[26, 33, 36, 37, 38, 39, 45, 46, 47, 48, 49, 50, 51, 52, 53, 58]`. Run 198's and run 199's `FIRINGS`
+lines both read **`board 22+6`**, and neither addendum touches it. **22 was correct** — it had been
+carried since *"last VERIFIED (run 99, 2026-08-25)"*, sixteen days — **and today is the day it
+stopped being correct**, because the seven merges that everything else in these records is about
+closed six of those PRs. **The event was recorded and its own effect on the board count was not.**
+That is the inherited-number failure this program has now found in `$ExpectedOfflineTotal`, in the
+vendored pin, in §7.2's tenth row and here: a figure stays right long enough to stop being checked.
+Android is unchanged at **6 open, all draft, zero merges ever**.
+
+**`#58` is in the open set and appears in no prior firing.** Not investigated here — flagged so the
+next session does not assume it is one of this routine's.
+
+**Finding 2 — the toolchain differs BETWEEN firings, so no firing may quote another's**
+(**C-200-4**). Run 198 executed a `dotnet build` and recorded **`dotnet` PRESENT**. In **this**
+container, two minutes later, `dotnet` is **ABSENT** — `which`, this session. Also ABSENT: `pwsh`,
+`sdkmanager`, `adb`; `ANDROID_HOME` **UNSET**; `node` and `java` present; and **`gradle` present** at
+`/opt/gradle/bin/gradle`, which still cannot run the android gate without an SDK. **Both reports are
+honest — the containers differ.**
+
+**The reason this is worth a record rather than a shrug:** these files have spent a hundred firings
+asserting *"`dotnet` and `pwsh` are absent, verified with `which`, not assumed"*, and a reader could
+reasonably compress that into a standing property of the environment. **It is not one.** Run 198
+could compile and this session cannot, so *"no gate can run here"* is a per-firing measurement with a
+four-hour shelf life. **A draft of this very entry asserted `dotnet` absent from inherited knowledge
+before the command was run** — the correct answer, reached the wrong way, which is exactly the habit
+that makes the next wrong answer invisible.
+
+**What this run did NOT do.** No re-pin; pin `7328a0b` unmoved and still off-`main`. **No PR opened,
+reopened, closed or commented** — `1fd1c33` already replied on #37, and a second reply would be the
+duplicate this entry exists to avoid. No S5 rebuild. **No gate ran and none is claimed** (verified
+above, not inherited). No production source, no vector byte, no spec byte, no pinch point in either
+repo. Engine checkout **read-only**. **No `FIRINGS.md` line** — this firing found something. **No
+`BLOCKED.md` entry: nothing newly blocked**, and B-18's fourteenth escalation is run 198's to own.
+**A duplicate draft was discarded, never force-pushed**; the branch history is runs 198/199 and their
+addenda with this appended. No deploy; the production relay was **not contacted at all**. No secret
+read, printed or echoed.

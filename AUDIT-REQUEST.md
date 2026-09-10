@@ -21328,3 +21328,42 @@ asked for #37 to be revived**, and the gate is unreachable here (**C-198-6**), s
 outcome. The PR **description was deliberately left intact** — it is an accurate record of
 2026-08-12 and reproducing it to prepend a banner would risk transcribing its evidence wrongly; the
 dated comment renders beneath it and opens by naming it stale.
+
+---
+
+## Run 200 (2026-09-10) — the two findings that survived the duplicate cull
+
+*Everything else this run derived — the seven-merge landing, #32, #37's reopening and conflict set,
+the escalation — is already recorded by `0b98161`, `9c3a59e`, `4e42831` and `1fd1c33`, and is
+deliberately not restated.*
+
+### C-200-3 — the open board is 16, not the 22 every record on this branch carries
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=open   # 16, all draft
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=open   # 6,  all draft
+grep -oE 'board [^|]*' FIRINGS.md | tail -3
+```
+
+*Expected, and **observed**:* **16 engine PRs open, every one `draft:true`** —
+`[26, 33, 36, 37, 38, 39, 45, 46, 47, 48, 49, 50, 51, 52, 53, 58]` — while runs 198 and 199 both
+print **`board 22+6`** and neither addendum corrects it. **22 had been carried since run 99
+(2026-08-25) and was correct until today**; the seven merges these records document closed six of
+those PRs. **The event was recorded; its own effect on the board count was not.** Android **6 open,
+all draft, zero merges ever**. **`#58` is in the open set and in no prior firing.**
+
+### C-200-4 — `dotnet` is ABSENT here and was PRESENT two minutes earlier; re-check every firing
+
+```bash
+for t in dotnet pwsh node npm java gradle sdkmanager adb; do
+  printf '%-10s ' "$t"; which $t 2>/dev/null || echo ABSENT; done
+echo "ANDROID_HOME=${ANDROID_HOME:-UNSET}"
+```
+
+*Expected, and **observed**:* **`dotnet` ABSENT**, `pwsh` ABSENT, `sdkmanager`/`adb` ABSENT,
+`ANDROID_HOME` **UNSET**, `node`/`java` present, **`gradle` present** at `/opt/gradle/bin/gradle`
+(no SDK, so still no android gate). **Run 198 ran a `dotnet build` in the same hour and recorded
+`dotnet` PRESENT.** Both are honest reports of different containers. **Consequence:** *"no gate can
+run here"* is a **per-firing measurement, not a property of the program**, and no firing may quote
+another's toolchain line. A draft of run 200's LOG entry asserted `dotnet` absent **before** this
+command was run — right answer, wrong method, and the method is the part that has to hold.
