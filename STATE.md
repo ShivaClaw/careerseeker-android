@@ -49,6 +49,65 @@
 > after 2026-09-11.** **B-18's smallest human unblock is unchanged: a human stops or repoints the
 > schedule.**
 >
+> ## ▶ ADDENDUM TO RUN 198 — 2026-09-10, written by the RUN 84 session on the `#56 merged` wake. **Run 198's snapshot caught the FIRST of seven merges. Six more landed behind it, and the final `main` is CI-VERIFIED GREEN.**
+>
+> **Provenance, stated first: this is not a new firing.** It is the run-84 session — the one that
+> opened PR #56 — woken by that PR's `ready_for_review` + `closed(merged)` events and writing only
+> what it verified first-hand after a fresh `git fetch --all --prune`. **Run 198's entry below is
+> correct for the moment it sampled**; it is not wrong, it is **early**. Run 198 recorded `main` at
+> **`5395b57`** with #32 as the only merge (**C-198-1**).
+>
+> **1. The landing sequence was SEVEN merges, not one** (**C-84-14**). `main` moved
+> **`aac05f3` → `cffe2b7`**, **23 commits, 7 merge commits**, all by `ShivaClaw` between
+> **23:00:07Z and 23:01:33Z**: **#32, #34, #35, #54, #55, #56, #57**. Run 198 sampled between #32 and
+> #34. The whole S2 relay chain and S5's spec half are now **on `main`**, and the record's long-standing
+> premise — *"19 engine drafts open and none is merged"* — is **retired**: **15 remain open**.
+>
+> **2. `main` IS VERIFIED GREEN, and that is the fact run 198 could not establish** (**C-84-15**).
+> Run 198 measured `dotnet build` locally on `5395b57` but could not run the full gate (`pwsh`
+> absent). **CI did, on the final `main`:** run
+> [`34540238989`](https://github.com/ShivaClaw/careerseeker/actions/runs/34540238989), head
+> **`cffe2b7`**, **both jobs `success`** — `windows-latest` **`=== Offline total: 611 passed, 0 failed
+> ===`** with `SyncHarness` **`130 passed, 0 failed`**; `ubuntu-latest` green including **`Assert sync
+> vectors match their generator`**. **`$ExpectedOfflineTotal` is still `611` on `cffe2b7`**, so the
+> six merges behind #32 moved the pin by **zero** — they are relay/vitest changes, which the .NET
+> offline harness does not count. **Run 198's #37 arithmetic therefore survives intact: `611 + 12 =
+> 623` is still the correct target.**
+>
+> **3. THE NON-OBVIOUS ONE: six of the seven merge CI runs were CANCELLED, and only the last verified
+> anything** (**C-84-15**). Runs 484–488 (#34, #35, #54, #55, #56) all report
+> **`conclusion: cancelled`** — each push superseded the previous run under the workflow's concurrency
+> group, inside a 90-second window. **Do not read "seven merges, CI green" as "seven CI-verified
+> merges."** Exactly one commit on `main` was ever gated: `cffe2b7`, the tip. That is sufficient —
+> the tip is what ships — but a later reader counting green checkmarks per merge will find six
+> cancellations and should not mistake them for failures.
+>
+> **4. The cross-repo pin: no drift event, and the residual is exactly one vector** (**C-84-14**).
+> Byte-compared the phone's vendored corpus against `origin/main` directly, file by file: **27 of 28
+> payload vectors byte-identical**; **`index.json` differs by exactly one declaration** (the
+> `invalid-unknown-field` entry, `expect_error: decrypt_failed`) and **nothing else** — no suite
+> string, no envelope limit, no active key id; and the phone carries **one extra file**,
+> `invalid-unknown-field.json`, **absent from `main`**. So the phone is a strict **superset**: it
+> enforces one rejection rule the shipped engine has no parser for. **`7328a0b` is still not an
+> ancestor of `main`** — it rides **PR #37**, which is **open, draft, and was touched 22:59:24Z**,
+> two minutes before the spree. **This closes itself when #37 lands; it is not a drift event and needs
+> no action here.** Confirms run 198's §4 from the other direction — run 198 compared phone-to-pin, this
+> compares phone-to-`main`.
+>
+> **5. NO NOTIFICATION SENT, because run 198 already sent one for this exact trigger.** Run 198's §5
+> records **"Escalation: SENT"** on the `main` moved / PR merged test — the same event. Re-sending it
+> hours later with a larger merge count would spend the channel on a fact its owner already has, and
+> **he is demonstrably live**: he merged seven PRs by hand in 90 seconds and touched #37 and #33 minutes
+> earlier. **Everything found here is either something he just did or something his next merge fixes.**
+>
+> **What this addendum did NOT do.** **No merge, no reopen, no new PR, no push to any engine branch,
+> no rebase, no force-push, no branch deletion** — PR #56 is merged and final, and this session is
+> **unsubscribed** from it. **No engine or android source file changed** — records only, and **no
+> `LOG.md` rewrite**: run 198's entry stands as written. **No vector byte, no pin move, no
+> `generate.mjs` edit, no `$ExpectedOfflineTotal` touch.** **No gate ran here** — `pwsh`/`dotnet`
+> absent, `ANDROID_HOME` unset; the 611 above is **CI's measurement, not mine**. **No deploy, no relay
+> contact, no Google/Play console, no secret read.** Terra untouched.
+>
 > ## ▶ RUN 198 — 2026-09-10. **SOMETHING MOVED. After 162 consecutive declinations, the assigned slice MERGED: PR #32 landed S5's spec half on `main`. And the event that woke this firing was WRONG — #37 is open, not closed.**
 >
 > **Heartbeat:** 2026-09-10, **one hundred and ninety-eighth** firing. Both checkouts fetched first,

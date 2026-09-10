@@ -21230,3 +21230,62 @@ cd <android> && ./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:ass
 *Expected:* **both fail to start.** `pwsh` is absent and not in the Ubuntu archive; `ANDROID_HOME` is
 `UNSET`. `:core:test` was **not** run either, and did not need to be — nothing in `:core` moved.
 **No gate result is claimed by this firing.**
+
+### C-84-14 — the landing was seven merges, and the phone/`main` vector delta is exactly one vector
+
+```bash
+cd <engine> && git fetch --all --prune
+cd <engine> && git log --oneline --merges aac05f3..origin/main        # expect 7
+cd <engine> && git rev-list --count aac05f3..origin/main              # expect 23
+cd <engine> && git merge-base --is-ancestor 7328a0b origin/main; echo "ancestor=$?"   # expect 1 (NOT an ancestor)
+# byte-compare the phone's vendored corpus against engine main:
+cd <engine> && git archive origin/main docs/sync-vectors/v1 | tar -x -C /tmp/m --strip-components=3
+cd <android> && git archive origin/claude/android-a0-probe core/src/test/resources/sync-vectors/v1 | tar -x -C /tmp/p --strip-components=6
+diff -rq /tmp/m /tmp/p
+diff /tmp/m/index.json /tmp/p/index.json
+```
+
+*Expected, and **observed**:* `main` moved **`aac05f3` → `cffe2b7`**, **23 commits / 7 merge
+commits** — **#32, #34, #35, #54, #55, #56, #57** — all by `ShivaClaw` between **23:00:07Z** and
+**23:01:33Z**. **Run 198 sampled between #32 and #34**, which is why its entry records `5395b57` and
+one merge; it is early, not wrong. **15 engine drafts remain open.**
+
+Vector comparison: **27 of 28 payload files byte-identical**; **`index.json` differs by exactly one
+declaration** — the `invalid-unknown-field` entry (`"type": "envelope"`, `"valid": false`,
+`"expect_error": "decrypt_failed"`) — and **nothing else**: no suite string, no envelope limit, no
+active key id. The phone carries **one extra file**, `invalid-unknown-field.json`, **absent from
+`main`**. **The phone is a strict superset, not a divergence** — it enforces one rejection rule the
+shipped engine has no parser for. **`7328a0b` is still not an ancestor of `main`**; it rides **PR #37**
+(**open, draft**, touched `22:59:24Z`). **This closes itself when #37 lands. Not a drift event.**
+
+### C-84-15 — `main` is CI-verified green at `cffe2b7`, and six of the seven merge runs were cancelled
+
+```bash
+# via the GitHub MCP tools, or:
+#   gh run list --branch main --limit 8
+#   gh run view 34540238989 --log | grep -E 'Offline total|130 passed|vectors match'
+cd <engine> && git show origin/main:scripts/Verify-Alpha.ps1 | grep -m1 'ExpectedOfflineTotal ='
+```
+
+*Expected, and **observed**:* run **`34540238989`**, head **`cffe2b7`**, **both jobs `success`**.
+`windows-latest` — **`=== Offline total: 611 passed, 0 failed ===`**, `SyncHarness`
+**`=== 130 passed, 0 failed ===`**. `ubuntu-latest` — green, including the steps **`Assert the relay
+has no decryption path`** and **`Assert sync vectors match their generator`**.
+**`$ExpectedOfflineTotal` is `611` on `cffe2b7`**, unchanged from the value run 198 measured on
+`5395b57` — the six merges behind #32 are relay/vitest work the .NET offline harness does not count,
+so they moved the pin by **zero**. **Run 198's #37 arithmetic (`611 + 12 = 623`) survives intact.**
+
+**The non-obvious half, and the reason this entry exists.** Workflow runs **484–488** — the merge
+commits for **#34, #35, #54, #55, #56** — all report **`conclusion: cancelled`**: each push superseded
+the previous run under the workflow's concurrency group, inside a **90-second** window. **Exactly one
+commit on `main` was ever gated — `cffe2b7`, the tip.** That is sufficient, because the tip is what
+ships, but **"seven merges, CI green" must not be read as "seven CI-verified merges"**, and a reader
+counting per-merge checkmarks will find six cancellations that are **not** failures.
+
+**This measurement is CI's, not mine.** `pwsh` and `dotnet` are absent in this sandbox and
+`ANDROID_HOME` is unset; no gate ran here and none is claimed.
+
+**No notification was sent for any of this** — run 198 **already sent** the escalation on the same
+trigger (`main` moved / a PR merged), its §5. Re-sending a larger merge count hours later would spend
+the channel on a fact its owner already has, and he is demonstrably live: seven hand-merges in 90
+seconds, with #37 and #33 touched minutes before.
