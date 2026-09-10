@@ -49,6 +49,40 @@
 > after 2026-09-11.** **B-18's smallest human unblock is unchanged: a human stops or repoints the
 > schedule.**
 >
+> ## ▶ MERGE WAKE (`#55 merged`) — 2026-09-10, run-82 session. **The landing is already recorded below by three other sessions. The one thing they do not say: §3's re-pin step, run today, DELETES a vector.**
+>
+> **Read the ADDENDUM and RUN 198 banners below for the landing itself** — seven merges, `main`
+> `aac05f3 → cffe2b7`, CI-green, the pin safe on seven refs, the phone a strict superset. **All of
+> that is theirs** (**C-84-14**, **C-84-15**, run 198 §4, addendum §4). This session drafted the same
+> facts, then **cut ~300 lines of restatement before committing** — the cost run 118's house law
+> exists to stop. **Two claims survived.**
+>
+> **1. `RETURN-DAY.md` §3's box — *"Do this in the same sitting: re-pin the phone's vectors"* — is now
+> live, and following it costs a vector** (**C-REPIN-5**). Against `main` = `cffe2b7`:
+> `repin-vectors.sh --check … origin/main` → **exit 1**, `vendored: 29 … at pin: 28`,
+> **`- vendored, absent at pin (1): invalid-unknown-field.json`**. §3 predicts the phone falls
+> **BEHIND** by `pairing-high-bit-confirm.json` and ends at 30 files; **#51/#50 did not land**, so
+> that vector is on **neither** side and the phone is **AHEAD**. **A re-pin today writes 28 and drops
+> PQ-A2-3.** **Nothing reports it** — checks compare phone-to-**pin**, never to `main` (**B-16**), and
+> a fresh pin matches by construction, so **android CI is green before, during and after.** The only
+> signal is the script's `-` line, which makes §3's closing *"read them"* load-bearing. **Restoring
+> branch PR #37** — additive against `main`, **3 files, +60 lines, 0 deletions**; merge cost is run
+> 198 §3's **623**. **NO pin was moved here; H3/H7 are the owner's.**
+>
+> **2. A SECOND notification was sent, and it is logged as a cost** (**C-REPIN-6**). Run 198 §5 sent
+> the escalation; the addendum §5 **withheld** a second on sound reasoning. This session sent anyway
+> on its wake, **before** the push rejection revealed 198/199 existed. Content was C-REPIN-5, so not a
+> pure repeat — **but the owner got two pushes in an hour for one landing.** Rule for the next
+> concurrent wake: **fetch and read the tip BEFORE sending, not only before committing.**
+>
+> **SCOPE: no rung moved. No pin, no vector byte, no spec byte, no `generate.mjs`, no `ci.yml`, no
+> Kotlin, no C#** — `--check` writes nothing. **No suite, no gate, no test count claimed**;
+> **`$ExpectedOfflineTotal` untouched** (623 is cited as run 198's, not re-measured). **Nothing
+> merged, closed, undrafted, reopened, force-pushed or deleted; #55 not reopened and no replacement
+> PR; no new branch or PR; no blocker filed; no schedule touched; no deploy; relay not contacted.**
+> Terra: **COMPLETE, files claimed: none.** **One local commit (~300 lines) was discarded rather than
+> pushed** after reading what had landed — **nothing pushed was rewritten.**
+>
 > ## ▶ ADDENDUM TO RUN 198 — 2026-09-10, written by the RUN 84 session on the `#56 merged` wake. **Run 198's snapshot caught the FIRST of seven merges. Six more landed behind it, and the final `main` is CI-VERIFIED GREEN.**
 >
 > **Provenance, stated first: this is not a new firing.** It is the run-84 session — the one that

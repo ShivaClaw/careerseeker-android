@@ -19536,3 +19536,49 @@ repo. Engine checkout **read-only**. **No `FIRINGS.md` line** — this firing fo
 **A duplicate draft was discarded, never force-pushed**; the branch history is runs 198/199 and their
 addenda with this appended. No deploy; the production relay was **not contacted at all**. No secret
 read, printed or echoed.
+## Merge wake (`#55 merged`) — 2026-09-10, run-82 session, after runs 198/199 and the run-84 addendum
+
+**Most of what this session drafted was already written by three concurrent sessions, and was cut
+before commit.** The seven merges (**C-84-14**), `main` CI-green at `cffe2b7` (**C-84-15**), the pin
+surviving the branch deletion on seven refs (run 198 §4), and the phone-vs-`main` byte comparison
+(addendum §4) are **theirs**. Re-deriving them here would be the ~355-line restatement run 118's
+house law exists to stop. **Two claims survived the cut.**
+
+**C-REPIN-5 — the one additive finding.** Those entries settle the *state* and are right about it:
+the phone is a strict superset, no drift, no action needed. **None of them addresses the
+*instruction*.** `RETURN-DAY.md` §3 carries a box headed *"Do this in the same sitting: re-pin the
+phone's vectors"*, and the merges it waits on have now happened. Measured against `main` = `cffe2b7`:
+`repin-vectors.sh --check … origin/main` → **exit 1**, `vendored: 29 … at pin: 28`, and
+**`- vendored, absent at pin (1): invalid-unknown-field.json`**. §3 predicts the phone falls *behind*
+by `pairing-high-bit-confirm.json` and that the write ends at 30 files; **#51/#50 did not land**, so
+that vector is on neither side and **a re-pin today writes 28 and drops PQ-A2-3**. **Nothing reports
+it** — every check compares the phone to the pin, never to `main` (**B-16**), and after a re-pin the
+new pin matches by construction, so android CI is green before, during and after. **The only signal
+is the script's own `-` line**, which makes §3's closing sentence load-bearing rather than
+cautionary. Restoring branch **PR #37**, additive against `main` — **3 files, +60 lines, 0
+deletions**; its merge cost is **run 198 §3's `623`**, not repeated here.
+
+**C-REPIN-6 — this session sent a second notification, and records it as a cost.** Run 198 §5 sent
+the escalation; the addendum §5 **deliberately withheld** a second one on sound reasoning. This
+session sent anyway on the `#55 merged` wake, **before** the push rejection revealed runs 198/199
+existed. Its content was C-REPIN-5, so not a pure repeat — **but two pushes reached the owner inside
+an hour for one landing, and the second is justified only insofar as C-REPIN-5 is genuinely new.**
+The rule it suggests: **fetch and read the branch tip before sending, not only before committing.**
+
+### What this wake did NOT do
+
+**No pin moved and no vector byte written** — `repin-vectors.sh` ran **`--check` only**, which writes
+nothing. **No spec byte, no `generate.mjs`, no `ci.yml`, no Kotlin, no C#, no `:app`/`:core` file.**
+**No suite ran and no test count is claimed**; no gate (`dotnet`, `pwsh`, `ANDROID_HOME` absent).
+**`$ExpectedOfflineTotal` untouched** — run 198's `623` is cited as theirs, not re-measured here.
+**Nothing merged, closed, undrafted, reopened, force-pushed or deleted**; **PR #55 was not reopened
+and no replacement PR raised**, per the wake's instruction; **no new branch, no new PR.** **No
+blocker filed.** **No schedule enumerated, created, modified or deleted.** **No deploy; the
+production relay was not contacted at all.** No Play, Google or OAuth console; **no secret read or
+printed**; no `.appdata`. Terra: **COMPLETE, files claimed: none** — no collision, **no file claimed
+in `careerseeker`.**
+
+**One local commit was discarded rather than pushed.** This session's first entry (~300 lines across
+the four records) was committed locally, rejected on push because the branch had moved, and then
+**reset away in favour of this shorter one** after reading what had landed. **Nothing pushed was
+rewritten** — the discarded commit never left this machine.

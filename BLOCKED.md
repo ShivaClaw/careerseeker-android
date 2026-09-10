@@ -5746,3 +5746,22 @@ from this sandbox (**C-198-6**).
 
 **The pin is not at risk** (**C-198-5**): `7328a0b` is reachable from seven remote branches and the
 vendored corpus is 29/29 byte-identical. Nothing was stranded by the base-branch deletion.
+
+### B-14 / B-16 status 2026-09-10 (`#55 merged` wake) — H7 is live, and executing it as written now costs a vector
+
+**Both stay OPEN; nothing new is blocked.** The landing facts are runs 198/199 and the run-84
+addendum's, not this entry's. **The one thing added:** `RETURN-DAY.md` §3's *"Do this in the same
+sitting: re-pin the phone's vectors"* box is now actionable, and **executed against today's `main` it
+DELETES `invalid-unknown-field.json`** (**C-REPIN-5**) — `--check` exits **1** with
+`- vendored, absent at pin (1)`. §3 predicts the opposite direction (phone *behind* by
+`pairing-high-bit-confirm.json`, write ending at 30 files); **#51/#50 did not land**, so that case has
+not arrived and an unmentioned one has.
+
+**This is B-16's mechanism doing real work:** every check compares the phone to **the pin**, never to
+`main`, and after a re-pin the new pin matches by construction — so **android CI is green before,
+during and after the removal.** The only signal is the script's own `-` line.
+
+**Smallest human unblock — unchanged in owner, now with an order:** land **PR #37** first (additive
+against `main`: 3 files, +60 lines, 0 deletions; merge cost is run 198 §3's **623**), then re-pin and
+expect 29/29 — **or** re-pin now and accept the loss **knowingly**. **H3/H7 remain the owner's; this
+wake moved no pin and takes no position.**

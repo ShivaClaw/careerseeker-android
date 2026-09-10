@@ -21428,3 +21428,110 @@ cd careerseeker-android && git show --stat HEAD
 *Expected:* `scripts/run-zero.sh`, `STATE.md`, `AUDIT-REQUEST.md` only — **no `.kt`, `.cs`, `.ts`,
 `.mjs`, no vector byte, no `docs/Sync-Protocol.md`, and no `FIRINGS.md` line** (this firing was not
 empty, and that file is for empty firings only).
+
+### C-REPIN-5 — `RETURN-DAY.md` §3's "re-pin in the same sitting" step, measured against the post-landing `main`, would DELETE a vector
+
+**Written on the `#55 merged` wake by the run-82 session, AFTER runs 198/199 and the run-84 addendum
+had already landed.** Almost everything that session first drafted was **restatement of theirs and was
+cut before commit** — the seven merges (**C-84-14**), `main` CI-green (**C-84-15**), the pin reachable
+from seven branches (run 198 §4), and the phone-vs-`main` byte comparison (addendum §4) are **theirs,
+not this entry's**. **This entry keeps only the one thing none of them states.**
+
+Those entries settle the *state*: the phone is a strict superset, *"not a drift event and needs no
+action here."* **Both true.** What none of them addresses is the *instruction*: `RETURN-DAY.md` §3
+carries a box headed **"Do this in the same sitting: re-pin the phone's vectors"**, and the merges it
+waits on have now happened. **Executed today, that instruction removes a vector.**
+
+```bash
+cd <android> && scripts/repin-vectors.sh --check --engine <engine> origin/main
+echo "exit=${PIPESTATUS[0]}"     # NOT `| tail` -- see C-118-9's pipe hazard
+```
+
+*Expected, and **observed**, at `main` = `cffe2b7`:* **exit `1`**, and
+
+```
+current pin  : 7328a0bc043335491cd96a67d634e8eea2a13af9
+target pin   : cffe2b78319595cbe18e37d42b7abb573d108606  (from 'origin/main')
+generator check at cffe2b7…: OK: 28 vector files match the generator.
+vendored: 29 files    at pin: 28 files
+  - vendored, absent at pin (1):
+      invalid-unknown-field.json
+  ~ same name, different bytes (1):
+      index.json
+```
+
+**Read the minus sign.** §3's box predicts the phone falls **BEHIND** by
+`pairing-high-bit-confirm.json` and says the write run should end `30 vector files vendored`. Neither
+holds: **#51/#50 did not land**, so that vector is on **neither** side, and the phone is **AHEAD**.
+**A re-pin to `main` today writes 28 and drops PQ-A2-3's `invalid-unknown-field.json`.**
+
+**Nothing would report the loss.** Every check in both repositories compares the phone against **the
+pin** and never against `main` (**B-16**); after a re-pin the new pin matches by construction, so
+**android CI is green before, during and after**. The only signal is this script's own `-` line —
+which is precisely why §3's box ends *"The script shows you the removals before it writes; read
+them."* **That sentence is now load-bearing rather than cautionary.**
+
+**Order, if the owner wants the vector kept:** land **PR #37** (`claude/s5-engine-wire-parser`) first
+— its vector-directory delta against `main` is purely additive —
+
+```bash
+cd <engine> && git diff --stat origin/main origin/claude/s5-engine-wire-parser -- docs/sync-vectors/
+```
+
+*Observed:* **3 files, +60 lines, 0 deletions** (`generate.mjs` +12, `index.json` +6,
+`invalid-unknown-field.json` +42); **not** a fast-forward, so it needs a real merge. **Run 198 §3 is
+the cost of that merge and is not repeated here:** #37's `$ExpectedOfflineTotal` arithmetic is stale
+and wants **623** on today's `main`.
+
+**This wake moved NO pin** — `--check` writes nothing — **and takes no position on the order.** Which
+upstream ref the repos track is **H3**; the re-pin is **H7**; both are the owner's.
+
+### C-REPIN-6 — a SECOND notification was sent for this landing, and that is a cost, not a win
+
+**Recorded because the alternative is a records set that hides its own duplicates.** Run 198 §5 sent
+the escalation on the `main` moved / PR merged trigger. The run-84 addendum §5 then **deliberately
+withheld** a second, reasoning that re-sending *"would spend the channel on a fact its owner already
+has, and he is demonstrably live."* **That reasoning is correct and this session's send does not
+overturn it.**
+
+This session sent anyway, on the `#55 merged` wake, **before** it could see runs 198/199 — the push
+rejection that revealed them arrived after the notification. Its content was **C-REPIN-5**, which is
+not what run 198 sent, so it was not a pure repeat. **But the owner received two pushes about the
+same landing within the hour, and the second one's justification is only as good as C-REPIN-5 is
+new.** An auditor who judges C-REPIN-5 already implied by the addendum's §4 should score this as
+**one notification too many**, and the honest rule it suggests for the next concurrent wake is:
+**`git fetch` and read the branch tip BEFORE sending, not only before committing.**
+
+### C-REPIN-7 — this session committed conflict markers locally, and caught them before pushing
+
+**Recorded because a records set that hides its own near-misses is worth less than one that does not**
+— the precedent is **C-118-9**.
+
+Rebasing this session's entry onto a branch that had moved three times produced append-vs-append
+conflicts in `AUDIT-REQUEST.md` and `LOG.md`. The resolution script asserted *"no markers remain"*,
+**the assertion fired, and the commit went ahead anyway** because `git add` and `git rebase
+--continue` ran in the same `&&` chain as the failed script. **Three marker lines per file were
+committed.**
+
+```bash
+cd <android> && grep -cE '^(<<<<<<< |>>>>>>> |=======$)' AUDIT-REQUEST.md LOG.md STATE.md BLOCKED.md
+```
+
+*Expected, and **observed** after repair:* **`0` in all four.** Before repair it was **3 and 3**.
+
+**Why the assertion misfired, which is the part worth keeping.** The check was a substring test for
+`<<<<<<<`, and **`AUDIT-REQUEST.md` legitimately contains that string twice** — at the two fenced
+`grep -c '^<<<<<<<' …` commands that an existing audit entry uses to search for exactly this hazard.
+**The guard against committing conflict markers tripped on the documentation of the guard against
+committing conflict markers.** The fix was to anchor the test (`^<<<<<<< `, `^=======$`,
+`^>>>>>>> `), under which the fenced examples do not match because they begin with `grep`.
+
+**Both sides were kept.** The three marker lines were removed **by verified line number**, leaving
+the other session's **C-198-7** and this session's **C-REPIN-5** intact and in append order —
+confirmed by `grep -c '### C-198-7'` → **1** and `grep -c '### C-REPIN-5'` → **1**, and by
+`check-citations.sh` → **`OK`, 1072 definitions**.
+
+**Nothing corrupt was pushed.** The bad commit existed only on this machine and was **amended**, not
+force-pushed over a published ref. **The lesson for the next concurrent wake is narrower than "be
+careful":** do not chain a resolution script to `git add && git rebase --continue` with `&&` — a
+failed assertion must stop the commit, and here it did not.
