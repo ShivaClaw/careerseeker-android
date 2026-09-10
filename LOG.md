@@ -19488,6 +19488,7 @@ withheld.
 
 ---
 
+<<<<<<< HEAD
 # RUN 200 — 2026-09-10. **Two corrections the merge records left behind: the open board is 16, not 22, and the toolchain is not the same from one firing to the next.**
 
 **Almost all of this run's draft was DISCARDED as duplicate, and that is the headline.** Run 198
@@ -19582,3 +19583,88 @@ in `careerseeker`.**
 the four records) was committed locally, rejected on push because the branch had moved, and then
 **reset away in favour of this shorter one** after reading what had landed. **Nothing pushed was
 rewritten** — the discarded commit never left this machine.
+=======
+## RUN 201 — a blocker that was false before it was written, and the rejected push that caught it (2026-09-10)
+
+Linux cloud sandbox, woken by a `pull_request.closed` event on **#34**. **Deliberately narrow.**
+Four firings have written about today's merge wave and the ground state is fully covered by runs
+198, 199 and the run-84 addendum — seven merges, `main` at `cffe2b7`, CI green with
+`Offline total: 611`, six cancelled runs, the one-vector pin residual, #37 reopened. **None of it is
+restated here**, per run 118's law against restatement. This entry records the one thing no sibling
+could: this firing's own near-miss.
+
+### 200-1 What was drafted, and why it was wrong
+
+The wake event said *"#34 closed without merging"*. Read at **22:57:31Z**, the API agreed:
+`state: closed`, `merged: false`, `mergeable_state: "dirty"`, `base.ref:
+"claude/s5-entitlement-ack-spec"`, **zero reviews, zero review comments**. That state was **real**.
+#32's merge deleted the base branch, and GitHub closes any PR whose base ref ceases to exist.
+
+Reasoning from it produced a coherent and entirely wrong picture: PR #34 orphaned by a topology
+side-effect rather than a decision; the retention fix stranded off `main`; a five-PR chain
+(#35 → #54 → #55 → #56 → #57) standing on a branch that routine post-close cleanup would delete,
+cascading five more auto-closes. The firing verified the parts it could — the fix genuinely was
+absent from `5395b57`, and it reproduced the retention defect first-person against that sha under
+miniflare — and **committed** a RUN banner, a LOG entry, five `C-198-*` audit commands, an
+escalation-ledger correction, and **B-28**: *"a five-PR chain stands on the head branch of a PR that
+was just auto-closed"*, smallest human unblock *"do not delete `claude/s2-relay-retention`"*.
+
+**By 23:00:04Z all of it was false.** #34 had been retargeted to `main`, undrafted and **merged by
+`ShivaClaw`**, with the rest of the chain merging behind it within ninety seconds. The chain was
+never orphaned — it was landing. The branch never needed protecting — it had already been absorbed.
+Even the honest first-person defect reproduction was true only of `5395b57`, a sha superseded in the
+same minute the measurement was taken.
+
+### 200-2 It was caught by luck, and dressing that up would be the worse error
+
+`git push` was **rejected**: a sibling firing had pushed to the branch first. That rejection is the
+only reason a re-read happened, and the re-read returned `merged: true`.
+
+**Alone on this branch, the wrong records would have shipped.** The next session would have inherited
+a phantom blocker telling it to guard a branch that no longer mattered and to treat a merged chain as
+endangered — exactly the failure `BLOCKED.md`'s preamble names, and the same class as the mislabels
+this file has corrected six times. The commit was discarded with `git reset --hard` **before any
+push**; nothing wrong reached the remote.
+
+### 200-3 The rule, which is the only part worth inheriting
+
+The house standard has been **derive state before acting**. Against a live board that is not
+sufficient: **derive it again at write time.**
+
+This firing derived at minute 0 and would have published at minute 20 a conclusion the API had
+contradicted at minute 3. **A wake event carries a timestamp, not a fact** — and the same is true of
+any PR read taken at the start of a long firing. Re-read every pull request your conclusion depends
+on immediately before committing it.
+
+A second, sharper trap sits inside the first: `list_pull_requests` served this firing a
+**pre-retarget** snapshot showing #34 `open` on its old base, while the direct `pull_request_read`
+showed it closed. The two disagreed, and **the temptation was to treat the list as authoritative and
+the fresher per-PR read as the anomaly.** Prefer the per-PR read for anything that just changed. Run
+199's sibling entry records the same list/read divergence from the other side.
+
+**`B-28` is registered in `scripts/check-citations.sh`'s `KNOWN_ABSENT` with its reason**, the same
+mechanism and for the same kind of reason as **B-11**: an id reserved during an investigation,
+disproved, and deliberately never filed. The guard reports `documented-absent: 2` and its self-test
+passes. **A future session that finds a `B-28` defined anywhere is looking at a resurrection of a
+disproved blocker and should delete it rather than investigate it** (**C-201-1**).
+
+### Boundary — what was not touched
+
+**No notification was sent.** Run 198 already sent on this exact trigger, and the run-84 addendum
+explicitly declined to double-send for it; a third message about one merge wave is noise, not
+signal. **The escalation ledger was therefore left untouched** — this firing did not send, so it has
+no count to add. An earlier draft of these records did edit that block; it was discarded with the
+rest.
+
+**No `FIRINGS.md` line** — that file is reserved for empty firings, and this one carries a finding.
+
+**Nothing was reopened, retargeted, merged, force-pushed or deleted, in either repository**, and
+**no source file in either repository was written** — no `.cs`, `.kt`, `.ts`, no `relay/` file, no
+vector byte, no `generate.mjs`, no `$ExpectedOfflineTotal`, no `Verify-Alpha.ps1`, no
+`docs/Sync-Protocol.md`. The wake event's instruction not to reopen #34 or open a replacement PR was
+followed throughout, and proved doubly right: barred, and unnecessary.
+
+The engine checkout was left detached at `origin/main`, `git status` clean, scratch probe deleted.
+**No deploy of any kind**, no `wrangler` invocation, and **the production relay was contacted zero
+times, not even `GET /v1/health`**. **No secrets read, written or printed.**
+>>>>>>> b4bbf41 (RUN 200: a blocker that was false before it was written, and the push that caught it)

@@ -99,7 +99,21 @@ CITE_DOCS=("LOG.md" "STATE.md" "BLOCKED.md" "AUDIT-REQUEST.md" "RETURN-DAY.md" \
 #         and is not filed" (BLOCKED.md). B-12's opening paragraph exists to
 #         explain the hole to whoever reaches for the missing number. Both
 #         mentions are that explanation, not a claim that B-11 exists.
-KNOWN_ABSENT=("B-11")
+#
+#   B-28  Drafted and disproved inside one firing (run 201), on purpose. Woken by
+#         "#34 closed without merging", that firing measured the state as real at
+#         22:57:31Z -- #32's merge had deleted #34's base branch, and GitHub
+#         closes a PR whose base ref ceases to exist -- and filed B-28: "a
+#         five-PR chain stands on the head branch of a PR that was just
+#         auto-closed", unblock "do not delete that branch". By 23:00:04Z #34 had
+#         been retargeted to main, undrafted and MERGED, with the whole chain
+#         landing behind it: every claim in the blocker was false before it was
+#         written. The records were discarded unpushed and B-28 was never filed.
+#         Every mention is the account of that near-miss, not a claim that B-28
+#         exists -- see LOG.md RUN 201 and C-201-1, which says outright that a
+#         B-28 found defined anywhere is a resurrection of a disproved blocker
+#         and should be deleted rather than investigated.
+KNOWN_ABSENT=("B-11" "B-28")
 
 MODE="report"
 case "${1:-}" in

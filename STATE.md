@@ -83,6 +83,51 @@
 > Terra: **COMPLETE, files claimed: none.** **One local commit (~300 lines) was discarded rather than
 > pushed** after reading what had landed — **nothing pushed was rewritten.**
 >
+> ## ▶ RUN 201 — 2026-09-10. **One thing only: this firing nearly published a blocker that was already false, and was saved by a rejected push. The facts of the landing are runs 198/199's and their addenda — not restated here.**
+>
+> **Deliberately thin, per run 118's law.** Four firings have now written about today's merge wave and
+> the ground state is fully covered: the seven merges, `main` at **`cffe2b7`**, CI green with
+> `Offline total: 611`, the six cancelled runs, the one-vector pin residual, #37 reopened. **None of
+> that is repeated here.** This entry exists for the one thing no sibling can record, because it was
+> this firing's own error.
+>
+> **The near-miss (C-201-1).** Woken by *"#34 closed without merging"*, this firing read #34 at
+> **22:57:31Z** and got a real state: `closed`, `merged: false`, `mergeable_state: "dirty"`, base
+> `claude/s5-entitlement-ack-spec`, **zero reviews**. #32's merge had deleted that base branch, and
+> GitHub closes a PR whose base ref ceases to exist. On that reading the firing drafted **and
+> committed** a full record set: a RUN banner, a LOG entry, five `C-198-*` commands, an escalation-
+> ledger correction, and a new blocker **B-28** — *"a five-PR chain stands on the head branch of a PR
+> that was just auto-closed"*, smallest unblock *"do not delete that branch"*.
+>
+> **By 23:00:04Z every load-bearing claim in it was false.** #34 had been retargeted to `main`,
+> undrafted and **merged**, and the whole chain merged behind it. The chain was never orphaned; the
+> branch never needed protecting. **The blocker described a hazard that had already resolved into its
+> opposite.**
+>
+> **It was caught by luck, and the luck is the point.** `git push` was **rejected** because a sibling
+> firing pushed first. That rejection forced a re-read, and the re-read returned `merged: true`.
+> **Alone on this branch, the wrong records would have shipped**, and the next session would have
+> inherited a phantom blocker instructing it to guard a branch that no longer mattered — precisely
+> what `BLOCKED.md`'s preamble exists to prevent. Discarded with `git reset --hard`, **never pushed**.
+>
+> **The rule, which is new and is the only thing here worth inheriting.** The house standard is
+> *derive state before acting*. Against a live board that is not enough: **derive it again at write
+> time.** This firing verified #34 at minute 0 and would have published at minute 20 a conclusion the
+> API had contradicted at minute 3. **A wake event carries a timestamp, not a fact.** Re-read every PR
+> your conclusion depends on immediately before committing it — and prefer the per-PR read to
+> `list_pull_requests`, which served this firing a **pre-retarget** snapshot showing #34 `open` on its
+> old base while the direct read showed it closed. The temptation was to trust the list and dismiss
+> the fresher signal as the stale one.
+>
+> **`B-28` is now in `check-citations.sh`'s `KNOWN_ABSENT` with its reason**, exactly as **B-11** is —
+> an id reserved, disproved, and deliberately never filed. Guard green, self-test passes.
+>
+> **No notification sent.** Run 198 already sent on this trigger and the run-84 addendum explicitly
+> declined to double-send; a third message about one merge wave is noise. **The escalation ledger was
+> left alone for the same reason** — this firing did not send, so it has nothing to add to a count.
+>
+> **Nothing reopened, retargeted, merged, force-pushed or deleted; no source file in either repo
+> changed.**
 > ## ▶ ADDENDUM TO RUN 198 — 2026-09-10, written by the RUN 84 session on the `#56 merged` wake. **Run 198's snapshot caught the FIRST of seven merges. Six more landed behind it, and the final `main` is CI-VERIFIED GREEN.**
 >
 > **Provenance, stated first: this is not a new firing.** It is the run-84 session — the one that

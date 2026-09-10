@@ -21331,6 +21331,7 @@ dated comment renders beneath it and opens by naming it stale.
 
 ---
 
+<<<<<<< HEAD
 ## Run 200 (2026-09-10) — the two findings that survived the duplicate cull
 
 *Everything else this run derived — the seven-merge landing, #32, #37's reopening and conflict set,
@@ -21535,3 +21536,43 @@ confirmed by `grep -c '### C-198-7'` → **1** and `grep -c '### C-REPIN-5'` →
 force-pushed over a published ref. **The lesson for the next concurrent wake is narrower than "be
 careful":** do not chain a resolution script to `git add && git rebase --continue` with `&&` — a
 failed assertion must stop the commit, and here it did not.
+=======
+## RUN 201 — the discarded records (C-201-1)
+
+### C-201-1 — B-28 was drafted, disproved and never filed
+
+> **Claim.** Run 201 committed a full record set — a RUN banner, a LOG entry, five `C-198-*`
+> commands, an escalation-ledger edit, and a blocker **B-28** — on a PR state that was true at
+> 22:57:31Z and false by 23:00:04Z, then discarded it **unpushed**. Neither `B-28` nor any
+> `C-198-*` id is defined in this repository, and the citation guard stays green because `B-28` is
+> registered in `KNOWN_ABSENT` with its reason.
+
+```bash
+grep -rn 'B-28' BLOCKED.md AUDIT-REQUEST.md | grep -v 'KNOWN_ABSENT'   # -> no DEFINITION heading
+grep -n 'KNOWN_ABSENT' scripts/check-citations.sh                       # -> ("B-11" "B-28")
+grep -rn 'C-198-' AUDIT-REQUEST.md                                      # -> narrative mentions only
+bash scripts/check-citations.sh                                         # -> documented-absent: 2, OK
+bash scripts/check-citations.sh --self-test                             # -> all cases passed
+git log --oneline origin/claude/android-a0-probe | grep -c 'RUN 199: the board was merged'  # -> 0
+```
+
+*Expected:* `B-28` appears only inside RUN 201's narrative and the `KNOWN_ABSENT` justification
+comment, never as a `## B-28 — …` heading; the guard reports **`documented-absent: 2`** and
+**`OK: every cited C-/B- id resolves to an entry that exists.`**; and the discarded commit is absent
+from the branch because it was reset before any push succeeded.
+
+**Why it is registered rather than scrubbed.** The same reason **B-11** is: the near-miss is the
+finding, and a future reader reaching for the missing number deserves the account rather than a
+hole. **If a `B-28` is ever found defined, it is a resurrection of a disproved blocker** — the chain
+it claimed was endangered merged on 2026-09-10 — **and should be deleted, not investigated.**
+
+To re-derive that the blocker's premise was false:
+
+```
+pull_request_read  method=get owner=ShivaClaw repo=careerseeker pullNumber=34
+```
+
+*Expected:* `merged: true`, `merged_by: "ShivaClaw"`, `merged_at: "2026-09-10T23:00:04Z"`,
+`base.ref: "main"` — plus the six merge commits for #34, #35, #54, #55, #56 and #57 recorded in the
+run-84 addendum's **C-84-14**.
+>>>>>>> b4bbf41 (RUN 200: a blocker that was false before it was written, and the push that caught it)
