@@ -21289,3 +21289,42 @@ counting per-merge checkmarks will find six cancellations that are **not** failu
 trigger (`main` moved / a PR merged), its §5. Re-sending a larger merge count hours later would spend
 the channel on a fact its owner already has, and he is demonstrably live: seven hand-merges in 90
 seconds, with #37 and #33 touched minutes before.
+### C-198-7 — #37 reopened; the conflict is EXACTLY the five count-reporting files
+
+Added minutes after C-198-1…6, on a `pull_request.reopened` event for the same PR. It confirms
+C-198-2's derivation — #37 was closed and reopened as part of #32's merge deleting its base — and
+adds one measurement that is sharper than C-198-4's prediction.
+
+```bash
+# state, including mergeability
+#   via MCP: pull_request_read method=get owner=ShivaClaw repo=careerseeker pullNumber=37
+cd <engine> && git fetch --all --prune
+git merge-tree --write-tree --name-only origin/main origin/claude/s5-engine-wire-parser | tail -n +2
+```
+
+*Expected:* the PR reads `state: open, draft: true, base.ref: main (5395b57),
+head.sha: 78079c7`, **`mergeable_state: "dirty"`** — it conflicts. And the conflicting set is
+**exactly five files, all of them count-reporting**:
+
+```
+README.md
+docs/CareerSeeker-Project-Summary.md
+docs/External-Audit-Handoff.md
+scripts/Verify-Alpha.ps1
+src/Engine/README.md
+```
+
+**`src/Sync/EnvelopeJson.cs`, `tests/SyncHarness/Program.cs`, `docs/Sync-Protocol.md` and every
+vector merge cleanly.** C-198-4 predicted the pin would collide; this measures that **nothing else
+does**. The substance of the change does not conflict with a month of `main` — only the numbers do,
+because both sides moved the same ones. That makes the one-step fix in C-198-4 (rebase, pin **623**,
+sweep the four docs) the whole of the work, not an estimate.
+
+**A reply was posted** rather than a push:
+[#37 comment 5626623253](https://github.com/ShivaClaw/careerseeker/pull/37#issuecomment-5626623253),
+recording the stale base, the measured numbers, the conflict set and the one-step fix. The standing
+posture for a PR this routine opened is *a pushed commit or a reply, never silence*; **no human has
+asked for #37 to be revived**, and the gate is unreachable here (**C-198-6**), so the reply is the
+outcome. The PR **description was deliberately left intact** — it is an accurate record of
+2026-08-12 and reproducing it to prepend a banner would risk transcribing its evidence wrongly; the
+dated comment renders beneath it and opens by naming it stale.

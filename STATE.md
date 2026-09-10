@@ -158,11 +158,23 @@
 > now sharper: a human stops or repoints the schedule** — the slice these firings were assigned is
 > merged, so the standing assignment is not merely stale, it is *complete*.
 >
-> **What this firing did NOT do.** No merge, no reopen, no new PR, no push to #37, no rebase, no
+> **Addendum, minutes later (C-198-7):** a `pull_request.reopened` event for #37 arrived and
+> **confirms** §2 — it was closed and reopened as a side effect of #32's merge deleting its base.
+> One measurement is sharper than §3 predicted: #37 reads **`mergeable_state: "dirty"`**, and
+> `git merge-tree` puts the conflict in **exactly five files, every one of them count-reporting**
+> (`README.md`, `docs/CareerSeeker-Project-Summary.md`, `docs/External-Audit-Handoff.md`,
+> `scripts/Verify-Alpha.ps1`, `src/Engine/README.md`). **`EnvelopeJson.cs`, `SyncHarness/Program.cs`,
+> `Sync-Protocol.md` and every vector merge cleanly** — a month of `main` does not collide with the
+> substance, only with the numbers both sides moved. So the one-step fix is the whole job, not an
+> estimate. **A reply was posted, not a push** (comment `5626623253`): the standing posture for a PR
+> this routine opened is a commit or a reply, never silence, and nobody has asked for #37 to be
+> revived.
+>
+> **What this firing did NOT do.** No merge, no rebase, no push to #37, no new PR, no
 > force-push, no branch deletion. No engine or android source file changed — records only. No gate
 > ran: `Verify-Alpha.ps1` needs PowerShell (**absent**) and the five-task android command needs the
 > SDK (**`ANDROID_HOME UNSET`**); `:core:test` was not run and nothing in `:core` moved. No deploy,
-> no relay contact, no Google/Play console, no secret read. Re-verify: **C-198-1…6**.
+> no relay contact, no Google/Play console, no secret read. Re-verify: **C-198-1…7**.
 >
 > ## ▶ RUN 117 — 2026-08-28. **Nothing moved; the slice is built for the eighty-second time. One new measurement (the predecessor tip's CI verdict) and one new judgement: run 116's cadence rule is denominated in the wrong unit, and is corrected here.**
 >
