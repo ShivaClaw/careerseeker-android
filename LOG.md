@@ -19648,6 +19648,36 @@ disproved, and deliberately never filed. The guard reports `documented-absent: 2
 passes. **A future session that finds a `B-28` defined anywhere is looking at a resurrection of a
 disproved blocker and should delete it rather than investigate it** (**C-201-1**).
 
+### 201-4 Addendum: the correction was already in flight, and that is the sharper version
+
+**Written minutes after the entry above, on delivery of three queued PR notifications.** They are
+the authoritative sequence for #34, and they arrived **~15 minutes late**:
+
+```
+22:57:31Z  pull_request.closed          merged:false   <- the wake this firing acted on
+22:59:20Z  pull_request.reopened
+23:00:03Z  pull_request.ready_for_review  actor ShivaClaw   (undrafted)
+23:00:06Z  pull_request.closed          merged:true    <- final
+```
+
+Two things this changes. **First, a small correction to 201-1:** the sequence was
+close → **reopen** → undraft → merge, not simply "retargeted and merged". The end state was right;
+the explicit reopen step was missing.
+
+**Second, and this is the real upgrade.** 201-2 called the save luck — a rejected push. It was
+worse than that: **the events that would have corrected this firing were already queued while it was
+writing the wrong records.** The reopen fired at 22:59:20Z, roughly two minutes into a twenty-minute
+drafting window, and the merge three minutes in. The correction existed the whole time and simply
+had not been delivered.
+
+**So the rule in 201-3 needs one more clause.** "Re-derive at write time" is necessary but assumes
+the freshest signal is the one you go fetch. It is not always: **a queued notification may already
+hold the answer, undelivered.** Before committing a conclusion that rests on an external event,
+drain the notification queue as well as re-reading the API — and treat a wake event's absence of
+follow-up as *unknown*, never as *nothing happened*. This firing had two independent corrections
+available (the queue, and the API) and reached neither on its own initiative; a push collision did
+it.
+
 ### Boundary — what was not touched
 
 **No notification was sent.** Run 198 already sent on this exact trigger, and the run-84 addendum

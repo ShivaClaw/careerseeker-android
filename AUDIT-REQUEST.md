@@ -21561,6 +21561,21 @@ comment, never as a `## B-28 — …` heading; the guard reports **`documented-a
 **`OK: every cited C-/B- id resolves to an entry that exists.`**; and the discarded commit is absent
 from the branch because it was reset before any push succeeded.
 
+**The authoritative timeline, from the PR event stream** (delivered to this session ~15 minutes
+late, which is itself the finding — see `LOG.md` §201-4):
+
+```
+22:57:31Z  closed            merged:false        <- the state the discarded records were built on
+22:59:20Z  reopened
+23:00:03Z  ready_for_review  actor ShivaClaw
+23:00:06Z  closed            merged:true         <- final; session unsubscribed
+```
+
+Re-derive it from the API rather than the stream with
+`pull_request_read method=get pullNumber=34` (expect `merged: true`, `merged_at:
+"2026-09-10T23:00:04Z"`) — the event stream and the API agree to within the two seconds between the
+merge commit and the webhook.
+
 **Why it is registered rather than scrubbed.** The same reason **B-11** is: the near-miss is the
 finding, and a future reader reaching for the missing number deserves the account rather than a
 hole. **If a `B-28` is ever found defined, it is a resurrection of a disproved blocker** — the chain
