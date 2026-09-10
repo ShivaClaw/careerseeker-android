@@ -21135,3 +21135,98 @@ git log --format='%h %s' -1 -- FIRINGS.md                     # run 138's send t
 git show $(git log --format=%H --grep='run 138' -1) --name-only --format='%s'   # expect: FIRINGS.md alone
 scripts/check-citations.sh                                     # expect: exit 0, every cited id resolves
 ```
+
+---
+
+## C-198 — The merge, the wrong wake event, and #37's stale base (run 198, 2026-09-10)
+
+`<engine>` is a checkout of `ShivaClaw/careerseeker`; `<android>` is this repo. `dotnet` is
+**PRESENT** in this container; `pwsh` is **ABSENT** and not in the Ubuntu archive, so **no gate ran**
+(C-198-6).
+
+### C-198-1 — PR #32 merged, and both spec-half commits are now ancestors of main
+
+```bash
+cd <engine> && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do
+  printf '%s ' "$c"; git merge-base --is-ancestor $c origin/main && echo ON-MAIN || echo off-main
+done
+```
+
+*Expected:* `8575539 ON-MAIN`, `22b028e ON-MAIN`, **`7328a0b off-main`**. Via the API:
+`list_pull_requests owner=ShivaClaw repo=careerseeker state=all` shows **#32 `merged_at:
+2026-09-10T22:57:29Z`**. This is the first merge anywhere since **#44, 2026-08-13** — the clause
+carried by firing lines 193–197 — so that clause is retired, not repeated.
+
+### C-198-2 — #37 is OPEN and retargeted to main; the wake event that said otherwise was wrong
+
+```bash
+# via the GitHub MCP server (gh is ABSENT in this container)
+list_pull_requests owner=ShivaClaw repo=careerseeker state=all   # then read the #37 row
+```
+
+*Expected:* `number: 37, state: open, draft: true, merged_at: null, closed_at: null,
+base.ref: main, head.ref: claude/s5-engine-wire-parser`.
+
+The firing was started by a `pull_request.closed` event claiming *"#37 closed without merging"*.
+**It is contradicted by the primary source.** #37's base was `claude/s5-entitlement-ack-spec`, which
+was deleted when #32 merged; GitHub retargets a stacked PR to the merged base rather than closing
+it. Corroborate the deletion:
+
+```bash
+cd <engine> && git ls-remote --heads origin | grep -E 's5-engine-wire-parser|s5-entitlement-ack-spec'
+```
+
+*Expected:* **only** `claude/s5-engine-wire-parser` returns. The absent line is the deleted base.
+
+### C-198-3 — main's measured state this firing
+
+```bash
+cd <engine> && git checkout --detach origin/main
+ls docs/sync-vectors/v1/*.json | wc -l
+dotnet build CareerSeeker.sln -c Release | tail -4
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build | tail -2
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1
+```
+
+*Expected:* **28** vectors, **0 Warning(s) / 0 Error(s)**, **`=== 130 passed, 0 failed ===`**, and
+**`$ExpectedOfflineTotal = 611`**. All four were executed this firing, not quoted.
+
+### C-198-4 — #37's arithmetic is stale against its new base
+
+```bash
+cd <engine>
+git show origin/claude/s5-engine-wire-parser:scripts/Verify-Alpha.ps1 | grep -n 'ExpectedOfflineTotal = '
+git show origin/main:scripts/Verify-Alpha.ps1                        | grep -n 'ExpectedOfflineTotal = '
+```
+
+*Expected:* the branch reads **610**, `main` reads **611**. The branch's **+12** SyncHarness
+assertions (130 → 142) are unchanged and still correct; what is stale is the base it was added to.
+**On today's `main` the correct pin is `611 + 12 = 623`**, with the same sweep across `README.md`,
+`src/Engine/README.md`, `docs/CareerSeeker-Project-Summary.md` and `docs/External-Audit-Handoff.md`.
+**Retargeting is not rebasing** — merging #37 as it stands would fail the drift trap. Deliberately
+**not fixed** this firing: it is a code change needing a gate this sandbox cannot run, on a PR nobody
+asked to revive.
+
+### C-198-5 — the vendored pin is reachable, and the corpus is byte-identical
+
+```bash
+cd <engine> && git branch -r --contains 7328a0b | wc -l
+cd <android> && bash scripts/run-zero.sh ../careerseeker | sed -n '/== 2\./,/== 3\./p'
+```
+
+*Expected:* `7328a0b` is contained in **seven** remote branches (not just #37's), so the deleted base
+branch stranded nothing; and §2 prints **`OK: 29 vector files match the generator.`** plus
+**`vendored: 29 files   at pin: 29 files`** with the byte-identical line. **No cross-repo drift
+event.** The pin remains **off-main**, which is the unchanged half: PQ-A2-3 / B-6's fix is unlanded.
+
+### C-198-6 — what did NOT run
+
+```bash
+cd <engine>  && pwsh -File scripts/Verify-Alpha.ps1
+cd <android> && ./gradlew --no-daemon checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug --rerun-tasks
+```
+
+*Expected:* **both fail to start.** `pwsh` is absent and not in the Ubuntu archive; `ANDROID_HOME` is
+`UNSET`. `:core:test` was **not** run either, and did not need to be — nothing in `:core` moved.
+**No gate result is claimed by this firing.**

@@ -5716,3 +5716,33 @@ adding a fourth sample of a stable ~10% intermittent would be the reporting-for-
 run is otherwise arguing against. The rate stands where run 117 left it: **3 in 29 ≈ 10%**. **No CI
 job was re-run, and no test was skipped, disabled or quarantined.** The fix still needs an `:app`
 compile this sandbox does not have (**B-7**, **B-4**).
+
+---
+
+## B-6 status 2026-09-10 (run 198) — the fix is now open against `main`, and stale against it
+
+**Not a new blocker; a status correction that matters for whoever picks this up.** Runs 22 onward
+record **B-6 RESOLVED**, on the strength of the parser + vector built on
+`claude/s5-engine-wire-parser`. That remains true of the *work* and false of the *codebase*:
+`7328a0b` is **still off-main** (**C-198-1**), so the engine on `main` still has no inbound wire
+parser and would still **accept** an envelope carrying an unknown top-level field — the exact
+condition B-6 was opened for. **The rule is fixed on a branch, not in the product.**
+
+**What changed today.** PR #32 merged (S5's spec half → `main`), its head branch was deleted, and
+GitHub **retargeted** the stacked PR **#37 to `main`**. #37 is **open and draft** — the wake event
+that reported it "closed without merging" is contradicted by the API (**C-198-2**).
+
+**The consequence, measured (C-198-3/-4):** retargeting is not rebasing. #37 was cut against a
+`598` pin and sets **610**; `main` now reads **611** with SyncHarness at **130**. The branch's **+12**
+is still correct, so the right number on today's `main` is **623** — plus the four-doc sweep.
+**Merging #37 as it stands would fail the drift trap.**
+
+**Smallest unblock, stated so it is one step:** rebase `claude/s5-engine-wire-parser` onto
+`origin/main`, set `$ExpectedOfflineTotal` to **623**, sweep `README.md`, `src/Engine/README.md`,
+`docs/CareerSeeker-Project-Summary.md` and `docs/External-Audit-Handoff.md` to SyncHarness **142** /
+total **623**, and let CI on `windows-latest` run the gate. **Not done here** — no human asked for
+#37 to be revived, this routine is past its stop condition (**B-18**), and the gate is unreachable
+from this sandbox (**C-198-6**).
+
+**The pin is not at risk** (**C-198-5**): `7328a0b` is reachable from seven remote branches and the
+vendored corpus is 29/29 byte-identical. Nothing was stranded by the base-branch deletion.

@@ -49,6 +49,62 @@
 > after 2026-09-11.** **B-18's smallest human unblock is unchanged: a human stops or repoints the
 > schedule.**
 >
+> ## ▶ RUN 198 — 2026-09-10. **SOMETHING MOVED. After 162 consecutive declinations, the assigned slice MERGED: PR #32 landed S5's spec half on `main`. And the event that woke this firing was WRONG — #37 is open, not closed.**
+>
+> **Heartbeat:** 2026-09-10, **one hundred and ninety-eighth** firing. Both checkouts fetched first,
+> per rule one; every count below was taken after that fetch. `scripts/run-zero.sh ../careerseeker`
+> returned **`SOMETHING MOVED`** — the first non-`NOTHING MOVED` verdict since the rule was written
+> at run 118 — so the one-line `FIRINGS.md` path does **not** apply and the full records do.
+>
+> **1. The 162-run decline is over, and it ended upstream rather than here.** `run-zero` §1 flagged
+> **both** spec-half commits as newly reachable: `!! 8575539 is now an ancestor of origin/main` and
+> `!! 22b028e is now an ancestor of origin/main`. Confirmed at the source — **PR #32 merged
+> `2026-09-10T22:57:29Z`** ("S5 (first half): the `entitlement_ack` body, PQ-A2-1/-2, and the relay
+> cap §3.1"). That is the **first merge anywhere since #44 on 2026-08-13**, retiring the `newest
+> merge #44 08-13` clause that rides every firing line from 193 to 197. **Engine `main` moved
+> `aac05f3 → 5395b57`.** Android `main` unmoved at `ebfaf81`.
+>
+> **2. The wake event was wrong, and it is recorded as wrong rather than acted on.** This firing was
+> started by a `pull_request.closed` event reporting **`ShivaClaw/careerseeker#37 — closed without
+> merging`**, with instructions not to reopen it. **The primary source contradicts it.**
+> `list_pull_requests state=all` returns #37 as **`state: open, draft: true, merged_at: null,
+> closed_at: null`, `base: main`** — its base was `claude/s5-entitlement-ack-spec`, and GitHub
+> **retargeted it to `main`** when #32 merged and that branch was deleted. So the closure was either
+> a transient or a misattribution of #32's own close event. **Nothing was reopened and no new PR was
+> opened** — there was nothing closed to reopen. The house rule that earned its keep here is the
+> ordinary one: verify a surprising claim against the primary source before acting on it.
+>
+> **3. The new finding, measured not inferred: #37 is now STALE against the base it was moved to.**
+> Retargeting is not rebasing. Measured on `origin/main` **this firing**, with `dotnet` present:
+> **28 vectors**, `dotnet build CareerSeeker.sln -c Release` → **0 warnings / 0 errors**, SyncHarness
+> **`=== 130 passed, 0 failed ===`**, and `$ExpectedOfflineTotal` = **611**. #37's branch
+> (`claude/s5-engine-wire-parser`, tip `78079c7`) was cut when the pin was **598** and sets it to
+> **610** with SyncHarness **142**. Its +12 is still right; **its base arithmetic is not**. On today's
+> `main` the correct pin is **611 + 12 = 623**, and the four count-reporting docs need the same sweep.
+> **As it stands #37 would fail the drift trap it was careful to respect.** Not fixed here: that is a
+> code change needing a gate this sandbox cannot run (`pwsh` **ABSENT**, and not in the Ubuntu
+> archive), on a PR nobody asked to be revived.
+>
+> **4. The pin is safe, checked rather than assumed.** The worry the wake event implied — a vendored
+> pin stranded on a deleted branch — does **not** materialise. `claude/s5-engine-wire-parser` still
+> exists at `78079c7`; `git branch -r --contains 7328a0b` lists **seven** later branches
+> (`s2-push-disposition`, `s2-relay-pull-result`, `s5-entitlement-ack-emitter`, `s5-inbound-pump`,
+> `s6-*`), so `7328a0b` is reachable from many refs, not one. `run-zero` §2: **corpus 29/29
+> byte-identical to the pin, generator `OK: 29 vector files match the generator.`** **No cross-repo
+> drift event.** `7328a0b` itself remains **off-main** — PQ-A2-3 / B-6's fix is still unlanded.
+>
+> **5. Escalation: SENT, on a positive state trigger rather than the calendar arm.** Run 82's standing
+> test fires on **`main` moving** and on **a PR merged or undrafted**; this firing has **both**, so it
+> does not wait for the 2026-09-11 calendar arm. **B-18's smallest human unblock is unchanged and is
+> now sharper: a human stops or repoints the schedule** — the slice these firings were assigned is
+> merged, so the standing assignment is not merely stale, it is *complete*.
+>
+> **What this firing did NOT do.** No merge, no reopen, no new PR, no push to #37, no rebase, no
+> force-push, no branch deletion. No engine or android source file changed — records only. No gate
+> ran: `Verify-Alpha.ps1` needs PowerShell (**absent**) and the five-task android command needs the
+> SDK (**`ANDROID_HOME UNSET`**); `:core:test` was not run and nothing in `:core` moved. No deploy,
+> no relay contact, no Google/Play console, no secret read. Re-verify: **C-198-1…6**.
+>
 > ## ▶ RUN 117 — 2026-08-28. **Nothing moved; the slice is built for the eighty-second time. One new measurement (the predecessor tip's CI verdict) and one new judgement: run 116's cadence rule is denominated in the wrong unit, and is corrected here.**
 >
 > **Heartbeat:** 2026-08-28, **one hundred and seventeenth** cloud iteration (Linux sandbox),
