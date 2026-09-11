@@ -57,6 +57,57 @@
 > after 2026-09-11.** **B-18's smallest human unblock is unchanged: a human stops or repoints the
 > schedule.**
 >
+> ## ▶ RUN 204 — 2026-09-11. **`run-zero.sh` — the one command every firing trusts — was failing on two signals that were already spent, and had no guard for the corruption that actually happened. Repaired. And the owner's 16-PR sweep is proven to have lost nothing.**
+>
+> **Heartbeat:** 2026-09-11, **two hundred and fourth** cloud iteration (Linux sandbox). Both
+> checkouts `git fetch --all --prune`d **before any count** (rule one) — engine `main` came back
+> `aac05f3..14469ad` against this container's fresh-but-stale clone. `autonomy/codex-state` read
+> before any write: tip **COMPLETE**, **files claimed: none** → **no collision**, Terra keeps
+> right-of-way. **No gate ran** (`pwsh`/`dotnet`/`sdkmanager`/`adb` **ABSENT**, `ANDROID_HOME`
+> **UNSET**) and none is claimed.
+>
+> **The assigned slice was S5's spec half again — the fourteenth-plus time. It is on `main`**
+> (**C-203-5**, re-measured): `8575539`, `22b028e`, `7328a0b` all report `on main (expected)`.
+> Declined, per the mission's own *"topmost rung genuinely verifiable in THIS environment"*. The
+> slice taken instead is the one **run 203 explicitly handed off**.
+>
+> **1. Nothing was lost in the landing (C-204-1).** `fleet-probe.sh plan` reports `ROT 6/6`; run 203
+> called it a phantom, and this run **measured it** rather than quoting it. All six branches §3 names
+> are ancestors of `origin/main`. **Three (#36, #51, #49) carry NO `merged_at`** — they landed inside
+> integration PR **#59** and were closed by hand, so PR metadata alone reads them as
+> *closed-unmerged*, which looks exactly like deleted work. **C-89-2's trap in a second form:**
+> `merged` lies and `merged_at` **understates**; the commit graph is the only authority. `#53` is the
+> one head deliberately off `main` (closed as superseded, as §3's own step 0 recommended).
+>
+> **2. Two dead signals (C-204-4, C-204-2).** `BASE_ENGINE_MAIN` still read `11bb1f5`: run 203
+> *recorded* the move to `14469ad` (**C-203-4**) and did not *advance* the constant, so §4 printed
+> `engine main MOVED` on a spent change — and would have at **every** future firing. The rule that
+> prevents this is the rule that failed, and it is now restated in the file: **the run that records a
+> move re-pins the constant, in the same commit.** Separately, §3 failed the whole verdict on
+> `ROT 6/6`, now permanent and correct — **a spent signal that fails the verdict masks every future
+> one.** Pinned as `BASE_PLAN_ROT`, flagging only a *deviation*: **retired, not silenced** — a 7th rot
+> still fires, and editing §3's table re-arms it. `RETURN-DAY.md` §3 carries a **SPENT** banner to
+> match, because a guard and the doc it guards move together.
+>
+> **3. The conflict-marker guard (C-204-3)** — run 203's handoff, built. Runs 200/202 each **committed
+> and pushed** an unresolved merge conflict into `AUDIT-REQUEST.md` and `LOG.md` and **nothing saw it**
+> (**C-203-9**). §3b greps both checkouts; clean today, and — the half that matters — it **fires on 4
+> lines at `02cd1e8~1`**, the real corruption, not a planted marker. A bare `=======` is excluded by
+> design (valid Markdown setext H1 underline); zero exist in either repo today, which is why the
+> exclusion is free, and the reasoning is written down so a later run does not "fix" it back.
+>
+> **4. The probe's conclusion described a world that had ended.** §6 and the VERDICT still narrated
+> run 99: 22 engine drafts, *"the lane is exhausted"*, and B-18's premise that **escalations go into
+> an empty room**. Board re-queried (**C-204-5**): engine **2 open** (#58, #26), android **6 open**,
+> all draft, **zero android PRs have ever merged**. §6 gains the **repository-visibility** query —
+> B-29's reusable half — stated **without** asserting a direction, because that direction is the
+> owner's open decision. `run-zero.sh` now **exits 0**, four guards green; it exited 1 before.
+>
+> **5. The escalation was WITHHELD, and that is a decision.** The predicate is a positive state
+> trigger or **five calendar days**. Run 203 sent **esc 16 today**, carrying B-29; `main` is unmoved
+> since, the board is unchanged, and this run produced **no new owner-actionable finding**. **Ledger
+> stays at 16.** Sending the same finding twice in one day spends attention and returns nothing.
+>
 > ## 🔴 RUN 203 — 2026-09-11. **`ShivaClaw/careerseeker-android` IS PUBLIC. `README.md:7` says "This repository is private, always." Both are true right now. 202 runs of records never checked, because nothing in either repo checks repository *metadata* — only file contents.**
 >
 > **Heartbeat:** 2026-09-11, **two hundred and third** cloud iteration (Linux sandbox). Both checkouts
@@ -3550,6 +3601,18 @@ in [`RETURN-DAY.md`](RETURN-DAY.md)**.
 > below it, it is completable in a sandbox with no Android SDK. **Run 92 reached the opposite
 > conclusion on the same facts and declined to push it; the disagreement, and the ground for it, are
 > recorded in B-25's status block and in C-93's closing note.**
+
+> **⚠ READ BEFORE THE TABLE — added run 204 (2026-09-11). The engine-side rows below are
+> UNDERSTATED, and this run did not rewrite them.** On 2026-09-10/11 the owner landed the S-series:
+> ~16 engine PRs (`#32`…`#59`), the open queue **18 → 2**, 26 branches swept. Work these rows call
+> unlanded is **on `main`** — the S5 spec half (**C-203-5**), `#37`'s strict wire parser, the
+> inbound pump, the ack emitter, and all six branches `RETURN-DAY.md` §3 names (**C-204-1**).
+> **What this run verified is the LANDING, not each rung's status:** proving `#48`'s head is an
+> ancestor of `main` does not by itself make **S8** DONE, and this run had no gate with which to
+> claim otherwise. **So the rows are left as found rather than upgraded on inference** — an
+> overstated ladder is worse than a stale one. A session with the Windows gate should re-derive
+> S1–S6 row by row against `main` at `14469ad` and rewrite them with measurements. **B-4** (no
+> emulator) and the gate remain the real blockers; neither moved.
 
 | Rung | Status | Evidence / reason |
 | --- | --- | --- |

@@ -19954,3 +19954,146 @@ check in C-203-2 reports paths, never contents. Terra's territory (`autonomy/cod
 the visibility finding; bolting a second guard into the shared probe in the same push would mix an
 unreviewed tooling change into a records run, and `run-zero.sh` is what every future firing depends
 on. Recommended, not done — stated so the next session can take it.
+
+---
+
+# RUN 204 — 2026-09-11. **The probe every firing trusts had two dead signals and was missing the guard that the last corruption needed. Repaired, and the landing is proven to have lost nothing.**
+
+**No gate ran.** `pwsh`, `dotnet`, `sdkmanager`, `avdmanager`, `emulator`, `adb` all **ABSENT**;
+`ANDROID_HOME` **UNSET**. Everything below was executed in this session and its output is quoted.
+
+## Milestone 0 — rule one, and the slice that was already built
+
+`git fetch --all --prune` in both checkouts **first**. Engine `main` came back
+`aac05f3..14469ad` against this container's stale clone — the incident rule earning itself again.
+
+The prompt assigned **S5's spec half** (§4.3 `entitlement_ack`, the vectors, PQ-A2-1/-2/-3). **It is
+built and it is on `main`** (**C-203-5**, re-measured here): `8575539`, `22b028e` and `7328a0b` all
+report `on main (expected)`. This is the **fourteenth**-plus run assigned built work; the prompt's
+other two stale facts (pin `679a317`, S5 *"NOT STARTED"*) are unchanged. **B-18**, unchanged.
+Rebuilding it was declined, as the mission's *"topmost rung genuinely verifiable in THIS
+environment"* clause permits. The slice taken instead was the one **run 203 explicitly handed off**.
+
+## Milestone 1 — the landing lost nothing, and that was measured, not inherited
+
+`fleet-probe.sh plan` reports `ROT 6/6` and exits 1. Run 203 called it a phantom — all six branches
+deleted *because they merged*. **This run proved it instead of quoting it** (**C-204-1**). Fetching
+`refs/pull/*/head` (the branches are gone from origin, so the SHAs resolve no other way) and testing
+each head with `merge-base --is-ancestor`:
+
+```
+48 s8-harness-linux-reach       c93e88d   YES-landed
+57 s2-relay-header-pairing      f00feb2   YES-landed
+36 s2-transport-vocabulary      6700078   YES-landed
+51 s3-pairing-confirm-consumer  edee32b   YES-landed
+52 s6-outcome-disposition       94fd979   YES-landed
+49 s6-composition-root-decision f5e0c0a   YES-landed
+53 s6-resume-reconciliation     8177353   NO -- NOT on main
+```
+
+**Three of those six (#36, #51, #49) carry no `merged_at` at all.** They landed inside integration
+PR **#59** and were closed by hand, so PR metadata alone reads them as *closed-unmerged* — which
+looks exactly like deleted work. It is not. That is **C-89-2's trap in a second form**, and it is now
+written into §6 where the next querying run will meet it: `merged` lies, and `merged_at`
+**understates**. The commit graph is the only authority. `#53` is the single head deliberately off
+`main` — closed as superseded per §11.4, which is what `RETURN-DAY.md` §3's own step 0 recommended.
+**The owner's sweep dropped nothing**, and that is worth having measured independently of his handoff.
+
+## Milestone 2 — two dead signals in `run-zero.sh`
+
+**The baseline that recorded a move without advancing it** (**C-204-4**). Run 203 recorded
+`11bb1f5 → 14469ad` as **C-203-4** and left `BASE_ENGINE_MAIN` at `11bb1f5`. So §4 printed
+`engine main MOVED` on a change *already recorded and already spent* — and would have at every
+future firing. The block's own comment warns against precisely this; the rule that prevents it was
+the rule that failed. Re-pinned, and restated in the file: **the run that records a move re-pins the
+constant, in the same commit.** A baseline nobody advances stops measuring.
+
+**The alarm that could never go quiet** (**C-204-2**). §3 failed the whole verdict on `ROT 6/6`, a
+condition now permanent and correct. One spent signal that fails the verdict **masks every future
+one** — the same signal-destroying staleness, one section up. Pinned as `BASE_PLAN_ROT` / 
+`BASE_PLAN_ROWS`, flagging only a **deviation**, mirroring the `SLICE_LANDED` pattern already in the
+file. **Retired, not silenced:** a 7th rot still fails, and editing §3's table re-arms it. Because a
+guard and the doc it guards move together, `RETURN-DAY.md` §3 now carries a **SPENT** banner — the
+alternative was a quiet probe pointing at a document that still reads as live instruction.
+
+## Milestone 3 — the conflict-marker guard, tested against the real corruption
+
+Runs 200 and 202 each **committed and pushed** a complete unresolved merge conflict into
+`AUDIT-REQUEST.md` and `LOG.md`, and **nothing detected it** (**C-203-9**); `check-citations.sh` was
+green across the corruption and green after the repair, so it never measured this at all. Run 203
+repaired it and recorded that the guard belongs in `run-zero.sh`. **This is that guard** (**C-204-3**).
+
+```
+== 3b. Conflict markers — committed '<<<<<<<' / '>>>>>>>' in tracked Markdown
+  clean  careerseeker-android
+  clean  careerseeker
+```
+
+Clean today is the weaker half of the evidence. The stronger half is the **negative control**: the
+guard's exact expression against the pre-repair tree, real historical data rather than a planted
+marker —
+
+```
+02cd1e8~1:AUDIT-REQUEST.md:21594:<<<<<<< HEAD
+02cd1e8~1:AUDIT-REQUEST.md:21785:>>>>>>> cba7471 (RUN 202 ...)
+02cd1e8~1:LOG.md:19491:<<<<<<< HEAD
+02cd1e8~1:LOG.md:19700:>>>>>>> b4bbf41 (RUN 200 ...)
+--- lines: 4
+```
+
+**A bare `=======` is excluded on purpose.** It is also a valid Markdown setext H1 underline, so it
+would false-positive on ordinary prose; `git grep -c -E '^=======$' -- '*.md'` returns **nothing** in
+either repo today, which is why the exclusion costs nothing — and the reasoning is written down
+rather than left for a later run to rediscover when it does cry wolf. Both unambiguous markers
+appear in every real conflict and in no resolved file.
+
+## Milestone 4 — the probe's own conclusion was describing a world that had ended
+
+§6 and the VERDICT still narrated **run 99's** ground state — 22 engine drafts, *"the lane is
+exhausted"*, and B-18's premise that **escalations go into an empty room**. All three are now false.
+Board re-queried by MCP (**C-204-5**): engine **2 open** (#58, #26, both draft), android **6 open**,
+all draft, **zero android PRs have ever merged**. §6 also gains the **repository-visibility** query —
+the reusable half of **B-29** — stated without asserting a direction, because which way it should
+assert is the owner's open decision and not a firing's.
+
+`./scripts/run-zero.sh ../careerseeker` → **exit 0**, all four guards green (citations, plan-rot
+against its pinned spent state, conflict markers, vectors). Before this run it exited 1 on two spent
+signals. Citations: **1096 definitions / 1097 cited / 2 documented-absent**, and the guard caught
+this very entry's first draft citing `C-204-1`/`-2` before they were defined — working as designed.
+
+## Milestone 5 — the escalation, deliberately WITHHELD
+
+**No message was sent, and that is a decision, not an omission.** The ledger's predicate is a
+positive state trigger, or **five calendar days** since the last send with the standing condition
+holding. Run 203 sent **esc 16 today**, carrying **B-29**. Neither arm is due: engine `main` is
+unmoved since 203, the board is unchanged, and this run produced **no new owner-actionable finding**
+— B-29 is open, already sent, and still the owner's alone. Run 203's own warning applies: *a future
+firing must not re-arm the calendar send on the old premise without re-deriving it.* **Sending the
+same finding twice in one day spends the owner's attention and returns nothing.** Ledger stays at 16.
+
+## Boundary — what this run did NOT touch
+
+**No gate ran and none is claimed.** `Verify-Alpha.ps1` and the five-task android command are both
+unreachable here; `816` is **not** re-measured and is cited nowhere in this entry as this run's.
+`:core:test` was **not** run, and no earlier green is restated as mine.
+
+**No pin moved. No vector byte, no `index.json`, no `generate.mjs`, no `Sync-Protocol.md`, no
+`ci.yml`, no Kotlin, no C#, no Gradle file.** The vendored corpus remains byte-identical to pin
+`11bb1f5`, 30/30 — **no cross-repo drift event.** No C# or Kotlin applier was written; those need a
+compiler this sandbox does not have, and they remain a local session's work.
+
+**Nothing was merged, closed, undrafted, reopened, force-pushed or deleted; no branch removed; no
+history rewritten.** The `refs/pull/*` fetch is read-only and created no ref at origin. **No
+repository setting was changed** — not visibility, not description, on any repo; **B-29 was not
+acted on.** No new PR in `careerseeker` and **nothing claimed there** beyond the one-line heartbeat
+on the docs-only `autonomy/claude-state` branch. **No deploy of any kind** — Cloudflare, Workers,
+relay or site. **The relay was not contacted at all**, not even `GET /v1/health`. No Play, Google or
+OAuth console; no accounts, no purchases, no Gmail, no keystore, no emulator. **No secret was read,
+printed or echoed.** Terra's territory (`autonomy/codex-state`, the beta worktrees) was **read,
+never written**.
+
+**One thing recommended and deliberately not done:** §6's visibility query is MANUAL prose, not an
+executable assertion. Making it executable needs the GitHub API from bash, which `run-zero.sh`
+deliberately cannot reach — and **its correct direction depends on B-29's answer**, which has not
+come. Building it now would hard-code a guess about what the owner intends. Stated so the next
+session can take it *after* the decision, not before.
