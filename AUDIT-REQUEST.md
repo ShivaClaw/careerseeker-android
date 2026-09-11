@@ -21331,7 +21331,6 @@ dated comment renders beneath it and opens by naming it stale.
 
 ---
 
-<<<<<<< HEAD
 ## Run 200 (2026-09-10) — the two findings that survived the duplicate cull
 
 *Everything else this run derived — the seven-merge landing, #32, #37's reopening and conflict set,
@@ -21536,7 +21535,6 @@ confirmed by `grep -c '### C-198-7'` → **1** and `grep -c '### C-REPIN-5'` →
 force-pushed over a published ref. **The lesson for the next concurrent wake is narrower than "be
 careful":** do not chain a resolution script to `git add && git rebase --continue` with `&&` — a
 failed assertion must stop the commit, and here it did not.
-=======
 ## RUN 201 — the discarded records (C-201-1)
 
 ### C-201-1 — B-28 was drafted, disproved and never filed
@@ -21590,10 +21588,10 @@ pull_request_read  method=get owner=ShivaClaw repo=careerseeker pullNumber=34
 *Expected:* `merged: true`, `merged_by: "ShivaClaw"`, `merged_at: "2026-09-10T23:00:04Z"`,
 `base.ref: "main"` — plus the six merge commits for #34, #35, #54, #55, #56 and #57 recorded in the
 run-84 addendum's **C-84-14**.
->>>>>>> b4bbf41 (RUN 200: a blocker that was false before it was written, and the push that caught it)
 
 ---
 
+<<<<<<< HEAD
 ## C-202 — The #59 landing, the gate-confirmed pin, and the table the trap cannot check (run 202, 2026-09-11)
 
 ### C-202-1 — #37 landed inside #59, and the vendored pin is finally an ancestor of `main`
@@ -21678,3 +21676,110 @@ nobody asked, the merge event said not to open a PR for this work, and `Verify-A
 here (`pwsh` absent) so it could not be gated from this sandbox. **A stronger fix worth considering
 instead of a literal bump:** assert each row against the harness's *measured* output rather than
 against a hand-written string, which is the only version of this check that could have failed.
+=======
+## RUN 202 — the re-pin, executed · 2026-09-11
+
+### C-202-1 — the re-pin ADDS one vector and deletes none, measured against `main` at `11bb1f5`
+
+> **Claim.** `RETURN-DAY.md` §3's queued re-pin was executed. Pin moved
+> **`7328a0b` → `11bb1f5`**; vendored corpus **29 → 30**; **one payload added**
+> (`pairing-high-bit-confirm.json`), **`index.json` rewritten**, **zero existing payload bytes
+> changed**, **nothing deleted**.
+
+```bash
+cd careerseeker-android && scripts/repin-vectors.sh --check --engine ../careerseeker origin/main
+git show --stat HEAD -- core/src/test/resources/sync-vectors/
+```
+
+*Expected from `--check`:* `pin position : on origin/main`, `OK: 30 vector files match the
+generator.`, `vendored: 30 files    at pin: 30 files`, and the byte-identical line. The commit's
+diffstat must show **one added file**, **`index.json` modified**, **`VECTORS.lock` modified**, and
+**no other file under `v1/`**. If any other payload's bytes moved, this was a cross-repo drift event
+and must be reverted.
+
+### C-202-2 — C-REPIN-5 is SUPERSEDED, and the reason is a moving `main`, not an error
+
+> **Claim.** C-REPIN-5 measured this same step hours earlier against `main` at **`cffe2b7`** and
+> correctly found it would **delete** `invalid-unknown-field.json` (main 28 files, phone 29 — the
+> phone AHEAD). It is now impossible: `main` moved to `11bb1f5`, and **`7328a0b` is an ancestor of
+> `main`**, so the file the deletion would have removed is upstream too.
+
+```bash
+cd careerseeker && git merge-base --is-ancestor 7328a0b origin/main; echo "exit=$?"
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l
+```
+
+*Expected:* **`exit=0`** (was non-zero when C-REPIN-5 was written) and **30**. **Neither record is
+wrong; they are measurements of different moments.** This is the fourth time in ~24 hours a record
+in these files was overtaken between being written and being read. **Re-measure before acting on any
+count here.**
+
+### C-202-3 — the suite is green and the count did NOT move, which is B-14 reproducing
+
+> **Claim.** `scripts/core-probe.sh` → **`BUILD SUCCESSFUL in 1m 25s`**, **`core-probe: 348 tests, 0
+> failed, 0 skipped, across 22 classes`**. **348 is unchanged from run 109 onward, with a vector
+> added.** `pairing-high-bit-confirm` is **vendored and not asserted**: `ProtocolVectorsTest`
+> enumerates from `index.json` but its *"every vector value"* case hardcodes `pairing-basic`.
+
+```bash
+cd careerseeker-android && scripts/core-probe.sh
+grep -n "pairing-basic" core/src/test/kotlin/app/careerseeker/core/ProtocolVectorsTest.kt
+```
+
+*Expected:* `348 tests, 0 failed`, and the hardcoded `pairing-basic`. **The falsification that
+matters is run 56's (C-ENUM-2): corrupt `pairing-high-bit-confirm.json`'s expected confirm code to
+`999999` and re-run — if the suite stays GREEN, the vector is not asserted and B-14 stands.** A
+green suite is therefore **not** evidence the new vector is tested. **B-14 and B-16/H3 remain open.**
+
+**JDK 17 note:** the probe needs it, the image ships 21, and `api.foojay.io` is denied (B-7). It was
+installed into the **ephemeral sandbox only** — `apt-get update && apt-get install -y
+--no-install-recommends openjdk-17-jdk-headless`. Nothing entered either repository's tracked tree.
+
+### C-202-4 — the offline pin is 816, not 598
+
+> **Claim.** Records up to and including run 198's carried `$ExpectedOfflineTotal = 598` and flagged
+> "does `main` still pass with 598?" as the cascade's largest open question. **That was the wrong
+> question** — the integration re-derived the pin on purpose (*"re-derive pin 812 + 4 = 816"*).
+
+```bash
+cd careerseeker && git show origin/main:scripts/Verify-Alpha.ps1 | grep -n "ExpectedOfflineTotal = "
+```
+
+*Expected:* **`$ExpectedOfflineTotal = 816`**. Any android record still quoting 598 as current is
+stale.
+
+### C-202-5 — `main`'s tip is CI-green; its intermediate merges are CANCELLED, not passed
+
+> **Claim.** Run [34549986264](https://github.com/ShivaClaw/careerseeker/actions/runs/34549986264)
+> (number **492**, `push`, head **`11bb1f5`**) is **`success`**, 01:16:09 → 01:18:22Z. But runs 486,
+> 487 and 488 — heads `52ef7f1`, `064a10e`, `e06ccae` — are **`cancelled`**, superseded inside the
+> workflow's concurrency group.
+
+```bash
+# MCP: actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker
+#      resource_id=ci.yml workflow_runs_filter={"branch":"main"}
+```
+
+*Expected:* `success` on `11bb1f5`; `cancelled` on the three above. **"Seven merges, CI green" is the
+wrong summary — the TIP is gated, the intermediate merge commits are not.** Whether that matters is
+a judgement for whoever owns the merge policy; it is recorded here so nobody counts checkmarks and
+concludes otherwise.
+
+### C-202-6 — `run-zero.sh`'s constants move again, and one flag is left standing on purpose
+
+> **Claim.** `BASE_ENGINE_MAIN` → **`11bb1f5cbf2561fe04cabf2cbfad1fa2c4039eb3`** (taken from
+> `git rev-parse`, per C-198-11's lesson — never typed from a short hash). `SLICE_LANDED` gains
+> **`7328a0b`**, so all three slice commits are now expected on `main` and §1 flags only deviations.
+> **One check still fails and is meant to:** *"fleet-probe.sh plan FAILED — the landing plan rotted"*,
+> 6 rows naming branches that are no longer leaves.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker; echo "exit=$?"
+```
+
+*Expected:* §1 three × `on main (expected)`; §2 `pin position : on origin/main`, `30 files`,
+byte-identical; §4 both mains unmoved; and **exit 1 on the plan check alone**. **That flag is success,
+not rot** — `RETURN-DAY.md` §3's plan named the branches to merge and they merged. **It was
+deliberately not rewritten**: re-deriving a merge plan is a decision about a human-facing handoff
+doc whose merges are already done, and concurrent firings are active in these files.
+>>>>>>> cba7471 (RUN 202: execute the re-pin -- 7328a0b -> 11bb1f5, and the pin is ON main)

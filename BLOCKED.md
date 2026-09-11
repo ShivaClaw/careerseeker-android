@@ -5765,3 +5765,44 @@ during and after the removal.** The only signal is the script's own `-` line.
 against `main`: 3 files, +60 lines, 0 deletions; merge cost is run 198 §3's **623**), then re-pin and
 expect 29/29 — **or** re-pin now and accept the loss **knowingly**. **H3/H7 remain the owner's; this
 wake moved no pin and takes no position.**
+
+---
+
+## RUN 202 status — one blocker retired by execution, one reproduced, none opened · 2026-09-11
+
+**B-16's "phone will be BEHIND by one file" gap — CLOSED by the re-pin.** The 2026-08-17
+`VECTORS.lock` note predicted that when `RETURN-DAY.md` §3's merges landed, `main` would gain
+`pairing-high-bit-confirm.json` and the phone would silently fall behind, **with no check firing** —
+android CI queries `?ref=$PIN` and the pin lacked the vector too. That is exactly what happened, and
+this firing re-vendored at `11bb1f5`: corpus 29 → 30, `pin position : on origin/main`. Re-verify:
+**C-202-1**. **H3 is NOT closed by this** — B-16 offered three options for making the gap *visible*
+(advisory job / compare against main / accept and document), and closing one instance of the gap is
+not choosing among them. Still Brandon's.
+
+**B-14 — REPRODUCED, not closed, and the re-pin is what re-proved it.** `:core` went 348 → **348**
+with a vector added (**C-202-3**). `ProtocolVectorsTest` enumerates from `index.json` but its
+*"every vector value"* case hardcodes `pairing-basic`, so `pairing-high-bit-confirm` is **vendored
+and never asserted**. Run 56's falsification stands as the cheap check: corrupt its expected confirm
+code to `999999` and the suite stays green. **A green suite is not evidence the new vector is
+tested.** Smallest unblock unchanged: make that case enumerate rather than hardcode — Kotlin in
+`:core`, doable in a cloud firing, and now with a concrete vector to prove it against.
+
+**B-6 — landed upstream, and the android side of it is now moot.** `7328a0b` (which adds
+`invalid-unknown-field.json`) is an ancestor of `main`, and the vector is in the re-pinned corpus.
+The engine-side parser question B-6 was blocked on was resolved upstream by the integration, not
+here. **Not claimed closed by this firing** — B-6's substance is engine behaviour and no gate this
+sandbox can run touches it.
+
+**A NON-BLOCKER, recorded so nobody files one.** `run-zero.sh` exits 1 on *"the landing plan
+rotted — 6 rows name a branch that is no longer a leaf."* **That is the plan having been executed.**
+`RETURN-DAY.md` §3 named branches to merge; they merged. It is expected output, not a defect, and it
+was deliberately not rewritten. **Do not file this as a blocker.**
+
+**B-18 — status only, and unchanged.** The schedule still fires past its stop condition; smallest
+human unblock is still a human stopping or repointing it. Concurrent firings are now demonstrably
+racing each other in these files (four rebases in one session, and a duplicate run-198 record set),
+which is a cost of B-18 rather than a new blocker.
+
+**B-1, B-2, B-4, B-5, B-7, B-8, B-9, B-12, B-13, B-15, B-17, B-19–B-26 — untouched this run**, not
+re-tested, and not asserted current on this run's evidence. B-7 was *observed* incidentally: the JDK
+17 install needed `apt-get` because `api.foojay.io` is denied, which is the same egress policy.

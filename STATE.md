@@ -251,6 +251,47 @@
 > absent, `ANDROID_HOME` unset; the 611 above is **CI's measurement, not mine**. **No deploy, no relay
 > contact, no Google/Play console, no secret read.** Terra untouched.
 >
+> ## ▶ RUN 202 — 2026-09-11. **The re-pin, EXECUTED. `RETURN-DAY.md` §3's step queued since run 51 is done: pin `7328a0b` → `11bb1f5`, and FOR THE FIRST TIME THE PIN IS ON `main`. `:core` 348/0/0 green — and the count not moving is B-14 reproducing, not a null result.**
+>
+> **The blocker was stale, and re-measuring is what removed it** (**C-202-1/-2**). **C-REPIN-5**
+> measured this same step hours earlier against `main` at `cffe2b7` and correctly found it would
+> **DELETE** `invalid-unknown-field.json` — main 28 files, phone 29, the phone AHEAD. Between then
+> and now `main` moved twice more and **#33 landed inside integration merge #59**, making `7328a0b`
+> an ancestor of `main`. The deletion is impossible. **Neither record is wrong; they measure
+> different moments — and this is the FOURTH time in ~24 hours a record here was overtaken between
+> being written and being read.**
+>
+> **What the re-vendor did**, by the script rather than by inference: **one payload added**
+> (`pairing-high-bit-confirm.json`), **`index.json` rewritten**, **zero existing payload bytes
+> changed**, **nothing deleted**; corpus **29 → 30**, byte-identical to the new pin, and
+> `repin-vectors.sh` reports **`pin position : on origin/main`** — which no previous pin has ever
+> done. The 2026-08-17 `VECTORS.lock` note **predicted this exact moment** and deserves the credit.
+>
+> **THE GREEN THAT IS NOT WHAT IT LOOKS LIKE** (**C-202-3**). `scripts/core-probe.sh` →
+> `BUILD SUCCESSFUL`, **`348 tests, 0 failed, 0 skipped, across 22 classes`**. **348 is unchanged
+> from run 109, with a vector added.** `pairing-high-bit-confirm` is **vendored and still not
+> asserted** — `ProtocolVectorsTest` enumerates `index.json` but hardcodes `pairing-basic` in its
+> "every vector value" case. **Vendoring a vector is not testing it. B-14 and B-16/H3 stay open and
+> stay Brandon's.**
+>
+> **TWO STALE FACTS CLOSED FROM PRIMARY SOURCES.** (1) **The offline pin is 816, not 598**
+> (**C-202-4**) — the integration re-derived it deliberately (*"812 + 4 = 816"*), so run 198's
+> "largest open question" was the wrong question. Any record still quoting **598** as current is
+> stale. (2) **`main`'s tip is CI-green** (**C-202-5**): run **492**, head `11bb1f5`, `success`. But
+> runs 486–488 are **`cancelled`**, superseded in the concurrency group — **"seven merges, CI green"
+> is the wrong summary; the TIP is gated, the intermediate merge commits are not.**
+>
+> **ONE GUARD FLAG LEFT STANDING ON PURPOSE** (**C-202-6**). `run-zero.sh` exits 1 on exactly one
+> check: *"the landing plan rotted"*, 6 rows naming branches that are no longer leaves. **That is
+> success, not rot** — §3's plan named the branches to merge and they merged. **Not rewritten**:
+> re-deriving a merge plan is a decision about a human-facing handoff doc whose merges are already
+> done, and concurrent firings are active in these files. `BASE_ENGINE_MAIN` → `11bb1f5` and
+> `SLICE_LANDED` gains `7328a0b`, so §1 now reads three × `on main (expected)`.
+>
+> **Machine change:** `openjdk-17-jdk-headless` installed into the **ephemeral sandbox only** (the
+> image ships 21, `:core` pins 17, `api.foojay.io` is denied — B-7). Nothing entered either
+> repository's tracked tree. **No notification** — run 198 already sent on this trigger.
+>
 > ## ▶ RUN 198 — 2026-09-10. **SOMETHING MOVED. After 162 consecutive declinations, the assigned slice MERGED: PR #32 landed S5's spec half on `main`. And the event that woke this firing was WRONG — #37 is open, not closed.**
 >
 > **Heartbeat:** 2026-09-10, **one hundred and ninety-eighth** firing. Both checkouts fetched first,

@@ -19698,3 +19698,123 @@ The engine checkout was left detached at `origin/main`, `git status` clean, scra
 **No deploy of any kind**, no `wrangler` invocation, and **the production relay was contacted zero
 times, not even `GET /v1/health`**. **No secrets read, written or printed.**
 >>>>>>> b4bbf41 (RUN 200: a blocker that was false before it was written, and the push that caught it)
+
+---
+
+## RUN 202 — the re-pin, executed · 2026-09-11 (Linux cloud sandbox)
+
+**`RETURN-DAY.md` §3's queued step — "Do this in the same sitting: re-pin the phone's vectors" —
+was run for real this firing.** It had been queued since run 51 (2026-08-17), waiting on merges that
+happened yesterday, and blocked as recently as hours ago by a measurement that was true when taken
+and false by the time it was read.
+
+### 202-1 The blocker was stale, and re-measuring is what removed it
+
+**C-REPIN-5** measured this step against `main` at **`cffe2b7`** and found it would **DELETE**
+`invalid-unknown-field.json` — main had 28 files, the phone 29, so the phone was AHEAD. **That was
+correct when measured.** Between then and this firing `main` moved twice more and **#33 landed inside
+integration merge #59**, so `7328a0b` became an ancestor of `main` and the deletion became impossible.
+
+Re-measured against `main` at **`11bb1f5`** (**C-202-1**), by the script rather than by inference:
+
+```
+current pin  : 7328a0b…      target pin : 11bb1f5…   pin position : on origin/main
+generator check at 11bb1f5…  : OK: 30 vector files match the generator.
+vendored: 29 files    at pin: 30 files
+  + added upstream, not vendored (1):  pairing-high-bit-confirm.json
+  ~ same name, different bytes (1):    index.json
+```
+
+**One payload added, one manifest rewritten, nothing deleted, and zero existing payload bytes
+changed.** That is the same safe shape as the 2026-08-12 move, and it is the shape that makes a
+re-vendor not a cross-repo drift event.
+
+### 202-2 The pin is on `main` for the first time in this program's history
+
+`repin-vectors.sh` reports **`pin position : on origin/main`**. Every previous pin — `679a317`,
+`7328a0b` — sat on an unmerged draft stack, which is why `VECTORS.lock`'s guarantee has always been
+hedged to *"the phone matches the pin, never the engine."* The hedge is still literally correct, but
+the gap it was hedging against is closed: pin and `main` are now the same commit.
+
+**The 2026-08-17 note predicted this exact moment** and deserves the credit: *"when RETURN-DAY.md
+§3's six merges land, main gains `pairing-high-bit-confirm.json` and the phone will be BEHIND by one
+file, with no check firing."* That is precisely what happened, it was invisible — CI queries
+`?ref=$PIN` and the pin lacked the vector too, so android CI stayed green straight through it
+(B-16) — and this re-vendor is what closes it.
+
+### 202-3 What ran, and the number that did NOT move
+
+```
+scripts/repin-vectors.sh --engine ../careerseeker origin/main
+  -> OK: re-pinned 7328a0b -> 11bb1f5;  30 vector files vendored; VECTORS.lock reads back as the new pin.
+
+scripts/core-probe.sh
+  -> BUILD SUCCESSFUL in 1m 25s
+  -> core-probe: 348 tests, 0 failed, 0 skipped, across 22 classes
+```
+
+**348 is the same count the records have carried since run 109 — a vector was added and the suite
+did not grow** (**C-202-3**). That is not a null result, it is **B-14 reproducing**:
+`ProtocolVectorsTest` enumerates from the phone's own `index.json`, but its *"every vector value"*
+case **hardcodes `pairing-basic`**, so `pairing-high-bit-confirm` is now **vendored and still not
+asserted**. Run 56 proved the mechanism by corrupting its expected confirm code to `999999` and
+watching the suite stay green (C-ENUM-2). **Vendoring a vector is not testing it**, and this run
+does not claim otherwise. B-14 and B-16/H3 remain open and remain Brandon's.
+
+**JDK 17 was installed into the ephemeral sandbox** to run the probe at all — the image ships 21,
+`:core` pins `jvmToolchain(17)`, and `api.foojay.io` is denied by the same egress policy as
+`dl.google.com` (B-7). Machine change only; **nothing entered either repository's tracked tree**.
+Two PPA fetches 403 through the proxy and are the known-harmless ones.
+
+### 202-4 Two questions this firing closed by reading primary sources
+
+**The offline pin is 816, not 598** (**C-202-4**). Previous records — mine included — carried 598 and
+flagged "does `main` still pass with 598?" as the largest open question of the cascade. It was the
+wrong question: the integration re-derived the pin deliberately (*"re-derive pin 812 + 4 = 816"*),
+and `main` now reads `$ExpectedOfflineTotal = 816`.
+
+**`main` is CI-green at the tip** (**C-202-5**): run [34549986264](https://github.com/ShivaClaw/careerseeker/actions/runs/34549986264),
+number **492**, `push`, head **`11bb1f5`**, conclusion **`success`**, 01:16:09 → 01:18:22Z. So the
+open question is answered: the post-merge tree passes with the re-derived pin. **Read the neighbours
+narrowly, though** — runs 486, 487 and 488 (heads `52ef7f1`, `064a10e`, `e06ccae`) are **`cancelled`**,
+superseded by the next push inside the concurrency group. **Cancelled is not passed**, and
+"seven merges, CI green" would be the wrong summary: **the tip is gated, the intermediate merge
+commits are not.**
+
+### 202-5 One guard flag left standing, deliberately
+
+`run-zero.sh` now exits **1** on exactly one check: *"fleet-probe.sh plan FAILED — the landing plan
+rotted. Re-derive it."* — **6 rows name a branch that is no longer a leaf.** That is correct and it is
+**success, not rot**: `RETURN-DAY.md` §3's plan named the branches to merge, and they merged. **I did
+not rewrite it.** Re-deriving a merge plan is a decision about a human-facing handoff document, the
+merges it governed are already done, and concurrent firings are active in these files. Recorded so
+the next reader knows the flag is expected rather than a new defect.
+
+### Boundary — what this run did NOT touch
+
+**Nothing was merged, closed, reopened, undrafted, retargeted, force-pushed, rebased or deleted** in
+either repository; no history rewritten. **No new branch and no new PR.** Android PR **#6** stays
+draft; the android repo is never-self-merge. **PR #33 was not touched** — it merged by a human's
+hand, and this run only observed it.
+
+**Not one byte of production source** — no `.kt`, `.cs`, `.ts`, `.kts`, `.ps1`, `.mjs` or workflow
+file. **No engine-repo file at all**: `docs/Sync-Protocol.md`, `generate.mjs`, every `.cs` and the
+whole of `relay/` were read-only, and **`generate.mjs` was not invoked** — the generator check in the
+output above is `repin-vectors.sh`'s, run at the pin inside the engine checkout, not an edit.
+**No byte of `RETURN-DAY.md`.** **No pinch point touched** — `$ExpectedOfflineTotal` is the engine's
+and was **read**, not written; no count-reporting doc, no `Host.cs`.
+
+**Vector bytes DID change, and that is this run's whole point** — stated plainly rather than buried
+in a prohibition list. One payload added (`pairing-high-bit-confirm.json`), `index.json` rewritten,
+**zero existing payloads modified**, corpus now byte-identical to a pin that is **on `main`**. The
+lock and the bytes moved in the same commit, as `VECTORS.lock` requires.
+
+**No gate ran in the full sense**: `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`
+and `gh` are **ABSENT**, `ANDROID_HOME` **UNSET**, so `Verify-Alpha.ps1` and the five-task android
+command were both unreachable. **`core-probe.sh` is ONE of those five tasks** and is reported as
+exactly that. Every CI result cited was read out of the runner's own fields; **no CI job was re-run
+and no test skipped, disabled or quarantined**. **No notification sent** — run 198 already sent on
+this trigger and nothing here is a new state a fourteenth message would add. **No deploys; the
+production relay was not contacted at all**, not even `GET /v1/health`. No Play, Google or OAuth
+console; no accounts, no purchases, no Gmail; **no secret read, printed or echoed**; no `.appdata`.
+Terra's `autonomy/codex-state` unchanged and uncollided-with.

@@ -62,11 +62,12 @@ ENGINE=${1:-../careerseeker}
 ANDROID=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 # ---- recorded state, as of run 198 (2026-09-10) ----------------------------
-# 2026-09-10, run 198: a MERGE CASCADE is in progress -- 7 merges in the 4 minutes this run
-# was writing (#32, #34, #35, #54, #55, #56, #57). This baseline is the tip MEASURED at
-# 23:01Z; it may well be stale by the next firing, and that is the script working, not failing.
-# A MOVED report here means re-derive, not that this constant is wrong.
-BASE_ENGINE_MAIN=cffe2b78319595cbe18e37d42b7abb573d108606   # 2026-09-10 — merge cascade (run 198)
+# 2026-09-10, run 198: a MERGE CASCADE began -- 7 merges in 4 minutes (#32, #34, #35, #54,
+# #55, #56, #57). 2026-09-11, run 202: it continued and #33 landed inside integration merge
+# #59, so ALL THREE slice commits are now on main and 7328a0b joins SLICE_LANDED. Each
+# baseline here is the tip MEASURED at the time, and may be stale by the next firing -- that
+# is the script working, not failing. A MOVED report means re-derive, not that this is wrong.
+BASE_ENGINE_MAIN=11bb1f5cbf2561fe04cabf2cbfad1fa2c4039eb3   # 2026-09-11 — #33/#59 landed (run 202)
 BASE_ANDROID_MAIN=ebfaf8108e635551c3beac851424a4407c5a8fdd  # 2026-08-06
 SLICE_COMMITS="8575539 22b028e 7328a0b"                     # the assigned S5 slice
 # Run 198 (2026-09-10): a human merged PR #32, so two of the three are now ON main and will
@@ -74,7 +75,7 @@ SLICE_COMMITS="8575539 22b028e 7328a0b"                     # the assigned S5 sl
 # had landed, but from now on it would fire forever on a permanent condition, which is the
 # same signal-destroying staleness the BASE_ENGINE_MAIN comment describes. So record which
 # ones are EXPECTED on main; section 1 now flags only a DEVIATION from this expectation.
-SLICE_LANDED="8575539 22b028e"                              # expected ancestors of origin/main
+SLICE_LANDED="8575539 22b028e 7328a0b"                      # expected ancestors of origin/main
 BASE_ENGINE_DRAFTS=22
 BASE_ANDROID_DRAFTS=6
 BASE_MERGED_SINCE_RUN95=0
