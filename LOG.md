@@ -19488,7 +19488,6 @@ withheld.
 
 ---
 
-<<<<<<< HEAD
 # RUN 200 — 2026-09-10. **Two corrections the merge records left behind: the open board is 16, not 22, and the toolchain is not the same from one firing to the next.**
 
 **Almost all of this run's draft was DISCARDED as duplicate, and that is the headline.** Run 198
@@ -19583,7 +19582,9 @@ in `careerseeker`.**
 the four records) was committed locally, rejected on push because the branch had moved, and then
 **reset away in favour of this shorter one** after reading what had landed. **Nothing pushed was
 rewritten** — the discarded commit never left this machine.
-=======
+
+<!-- run 203: conflict from b4bbf41 resolved by KEEPING BOTH SIDES; see C-203-9 -->
+
 ## RUN 201 — a blocker that was false before it was written, and the rejected push that caught it (2026-09-10)
 
 Linux cloud sandbox, woken by a `pull_request.closed` event on **#34**. **Deliberately narrow.**
@@ -19697,7 +19698,6 @@ followed throughout, and proved doubly right: barred, and unnecessary.
 The engine checkout was left detached at `origin/main`, `git status` clean, scratch probe deleted.
 **No deploy of any kind**, no `wrangler` invocation, and **the production relay was contacted zero
 times, not even `GET /v1/health`**. **No secrets read, written or printed.**
->>>>>>> b4bbf41 (RUN 200: a blocker that was false before it was written, and the push that caught it)
 
 ---
 

@@ -21591,7 +21591,6 @@ run-84 addendum's **C-84-14**.
 
 ---
 
-<<<<<<< HEAD
 ## C-202 — The #59 landing, the gate-confirmed pin, and the table the trap cannot check (run 202, 2026-09-11)
 
 ### C-202-1 — #37 landed inside #59, and the vendored pin is finally an ancestor of `main`
@@ -21676,8 +21675,32 @@ nobody asked, the merge event said not to open a PR for this work, and `Verify-A
 here (`pwsh` absent) so it could not be gated from this sandbox. **A stronger fix worth considering
 instead of a literal bump:** assert each row against the harness's *measured* output rather than
 against a hand-written string, which is the only version of this check that could have failed.
-=======
-## RUN 202 — the re-pin, executed · 2026-09-11
+
+<!-- run 203: conflict from cba7471 resolved by KEEPING BOTH SIDES; see C-203-9 -->
+
+## RUN 202 (concurrent firing) — the re-pin, executed · 2026-09-11
+
+> ## ⚠ `C-202-*` IS AMBIGUOUS — TWO BLOCKS DEFINE IT. Disambiguated, not renumbered, at run 203 (**C-203-9**).
+>
+> Two concurrent run-202 firings each wrote a `C-202-1…N` block, and the merge between them was
+> committed **with its conflict markers still in the file** (`cba7471`). Both blocks are real; both
+> are kept. **Run 203 deliberately did NOT renumber either one.** A first attempt renumbered this
+> block and broke four live citations — this block is the more widely cited of the two, and
+> `FIRINGS.md`'s line for runs 200-202 cites the other. `FIRINGS.md` is generated and append-only, so
+> no renumbering exists that leaves every existing citation intact. **Ambiguity that is written down
+> beats a fix that silently breaks a generated record.**
+>
+> **Which block a citation means, by content:**
+>
+> - **THIS block (the re-pin)** — cited by `STATE.md`'s *"RUN 202 — the re-pin, EXECUTED"* banner
+>   (`C-202-1/-2`, `-3`, `-4`, `-5`, `-6`), `LOG.md`'s run-202 re-pin entry, and `BLOCKED.md`'s
+>   B-14/B-16 notes. Subjects: the pin move `7328a0b → 11bb1f5`, `core-probe.sh`, `C-REPIN-5`,
+>   the CI-green tip, the guard flag left standing.
+> - **The block ABOVE (the #59 landing / harness table)** — cited by `FIRINGS.md:147`
+>   (*"re-verify C-202-1…4"*) and its own `STATE.md` banner. Subjects: #37 landing inside #59, the
+>   gate-confirmed `816`, the measured harness split, the stale harness table.
+>
+> **No claim text in either block was altered by run 203.** Only the conflict markers were removed.
 
 ### C-202-1 — the re-pin ADDS one vector and deletes none, measured against `main` at `11bb1f5`
 
@@ -21782,4 +21805,3 @@ byte-identical; §4 both mains unmoved; and **exit 1 on the plan check alone**. 
 not rot** — `RETURN-DAY.md` §3's plan named the branches to merge and they merged. **It was
 deliberately not rewritten**: re-deriving a merge plan is a decision about a human-facing handoff
 doc whose merges are already done, and concurrent firings are active in these files.
->>>>>>> cba7471 (RUN 202: execute the re-pin -- 7328a0b -> 11bb1f5, and the pin is ON main)
