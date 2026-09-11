@@ -83,6 +83,70 @@
 > Terra: **COMPLETE, files claimed: none.** **One local commit (~300 lines) was discarded rather than
 > pushed** after reading what had landed — **nothing pushed was rewritten.**
 >
+> ## ▶ RUN 202 — 2026-09-11. **#37 MERGED inside the #59 landing, `main` is GATE-GREEN at `816`, and run 62's prediction is retired by the gate. One new defect: the harness table is stale and the drift trap STRUCTURALLY cannot catch it.**
+>
+> **Woken by `pull_request.closed {outcome: merged}` for #37.** Verified against the repository
+> before anything was written; **no identifier below appears anywhere in these records yet** —
+> `11bb1f5`, CI run `34549986264`, `#59` and `run 492` all returned **0 hits** across `STATE.md`,
+> `AUDIT-REQUEST.md`, `BLOCKED.md` and `FIRINGS.md`, which is why this firing writes rather than
+> declines.
+>
+> **1. B-6's fix is in the product, not just on a branch.** #37 did not merge on its own: it was
+> carried by **PR #59, "S-series landing — integrates 13 queued PRs"**, merged `01:16Z`.
+> `git ls-tree origin/main` now returns **`src/Sync/EnvelopeJson.cs`** and
+> **`docs/sync-vectors/v1/invalid-unknown-field.json`**. The engine on `main` now **rejects** an
+> envelope carrying an unknown top-level field. Run 198's BLOCKED.md correction — *"true of the work
+> and false of the product"* — is **itself now superseded**, and that is the honest way round: it was
+> right when written.
+>
+> **2. `main` is gate-green, and that retires a labelled prediction.** CI run
+> [`34549986264`](https://github.com/ShivaClaw/careerseeker/actions/runs/34549986264) (run **492**,
+> head `11bb1f5`) completed **`success`**. `Verify-Alpha.ps1` **throws** on a pin mismatch, so green
+> *is* the pin check: **`$ExpectedOfflineTotal = 816` is CONFIRMED.** Run 62 derived exactly that
+> number and wrote *"**816 IS A PREDICTION** … if the gate reports something else the gate is right"*
+> (**C-RES-4**), together with `SyncHarness 335`. **The gate reported 816. Both predictions hold** —
+> recorded because a prediction that is never marked resolved is a prediction that quietly becomes
+> folklore.
+>
+> **3. The new defect, and it is the interesting one: the harness table is stale, and the trap cannot
+> see it.** Measured here on `11bb1f5` — solution builds **0 warnings / 0 errors**, and **all ten**
+> offline harnesses ran (`EngineHarness` completes on Linux now, which it did not on 2026-08-12):
+>
+> ```
+> Slice 28 · EngineHarness 217 · ResearcherHarness 57 · HookHarness 16 · StoreParityHarness 28
+> GatewayGateHarness 36 · DispatcherNoSendHarness 35 · LifecycleHarness 45 · RendererHarness 6
+> SyncHarness 335                                                        subtotal = 803
+> ```
+>
+> **`SyncHarness` measures 335. `README.md`, `src/Engine/README.md` and
+> `docs/CareerSeeker-Project-Summary.md` all still say `| SyncHarness | 134 |`** — the value from
+> PR #52's era. The rows in that table now sum to **615** (PR #52's old pin) while the table's own
+> **Total says 816**: the table contradicts itself by exactly **201**, which is exactly
+> `335 − 134`. **Nothing fails**, and the reason is the finding: `Verify-Alpha.ps1` asserts the
+> **same stale literal** — `'| SyncHarness | 134 |'` at lines **671, 700 and 705** — so the doc and
+> the verifier agree with each other and both disagree with the harness. `CLAUDE.md` names this
+> exact failure: *"a verifier expectation that drifts from the doc will silently stop testing what it
+> claims to test."* **The pinned total is the only thing actually pinned; every per-harness row is
+> asserted against itself.**
+>
+> **The `803` vs `816` gap is NOT part of that defect and is not claimed as one.** `EngineHarness`
+> measures **217** here against the docs' **230**; `803 + 13 = 816`, and the gate passing on Windows
+> says the total is right. **That the 13 are Windows-only (DPAPI) assertions is inference, not
+> measurement** — it is the obvious reading, and this firing did not prove it.
+>
+> **Fix, stated as one step and NOT taken:** set the `SyncHarness` row to **335** in those three docs
+> **and** in the three `Assert-Contains` literals, in one commit, per `CLAUDE.md`'s "one unit that
+> moves together". **Not pushed.** Nobody asked, the merge event said not to open a PR for this work,
+> the owner is mid-integration, and `Verify-Alpha.ps1` cannot run here (**`pwsh` absent**) so the
+> change could not be gated from this sandbox.
+>
+> **What this firing did NOT do.** No merge, no PR opened or reopened, no push to any engine branch,
+> no rebase, no force-push, no branch deletion. **No engine or android source file changed — records
+> only.** The android gate did **not** run (`ANDROID_HOME UNSET`) and `:core:test` was not run —
+> nothing in `:core` moved. No deploy, no relay contact, no secret read. **The vendored pin is
+> untouched**; `7328a0b` is now an ancestor of `main`, which closes the re-pin question rather than
+> opening one. Re-verify: **C-202-1…4**.
+>
 > ## ▶ RUN 201 — 2026-09-10. **One thing only: this firing nearly published a blocker that was already false, and was saved by a rejected push. The facts of the landing are runs 198/199's and their addenda — not restated here.**
 >
 > **Deliberately thin, per run 118's law.** Four firings have now written about today's merge wave and

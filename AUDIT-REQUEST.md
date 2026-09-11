@@ -21591,3 +21591,90 @@ pull_request_read  method=get owner=ShivaClaw repo=careerseeker pullNumber=34
 `base.ref: "main"` — plus the six merge commits for #34, #35, #54, #55, #56 and #57 recorded in the
 run-84 addendum's **C-84-14**.
 >>>>>>> b4bbf41 (RUN 200: a blocker that was false before it was written, and the push that caught it)
+
+---
+
+## C-202 — The #59 landing, the gate-confirmed pin, and the table the trap cannot check (run 202, 2026-09-11)
+
+### C-202-1 — #37 landed inside #59, and the vendored pin is finally an ancestor of `main`
+
+```bash
+cd <engine> && git fetch --all --prune
+git log --oneline -1 origin/main
+for c in 7328a0b 78079c7 010076f 274ea6b; do
+  printf '%s ' "$c"; git merge-base --is-ancestor $c origin/main && echo ON-MAIN || echo off-main
+done
+git ls-tree --name-only origin/main src/Sync/ | grep EnvelopeJson
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | grep unknown-field
+git show origin/main:docs/sync-vectors/v1/invalid-unknown-field.json | sha256sum
+git show 7328a0b:docs/sync-vectors/v1/invalid-unknown-field.json     | sha256sum
+```
+
+*Expected:* `main` is `11bb1f5` (*"Merge pull request #59 … integrates 13 queued PRs"*); **all four
+commits ON-MAIN**; `src/Sync/EnvelopeJson.cs` and `invalid-unknown-field.json` both present; and the
+two hashes **identical** (`dfdaa4c6…`). **#37 did not merge alone — #59 carried it.** This closes two
+things at once: **B-6's fix is in the product**, and the vendored pin `7328a0b`, flagged by
+`run-zero.sh` §2 as *"NOT an ancestor of origin/main"* since it was set, **now is one**. The re-pin
+question is closed by the landing rather than by a re-pin.
+
+### C-202-2 — `main` is gate-green, and `816` is confirmed rather than predicted
+
+```bash
+# via MCP: actions_get method=get_workflow_run resource_id=34549986264
+cd <engine> && git show origin/main:scripts/Verify-Alpha.ps1 | grep -n 'ExpectedOfflineTotal = '
+```
+
+*Expected:* run **492**, head `11bb1f5`, **`conclusion: success`**, completed `01:18:22Z`; the pin
+reads **816**. `Verify-Alpha.ps1` throws on a pin mismatch, so a green run **is** the pin check.
+
+This **retires a labelled prediction**: run 62 derived `816` and `SyncHarness 335` and wrote
+*"816 IS A PREDICTION … if the gate reports something else the gate is right"* (**C-RES-4**). The
+gate reported **816**. Both hold. Recorded because an unresolved prediction becomes folklore.
+
+### C-202-3 — the measured harness split, and the one number this firing did NOT prove
+
+```bash
+cd <engine> && git checkout --detach origin/main
+dotnet build CareerSeeker.sln -c Release | tail -4
+for h in Slice EngineHarness ResearcherHarness HookHarness StoreParityHarness \
+         GatewayGateHarness DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  printf '%-26s ' "$h"
+  dotnet run --project tests/$h/$h.csproj -c Release --no-build 2>&1 | grep -oE '=== [0-9]+ passed' | tail -1
+done
+```
+
+*Expected:* **0 Warning(s) / 0 Error(s)**, and **all ten** harnesses complete — note `EngineHarness`
+**now runs on Linux** (217), which it could not on 2026-08-12 (**C-WP-10**), so that limit is retired.
+Subtotal **803**, with **`SyncHarness 335`**.
+
+**`803 + 13 = 816`**, and `EngineHarness` reads **230** in the docs against **217** here. **That the
+13 are Windows-only DPAPI assertions is INFERENCE, not measurement** — it is the obvious reading and
+the gate's green confirms the total, but this firing did not prove the split and does not claim it.
+
+### C-202-4 — the harness table contradicts itself, and the drift trap structurally cannot catch it
+
+```bash
+cd <engine>
+grep -E '^\| (Slice|EngineHarness|ResearcherHarness|HookHarness|StoreParityHarness|GatewayGateHarness|DispatcherNoSendHarness|LifecycleHarness|RendererHarness|SyncHarness) \|' README.md
+grep -n '\*\*Total\*\*' README.md
+grep -n 'SyncHarness | ' scripts/Verify-Alpha.ps1
+grep -l 'SyncHarness | 134' README.md src/Engine/README.md docs/CareerSeeker-Project-Summary.md
+```
+
+*Expected:* the rows sum to **615** while the same table's **Total** reads **816** — a self-contradiction
+of exactly **201**, which is exactly `335 − 134`. `| SyncHarness | 134 |` is the value from PR #52's
+era and appears in **all three** docs, and `Verify-Alpha.ps1` asserts **that same stale literal** at
+lines **671, 700 and 705**.
+
+**So doc and verifier agree with each other and both disagree with the harness, and nothing fails.**
+`CLAUDE.md` names this exact mode: *"a verifier expectation that drifts from the doc will silently
+stop testing what it claims to test."* **Only the pinned total is really pinned; every per-harness
+row is asserted against itself.** A reader of any of those three docs is told SyncHarness has 134
+assertions when it has 335.
+
+**One-step fix, deliberately NOT taken:** set the row to **335** in the three docs **and** the three
+`Assert-Contains` literals, in one commit — `CLAUDE.md`'s "one unit that moves together". Not pushed:
+nobody asked, the merge event said not to open a PR for this work, and `Verify-Alpha.ps1` cannot run
+here (`pwsh` absent) so it could not be gated from this sandbox. **A stronger fix worth considering
+instead of a literal bump:** assert each row against the harness's *measured* output rather than
+against a hand-written string, which is the only version of this check that could have failed.
