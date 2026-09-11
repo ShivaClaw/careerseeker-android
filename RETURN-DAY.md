@@ -49,6 +49,26 @@ handoff; it wrote no engine code and no Kotlin.
 
 ## 3. The landing plan — 17 PRs, 7 merges, 3 stops
 
+> ## ✅ SPENT — this plan was EXECUTED. Do not act on it; it is kept as a record. (run 204, 2026-09-11)
+>
+> The owner landed the S-series on 2026-09-10/11. **All six branches this section names are on
+> `origin/main`**, measured by `merge-base --is-ancestor` against the PR head SHAs rather than
+> inherited from the handoff (**C-204-1**) — including the three whose PR rows carry **no
+> `merged_at`** (#36, #51, #49), which landed inside integration PR **#59** and were closed by hand.
+> That is **C-89-2's trap in a second form**: `merged_at` is null for a PR that demonstrably landed,
+> so the commit graph is the only authority here. **Step 0 was decided as §11.4 recommended** — #53
+> is closed as superseded and is the one head deliberately **NOT** on `main`, which is the expected
+> result, not lost work.
+>
+> **`fleet-probe.sh plan` therefore reports `ROT 6/6` and exits 1 — permanently, and correctly.**
+> Every named branch is deleted at origin *because it merged*. That is the guard doing its job on a
+> finished plan, **not the run-88 alarm it looks identical to**. `run-zero.sh` now pins this as
+> `BASE_PLAN_ROT=6` and flags only a *deviation*, so the signal is retired without being silenced
+> (**C-204-2**). A firing that "re-derives the landing plan" on this signal is chasing a phantom —
+> three runs have now been told so.
+>
+> Step −1's guard below still applies to **any future plan**; it is this *table* that is spent.
+
 Full derivation and the commands: [`docs/Merge-Topology.md` §12](docs/Merge-Topology.md).
 **Decide step 0 before doing any of it.**
 

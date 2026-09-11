@@ -21975,3 +21975,104 @@ conflict was committed **with the markers in it** rather than resolved — twice
 this program treats as its evidence. That is **B-18's cost made concrete**, and it means a reader of
 those files between 2026-09-10 and this run was reading a corrupt record. **A marker grep belongs in
 `run-zero.sh`; it is not added here** (see the LOG entry's boundary paragraph for why).
+
+---
+
+## RUN 204 — 2026-09-11. The probe every firing depends on had gone stale in two places, and was missing the guard that the last corruption actually needed.
+
+### C-204-1 — all six of `RETURN-DAY.md` §3's branches are on `main`; only #53 is not
+
+> **Claim.** §3's landing plan is **executed, not rotted**. The six branches it names — `#48`
+> `s8-harness-linux-reach`, `#57` `s2-relay-header-pairing`, `#36` `s2-transport-vocabulary`, `#51`
+> `s3-pairing-confirm-consumer`, `#52` `s6-outcome-disposition`, `#49` `s6-composition-root-decision`
+> — are **each an ancestor of `origin/main`**. They are deleted at origin *because they merged*.
+> **Three of them (#36, #51, #49) carry NO `merged_at`**: they landed inside integration PR **#59**
+> and were closed by hand, so PR metadata alone reads them as closed-unmerged, which would look like
+> deleted work and is not. **`#53` `s6-resume-reconciliation` is the one head deliberately NOT on
+> `main`** — closed as superseded per §11.4, branch kept. **No work was lost in the sweep.**
+
+```bash
+cd careerseeker && git fetch --all --prune
+git fetch origin '+refs/pull/*/head:refs/remotes/origin/pr/*'
+for s in c93e88d f00feb2 6700078 edee32b 94fd979 f5e0c0a; do
+  git merge-base --is-ancestor $s origin/main && echo "$s landed" || echo "$s NOT on main"
+done
+git merge-base --is-ancestor 8177353 origin/main && echo "53 landed" || echo "53 NOT on main (expected)"
+```
+
+*Expected:* all six print `landed`; `8177353` prints `NOT on main (expected)`. **A seventh head
+missing from `main` is a lost-work finding and retires this claim.** The PR-ref fetch is required —
+the branches are deleted at origin, so the SHAs do not resolve from branch refs alone.
+
+### C-204-2 — the plan-rot alarm is pinned as spent, and a 7th rot still fires
+
+> **Claim.** `fleet-probe.sh plan` exits **1** with `ROT 6/6` **permanently and correctly**, because
+> the plan it guards is finished. `run-zero.sh` previously failed its whole verdict on that, so one
+> spent signal masked every future one. It now pins `BASE_PLAN_ROT=6` / `BASE_PLAN_ROWS=6` and flags
+> only a **deviation** — the same pattern `SLICE_LANDED` already uses. **Retired, not silenced.**
+
+```bash
+cd careerseeker-android
+./scripts/fleet-probe.sh plan ../careerseeker RETURN-DAY.md; echo "fleet-probe exit=$?"
+./scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 3\./,/^== 3b/p'
+```
+
+*Expected:* `fleet-probe` still exits **1** and prints `ROT: 6`; `run-zero` reports
+`ROT 6/6 is the EXPECTED spent state` and does **not** mark it `!!`. **If `plan rows:` is no longer
+`6`, §3's table was edited and `run-zero` fails deliberately** — the pin re-arms on a doc change,
+which is the drift rule applied to a guard.
+
+### C-204-3 — the conflict-marker guard, and the negative control proving it catches the real thing
+
+> **Claim.** `run-zero.sh` §3b greps tracked `*.md` in **both** checkouts for `^<<<<<<< ` and
+> `^>>>>>>> `. Both repos are **clean today**. Against the pre-repair tree it **fires**, catching the
+> exact corruption of **C-203-9** — so this is tested against real historical data, not a
+> hand-planted marker. A bare `=======` is **excluded by design**: it is a valid Markdown setext H1
+> underline and would false-positive on prose.
+
+```bash
+cd careerseeker-android
+./scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 3b/,/^== 4\./p'   # today: clean, clean
+git grep -n -E '^(<<<<<<< |>>>>>>> )' 02cd1e8~1 -- '*.md'                   # negative control
+git grep -c -E '^=======$' -- '*.md'                                        # false-positive check
+```
+
+*Expected:* §3b prints `clean` for both repos. The negative control prints **4** marker lines —
+`AUDIT-REQUEST.md:21594`/`:21785` and `LOG.md:19491`/`:19700` — which is what a guard present at run
+200 would have blocked. The third command prints **nothing**: no setext underline exists in either
+repo today, which is *why* the exclusion costs nothing and is stated rather than assumed.
+
+### C-204-4 — the baseline that recorded a move without advancing it
+
+> **Claim.** Run 203 recorded engine `main` `11bb1f5 → 14469ad` (**C-203-4**) but left
+> `BASE_ENGINE_MAIN` at `11bb1f5`, so §4 reported `engine main MOVED` on an already-recorded change
+> and would have done so at **every future firing** — the script's own documented failure mode,
+> committed by the rule meant to prevent it. Re-pinned at run 204. `BASE_ENGINE_DRAFTS` 22 → **2**
+> and `BASE_MERGED_SINCE_RUN95` 0 → **16** likewise.
+
+```bash
+cd careerseeker-android
+grep -n 'BASE_ENGINE_MAIN=\|BASE_ENGINE_DRAFTS=\|BASE_MERGED_SINCE_RUN95=' scripts/run-zero.sh
+./scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 4\./,/^== 5\./p'
+```
+
+*Expected:* `BASE_ENGINE_MAIN=14469ad665d3f55a42724ddc2f2fa44585216158`, and §4 prints
+**`engine  main unmoved  14469ad`**. **If §4 says MOVED again, engine `main` genuinely advanced past
+14469ad — re-derive, and re-pin it in the same commit as the run that records it.**
+
+### C-204-5 — the board: the queue is drained, and android has never merged anything
+
+> **Claim.** Engine: **2 open**, `#58` (audit F01/F02, awaiting Codex) and `#26` (SBOM, human queue
+> Q07), **both draft**. Android: **6 open**, all draft, and **zero android PRs have ever merged** —
+> `state=all` returns exactly those six. The queue went **18 → 2**. This independently confirms the
+> owner's `docs/Codex-Resume-Handoff.md`; it was **queried, not quoted**.
+
+```
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=open   -> 2 rows, both draft:true
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all    -> 6 rows, all draft:true,
+                                                                             every merged_at null
+```
+
+*Expected:* as above, via the GitHub MCP server (no `gh` in this sandbox). **Do not read the rows'
+`merged` field** — it is false for PRs that demonstrably merged (**C-89-2**), and `merged_at` is null
+for integration-landed PRs too (**C-204-1**). The commit graph is the authority.
