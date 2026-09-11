@@ -5806,3 +5806,90 @@ which is a cost of B-18 rather than a new blocker.
 **B-1, B-2, B-4, B-5, B-7, B-8, B-9, B-12, B-13, B-15, B-17, B-19–B-26 — untouched this run**, not
 re-tested, and not asserted current on this run's evidence. B-7 was *observed* incidentally: the JDK
 17 install needed `apt-get` because `api.foojay.io` is denied, which is the same egress policy.
+
+---
+
+## B-29 — `careerseeker-android` is PUBLIC while its own README says "private, always"
+
+**Filed 2026-09-11, run 203.** This is an **owner decision**, not a technical obstruction: the fix is
+one setting, and an agent must not be the one to flip it.
+
+### Symptom
+
+`ShivaClaw/careerseeker-android` is a **public** repository. Measured, not inferred — the GitHub API
+reports `"private": false` and `"visibility": "public"` (**C-203-1**).
+
+The repository states the opposite about itself, in two places:
+
+- `README.md:7-9` — *"**This repository is private, always.** It stays private regardless of the main
+  repo's visibility (`ShivaClaw/careerseeker` is public, so that the alpha ZIP can be served).
+  Nothing here is intended for public consumption."*
+- its own GitHub **description** — *"… Private always."*
+
+`ShivaClaw/careerseeker-ios` is **also public**. `ShivaClaw/careerseeker` being public is **by design**
+(`README.md:26` names it) and is **not** part of this blocker.
+
+### Scope — what is and is not exposed
+
+**No credential is exposed** (**C-203-2**). No `.jks`, `.keystore`, `.p12`, `.pem`, or
+`secret`/`token`-named file is tracked at `HEAD`, and none was ever added at any point in this repo's
+history. The program's no-secrets rule held.
+
+What IS world-readable is **content**: Play Console / listing / billing planning, the pricing and
+monetization decisions, `SIDELOAD.md`, every runbook, and this entire unattended-program record —
+`STATE.md`, `LOG.md`, `BLOCKED.md`, `AUDIT-REQUEST.md` — including its open blockers and its
+self-criticism. **Characterise this as a business-confidentiality and strategy exposure, not a key
+compromise.** Do not let a later session strengthen or weaken that sentence without re-running
+**C-203-2**.
+
+### When it happened — INFERRED, not measured
+
+`careerseeker-android` `updated_at` **2026-09-04T17:33:24Z**; `careerseeker-ios` **2026-09-04T17:33:46Z**
+— **22 seconds apart**. The ios repo's `pushed_at` is **2026-08-16**, so its `updated_at` reflects a
+**metadata-only** change with no commit behind it; the engine repo shows no such split. Two sibling
+repos changing metadata 22s apart, one with no push, reads as **a single bulk visibility flip on
+2026-09-04T17:33Z** (**C-203-3**).
+
+**This is an inference from timestamps and nothing more.** The API exposes no visibility history to
+this session. **Only the owner's GitHub audit log can confirm the date or the actor.** Treat it as a
+lead, and do not repeat it as a measurement.
+
+### Attempts
+
+- **Verified independently rather than inherited.** `docs/Codex-Resume-Handoff.md` (engine `main`
+  `14469ad`) flags the same thing in its *"VISIBILITY FINDING"* bullet. This firing did **not** quote
+  it: the API was queried directly and the README read at `HEAD` (**C-203-1**).
+- **Checked whether the records already knew.** `grep -rn -iE "visibility|private always"` across
+  `STATE.md`, `LOG.md`, `BLOCKED.md`, `AUDIT-REQUEST.md`, `FIRINGS.md` and `RETURN-DAY.md` returns
+  **no prior finding** in 202 runs (**C-203-7**).
+- **Established why it was missed.** Every drift check in both repos compares **file contents** —
+  corpus against pin, doc against verifier literal, citation against definition. **Nothing in either
+  repo asserts a repository *setting*.** `run-zero.sh` re-derives the ground state in one command and
+  has no visibility field. That gap is the reusable part of this finding.
+- **Not acted on, deliberately.** No repository setting was changed. Flipping a repo's visibility is
+  an outward-facing, hard-to-reverse act on the owner's account, and it is exactly what this
+  program's boundary forbids an agent to do unilaterally. **Making it private would also cut off any
+  unauthenticated cloud automation that currently reads it** — which may be *why* it is public.
+
+### Smallest human unblock
+
+**Brandon decides one of two things, and says which:**
+
+1. **It was unintentional** → make both `careerseeker-android` and `careerseeker-ios` private
+   (Settings → General → Danger Zone → Change visibility). Then check whether anything depended on
+   anonymous read access — cloud sessions, CI against the vendored pin, the alpha ZIP path — because
+   that is the cost, and it is the likely reason the flip was made.
+2. **It was deliberate** (e.g. to let cloud sessions reach it) → then `README.md:7` and the repo
+   description are **false and must be corrected**, and the program's "private always" decision
+   should be restated to say what is actually intended. A written invariant that the world
+   contradicts is worse than no invariant.
+
+**Either way the README and the setting must be made to agree.** They currently disagree, and that is
+the whole of B-29.
+
+### The durable fix, offered but NOT built
+
+A visibility assertion could be added to `run-zero.sh` — but it needs the GitHub API, which that
+script deliberately cannot reach (its §6 MANUAL limit), so it would have to be a session-level check
+rather than a shell one. **Not written this run**, because the right shape depends on the owner's
+answer above: if the repo is meant to be public, the check asserts the opposite.
