@@ -21805,3 +21805,173 @@ byte-identical; §4 both mains unmoved; and **exit 1 on the plan check alone**. 
 not rot** — `RETURN-DAY.md` §3's plan named the branches to merge and they merged. **It was
 deliberately not rewritten**: re-deriving a merge plan is a decision about a human-facing handoff
 doc whose merges are already done, and concurrent firings are active in these files.
+
+---
+
+## C-203 — the visibility finding, the docs-only `main` move, and two committed conflicts (run 203, 2026-09-11)
+
+### C-203-1 — `careerseeker-android` is PUBLIC while its README says "private, always"
+
+> **Claim.** The GitHub API reports `"private": false` / `"visibility": "public"` for
+> `ShivaClaw/careerseeker-android`, while `README.md:7` reads *"**This repository is private,
+> always.**"* and the repo's GitHub description ends *"Private always."* `ShivaClaw/careerseeker-ios`
+> is also public. `ShivaClaw/careerseeker` is public **by design** (`README.md:26`) and is not part of
+> the finding.
+
+```bash
+# via the GitHub MCP server (no gh binary needed, and none is present here):
+#   search_repositories query="user:ShivaClaw careerseeker" minimal_output=false
+# read the `private` and `visibility` fields of each item. Then, in the android checkout:
+cd careerseeker-android && sed -n '7,9p;26p' README.md
+```
+
+*Expected:* the API rows show `"private": false` and `"visibility": "public"` for **both**
+`careerseeker-android` and `careerseeker-ios`; `README.md:7` asserts the opposite for this repo and
+`:26` marks the engine repo public on purpose. **The contradiction is the finding.**
+
+### C-203-2 — the exposure is content, not credentials
+
+> **Claim.** No credential is exposed. No `.jks`, `.keystore`, `.p12`, `.pem` or `secret`/`token`-named
+> file is tracked at `HEAD`, and none was added at any point in this repo's history. What is
+> world-readable is the program's strategy and records.
+
+```bash
+cd careerseeker-android
+git ls-files | grep -iE '\.jks$|\.keystore$|secret|token|\.p12$|\.pem$|credential'   # expect: no output
+git log --all --diff-filter=A --name-only --pretty=format: | grep -iE '\.jks$|\.keystore$|\.p12$|\.pem$' | sort -u
+```
+
+*Expected:* **both commands print nothing.** The first proves the working tree is clean, the second
+proves nothing of that shape was ever added and later removed. **If either prints a path, B-29's
+scoping sentence is wrong and the finding is more severe than filed.**
+
+### C-203-3 — the flip date is INFERRED from timestamps, not measured
+
+> **Claim.** `careerseeker-android` `updated_at` **2026-09-04T17:33:24Z**; `careerseeker-ios`
+> **2026-09-04T17:33:46Z** — 22s apart. ios `pushed_at` is **2026-08-16**, so its `updated_at` is a
+> metadata-only change with no commit behind it. That pattern reads as one bulk visibility flip on
+> 2026-09-04T17:33Z. **This is an inference. The API exposes no visibility history.**
+
+```bash
+# search_repositories query="user:ShivaClaw careerseeker" minimal_output=false
+# compare each item's `updated_at` against its `pushed_at`.
+```
+
+*Expected:* the two app repos' `updated_at` within a minute of each other on 2026-09-04; ios
+`pushed_at` ≈ 3 weeks earlier; the engine repo showing `updated_at` ≈ `pushed_at` (no split).
+**An auditor should attack this first** — the correlation is suggestive and is *not* proof. Only
+Brandon's GitHub audit log can confirm the date or the actor, and this claim must not be restated as
+a measurement.
+
+### C-203-4 — engine `main` moved, and the move is docs-only
+
+> **Claim.** `11bb1f5 → 14469ad`: **one commit, one file**, `docs/Codex-Resume-Handoff.md` **+40/−3**,
+> authored by Brandon Kirksey 2026-09-10 19:22:07 −0600. No code, vector, spec, `generate.mjs` or
+> `ci.yml` byte changed.
+
+```bash
+cd careerseeker && git fetch --all --prune
+git log --oneline 11bb1f5..origin/main
+git diff --stat 11bb1f5 origin/main
+```
+
+*Expected:* exactly one commit `14469ad`; the stat shows `docs/Codex-Resume-Handoff.md | 43 +++---`,
+**1 file changed, 40 insertions(+), 3 deletions(-)** and nothing else. **A second path in that stat
+retires this claim.**
+
+### C-203-5 — the assigned slice is on `main`, and the generator is green there
+
+> **Claim.** `8575539`, `22b028e`, `7328a0b` are all ancestors of `origin/main`; the generator check at
+> `main` returns **`OK: 30 vector files match the generator.`**, exit **0**. **Run by this session.**
+
+```bash
+cd careerseeker && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do git merge-base --is-ancestor $c origin/main && echo "$c on main"; done
+git checkout origin/main && node docs/sync-vectors/generate.mjs --check; echo "exit=$?"
+```
+
+*Expected:* three × `on main`; `OK: 30 vector files match the generator.`; `exit=0`. **The stored
+prompt still calls S5 "NOT STARTED" and still names pin `679a317`; both are stale and the real pin is
+`11bb1f5`.**
+
+### C-203-6 — the phone is in sync with `main`, and H7 is closed
+
+> **Claim.** `VECTORS.lock` pins `11bb1f5`; the vendored corpus is **30 files**; `main` carries **30**,
+> including both `pairing-high-bit-confirm.json` and `invalid-unknown-field.json`.
+
+```bash
+cd careerseeker-android && grep -o '[0-9a-f]\{40\}' core/src/test/resources/sync-vectors/VECTORS.lock | head -1
+git ls-files 'core/src/test/resources/sync-vectors/v1/*.json' | wc -l
+cd ../careerseeker && git ls-tree --name-only origin/main docs/sync-vectors/v1/ | wc -l
+git ls-tree --name-only origin/main docs/sync-vectors/v1/ | grep -E 'pairing-high-bit-confirm|invalid-unknown-field'
+```
+
+*Expected:* pin `11bb1f5cbf2561fe04cabf2cbfad1fa2c4039eb3`; **30** and **30**; both vector names
+present. Run 202's re-pin is what closed this, and the MERGE-WAKE banner's *"a re-pin DELETES a
+vector"* warning is **spent** — it was true against `cffe2b7` only.
+
+### C-203-7 — 202 runs of records contain no prior visibility finding
+
+> **Claim.** Nothing in the house records ever asserted a repository *setting*; every drift check in
+> both repos compares file **contents**.
+
+```bash
+cd careerseeker-android
+grep -rn -iE "visibility|is public|are public|private-always|private always" \
+  STATE.md LOG.md BLOCKED.md AUDIT-REQUEST.md FIRINGS.md RETURN-DAY.md | grep -v "C-203\|B-29"
+```
+
+*Expected:* only incidental prose (*"visibility added"* in an S6 row; *"public to the repo's
+collaborators"* in an audit command) — **no finding, no blocker, no check**. `run-zero.sh` likewise
+has no visibility field. **That gap is the reusable half of B-29.**
+
+### C-203-8 — the board, and the queue that went 18 → 2
+
+> **Claim.** Engine **2 open**: **#58** (audit F01/F02) and **#26** (SBOM), both `draft:true`. Android
+> **6 open**, all `draft:true`, **zero merges in its entire history**.
+
+```bash
+# list_pull_requests owner=ShivaClaw repo=careerseeker         state=open
+# list_pull_requests owner=ShivaClaw repo=careerseeker-android state=open
+```
+
+*Expected:* the two engine rows and the six android rows above. **Read `merged_at` or the commit
+graph, never the rows' `merged` field (C-89-2).** The drop from 18 open to 2 independently confirms
+the owner's `docs/Codex-Resume-Handoff.md` account of the burn-down — it was **verified, not quoted**.
+
+### C-203-9 — two committed merge conflicts in the two main evidence files, resolved by keeping both sides
+
+> **Claim.** `AUDIT-REQUEST.md` and `LOG.md` each carried a **complete, unresolved conflict**
+> — `<<<<<<< HEAD` / `=======` / `>>>>>>>` — committed and pushed by runs 200 (`b4bbf41`) and 202
+> (`cba7471`). Both sides were real records written by concurrent firings. **Nothing detected this:**
+> `check-citations.sh` was green across the corruption, and no check in either repo greps for conflict
+> markers. Resolved at run 203 by **keeping both sides**, with **no claim text altered** — only the
+> four marker lines removed.
+>
+> **The two blocks collide on `C-202-1…4`, and run 203 left the collision in place on purpose.** A
+> first attempt renumbered the re-pin block to `C-202R-*`; `check-citations.sh` then failed with
+> **`dangling citation(s): C-202-5, C-202-6`**, because that block is the more widely cited of the two
+> (`STATE.md` ×5, `LOG.md` ×4, `BLOCKED.md` ×2) while `FIRINGS.md:147` cites the *other*. `FIRINGS.md`
+> is generated and append-only, so **no renumbering leaves every existing citation intact.** The
+> attempt was reverted and replaced with a disambiguation box above the second block. **Written-down
+> ambiguity beats a fix that silently breaks a generated record.**
+
+```bash
+cd careerseeker-android
+git show b4bbf41 --stat; git show cba7471 --stat          # the two commits that introduced them
+grep -rn "^<<<<<<< \|^=======$\|^>>>>>>> " --include=*.md . | grep -v '^./.git'
+grep -c "^### C-202-[0-9]" AUDIT-REQUEST.md; grep -c "^### C-202-[0-9]" AUDIT-REQUEST.md
+```
+
+*Expected today:* the marker grep prints **nothing** (4 marker lines removed, 0 remain); **10**
+`### C-202-*` headings, being the two colliding blocks of 4 and 6, and **0** `C-202R-*`.
+*Expected at `HEAD~1`:* the same marker grep prints **6** lines across the two files.
+`scripts/check-citations.sh` exits **0** both before and after — **which is the point of C-203-9:
+the guard was green across the corruption and is green after the repair, so it never measured this
+at all.**
+
+**The durable point, and it is not the typo-fix:** two firings raced, git stopped them, and the
+conflict was committed **with the markers in it** rather than resolved — twice, in the two documents
+this program treats as its evidence. That is **B-18's cost made concrete**, and it means a reader of
+those files between 2026-09-10 and this run was reading a corrupt record. **A marker grep belongs in
+`run-zero.sh`; it is not added here** (see the LOG entry's boundary paragraph for why).

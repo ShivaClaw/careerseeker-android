@@ -19818,3 +19818,139 @@ this trigger and nothing here is a new state a fourteenth message would add. **N
 production relay was not contacted at all**, not even `GET /v1/health`. No Play, Google or OAuth
 console; no accounts, no purchases, no Gmail; **no secret read, printed or echoed**; no `.appdata`.
 Terra's `autonomy/codex-state` unchanged and uncollided-with.
+
+---
+
+# RUN 203 — 2026-09-11. **The repo that says "private, always" is public. 202 runs of records never checked, because nothing in either program checks repository *metadata*.**
+
+**Two hundred and third cloud iteration (Linux sandbox).** Rule one first: `git fetch --all --prune`
+in **both** checkouts before any count; every number here is post-fetch. `autonomy/codex-state` read
+before any write — **COMPLETE**, *"the ladder is exhausted"*, **files claimed: none** — so no
+collision, and Terra keeps right-of-way.
+
+`scripts/run-zero.sh ../careerseeker` returned **SOMETHING MOVED**, so this is a full-records firing
+under the run-118 house law, not a `FIRINGS.md` one-liner.
+
+## Milestone 1 — the assigned slice was already done, for roughly the 163rd time
+
+The stored prompt assigns S5's spec half: amend §4.3 with the `entitlement_ack` body, add the vector
+via `generate.mjs`, close PQ-A2-1/-2/-3. **All of it is on `main`** (**C-203-5**). `8575539`,
+`22b028e` and `7328a0b` are ancestors of `origin/main`; the owner landed them in the S-series
+burn-down. Run by this session at `main` `14469ad`:
+
+```
+OK: 30 vector files match the generator.
+exit=0
+```
+
+The prompt also still names vendored pin `679a317` and calls S5 *"NOT STARTED"*. **Both are stale**;
+the real pin is `11bb1f5` and S5's spec half is shipped. This is **B-18**, unchanged, and it is why
+the run spent its slice elsewhere rather than rebuilding built work — a choice the mission's own
+*"pick the topmost rung genuinely verifiable in THIS environment"* clause permits and the records
+have recommended since run 47.
+
+## Milestone 2 — the finding: `careerseeker-android` is PUBLIC
+
+**This is the first finding in this window that is not about the routine itself.**
+
+The GitHub API reports `"private": false`, `"visibility": "public"` for
+`ShivaClaw/careerseeker-android` (**C-203-1**). `README.md:7` reads *"**This repository is private,
+always.** … Nothing here is intended for public consumption."* The repo's own GitHub **description**
+ends *"Private always."* `careerseeker-ios` is **also** public. The engine repo is public **by
+design** and is not part of this.
+
+**Verified, not inherited.** `docs/Codex-Resume-Handoff.md` — the +40 lines that moved engine `main`
+this week — flags the same thing in a *"VISIBILITY FINDING"* bullet. This firing did not quote it:
+the API was queried directly and the README read at `HEAD`. Quoting would have been cheaper and would
+not have been evidence.
+
+**Scoped honestly (C-203-2).** No credential is exposed: no `.jks`, `.keystore`, `.p12`, `.pem` or
+`secret`/`token`-named file is tracked at `HEAD`, and none was ever added anywhere in this repo's
+history. The no-secrets rule held. What is world-readable is **content** — Play Console and billing
+planning, pricing and monetization decisions, `SIDELOAD.md`, every runbook, and this entire record
+including its blockers and its self-criticism. **A confidentiality and strategy exposure, not a key
+compromise.** The distinction is load-bearing and should not be blurred in either direction.
+
+**The date is a lead, not a measurement (C-203-3).** android `updated_at` **2026-09-04T17:33:24Z**,
+ios **17:33:46Z** — 22 seconds apart; ios `pushed_at` is 2026-08-16, so its change is metadata-only
+with no commit behind it, and the engine repo shows no such split. That reads as one bulk flip on
+2026-09-04T17:33Z. **The API exposes no visibility history; only Brandon's audit log can confirm it.**
+Labelled an inference everywhere it appears.
+
+**Why 202 runs missed it.** Every drift check in both repos compares **file contents** — corpus
+against pin, doc against verifier literal, citation against definition. **Nothing anywhere asserts a
+repository setting**, and `run-zero.sh`, which re-derives the whole ground state in one command, has
+no visibility field. `grep` across all six record files returns **no prior finding** (**C-203-7**).
+That gap is the reusable half of this run.
+
+Filed as **B-29** with both branches of the decision written out. **Nothing was changed.** Flipping a
+repository's visibility is an outward-facing, hard-to-reverse act on the owner's account — and
+making it private may be exactly what breaks the unauthenticated cloud access that could be the
+reason it is public. **That is the owner's call, and only the owner's.**
+
+## Milestone 3 — two committed merge conflicts, in the two evidence files
+
+`AUDIT-REQUEST.md` and `LOG.md` each carried a **complete, unresolved conflict** — `<<<<<<< HEAD` /
+`=======` / `>>>>>>>` — committed and pushed by runs 200 (`b4bbf41`) and 202 (`cba7471`)
+(**C-203-9**). Both sides were real records from concurrent firings; neither was a mistake, the
+*merge* was.
+
+**Nothing detected it.** `check-citations.sh` was green across the corruption and is green after the
+repair; no check in either repo greps for conflict markers. A reader of those two files between
+2026-09-10 and today was reading a corrupt record — and those are the two documents this program
+treats as its evidence.
+
+Resolved by **keeping both sides**, no claim text altered. The two blocks **collide on `C-202-1…4`**,
+and the collision was **left in place deliberately**: renumbering the re-pin block broke four live
+citations (`check-citations.sh` → *dangling: C-202-5, C-202-6*), and the *other* block is the one
+`FIRINGS.md:147` cites. `FIRINGS.md` is generated and append-only, so **no renumbering leaves every
+citation intact.** The attempt was reverted; a disambiguation box now says which block each citer
+means. **Written-down ambiguity beats a fix that silently breaks a generated record** — and the first
+attempt is recorded here rather than quietly dropped, because a run that only shows its successful
+edits is not showing its work.
+
+## Milestone 4 — re-derivation, and one plan to retire
+
+- **Engine `main` moved, docs-only** (**C-203-4**): `11bb1f5 → 14469ad`, one commit, one file,
+  `docs/Codex-Resume-Handoff.md` **+40/−3**, Brandon-authored. **No code, vector, spec or CI byte.**
+- **The phone is in sync; H7 is closed** (**C-203-6**): `VECTORS.lock` pins `11bb1f5`, vendored **30**,
+  `main` carries **30**, both `pairing-high-bit-confirm.json` and `invalid-unknown-field.json`
+  present. Run 202's re-pin did it, and the MERGE-WAKE warning that a re-pin *"DELETES a vector"* is
+  **spent** — true against `cffe2b7` only.
+- **`RETURN-DAY.md` §3's landing plan is SPENT.** `fleet-probe.sh plan` reports **ROT 6/6**, which
+  looks like the alarm it raised at run 88. It is not: **all six named branches are DELETED at
+  origin** because the owner merged and swept them. A firing that "re-derives the landing plan" on
+  this signal is chasing a phantom. (Consistent with the non-blocker a previous firing already
+  recorded; restated only because §3 itself still reads as live instruction.)
+- **Board** (**C-203-8**): engine **2 open** — #58, #26, both draft; android **6 open**, all draft,
+  zero merges ever. The queue went **18 → 2**, independently confirming the owner's handoff.
+- **The standing condition has changed.** Thirteen escalations were sent into an empty room and the
+  ledger's *"zero repo events have followed any of them"* was true each time. It is now **false**:
+  the owner landed the S-series and wrote a handoff. **A future firing must not re-arm the calendar
+  send on the old premise without re-deriving it.**
+
+## Boundary — what this run did NOT touch
+
+**No gate ran and none is claimed.** `pwsh`, `dotnet`, `sdkmanager`, `avdmanager`, `emulator`, `adb`
+all **ABSENT**; `ANDROID_HOME` **UNSET**. `Verify-Alpha.ps1` and the five-task android command are
+both unreachable here, and `816` is cited as run 202's CI-confirmed figure, **not re-measured**.
+`:core:test` was **not** run this firing and no earlier green is restated as this run's.
+
+**No pin moved. No vector byte, no `index.json`, no `generate.mjs`, no `Sync-Protocol.md`, no
+`ci.yml`, no Kotlin, no C#** — `generate.mjs --check` writes nothing. The vendored corpus is
+byte-identical to pin `11bb1f5`; **no cross-repo drift event.**
+
+**No repository setting was changed** — not visibility, not description, not on any repo. **Nothing
+merged, closed, undrafted, reopened, force-pushed or deleted; no branch removed; no history
+rewritten.** No new PR in the engine repo and **nothing claimed in `careerseeker`** beyond the
+one-line heartbeat on the docs-only `autonomy/claude-state` branch. **No deploy of any kind**
+— Cloudflare, Workers, relay or site. **The relay was not contacted at all**, not even
+`GET /v1/health`. No Play, Google or OAuth console; no accounts, no purchases, no Gmail, no keystore,
+no emulator. **No secret was read, printed or echoed** — existence checks only, and the existence
+check in C-203-2 reports paths, never contents. Terra's territory (`autonomy/codex-state`,
+`Documents\CareerSeeker`, the beta worktrees) was **read, never written**.
+
+**A marker grep belongs in `run-zero.sh` and was deliberately not added.** This firing's slice was
+the visibility finding; bolting a second guard into the shared probe in the same push would mix an
+unreviewed tooling change into a records run, and `run-zero.sh` is what every future firing depends
+on. Recommended, not done — stated so the next session can take it.
