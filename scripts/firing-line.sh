@@ -89,7 +89,13 @@ main_sha() {  # $1 = 'engine' | 'android'
 eng_main=$(main_sha engine)
 and_main=$(main_sha android)
 cites=$(grep -m1 '^  definitions:' <<<"$probe" | awk '{print $2"/"$4"/"$6}')
-gen=$(grep -qF 'OK: 29 vector files match the generator.' <<<"$probe" && echo 'gen OK' || echo 'gen ?')
+# Count-agnostic on purpose (run 203). This was pinned to the literal string
+# 'OK: 29 vector files match the generator.'; run 202's re-pin took the corpus to
+# 30 and the field silently became 'gen ?' -- a generated record reporting "I
+# could not tell" while the generator was in fact green. Same class as the two
+# constants run 198's addendum fixed. The COUNT is already reported by the
+# corpus field, so this one only ever needed to answer OK / not-OK.
+gen=$(grep -qE '^  OK: [0-9]+ vector files match the generator\.' <<<"$probe" && echo 'gen OK' || echo 'gen ?')
 
 if [ -z "$pin$eng_main$and_main" ]; then
   echo "firing-line: run-zero.sh produced nothing parseable; write a full entry by hand" >&2
