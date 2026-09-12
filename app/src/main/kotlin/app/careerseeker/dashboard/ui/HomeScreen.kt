@@ -27,7 +27,6 @@ import app.careerseeker.dashboard.replica.SyncStateRow
 fun HomeScreen(counters: CountersRow?, syncState: SyncStateRow?, modifier: Modifier = Modifier) {
     Column(modifier = modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         ScreenTitle("CareerSeeker")
-        StatusBanner(syncState)
 
         if (counters == null) {
             EmptyHint("No engine data yet. Pair a phone or enable demo mode.")

@@ -5,6 +5,7 @@ import app.careerseeker.core.crypto.SyncCrypto
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -13,6 +14,7 @@ import kotlinx.serialization.json.long
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -55,6 +57,24 @@ class ProtocolVectorsTest {
             .filter { it.str("type") == "envelope" }
             .map { load(it.str("name")) }
 
+    /**
+     * Every VALID pairing vector the manifest lists, by name.
+     *
+     * Enumerated rather than named, deliberately. Until 2026-08-18 the derivation test below
+     * loaded `pairing-basic` by hand while calling itself "every vector value", so a pairing
+     * vector added upstream was vendored, listed here, and asserted by nothing — measured with
+     * a negative control: corrupting `pairing-high-bit-confirm`'s expected confirm code left
+     * :core:test green at 288/0. Enumerating from the manifest is what makes a re-pin actually
+     * deliver the phone testing what the engine ships (B-14/H7).
+     *
+     * `valid: false` vectors are excluded: they pin a REJECTION and have their own tests
+     * (e.g. `pairing-mitm-keyswap`), so running the happy-path assertions over them is wrong.
+     */
+    private fun validPairingVectors(): List<Pair<String, JsonObject>> =
+        index()["vectors"]!!.jsonArray.map { it.jsonObject }
+            .filter { it.str("type") == "pairing" && it["valid"]!!.jsonPrimitive.boolean }
+            .map { it.str("name") to load(it.str("name")) }
+
     private fun keyFor(dir: String): ByteArray = hex(
         if (dir == "e2p") "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
         else "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
@@ -75,36 +95,48 @@ class ProtocolVectorsTest {
 
     @Test
     fun `pairing derivation reproduces every vector value`() {
-        val v = load("pairing-basic")
-        val expected = v["expected"]!!.jsonObject
-        val secret = b64u(v.str("secret_b64u"))
+        val vectors = validPairingVectors()
+        assertTrue(vectors.isNotEmpty(), "the manifest lists no valid pairing vectors")
 
-        val enginePub = b64u(v["engine"]!!.jsonObject.str("pub_b64u"))
-        val phonePub = b64u(v["phone"]!!.jsonObject.str("pub_b64u"))
-        val engineD = hex(v["engine"]!!.jsonObject.str("d_hex"))
-        val phoneD = hex(v["phone"]!!.jsonObject.str("d_hex"))
+        for ((name, v) in vectors) {
+            val expected = v["expected"]!!.jsonObject
+            val secret = b64u(v.str("secret_b64u"))
 
-        val ssEngine = SyncCrypto.ecdhSharedSecret(engineD, phonePub)
-        val ssPhone = SyncCrypto.ecdhSharedSecret(phoneD, enginePub)
-        assertEquals(expected.str("ss_hex").lowercase(), ssEngine.toHex(), "ECDH shared secret")
-        assertTrue(ssEngine.contentEquals(ssPhone), "ECDH is symmetric")
+            val enginePub = b64u(v["engine"]!!.jsonObject.str("pub_b64u"))
+            val phonePub = b64u(v["phone"]!!.jsonObject.str("pub_b64u"))
+            val engineD = hex(v["engine"]!!.jsonObject.str("d_hex"))
+            val phoneD = hex(v["phone"]!!.jsonObject.str("d_hex"))
 
-        val keys = PairingDerivation.derive(listOf(ssEngine), secret)
-        assertEquals(expected.str("k_e2p_hex").lowercase(), keys.keyEngineToPhone.toHex(), "k_e2p")
-        assertEquals(expected.str("k_p2e_hex").lowercase(), keys.keyPhoneToEngine.toHex(), "k_p2e")
-        assertEquals(expected.str("relay_token_b64u"), keys.relayToken, "relay token")
-        assertEquals(expected.str("confirm"), keys.confirmCode, "6-digit confirm code")
-        assertEquals(expected.str("provisional_token_b64u"), PairingDerivation.provisionalRelayToken(secret), "provisional token")
+            val ssEngine = SyncCrypto.ecdhSharedSecret(engineD, phonePub)
+            val ssPhone = SyncCrypto.ecdhSharedSecret(phoneD, enginePub)
+            assertEquals(expected.str("ss_hex").lowercase(), ssEngine.toHex(), "ECDH shared secret ($name)")
+            assertTrue(ssEngine.contentEquals(ssPhone), "ECDH is symmetric ($name)")
 
-        // The completion opens under the derived k_p2e, and the device key is inside it.
-        val completion = v["completion"]!!.jsonObject
-        assertEquals(
-            PairingDerivation.completionAad(index().str("pairing_id"), v.str("suite"), v["phone"]!!.jsonObject.str("pub_b64u")),
-            completion.str("aad"),
-        )
-        val payload = SyncCrypto.open(keys.keyPhoneToEngine, b64u(completion.str("nonce_b64u")),
-            completion.str("aad"), b64u(completion.str("ciphertext_b64u")))
-        assertTrue(payload.toString(Charsets.UTF_8).contains(v["device_sig"]!!.jsonObject.str("pub_b64u")))
+            val keys = PairingDerivation.derive(listOf(ssEngine), secret)
+            assertEquals(expected.str("k_e2p_hex").lowercase(), keys.keyEngineToPhone.toHex(), "k_e2p ($name)")
+            assertEquals(expected.str("k_p2e_hex").lowercase(), keys.keyPhoneToEngine.toHex(), "k_p2e ($name)")
+            assertEquals(expected.str("relay_token_b64u"), keys.relayToken, "relay token ($name)")
+            assertEquals(expected.str("confirm"), keys.confirmCode, "6-digit confirm code ($name)")
+            assertEquals(
+                expected.str("provisional_token_b64u"),
+                PairingDerivation.provisionalRelayToken(secret),
+                "provisional token ($name)",
+            )
+
+            // The completion opens under the derived k_p2e, and the device key is inside it.
+            val completion = v["completion"]!!.jsonObject
+            assertEquals(
+                PairingDerivation.completionAad(index().str("pairing_id"), v.str("suite"), v["phone"]!!.jsonObject.str("pub_b64u")),
+                completion.str("aad"),
+                "completion aad ($name)",
+            )
+            val payload = SyncCrypto.open(keys.keyPhoneToEngine, b64u(completion.str("nonce_b64u")),
+                completion.str("aad"), b64u(completion.str("ciphertext_b64u")))
+            assertTrue(
+                payload.toString(Charsets.UTF_8).contains(v["device_sig"]!!.jsonObject.str("pub_b64u")),
+                "device signing key inside the completion ($name)",
+            )
+        }
     }
 
     @Test
@@ -162,31 +194,83 @@ class ProtocolVectorsTest {
         val valid = envelopeVectors().filter { it["valid"]!!.jsonPrimitive.content == "true" }
             .sortedBy { it["envelope_json"]!!.jsonObject["seq"]!!.jsonPrimitive.long }
         for (v in valid) {
-            val result = receiver.receive(received(v["envelope_json"]!!.jsonObject), ::keyFor)
-            assertTrue(result.accepted, "receiver should accept ${v.str("name")} (got ${result.error})")
+            val error = receiveFromWire(receiver, v["envelope_json"]!!.jsonObject)
+            assertNull(error, "receiver should accept ${v.str("name")} (got $error)")
         }
 
         for (v in envelopeVectors().filter { it["valid"]!!.jsonPrimitive.content == "false" }) {
             val name = v.str("name")
             val expected = v.str("expect_error")
-            val result = if (v["envelope_json"] == null || v["envelope_json"] is kotlinx.serialization.json.JsonNull) {
-                // invalid-oversized ships a synth length rather than a literal megabyte.
+            val error = if (v["envelope_json"] == null || v["envelope_json"] is kotlinx.serialization.json.JsonNull) {
+                // invalid-oversized ships a synth length rather than a literal megabyte. It has
+                // no wire form to parse, so it is handed to the receiver already structured.
                 val synth = v["synth_ciphertext_len"]!!.jsonPrimitive.int
                 receiver.receive(
                     ReceivedEnvelope(1, idx.str("pairing_id"), "e2p", 999L, "2026-06-11T14:02:11Z",
                         idx.str("active_key_id"), Base64Url.encode(ByteArray(Protocol.NONCE_BYTES)),
                         Base64Url.encode(ByteArray(synth)), null),
                     ::keyFor,
-                )
+                ).error
             } else {
-                receiver.receive(received(v["envelope_json"]!!.jsonObject), ::keyFor)
+                receiveFromWire(receiver, v["envelope_json"]!!.jsonObject)
             }
-            assertEquals(expected, result.error?.wire, "$name should reject as $expected")
+            assertEquals(expected, error?.wire, "$name should reject as $expected")
         }
 
         // The rejections above must not have advanced the sequence tracker.
         assertEquals(4L, receiver.highestAccepted(Direction.ENGINE_TO_PHONE))
         assertEquals(1L, receiver.highestAccepted(Direction.PHONE_TO_ENGINE))
+    }
+
+    // ---------------------------------------------------------------- entitlement acks
+
+    private fun ackVectors(): List<JsonObject> =
+        index()["vectors"]!!.jsonArray.map { it.jsonObject }
+            .filter { it.str("type") == "entitlement_ack" }
+            .map { load(it.str("name")) }
+
+    /**
+     * §4.3.3, driven by the shared vectors rather than by constants copied out of them.
+     *
+     * The plaintext here is whatever AES-GCM produces from the vector's own `ciphertext_b64u`
+     * — it is never re-serialised from `plaintext_json`, so no canonicalisation choice on this
+     * side can hide a disagreement about field order or about an omitted-versus-null
+     * `order_id`. That is the difference between reading a vector and transcribing one: a
+     * transcription is a snapshot and cannot fail when the vector moves.
+     */
+    @Test
+    fun `entitlement ack vectors decrypt to the exact bytes that unlock Pro`() {
+        val acks = ackVectors()
+        // The pair IS the optionality proof; one alone would not pin it.
+        assertEquals(2, acks.size, "both ack forms must be vendored")
+        val applier = EntitlementAckApplier(knownProductIds = setOf("pro_unlock"))
+
+        val granted = acks.map { v ->
+            val name = v.str("name")
+            val plaintext = SyncCrypto.open(hex(v.str("key_hex")), b64u(v.str("nonce_b64u")),
+                v.str("aad"), b64u(v.str("ciphertext_b64u")))
+            assertEquals(
+                json.parseToJsonElement(v["plaintext_json"]!!.toString()).canonical(),
+                json.parseToJsonElement(plaintext.toString(Charsets.UTF_8)).canonical(),
+                "$name round-trip",
+            )
+
+            val body = v["plaintext_json"]!!.jsonObject["body"]!!.jsonObject
+            val ack = requireNotNull(applier.parse(plaintext)) { "$name must parse as a grant" }
+            assertEquals(body.str("product_id"), ack.productId, "$name product_id")
+            assertEquals(body.str("acknowledged_at"), ack.acknowledgedAt, "$name acknowledged_at")
+            // Read from the vector, not asserted against a literal: absent stays absent.
+            assertEquals(body["order_id"]?.jsonPrimitive?.content, ack.orderId, "$name order_id")
+
+            val state = applier.apply(ProState.Free, plaintext)
+            assertTrue(state.isPro, "$name is an ack, and an ack means granted (§4.3.3)")
+            state
+        }
+
+        // The two vectors differ in order_id and nothing else, so they must grant identically.
+        // An implementation that required order_id would diverge here rather than in a support
+        // ticket about an unlock that never happened.
+        assertEquals(granted[0], granted[1], "order_id is optional and grants the same entitlement")
     }
 
     // ---------------------------------------------------------------- protocol invariants
@@ -202,12 +286,25 @@ class ProtocolVectorsTest {
         assertTrue(PayloadKind.RESERVED_FOR_L2.contains("kill"))
     }
 
-    private fun received(env: JsonObject) = ReceivedEnvelope(
-        env["v"]!!.jsonPrimitive.int, env.str("pairing"), env.str("dir"),
-        env["seq"]!!.jsonPrimitive.long, env.str("ts"), env.str("key_id"),
-        env.str("nonce"), env.str("ciphertext"),
-        env["sig"]?.let { if (it is kotlinx.serialization.json.JsonNull) null else it.jsonPrimitive.content },
-    )
+    /**
+     * Delivers a vector the way the relay does: as **wire text**, through [EnvelopeJson].
+     *
+     * This used to build [ReceivedEnvelope] field by field, reading the nine keys §3 defines
+     * and ignoring anything else. That is precisely the permissive parser §3's closing rule
+     * forbids ("Other unknown top-level fields MUST be rejected, not ignored"), so the one
+     * suite that exists to prove the two implementations agree was structurally unable to
+     * fail on the rule — `invalid-unknown-field` was ACCEPTED here while the engine rejected
+     * it. `EnvelopeJson` had enforced the rule since it was written; nothing routed the
+     * vectors through it. Re-serialising `envelope_json` keeps the unknown field, so the
+     * parser sees what a receiver on the network would see.
+     *
+     * This calls [EnvelopeReceiver.receiveWire] — the shipped seam a production caller uses —
+     * rather than re-implementing parse-then-receive here. A vector suite that reconstructs
+     * the entry point it is meant to be testing is how the gap above survived in the first
+     * place.
+     */
+    private fun receiveFromWire(receiver: EnvelopeReceiver, env: JsonObject): ErrorCode? =
+        receiver.receiveWire(env.toString(), ::keyFor).error
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 }

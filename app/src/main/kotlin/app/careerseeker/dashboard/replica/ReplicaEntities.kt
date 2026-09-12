@@ -24,6 +24,22 @@ data class ApplicationRow(
     val score: Int,
     /** The e2p envelope seq that last touched this row — recency for list ordering. */
     val updatedSeq: Long,
+    /**
+     * Pro outcome-tracking state (§4.3.1), or null when unset or non-Pro.
+     *
+     * Nullable on the wire and nullable here: §4.3.1 says a receiver treats an absent field as
+     * "no outcome", **never** as a malformed value — so a snapshot from a non-Pro engine must
+     * not fail to parse.
+     *
+     * The vocabulary is the *store's superset* (`sent | no_reply | replied | interview | offer |
+     * rejected`), which is wider than the five values a phone may set. It is carried as a
+     * display-only string for exactly that reason: the replica must be able to render
+     * `no_reply` — a desktop-set observation — without the phone being able to send it.
+     *
+     * Declared last, with a default, so the existing positional constructions in the demo
+     * fixture and the applier tests keep meaning what they meant.
+     */
+    val outcome: String? = null,
 )
 
 /** One discovered job as the Jobs screen renders it. Flags are display-only booleans. */
@@ -105,4 +121,19 @@ data class SyncStateRow(
      * verdict); deltas/heartbeats preserve it; an `evidence` payload sets it.
      */
     val auditOk: Boolean? = null,
+    /**
+     * True once a full `snapshot` has been applied to this replica.
+     *
+     * A `delta` carries the *recent window*, not the whole pipeline (§4.3.1). Applying one to
+     * an empty replica would therefore render three applications as though they were all of
+     * them — a fabricated status, and the exact failure the engine's own postmortem was about.
+     * The phone can legitimately arrive mid-stream (it pairs and pulls from seq 0, and the
+     * relay's TTL may already have purged the snapshot), so this is a real path, not a
+     * theoretical one.
+     *
+     * The applier refuses deltas until this is true and asks for a snapshot instead. It cannot
+     * be inferred from [highestAppliedE2pSeq] — a heartbeat also advances that — so it is
+     * stored.
+     */
+    val snapshotSeen: Boolean = false,
 )

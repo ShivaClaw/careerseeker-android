@@ -52,6 +52,15 @@ fun DashboardApp(db: ReplicaDb) {
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        // The provenance banner lives in the SHELL, not in a screen.
+        //
+        // It used to be drawn by HomeScreen alone, which meant Applications, Jobs, Evidence
+        // and the detail overlay rendered demo rows with nothing anywhere on screen saying so.
+        // A user who opened the app on the Jobs tab saw six fabricated postings presented as
+        // their pipeline. The honest-UI rule is "labelled on EVERY screen", and hoisting it
+        // here is what makes that structural: a screen added later cannot forget it, because
+        // no screen draws it.
+        topBar = { StatusBanner(syncState) },
         bottomBar = {
             NavigationBar {
                 Tab.entries.forEach { t ->
