@@ -22076,3 +22076,157 @@ list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all    -> 6 r
 *Expected:* as above, via the GitHub MCP server (no `gh` in this sandbox). **Do not read the rows'
 `merged` field** — it is false for PRs that demonstrably merged (**C-89-2**), and `merged_at` is null
 for integration-landed PRs too (**C-204-1**). The commit graph is the authority.
+
+---
+
+## Run 221 — 2026-09-14. The harness-count drift, and the toolchain limit that was overstated
+
+Every claim below was produced in that firing. Re-verification needs a checkout of **both** repos
+and, for C-221-1 … C-221-5, a .NET 8 SDK (see **C-221-6** for how to get one here).
+
+### C-221-1 — SyncHarness measures 335; three published docs said 134
+
+> **Claim.** At engine `main` `14469ad`, `SyncHarness` reports **335 passed, 0 failed**.
+> `README.md:83`, `src/Engine/README.md:161` and `docs/CareerSeeker-Project-Summary.md:60` each
+> listed **134**. The error is **201** assertions and it is in audit-facing documents.
+
+```bash
+cd careerseeker && git fetch --all --prune && git checkout 14469ad
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release | tail -1
+grep -rn '| SyncHarness | ' README.md src/Engine/README.md docs/CareerSeeker-Project-Summary.md
+```
+
+*Expected:* `=== 335 passed, 0 failed ===`, and three doc lines reading `| SyncHarness | 134 |` at
+`14469ad`. **On `main` after PR #60 lands, the doc lines read `335` and this command is how you
+confirm the row still matches the harness.**
+
+### C-221-2 — the three harness tables did not add up, and the prose reported the wrong total
+
+> **Claim.** In all three docs the table's rows summed to **615** while the table's own Total row
+> said **816**. `docs/CareerSeeker-Project-Summary.md:47` stated *"The pinned offline verifier is
+> **615 passed, 0 failed**"* — the row-sum, three lines above its own `| **Total** | **816** |`.
+
+```bash
+cd careerseeker && git checkout 14469ad
+for f in README.md src/Engine/README.md docs/CareerSeeker-Project-Summary.md; do
+  echo -n "$f rows: "
+  grep -E '^\| [A-Za-z]+ \| [0-9]+ \|$' "$f" | sed 's/.*| \([0-9]*\) |/\1/' | paste -sd+ | bc
+  grep -n '\*\*Total\*\*' "$f"
+done
+grep -n 'pinned offline verifier is' docs/CareerSeeker-Project-Summary.md
+```
+
+*Expected at `14469ad`:* `rows: 615` for each file, a Total row of `816`, and the prose `615`.
+**All four numbers are 816 after PR #60.**
+
+### C-221-3 — the drift trap was confirming the error, not catching it
+
+> **Claim.** `scripts/Verify-Alpha.ps1` asserted the stale row literal **and** the correct total
+> against the same document — `'| SyncHarness | 134 |'` at lines **671, 700, 705** and
+> `'| **Total** | **816** |'` alongside it. Both assertions passed. Only the Total was really
+> pinned, so CLAUDE.md's drift trap could never see the contradiction.
+
+```bash
+cd careerseeker && git checkout 14469ad
+grep -n "SyncHarness | 134\|\*\*Total\*\* | \*\*816\*\*" scripts/Verify-Alpha.ps1
+```
+
+*Expected:* both literals present in the same `Invoke-Step "Public README and harness count smoke"`
+block. **This is the finding, not a side note: a doc assertion and a verifier assertion that quote
+each other prove nothing.**
+
+### C-221-4 — 803 + 13 = 816, so the Total was right and the row was stale
+
+> **Claim.** All ten offline harnesses run on Linux: **803 passed, 0 failed**. `EngineHarness`
+> measures **217** here and **230** on Windows because **6** full-data-deletion and **7** DPAPI
+> vault assertions skip off-platform, announced in its own output (**B-10**, re-measured not
+> quoted). 803 + 13 = **816** = `$ExpectedOfflineTotal` = what Windows CI enforces.
+
+```bash
+cd careerseeker && git checkout 14469ad && dotnet build CareerSeeker.sln -c Release
+for h in Slice EngineHarness ResearcherHarness HookHarness StoreParityHarness \
+         GatewayGateHarness DispatcherNoSendHarness LifecycleHarness RendererHarness SyncHarness; do
+  printf '%-26s ' "$h"
+  dotnet run --project tests/$h/$h.csproj -c Release --no-build | grep -E '^=== [0-9]+ passed'
+done
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1
+grep -n 'IsWindows' tests/EngineHarness/Program.cs
+```
+
+*Expected:* `28 217 57 16 28 36 35 45 6 335`, every line `0 failed`, build `0 Warning(s) 0
+Error(s)`, `$ExpectedOfflineTotal = 816`, and the two platform gates at `Program.cs:231` (6 skips)
+and `:2506` (7 skips). **The 13 is read from the source, not measured — the Windows gate is what
+settles `EngineHarness = 230`.**
+
+### C-221-5 — the guard fires on the real defect, and it was validated as installed
+
+> **Claim.** `Assert-HarnessTableSumsToTotal` (PR #60, `e3e8848`) was exercised against the
+> function **lifted out of `Verify-Alpha.ps1`'s own AST**, not a copy: the script parses clean
+> (0 errors, 5039 tokens); the guard passes on the three repaired tables; it **fires on all three**
+> when SyncHarness is regressed to 134 — the real corruption, not a planted one; it fires on a doc
+> with no Total row; it tolerates alignment padding; and every pre-existing `Assert-Contains`
+> literal still holds.
+
+```bash
+# pwsh 7.4.6, Linux; see C-221-6 for how to get it
+cd careerseeker && git checkout claude/harness-count-drift
+pwsh -NoLogo -Command '
+  $e=$null; $t=$null
+  $ast=[System.Management.Automation.Language.Parser]::ParseFile("scripts/Verify-Alpha.ps1",[ref]$t,[ref]$e)
+  "syntax errors: " + $e.Count
+  $fn=$ast.Find({$args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                 $args[0].Name -eq "Assert-HarnessTableSumsToTotal"},$true)
+  Invoke-Expression $fn.Extent.Text
+  foreach($d in "README.md","src/Engine/README.md","docs/CareerSeeker-Project-Summary.md"){
+    $c=Get-Content -LiteralPath $d -Raw
+    Assert-HarnessTableSumsToTotal $c $d; "PASS  $d"
+    try { Assert-HarnessTableSumsToTotal $c.Replace("| SyncHarness | 335 |","| SyncHarness | 134 |") $d
+          "MISS  $d" } catch { "FIRES $d" }
+  }'
+```
+
+*Expected:* `syntax errors: 0`, then `PASS` and `FIRES` for each of the three docs. **A `MISS` line
+means the guard has stopped measuring what it claims to; do not treat it as passing.**
+
+### C-221-6 — `dotnet ABSENT` and `pwsh ABSENT` mean not preinstalled, not unobtainable
+
+> **Claim.** The .NET CDN is egress-denied here (**403 CONNECT**, B-7's neighbourhood) but
+> `packages.microsoft.com` answers **200** and the apt route installs **dotnet-sdk-8.0 (8.0.131)`**.
+> PowerShell **7.4.6** installs from the PowerShell GitHub release tarball. With them, the **ten
+> offline harnesses run here** (C-221-4) — which is how a 201-assertion error survived 220 firings
+> that read `run-zero.sh` §5 as *nothing is measurable*. `Verify-Alpha.ps1` itself remains
+> unreachable: it needs **Windows**.
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.404/dotnet-sdk-8.0.404-linux-x64.tar.gz
+curl -sS -o /dev/null -w '%{http_code}\n' https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb
+# then, if the second is 200:
+curl -sSL -o /tmp/ms.deb https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb
+dpkg -i /tmp/ms.deb && apt-get update -qq && apt-get install -y dotnet-sdk-8.0 && dotnet --version
+cd careerseeker-android && ./scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 5\./,/^== 6\./p'
+```
+
+*Expected:* the CDN `curl` fails `CONNECT tunnel failed, response 403` (prints `000`);
+`packages.microsoft.com` prints `200`; `dotnet --version` prints `8.0.131`; and §5 now carries the
+INSTALLABLE note. **If the first URL starts returning 200, the egress policy changed — record it,
+because B-7 is scoped on that denial.**
+
+### C-221-7 — the assigned S5 slice, re-verified in the product for the 179th time
+
+> **Claim.** All four asks are on `origin/main` `14469ad`, read first-person this firing, not
+> quoted from these records: `8575539`, `22b028e`, `7328a0b` are each ancestors of `origin/main`;
+> §4.3.3 gives `{product_id, acknowledged_at, order_id?}`; §3.1's cap is *"measured on the
+> ciphertext"*; §3 reports structural rejection as `decrypt_failed`; `invalid-unknown-field.json`
+> is in the corpus, which checks 30/30 against the generator.
+
+```bash
+cd careerseeker && git fetch --all --prune
+for c in 8575539 22b028e 7328a0b; do git merge-base --is-ancestor $c origin/main && echo "$c on main"; done
+git show origin/main:docs/Sync-Protocol.md | grep -n 'Entitlement acknowledgement body\|measured on the ciphertext\|structural rejection'
+git show origin/main:docs/sync-vectors/v1/invalid-unknown-field.json | head -3
+node docs/sync-vectors/generate.mjs --check
+```
+
+*Expected:* three `on main` lines, the three protocol phrases, the vector, and
+`OK: 30 vector files match the generator.` **This slice is built and landed. A prompt that assigns
+it is describing a state that ended on 2026-08-09.**

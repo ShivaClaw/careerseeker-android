@@ -5893,3 +5893,71 @@ A visibility assertion could be added to `run-zero.sh` — but it needs the GitH
 script deliberately cannot reach (its §6 MANUAL limit), so it would have to be a session-level check
 rather than a shell one. **Not written this run**, because the right shape depends on the owner's
 answer above: if the repo is meant to be public, the check asserts the opposite.
+
+---
+
+## B-30 — PR #60's fix is complete and cannot be proven: the gate that would confirm it is Windows-only (run 221, 2026-09-14)
+
+**Filed 2026-09-14, run 221. A GATE dependency, not a defect** — the change is made, validated as
+far as this environment permits, and parked in draft because the last check needs a machine this
+session does not have.
+
+### Symptom
+
+`ShivaClaw/careerseeker` **PR #60** (`claude/harness-count-drift`, commits `0081665`, `e3e8848`)
+corrects a **201-assertion** error in three audit-facing documents and closes the blind spot that
+let it survive (**C-221-1**, **C-221-2**, **C-221-3**). It is **DRAFT** and must stay draft: the
+main-repo merge policy is conditional on a full local gate —
+`scripts\Verify-Alpha.ps1 -IncludePublish -IncludePackage` — and that script needs **Windows**
+(DPAPI, MSIX, publish). It was **not run**, and nothing in the PR claims it was.
+
+Two specific things the Windows gate settles and this session could not:
+
+1. **`EngineHarness = 230` is the one number in the corrected table that was not measured.** It is
+   **217 measured on Linux plus 13 skips read from the source** — 6 full-data-deletion and 7 DPAPI
+   vault assertions (`tests/EngineHarness/Program.cs:231`, `:2506`; **B-10**, **C-221-4**). If those
+   two blocks do not hold exactly 6 and 7, **816 decomposes differently**. `SyncHarness = 335` was
+   measured directly and is unaffected either way, but the table would still not add up.
+2. **`Assert-HarnessTableSumsToTotal` has never executed inside a real `Verify-Alpha.ps1` run.** It
+   was parsed from the file's own AST and exercised standalone under pwsh 7.4.6 on Linux — passing
+   on the repaired tables, firing on all three regressed ones, firing on a table-less document
+   (**C-221-5**). That is genuine evidence and it is **not** the same as the gate. **This is the
+   largest risk in the PR**, and it is named in the PR's own self-audit.
+
+### Attempts
+
+- **Installed the .NET 8 SDK and measured what could be measured.** Ten harnesses, **803 passed,
+  0 failed**, build **0 warnings / 0 errors** (**C-221-4**, **C-221-6**). This is what turned run
+  202's *stated-not-pushed* fix into a pushed one.
+- **Installed PowerShell 7.4.6 and validated the guard as installed**, not as a copy (**C-221-5**).
+- **Tried the .NET CDN first and stopped at two attempts.** `dot.net` and
+  `builds.dotnet.microsoft.com` are **403 CONNECT-denied**; `packages.microsoft.com` is **200** and
+  is the route that worked (**C-221-6**).
+- **Did not merge, and did not undraft.** The policy's condition is unmet; a session that cannot
+  run the gate is not the one to decide the gate is unnecessary.
+- **Did not widen the guard.** `docs/Injection-Rate-Report-2026-08.md` also carries a `**Total**`
+  row and was deliberately left alone — it is not a harness table, and sweeping every table in the
+  repo has its own false-positive surface.
+
+### Smallest human unblock
+
+**One command on the Windows machine, in the `careerseeker` checkout:**
+
+```powershell
+git fetch origin && git checkout claude/harness-count-drift
+scripts\Verify-Alpha.ps1
+```
+
+**Green** → `EngineHarness` really is 230, the guard runs clean in the gate, and PR #60 can be
+undrafted and merged per the main-repo policy. **Red** → the failure text names which of the two
+open questions above is the problem, and it belongs in this entry.
+
+`-IncludePublish -IncludePackage` are wanted before merge per CLAUDE.md's higher-signal pass, but
+the plain run is what answers B-30.
+
+### What is NOT blocked by this
+
+The **finding** stands on its own and needs no gate: the rows summed to 615 against a Total of 816
+in three shipped documents, and the verifier asserted the stale row and the correct total side by
+side. That is arithmetic, reproducible in this sandbox, and true at `14469ad` today (**C-221-2**,
+**C-221-3**). Only the **fix's confirmation** is blocked.

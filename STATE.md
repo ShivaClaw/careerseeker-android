@@ -30,10 +30,15 @@
 >
 > ## 📣 ESCALATION LEDGER — the canonical count, updated on send. Read this block; do not count markers. Brought current at run 168 (2026-09-06).
 >
-> **Messages sent: 16.** Runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112, 138, 168, 198, 200-202,
-> 203**. **Run 203's send is the first whose subject is NOT this routine's own liveness** — it carries
-> the repository-visibility finding (**C-203-1**), and it is the first send with a concrete,
+> **Messages sent: 17.** Runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112, 138, 168, 198, 200-202,
+> 203, 221**. **Run 203's send is the first whose subject is NOT this routine's own liveness** — it
+> carries the repository-visibility finding (**C-203-1**), and it is the first send with a concrete,
 > one-command owner action attached.
+>
+> **Run 221 sent the seventeenth, on a positive finding and not the calendar arm** (which was not due
+> until 2026-09-16): a **201-assertion** error in three audit-facing documents that the drift trap had
+> been **confirming** rather than catching, unfixed for eighteen firings, now fixed on **draft PR
+> #60** — with a one-command owner action, the Windows gate (**B-30**, **C-221-1** … **C-221-5**).
 >
 > **The "zero repo events have followed any of them" clause is RETIRED at run 203.** It was true for
 > thirteen sends and is now false twice over: the owner landed the S-series on 2026-09-10/11 (18 open
@@ -56,6 +61,51 @@
 > thirteenth **2026-09-06T01:00:03Z**, elapsed **5d 0h 0m 03s**. **The next calendar arm is on or
 > after 2026-09-11.** **B-18's smallest human unblock is unchanged: a human stops or repoints the
 > schedule.**
+>
+> ## 🔴 RUN 221 — 2026-09-14. **Three shipped documents said the offline verifier is 615 assertions. It is 816. The row that was wrong — SyncHarness, 134 against a measured 335 — was pinned by `Verify-Alpha.ps1` itself, so the drift trap was confirming the error for 220 firings.**
+>
+> **Heartbeat:** 2026-09-14, **two hundred and twenty-first** cloud iteration (Linux sandbox). Both
+> checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+> before any write: tip **COMPLETE**, **files claimed: none** → **no collision**, Terra keeps
+> right-of-way. `run-zero.sh` → **`NOTHING MOVED`, exit 0**, four guards green; mains
+> `14469ad`/`ebfaf81`, corpus **30/30** at pin `11bb1f5`, board **2 + 6 open, all draft**. The
+> assigned S5 spec half is **on `main`** and was re-verified first-person — **declined, the 179th
+> time** (**C-221-7**).
+>
+> **1. The inherited limit was wrong, and that is why this sat for 220 firings (C-221-6).**
+> `run-zero.sh` §5 prints `dotnet ABSENT` above *"No gate is reachable from here"*, and the two have
+> been read together as *nothing here is measurable*. §6 already warns about exactly this, about
+> `gh`. **`dot.net` and `builds.dotnet.microsoft.com` are 403 CONNECT-denied — but
+> `packages.microsoft.com` answers 200**, and installs **dotnet-sdk-8.0 (8.0.131)**. PowerShell
+> **7.4.6** installs from the GitHub release tarball. §5 now says so, with the commands.
+>
+> **2. Measured, all ten harnesses (C-221-4).** `28 / 217 / 57 / 16 / 28 / 36 / 35 / 45 / 6 / 335`,
+> **803 passed, 0 failed**; build **0 warnings / 0 errors**. `EngineHarness` 217-not-230 is **B-10**,
+> re-measured not quoted: 6 + 7 Windows-only skips. **803 + 13 = 816 = `$ExpectedOfflineTotal`**.
+>
+> **3. The defect (C-221-1, C-221-2).** `SyncHarness` is **335**; `README.md`, `src/Engine/README.md`
+> and `docs/CareerSeeker-Project-Summary.md` each said **134**. In all three, **the rows summed to
+> 615 while the table's own Total row said 816**, and the Summary's prose reported the row-sum —
+> *"the pinned offline verifier is 615 passed"* — three lines above its own `816`.
+>
+> **4. Why nothing caught it (C-221-3).** `Verify-Alpha.ps1` asserted `'| SyncHarness | 134 |'` **and**
+> `'| **Total** | **816** |'` against the same file, lines 671/700/705. **Both were true.** Doc and
+> verifier quoted each other, so only the Total was ever really pinned. **A literal assertion cannot
+> catch an internal contradiction, because it never adds anything up.** Run 202 saw this and could
+> not fix it — no `pwsh`, no measured count. Eighteen firings later, this run had both.
+>
+> **5. Fixed and guarded, on DRAFT PR #60 (C-221-5).** `0081665` moves the three docs, the prose and
+> the three verifier literals as **one unit** (CLAUDE.md's rule). `e3e8848` adds
+> `Assert-HarnessTableSumsToTotal`: the table must prove its own arithmetic — structural, padding-
+> tolerant, and it throws rather than silently checking nothing. Validated under pwsh against the
+> function **lifted from the file's own AST**: parses clean, passes repaired, **fires on all three
+> regressed** — the real corruption, not a planted one. `$ExpectedOfflineTotal` **unchanged at 816**;
+> no assertion added or removed, so **no drift-trap sweep was owed**.
+>
+> **6. What is NOT proven, and it is in the PR's own self-audit (B-30).** The full gate is **Windows-
+> only and did not run**. **`EngineHarness = 230` is the one number not measured** — 217 plus 13 read
+> from source. The guard has **never executed inside a real `Verify-Alpha.ps1` run**. PR #60 stays
+> **draft**. Smallest unblock: `scripts\Verify-Alpha.ps1` on the branch, on Windows.
 >
 > ## ▶ RUN 204 — 2026-09-11. **`run-zero.sh` — the one command every firing trusts — was failing on two signals that were already spent, and had no guard for the corruption that actually happened. Repaired. And the owner's 16-PR sweep is proven to have lost nothing.**
 >

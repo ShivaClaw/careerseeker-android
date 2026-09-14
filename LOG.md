@@ -20097,3 +20097,179 @@ executable assertion. Making it executable needs the GitHub API from bash, which
 deliberately cannot reach — and **its correct direction depends on B-29's answer**, which has not
 come. Building it now would hard-code a guess about what the owner intends. Stated so the next
 session can take it *after* the decision, not before.
+
+---
+
+# RUN 221 — 2026-09-14. **`dotnet ABSENT` was read as "nothing measurable" for many firings. It meant "not preinstalled." Installing it measured a 201-assertion error in three published docs that the drift trap had been confirming.**
+
+**Heartbeat:** 2026-09-14, **two hundred and twenty-first** cloud iteration (Linux sandbox). Both
+checkouts `git fetch --all --prune`d **before any count** (rule one); every number below is
+post-fetch. `autonomy/codex-state` read before any write: tip **COMPLETE**, *"the ladder is
+exhausted"*, **files claimed: none** → **no collision**, Terra keeps right-of-way.
+
+`scripts/run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**, four guards green. Engine
+`main` `14469ad`, android `main` `ebfaf81`, corpus **30/30** byte-identical to pin `11bb1f5`,
+citations `1096/1097/2`, plan `ROT 6/6` (the expected spent state), no conflict markers. Board
+re-queried: engine **2 open** (#58, #26), android **6 open**, **all draft** — the recorded
+baseline exactly. The assigned S5 spec half is **on `main`** and was re-verified first-person, in
+the product, this firing: `8575539`, `22b028e`, `7328a0b` each report `on main (expected)`;
+§4.3.3 *"Entitlement acknowledgement body"* gives `{product_id, acknowledged_at, order_id?}`;
+§3.1's cap reads *"measured on the ciphertext"*; §3 reports structural rejection as
+`decrypt_failed`; `invalid-unknown-field.json` is in the corpus. **Declined again — the 179th
+numbered decline.**
+
+**So this firing began exactly like the previous twenty. What changed is one assumption nobody
+had tested.**
+
+## Milestone 1 — the probe's `ABSENT` lines were doing the same damage §6 warns about for `gh`
+
+`run-zero.sh` §6 already carries the lesson in writing: *"a probe that overstates what is out of
+reach costs as much as one that overstates what it checked."* It says so about `gh`, which run 99
+answered through the MCP server after three runs read `gh ABSENT` as unanswerable. §5 prints
+`dotnet ABSENT` and `pwsh ABSENT` immediately above *"No gate is reachable from here"*, and the
+two have been read together as *no engine verification is possible here*.
+
+**Measured, this firing (C-221-6).** `dot.net` and `builds.dotnet.microsoft.com` are **403
+CONNECT-denied** by the egress policy — B-7's neighbourhood, and that part of the inherited belief
+is true. But `packages.microsoft.com` answers **200**, and the apt route installs the SDK:
+
+```
+$ curl -sS -o /dev/null -w "%{http_code}" https://builds.dotnet.microsoft.com/...  -> 000 (403 CONNECT)
+$ curl -sS -o /dev/null -w "%{http_code}" https://packages.microsoft.com/...       -> 200
+$ dpkg -i packages-microsoft-prod.deb && apt-get install -y dotnet-sdk-8.0
+$ dotnet --version
+8.0.131
+```
+
+PowerShell **7.4.6** likewise installs from the PowerShell GitHub release tarball. It does **not**
+make `Verify-Alpha.ps1` runnable — that needs Windows — but it parses the script and executes
+individual assertions standalone.
+
+`dotnet build CareerSeeker.sln -c Release` → **Build succeeded, 0 Warning(s), 0 Error(s)** — the
+CLAUDE.md baseline, measured here, on Linux.
+
+## Milestone 2 — all ten offline harnesses, measured, and one row off by 201
+
+`dotnet run --project tests/<H>/<H>.csproj -c Release`, each harness, at engine `main` `14469ad`:
+
+| Harness | measured | the docs' table |
+|---|---:|---:|
+| Slice | 28 | 28 |
+| EngineHarness | 217 | 230 |
+| ResearcherHarness | 57 | 57 |
+| HookHarness | 16 | 16 |
+| StoreParityHarness | 28 | 28 |
+| GatewayGateHarness | 36 | 36 |
+| DispatcherNoSendHarness | 35 | 35 |
+| LifecycleHarness | 45 | 45 |
+| RendererHarness | 6 | 6 |
+| **SyncHarness** | **335** | **134** |
+
+**0 failed throughout.** `EngineHarness` is the known limit and explains itself: **6**
+full-data-deletion and **7** DPAPI vault assertions skip off Windows, announced in its own output
+(`tests/EngineHarness/Program.cs:231`, `:2506`). That is **B-10**, independently re-measured here
+rather than quoted — 217 + 13 = **230**, the documented value.
+
+Linux subtotal **803**; 803 + 13 = **816** = `$ExpectedOfflineTotal` = what CI enforces on
+`windows-latest` (run **34550381957**, `14469ad`, **success** — a gate result this session read but
+did **not** run).
+
+**SyncHarness is the one real error: 134 published, 335 measured, off by 201.**
+
+## Milestone 3 — the tables contradicted themselves, and the drift trap was confirming it
+
+The same harness table appears in `README.md`, `src/Engine/README.md` and
+`docs/CareerSeeker-Project-Summary.md`. **In all three, the rows summed to 615 while the table's
+own Total row said 816.** `docs/CareerSeeker-Project-Summary.md:47` printed the row-sum — the wrong
+number — in prose: *"The pinned offline verifier is **615 passed, 0 failed**"*, three lines above a
+Total row saying **816**.
+
+**Why 220 firings and every CI run missed it.** `Verify-Alpha.ps1` asserted
+`'| SyncHarness | 134 |'` **and** `'| **Total** | **816** |'` against the same document, at lines
+671, 700 and 705. **Both were true.** Doc and verifier agreed on the same wrong row, so the
+mechanism CLAUDE.md names as protecting these counts was *confirming* the error rather than
+catching it — and only the Total was ever really pinned. A literal assertion cannot catch an
+internal contradiction, because it never adds anything up.
+
+Run 202 saw this and recorded the fix as *stated, not pushed*, having no `pwsh` and no measured
+SyncHarness count of its own. **Eighteen firings later it was still unfixed.** This run had both.
+
+## Milestone 4 — fixed, and the blind spot closed, on a draft PR
+
+`ShivaClaw/careerseeker` **PR #60**, branch `claude/harness-count-drift`, base `main`, **DRAFT**,
+two commits:
+
+1. `0081665` — `SyncHarness 134 → 335` in the three docs, the prose `615 → 816`, and the three
+   `Verify-Alpha.ps1` literals that pinned the stale row. **One commit**, per CLAUDE.md's *"doc
+   content and verifier expectations are one unit that changes together."*
+2. `e3e8848` — `Assert-HarnessTableSumsToTotal`: the table must now prove its own arithmetic.
+   Structural, not literal — bold and alignment padding are stripped, so a linter re-padding the
+   columns cannot break it, and a row whose number legitimately moves only has to be *correct*
+   rather than match a pinned string. It throws when it finds no table, so it cannot silently
+   check nothing if the table is renamed.
+
+`$ExpectedOfflineTotal` is **unchanged at 816** — no assertion was added or removed, and it
+accumulates harness output, not this script's own `Assert-Contains` calls. **No drift-trap sweep
+was owed and none was performed.**
+
+**Validated with pwsh 7.4.6, against the function lifted out of `Verify-Alpha.ps1`'s own AST —
+not a copy of it:** the script parses clean (0 syntax errors, 5039 tokens); the guard passes on
+all three repaired tables; it **fires on all three** when SyncHarness is regressed to 134 — the
+real defect, not a planted one; it fires on a document with no Total row; it tolerates alignment
+padding; and every pre-existing `Assert-Contains` literal in the three docs still holds.
+`node docs/sync-vectors/generate.mjs --check` → `OK: 30 vector files match the generator.`
+
+**`docs/P1-Evidence.md` and `docs/P2-Evidence.md` keep their older SyncHarness numbers** — they are
+point-in-time capture records and say so in their own text. Changing them would have falsified a
+history, not fixed a count.
+
+## Milestone 5 — the probe amended, so the next firing does not re-derive the limit
+
+`scripts/run-zero.sh` §5 now states that `dotnet ABSENT` and `pwsh ABSENT` mean **not
+preinstalled**, carries the exact install commands, records that the .NET CDN is 403 while
+`packages.microsoft.com` is 200, and says what remains genuinely out of reach: **Windows** (DPAPI,
+MSIX, publish) and the **android SDK** (B-7, B-4). Same shape as §6's `gh` correction, for the
+same reason.
+
+## Milestone 6 — the escalation: SENT, on a real finding
+
+The predicate is a positive state trigger or five calendar days. The calendar arm is **not** due
+(esc 16 went 2026-09-11; next arm on or after 2026-09-16). **This sends on the finding**: a
+201-assertion error in three published, audit-facing documents, unfixed for eighteen firings,
+which the verifier was actively confirming — and a concrete owner action, the Windows gate on
+PR #60. **Ledger 16 → 17.**
+
+## Boundary — what this run did NOT touch
+
+**The full gate did not run and is claimed nowhere.** `scripts\Verify-Alpha.ps1` needs Windows;
+this was Linux. `-IncludeLive`, `-IncludePackage`, `-IncludeResearch` and `-IncludePublish` were
+**not** exercised. **`EngineHarness = 230` is the one number in PR #60 I did not measure** — it is
+217 measured plus 13 skips read from the source, and it is labelled that way in the PR. The
+five-task android command did **not** run; `:core:test` was **not** run; no android green is
+restated as mine. CI run `34550381957` was **read, not run**.
+
+**No pin moved. No vector byte, no `index.json`, no `generate.mjs`, no `Sync-Protocol.md`, no
+`ci.yml`, no Kotlin, no C#, no Gradle file, no `.csproj`.** The vendored corpus remains
+byte-identical to pin `11bb1f5`, **30/30** — **no cross-repo drift event.** No C# or Kotlin
+applier was written; those still need a compiler-and-device session. `$ExpectedOfflineTotal` was
+**not** changed.
+
+**Nothing was merged, closed, undrafted, reopened, force-pushed or deleted; no branch removed; no
+history rewritten.** PR #60 is **draft** and stays draft — the main-repo merge policy is
+conditional on a full local gate this session cannot run, so it was not exercised. **No repository
+setting was changed** — not visibility, not description, on any repo; **B-29 was not acted on**,
+and `careerseeker-ios` was **not queried at all**, being outside this session's repository scope.
+**No deploy of any kind** — Cloudflare, Workers, relay or site. **The relay was not contacted**,
+not even `GET /v1/health`. No Play, Google or OAuth console; no accounts, no purchases, no Gmail,
+no keystore, no emulator, no `sdkmanager`. **No secret was read, printed or echoed.** Terra's
+territory (`autonomy/codex-state`, the beta worktrees) was **read, never written**.
+
+**Machine change, logged as the mission requires:** `dotnet-sdk-8.0` (8.0.131) via
+`packages.microsoft.com`, and PowerShell 7.4.6 into `/opt/pwsh`, both in an **ephemeral container**
+that is discarded with this session. Neither touched either repository's tracked tree.
+
+**One thing recommended and deliberately not done.** The guard is applied to three documents by
+name. `docs/Injection-Rate-Report-2026-08.md` also has a `**Total**` row and was **left alone** —
+it is not a harness table, and widening the guard to sweep every table in the repo is a bigger
+change than this slice, with its own false-positive surface. Stated so the next session can weigh
+it deliberately rather than discover it.
