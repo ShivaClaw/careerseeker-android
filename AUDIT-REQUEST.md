@@ -22251,3 +22251,29 @@ step *"Run offline alpha verification"* success, and the two summary lines above
 green step is proof the guard RAN, not that it was skipped: the guard throws when it finds no table.**
 *Also check* `grep -n 'windows-latest\|Verify-Alpha' .github/workflows/ci.yml` — if CI ever stops
 running the gate, this claim's basis is gone and B-30 reopens in full.
+
+### C-221-9 — every harness row read off the Windows CI log, EngineHarness included
+
+> **Claim.** Job **103865275940** (`windows-latest`, head `e3e8848`) prints a summary line per
+> harness: **EngineHarness 230**, ResearcherHarness 57, HookHarness 16, StoreParityHarness 28,
+> GatewayGateHarness 36, DispatcherNoSendHarness 35, LifecycleHarness 45, RendererHarness 6,
+> **SyncHarness 335**, and `Offline total: 816 passed, 0 failed`. **`EngineHarness = 230` is now
+> read, not derived** — closing the last measurable item in **B-30** and item 1 of PR #60's
+> self-audit. 230 − 217 (Linux, **C-221-4**) = **13** = B-10's 6 + 7 skips, confirmed from both sides.
+> **`Slice = 28` is the one row still arithmetic** (816 − 788); it measured 28 on Linux.
+
+```
+get_job_logs owner=ShivaClaw repo=careerseeker job_id=103865275940 \
+             return_content=true tail_lines=760
+# the response exceeds the inline limit and is saved to a file; then:
+python3 -c "
+import sys,re
+s=open(PATH,encoding='utf-8',errors='replace').read().replace('\\\\r\\\\n','\n')
+for l in s.split('\n'):
+    l=re.sub(r'^\d{4}-\d\d-\d\dT\S+Z\s*','',l)
+    if re.match(r'^\s*=== \d+ passed',l) or 'Offline harness' in l or 'Offline total' in l:
+        print(l.strip())"
+```
+
+*Expected:* the ten summary lines above and the 816 total. **Do not re-run the workflow to get
+them** — the log of the completed run is the evidence, and re-running would replace it.

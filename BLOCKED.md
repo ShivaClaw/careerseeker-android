@@ -5993,3 +5993,16 @@ session is forbidden to merge in either repo and did not.
 **A caution for whoever reads this next.** The gate ran **on a runner**, not in this session. Every
 number in **C-221-4** is still this session's own Linux measurement, and every number in **C-221-8**
 is read from a log. Do not let the two merge into a claim that this firing gated anything.
+
+### B-30 NARROWED AGAIN — same firing, after reading the full CI log
+
+The *"still open"* item above — `EngineHarness = 230` being arithmetic rather than a line anyone read
+— is **closed** (**C-221-9**). Job `103865275940`'s log prints `=== 230 passed, 0 failed ===` for
+`EngineHarness` on `windows-latest`, and 230 − 217 measured here = **13** = B-10's 6 + 7 skips,
+confirmed from both platforms. **`Slice = 28` is the one row still arithmetic** (816 − 788), and it
+measured 28 on Linux.
+
+**B-30 now contains nothing this session could have measured and did not.** What is left is:
+`-IncludePublish` and `-IncludePackage`, which have run nowhere, and **the merge decision, which is
+the owner's**. Smallest human unblock, final form:
+`scripts\Verify-Alpha.ps1 -IncludePublish -IncludePackage` on Windows, then merge or don't.

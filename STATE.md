@@ -109,8 +109,11 @@
 > `=== 335 passed, 0 failed ===` and **`=== Offline total: 816 passed, 0 failed ===`** (**C-221-8**).
 > **So the guard HAS executed inside a real `Verify-Alpha.ps1` invocation, on Windows, and passed** —
 > the PR's self-declared largest risk, closed. **Still open and smaller than first filed:**
-> `EngineHarness = 230` is arithmetic, not a line anyone read (one full job-log read closes it), and
-> `-IncludePublish` / `-IncludePackage` have run nowhere. **CI ran the gate; this session did not —
+> `-IncludePublish` / `-IncludePackage` have run nowhere. **`EngineHarness = 230` was arithmetic and
+> is now READ** — the same firing pulled job `103865275940`'s full log: `=== 230 passed, 0 failed ===`
+> on `windows-latest`, and 230 - 217 measured here = **13** = B-10's 6 + 7 skips, confirmed from both
+> platforms (**C-221-9**). `Slice = 28` is the one row still arithmetic. **B-30 now holds nothing this
+> session could have measured and did not.** **CI ran the gate; this session did not —
 > do not let those merge.** PR #60 stays **draft**; merging is forbidden here and is the owner's call.
 >
 > ## ▶ RUN 204 — 2026-09-11. **`run-zero.sh` — the one command every firing trusts — was failing on two signals that were already spent, and had no guard for the corruption that actually happened. Repaired. And the owner's 16-PR sweep is proven to have lost nothing.**

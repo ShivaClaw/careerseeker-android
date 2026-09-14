@@ -20317,3 +20317,29 @@ the strength of this green.**
 
 **Boundary, unchanged from the entry above**, plus: the CI logs were **read via the GitHub API, never
 re-run** — no workflow was dispatched, re-run or cancelled by this session.
+
+## Milestone 8 — the last unmeasured number, read (same firing)
+
+Milestone 7 left **one** thing open and said exactly how to close it: *"one full read of job
+`103865275940`'s log"*. Done, rather than left for someone else (**C-221-9**). Every harness summary
+line from that Windows run:
+
+```
+=== 230 passed, 0 failed ===   (EngineHarness)
+=== 57 ===  ResearcherHarness      === 16 ===  HookHarness
+=== 28 ===  StoreParityHarness     === 36 ===  GatewayGateHarness
+=== 35 ===  DispatcherNoSendHarness === 45 === LifecycleHarness
+=== 6  ===  RendererHarness        === 335 === SyncHarness
+=== Offline total: 816 passed, 0 failed ===
+```
+
+**`EngineHarness` is 230 on Windows — read, not derived.** That was the one number in PR #60 this
+run had only by arithmetic, and it is now the only kind of evidence this program accepts. It also
+confirms **B-10** from the other side: 230 Windows − 217 Linux = **13**, the 6 + 7 platform skips.
+
+`Slice` is the one row above the log tail I pulled; **816 − 788 = 28**, matching the 28 measured here
+on Linux. **That row is arithmetic and is labelled so** — it is the only one left that is.
+
+**B-30 now has nothing measurable left in it**: what remains is `-IncludePublish` /
+`-IncludePackage`, which have run nowhere, and the merge decision, which is the owner's. **Still not
+merged, not undrafted, and no workflow was re-run or dispatched by this session.**
