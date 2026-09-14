@@ -5961,3 +5961,35 @@ The **finding** stands on its own and needs no gate: the rows summed to 615 agai
 in three shipped documents, and the verifier asserted the stale row and the correct total side by
 side. That is arithmetic, reproducible in this sandbox, and true at `14469ad` today (**C-221-2**,
 **C-221-3**). Only the **fix's confirmation** is blocked.
+
+### B-30 NARROWED — same firing (run 221), after CI ran
+
+**The entry above was filed too pessimistically and is corrected here rather than rewritten**, so the
+mistake stays visible. `.github/workflows/ci.yml` runs `build-and-test` on **`windows-latest`** with
+`run: ./scripts/Verify-Alpha.ps1`. Pushing the branch **ran the gate**. Run **34808598457**, job
+**103865275940**, head `e3e8848`: all steps **success**, log carrying
+`=== 335 passed, 0 failed ===` and **`=== Offline total: 816 passed, 0 failed ===`** (**C-221-8**).
+
+**Closed by that run:**
+
+- **`Assert-HarnessTableSumsToTotal` has executed inside a real `Verify-Alpha.ps1` invocation, on
+  Windows, and passed.** Symptom 2 above — named as the PR's largest risk — is **resolved**. The
+  guard throws when it finds no table, so green means it ran, not that it was skipped.
+- **`$ExpectedOfflineTotal = 816` held against a real Windows measurement** with SyncHarness at 335.
+
+**Still open, and it is smaller than the entry above claims:**
+
+- **`EngineHarness = 230` remains arithmetic, not a line anyone read.** 816 Windows total minus 335
+  SyncHarness minus the 586 the other eight measured here. The log tail pulled this firing does not
+  reach EngineHarness's own summary. **Anyone can close this in one read** — pull the full job log
+  for **103865275940** and find its `=== N passed` line. It was not done here and is not claimed.
+- **`-IncludePublish` and `-IncludePackage` have not run**, on CI or locally. CI runs the plain gate;
+  the main-repo merge policy wants the flagged local pass. That is the remaining merge condition.
+
+**Smallest human unblock, revised.** Not *"run the gate"* — CI already did. It is: **decide whether
+to merge PR #60**, after `scripts\Verify-Alpha.ps1 -IncludePublish -IncludePackage` on Windows. This
+session is forbidden to merge in either repo and did not.
+
+**A caution for whoever reads this next.** The gate ran **on a runner**, not in this session. Every
+number in **C-221-4** is still this session's own Linux measurement, and every number in **C-221-8**
+is read from a log. Do not let the two merge into a claim that this firing gated anything.

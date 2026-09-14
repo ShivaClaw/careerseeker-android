@@ -102,10 +102,16 @@
 > regressed** — the real corruption, not a planted one. `$ExpectedOfflineTotal` **unchanged at 816**;
 > no assertion added or removed, so **no drift-trap sweep was owed**.
 >
-> **6. What is NOT proven, and it is in the PR's own self-audit (B-30).** The full gate is **Windows-
-> only and did not run**. **`EngineHarness = 230` is the one number not measured** — 217 plus 13 read
-> from source. The guard has **never executed inside a real `Verify-Alpha.ps1` run**. PR #60 stays
-> **draft**. Smallest unblock: `scripts\Verify-Alpha.ps1` on the branch, on Windows.
+> **6. What is NOT proven (B-30) — AND THE CORRECTION THAT FOLLOWED IT, same firing.** B-30 was filed
+> saying the confirming gate is Windows-only and did not run. **True of this session, false of the
+> change:** `ci.yml`'s `build-and-test` runs on **`windows-latest`** with `./scripts/Verify-Alpha.ps1`,
+> so the push ran it. Run **34808598457**, head `e3e8848`, **all steps success**, log reading
+> `=== 335 passed, 0 failed ===` and **`=== Offline total: 816 passed, 0 failed ===`** (**C-221-8**).
+> **So the guard HAS executed inside a real `Verify-Alpha.ps1` invocation, on Windows, and passed** —
+> the PR's self-declared largest risk, closed. **Still open and smaller than first filed:**
+> `EngineHarness = 230` is arithmetic, not a line anyone read (one full job-log read closes it), and
+> `-IncludePublish` / `-IncludePackage` have run nowhere. **CI ran the gate; this session did not —
+> do not let those merge.** PR #60 stays **draft**; merging is forbidden here and is the owner's call.
 >
 > ## ▶ RUN 204 — 2026-09-11. **`run-zero.sh` — the one command every firing trusts — was failing on two signals that were already spent, and had no guard for the corruption that actually happened. Repaired. And the owner's 16-PR sweep is proven to have lost nothing.**
 >

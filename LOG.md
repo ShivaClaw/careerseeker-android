@@ -20273,3 +20273,47 @@ name. `docs/Injection-Rate-Report-2026-08.md` also has a `**Total**` row and was
 it is not a harness table, and widening the guard to sweep every table in the repo is a bigger
 change than this slice, with its own false-positive surface. Stated so the next session can weigh
 it deliberately rather than discover it.
+
+## Milestone 7 — CORRECTION, same firing: the Windows gate DID run, and B-30 was filed too pessimistically
+
+**Written after milestones 1-6 and after PR #60 was opened.** Milestone 6 and **B-30** as first filed
+say the confirming gate is Windows-only and did not run. **That was true of this session and false of
+the change.** `.github/workflows/ci.yml` runs `build-and-test` on **`windows-latest`** and its step 6
+is `shell: pwsh` / `run: ./scripts/Verify-Alpha.ps1`. Pushing the branch ran it.
+
+**Read from the job log, not inferred (C-221-8).** Run **34808598457**, job **103865275940**,
+`windows-latest`, head `e3e8848` — **all six steps success**, including *"Build Release with warnings
+as errors"* and *"Run offline alpha verification"*:
+
+```
+=== 335 passed, 0 failed ===
+=== Offline total: 816 passed, 0 failed ===
+CareerSeeker alpha verification complete.
+```
+
+The relay job passed too, `node docs/sync-vectors/generate.mjs --check` included.
+
+**What that settles, and it is most of B-30:**
+
+- **`Assert-HarnessTableSumsToTotal` has now executed inside a real `Verify-Alpha.ps1` invocation, on
+  Windows, and passed** on all three repaired tables. That was named as the largest risk in PR #60's
+  self-audit. It is no longer open. The guard **throws** when it finds no table, so a green step is
+  proof it ran rather than proof it was skipped.
+- **`$ExpectedOfflineTotal = 816` held against a real Windows measurement** with SyncHarness at
+  **335** — the corrected number, measured twice now, on two platforms.
+- **`EngineHarness = 230` on Windows follows**: the Windows total is 816, SyncHarness contributed 335,
+  and the other eight harnesses measured 586 between them here. **This one is still arithmetic, not a
+  line I read** — the log tail I pulled does not reach EngineHarness's own summary, and I am not
+  calling it measured.
+
+**What is STILL not run, and PR #60 still says so.** CI runs the **plain** `Verify-Alpha.ps1`. The
+main-repo merge policy wants `-IncludePublish -IncludePackage` locally, and neither was exercised, nor
+`-IncludeLive` or `-IncludeResearch`. **And I did not run any of this** — CI did, on a runner. The
+distinction matters and it is why this is a correction to B-30's scope and not a claim that I gated it.
+
+**PR #60 stays DRAFT and unmerged regardless.** This session's standing instruction forbids merging in
+either repo, and the merge decision is the owner's. **Nothing was undrafted, merged or force-pushed on
+the strength of this green.**
+
+**Boundary, unchanged from the entry above**, plus: the CI logs were **read via the GitHub API, never
+re-run** — no workflow was dispatched, re-run or cancelled by this session.

@@ -22230,3 +22230,24 @@ node docs/sync-vectors/generate.mjs --check
 *Expected:* three `on main` lines, the three protocol phrases, the vector, and
 `OK: 30 vector files match the generator.` **This slice is built and landed. A prompt that assigns
 it is describing a state that ended on 2026-08-09.**
+
+### C-221-8 — the Windows gate ran on PR #60's head, and reported 816
+
+> **Claim.** `.github/workflows/ci.yml`'s `build-and-test` job runs on **`windows-latest`** and
+> executes `./scripts/Verify-Alpha.ps1` under `pwsh`. On head `e3e8848` it reported
+> **`=== Offline total: 816 passed, 0 failed ===`** with **`SyncHarness === 335 passed, 0 failed`**,
+> all steps success. So `Assert-HarnessTableSumsToTotal` **has** executed inside a real
+> `Verify-Alpha.ps1` run, on Windows, and passed — retiring most of **B-30**. **CI ran it; this
+> session did not.** The flagged passes (`-IncludePublish`, `-IncludePackage`) remain unrun.
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker \
+             workflow_runs_filter={"branch":"claude/harness-count-drift"}
+get_job_logs  owner=ShivaClaw repo=careerseeker job_id=103865275940 return_content=true
+```
+
+*Expected:* run **34808598457** `conclusion: success`, job **103865275940** on `windows-latest`, the
+step *"Run offline alpha verification"* success, and the two summary lines above in its log. **A
+green step is proof the guard RAN, not that it was skipped: the guard throws when it finds no table.**
+*Also check* `grep -n 'windows-latest\|Verify-Alpha' .github/workflows/ci.yml` — if CI ever stops
+running the gate, this claim's basis is gone and B-30 reopens in full.
