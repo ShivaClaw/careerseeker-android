@@ -6011,6 +6011,14 @@ the owner's**. Smallest human unblock, final form:
 
 ## B-31 — The android gate stopped executing on 2026-09-14, and nothing in this program watches for that (run 226, 2026-09-15)
 
+> **STATUS, updated in the same firing: the GATE HALF IS CLOSED; the BLIND-SPOT HALF STAYS OPEN.**
+> Run **403** (`34916050850`), head `8c96e4f`, `ubuntu-latest` → **`success` in 4m28s**, with
+> **steps 1–13 all `success`** — the vendored sync-vector drift guard among them — and step 14
+> correctly `skipped` on B-25's `workflow_dispatch` condition (**C-226-11**). The fix is **proven,
+> not asserted**, and no human action is needed for it. **What remains open is the second half
+> below:** `run-zero.sh` still has no section that looks at a workflow run, so the next dead gate
+> would again be invisible to four firings in a row. That half is a decision, not a command.
+
 **Filed 2026-09-15, run 226.** Two things in one entry, because they are the same gap seen from
 both ends: a **broken gate** (fixed in this push, unproven until CI says so) and a **blind spot**
 that let it break unnoticed (open, and the more valuable half).

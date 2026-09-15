@@ -20532,3 +20532,42 @@ deploy of any kind.** The production relay was **not contacted at all**, not eve
 **No Play/Google/OAuth console, no accounts, no purchases, no Gmail, no secret read or printed**,
 no `.appdata`. **B-29 was not acted on** — the repository-visibility decision is the owner's, and
 this firing did not flip it.
+
+## Milestone 8 — CONFIRMED, same firing: the gate is green, and B-31's first half closes (C-226-11)
+
+Milestone 5 said this run would not claim the fix worked, and named the CI run on the push as the
+only evidence. **It ran. Run 403 (`34916050850`), head `8c96e4f`, `ubuntu-latest`: `success` in
+4m28s.** Step by step, against run 402's array in Milestone 2:
+
+| # | step | run 402 | **run 403** |
+|---|---|---|---|
+| 4 | Set up Android SDK | **FAILURE** (7s) | **success** (6s) |
+| 5 | Set up Gradle | skipped | success |
+| 6 | Assert every cited C-/B- id resolves | skipped | **success** |
+| 7 | Assert `:core` has no Android dependency | skipped | **success** |
+| 8 | **Assert vendored sync vectors match the pinned commit** | skipped | **success** |
+| 9 | Unit tests (`:core`) | skipped | **success** |
+| 10 | Unit tests (`:app`, Robolectric) | skipped | **success** |
+| 11 | Assemble debug APK | skipped | **success** |
+| 12 | Lint | skipped | **success** |
+| 13 | Assert no analytics or tracking SDKs ship | skipped | **success** |
+| 14 | Upload debug APK | skipped | `skipped` — **correct**, B-25's `workflow_dispatch` condition |
+
+**Step 8 is the one that matters most.** The vendored sync-vector drift guard — the only automated
+check anywhere comparing the phone's corpus against the engine's pinned copy — **executed and
+passed**. It had not run since 2026-09-14T21:02Z.
+
+**Step 14's `skipped` is the one skip that is correct**, and it is worth saying so explicitly so the
+next reader does not mistake it for a residue of B-31: it is gated on `github.event_name ==
+'workflow_dispatch'` by design (**B-25**), and this was a `push`. In run 402 it was skipped because
+the *job had died*; here it is skipped because its *condition is false*. Same word, opposite
+meanings — which is precisely the ambiguity B-31 warns about.
+
+**So the fix is proven, not asserted, and this is a gate result this session actually read.**
+Milestone 5's "NOT verified here" is now verified — by CI, on `ubuntu-latest`, with a real SDK, on
+this exact head. **B-31's gate half is CLOSED.** Its **blind-spot half stays OPEN**: `run-zero.sh`
+still has no section that looks at a workflow run, and that is a decision, not a command.
+
+**Self-audit item 2 is also answered.** The PR asked whether `platform-tools` alone would suffice
+for `assembleDebug` and `lintDebug`, since the platform and build-tools are auto-downloaded. **It
+does** — steps 11 and 12 both passed. That assumption is no longer an assumption.

@@ -22460,3 +22460,22 @@ cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/5
 
 *Expected:* the six ABSENT lines and `ANDROID_HOME UNSET`; and a run newer than 402 whose
 conclusion is the answer to B-31.
+
+### C-226-11 — the fix is confirmed by CI: run 403 green, every check executed
+
+> **Claim.** Run **403** (`34916050850`), head `8c96e4f`, `ubuntu-latest`, **`success` in 4m28s**.
+> Steps **1–13 all `success`** — including step 6 (citation guard), step 7 (`:core` Android-free),
+> **step 8 (vendored sync-vector drift guard)**, steps 9–10 (`:core:test`, `:app:test`), step 11
+> (`assembleDebug`), step 12 (`lintDebug`) and step 13 (tracker check). Step **14 is `skipped`, and
+> that is correct** — `if: github.event_name == 'workflow_dispatch'` (**B-25**), and this was a
+> `push`. Contrast run 402, where step 4 failed and 5–14 were skipped because the job had died.
+
+```bash
+# actions_list method=list_workflow_jobs owner=ShivaClaw repo=careerseeker-android \
+#   resource_id=34916050850
+# read the `steps` array: every entry 1-13 conclusion=success; 14 conclusion=skipped
+```
+
+*Expected:* `conclusion: success` on the run; step 4 `success`; steps 5–13 `success`; step 14
+`skipped`. **This closes B-31's gate half.** The blind-spot half — `run-zero.sh` cannot see CI —
+remains open by design.

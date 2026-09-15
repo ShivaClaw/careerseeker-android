@@ -39,8 +39,10 @@
 > calendar** (which was not due; the seventeenth went on 2026-09-14). The subject is **B-31**: the
 > android gate has not executed since 2026-09-14T21:02Z. It does not fail a check, it dies in the
 > toolchain step, and **all ten checks below it — the vendored-vector drift guard included — report
-> `skipped`** (**C-226-1** … **C-226-3**). Fixed in the same firing with one input; unproven until
-> CI speaks, which needs no human (**B-31**).
+> `skipped`** (**C-226-1** … **C-226-3**). Fixed in the same firing with one input, and **CONFIRMED
+> the same firing**: run 403 green, steps 1–13 all `success`, the drift guard executing again
+> (**C-226-11**). **B-31's gate half is closed; its blind-spot half — `run-zero.sh` cannot see CI —
+> stays open as a decision for the owner.**
 >
 > **Run 221 sent the seventeenth, on a positive finding and not the calendar arm** (which was not due
 > until 2026-09-16): a **201-assertion** error in three audit-facing documents that the drift trap had
@@ -107,12 +109,21 @@
 > still has **13 steps in the identical order**. Nothing here ever used `tools`. The change's whole
 > effect is that steps 5–14 **get to run again**.
 >
-> **6. What is NOT proven, and is not claimed (C-226-10, B-31).** This session **cannot run the
-> android gate** — **B-7 re-probed this firing and UNCHANGED**: `dl.google.com` and `api.foojay.io`
-> 403 CONNECT-denied, Maven Central 200 (**C-226-9**). Honoured, not routed around. The confirming
-> evidence is **the CI run on this push**, and it needs **no human**. What did run here: CI's own
-> step 6, the citation guard, green (**C-226-8**). **The workflow was deliberately NOT re-run** —
-> run 402's log is the evidence and re-running destroys it.
+> **6. What this session could NOT prove — and then CI proved it, same firing (C-226-11).** This
+> session **cannot run the android gate**: **B-7 re-probed and UNCHANGED**, `dl.google.com` and
+> `api.foojay.io` 403 CONNECT-denied, Maven Central 200 (**C-226-9**), honoured and not routed
+> around. So the fix was pushed **unproven and labelled so**. **Run 403 (`34916050850`), head
+> `8c96e4f`, `ubuntu-latest`: `success` in 4m28s, steps 1–13 ALL `success`** — the **vendored
+> sync-vector drift guard** among them, executing for the first time since 2026-09-14T21:02Z — with
+> step 14 correctly `skipped` on B-25's `workflow_dispatch` condition. **The gate is restored,
+> proven rather than asserted, and B-31's gate half is CLOSED.** **The workflow was deliberately NOT
+> re-run** — run 402's log is the evidence of the failure and re-running destroys it.
+>
+> **7. What stays OPEN, and it is the half worth the owner's attention.** `run-zero.sh` still has no
+> section that looks at a workflow run. The gate broke for an external reason, will break again for
+> another, and **four consecutive firings would again file "NOTHING MOVED" while pushing red**. That
+> is a decision (**B-31**), not a command, and this firing deliberately did not make it in the same
+> push as the repair it would have caught.
 >
 > ## 🔴 RUN 221 — 2026-09-14. **Three shipped documents said the offline verifier is 615 assertions. It is 816. The row that was wrong — SyncHarness, 134 against a measured 335 — was pinned by `Verify-Alpha.ps1` itself, so the drift trap was confirming the error for 220 firings.**
 >
