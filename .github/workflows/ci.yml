@@ -34,8 +34,36 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # B-31. `packages` is pinned here ONLY to drop one obsolete entry from the action's
+      # default, and the default is the whole bug: android-actions/setup-android@v3
+      # declares `packages` with default `'tools platform-tools'`, and installs the list
+      # one package at a time. `tools` -- the legacy SDK Tools package, deprecated since
+      # 2021 -- is no longer in Google's repository, so the first install now fails:
+      #
+      #   [command].../cmdline-tools/16.0/bin/sdkmanager tools
+      #   Warning: Failed to find package 'tools'
+      #   Error: The process '.../sdkmanager' failed with exit code 1
+      #
+      # `tools` is FIRST in that default, so the step died before `platform-tools` was
+      # ever attempted, and with it the whole job: run 402 failed here in 7 seconds and
+      # every step below -- all three assertion guards, :core:test, :app:test,
+      # assembleDebug, lint, the tracker check -- reported `skipped`. A green-to-red with
+      # no cause in the diff: firings 222-225 each changed exactly one line of FIRINGS.md
+      # and nothing else, and run 401 passed on 88cc151 at 17:01 while run 402 failed on
+      # d8ca4fe at 21:02 the same day. The trigger is outside this repository.
+      #
+      # THIS IS NOT A WEAKENED GATE, and the distinction matters because the failing step
+      # is a toolchain step: nothing below is touched, and no check is skipped, relaxed or
+      # removed. The opposite -- until this lands, EVERY check in this job is skipped,
+      # including the vendored-vector drift guard that is the only automated thing
+      # standing between the phone's corpus and the engine's. Dropping `tools` removes a
+      # package the build never used: no step here invokes `android`, `ddms` or `monitor`,
+      # and the platform and build-tools AGP needs are auto-downloaded under the licences
+      # the action accepts one line above.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       # The committed wrapper (generated 2026-07-22 from the official 9.6.1 distribution;
       # jar sha256 verified against services.gradle.org) is now the single source of the
