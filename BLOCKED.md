@@ -6011,7 +6011,29 @@ the owner's**. Smallest human unblock, final form:
 
 ## B-31 — The android gate stopped executing on 2026-09-14, and nothing in this program watches for that (run 226, 2026-09-15)
 
-> **STATUS, updated in the same firing: the GATE HALF IS CLOSED; the BLIND-SPOT HALF STAYS OPEN.**
+> **STATUS at run 227 (2026-09-15): BOTH HALVES NOW CLOSED, and the reason the second stayed open
+> for a firing was a WRONG SENTENCE IN THIS ENTRY.** The "smallest human unblock" below says the
+> check *cannot be done in bash* because `gh` is ABSENT, and therefore had to be a fifth MANUAL
+> paragraph plus a decision. **That premise is false and was never tested** (**C-227-1**): `curl`
+> reaches `api.github.com` from this container anonymously, HTTP **200**, for the runs list and for
+> the per-run step array. So the fix needed no decision and no human — it needed someone to try the
+> thing the entry had ruled out, which is §6's own "read `gh ABSENT` narrowly" rule applied to a
+> sentence this program wrote about itself. `run-zero.sh` **§4b** now checks the eight required
+> gate steps **by name** against the latest run's step array (**C-227-2**), is proven to flag the
+> real B-31 run via `RUNZERO_GATE_RUN=34896487955` replay (**C-227-3**), and degrades to a loud
+> non-failing `??` when the API is unreadable (**C-227-4**).
+>
+> **The one live caveat, and it is B-29's:** §4b reads the API **anonymously**, so it works only
+> while the repo is publicly readable. If the owner lands B-29 as private, §4b goes `??`-blind and
+> the VERDICT says so — it will not silently go green. A token would close that, and this firing
+> did not ask for one.
+>
+> **Not covered, deliberately:** the **engine** repo's CI has the identical exposure and §4b does
+> not look at it. That is scope this slice declined, not a blocker; it is recorded as next intent
+> in `STATE.md`.
+>
+> **Superseded text follows, kept because the wrong premise is the lesson.** *(Run 226: the GATE
+> HALF IS CLOSED; the BLIND-SPOT HALF STAYS OPEN.)*
 > Run **403** (`34916050850`), head `8c96e4f`, `ubuntu-latest` → **`success` in 4m28s**, with
 > **steps 1–13 all `success`** — the vendored sync-vector drift guard among them — and step 14
 > correctly `skipped` on B-25's `workflow_dispatch` condition (**C-226-11**). The fix is **proven,

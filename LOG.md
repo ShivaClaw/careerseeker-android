@@ -20571,3 +20571,163 @@ still has no section that looks at a workflow run, and that is a decision, not a
 **Self-audit item 2 is also answered.** The PR asked whether `platform-tools` alone would suffice
 for `assembleDebug` and `lintDebug`, since the platform and build-tools are auto-downloaded. **It
 does** — steps 11 and 12 both passed. That assumption is no longer an assumption.
+
+---
+
+# RUN 227 — 2026-09-15. **B-31 said the probe could not read CI from bash. Nobody had tried. `curl` gets HTTP 200 unauthenticated, so the blind spot was never a decision — it was an untested sentence.**
+
+## Milestone 0 — rule one, and the ground state
+
+`git fetch --all --prune` in **both** checkouts, before anything else; every count below is taken
+after it. The android tree again arrived detached at the docs-only `main` (`ebfaf81`), so the work
+branch `claude/android-a0-probe` was checked out — **569 ahead / 10 behind** `origin/main` at entry.
+
+`scripts/run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**: the three S5 slice commits
+(`8575539`, `22b028e`, `7328a0b`) each **on main (expected)**, pin **`11bb1f5`** unchanged and an
+ancestor of `origin/main`, corpus **30/30 byte-identical**, citations **1118 / 1119 / 2**, plan ROT
+6/6 at its pinned spent state, conflict markers clean in both repos, engine `main` **`14469ad`** and
+android `main` **`ebfaf81`** both unmoved (**C-227-5**).
+
+**Terra read first, per right-of-way:** `autonomy/codex-state:STATE.md` reports **"Current rung:
+COMPLETE … the ladder is exhausted"**, **files claimed: none**. **No collision.**
+
+## Milestone 1 — the assigned slice, declined for the reason the mission banner gives
+
+The stored prompt assigns S5's spec half — amend §4.3 with the `entitlement_ack` body, add the
+vector, close PQ-A2-1/-2/-3. **It is built, and this firing verified that first-person rather than
+quoting it:** run-zero §1 reports all three commits **on main**, and the vendored corpus is
+byte-identical at the pin. Rebuilding it would rewrite vector bytes a second codebase consumes —
+the cross-repo drift event the prompt itself forbids. The prompt's two known-stale facts are
+**unchanged** (it still says pin `679a317` and "S5 … NOT STARTED"), so **trigger 3 is negative**.
+
+## Milestone 2 — the slice this firing took, and why it was the topmost workable one
+
+Run 226 closed **B-31's gate half** and left its **blind-spot half open**, calling it *"a decision,
+not a command"*: `run-zero.sh` has no section that looks at a workflow run, which is why firings
+222–225 each printed `NOTHING MOVED` while their own pushes were dying in step 4 of 14. The entry's
+**smallest unblock said the check could not be done in bash** — *"`gh` is ABSENT — §6's own
+limit"* — and therefore had to be a fifth MANUAL paragraph that a session might act on.
+
+**That sentence is false, and one command disproves it** (**C-227-1**):
+
+```
+runs 200
+jobs 200
+```
+
+`curl` reaches `api.github.com` from this container **anonymously** — no `gh`, no token, no MCP —
+for both the workflow-runs list and the per-run **jobs/steps array**. The blind spot was never
+waiting on a human. It was waiting on someone to test a limit the record had asserted, which is
+**§6's own rule** — *read `gh ABSENT` narrowly* — turned on a sentence this program wrote about
+itself. Run 221 found a 201-assertion doc error the same way, from `dotnet ABSENT`.
+
+## Milestone 3 — §4b: a check that RUNS, not a fifth paragraph
+
+`scripts/run-zero.sh` gains section **4b**. What it does, and each choice's reason:
+
+- **Reads the branch's latest completed run**, then its **step array**, and checks the **eight
+  required gate steps by name**. Names, never numbers: the array also carries `Set up job` and
+  three `Post …` entries, and numbering is not contiguous (1–14, then 26–29).
+- **`Upload debug APK` is deliberately NOT required.** It is `workflow_dispatch`-gated (**B-25**),
+  so on a push it is skipped **by design**. One legitimate skip beside eight mandatory ones is
+  exactly the ambiguity B-31 named — *"B-25 is a red job with a green gate; B-31 is a red job with
+  no gate at all"* — so the distinction is now **encoded**, not left to a reader's memory.
+- **It can move the verdict.** That is the whole difference from §6's MANUAL paragraphs, which 225
+  firings read past. A skipped or absent required step calls `bad()` and the script exits **1**.
+
+Measured live this firing (**C-227-2**):
+
+```
+== 4b. The gate — did CI EXECUTE on this branch, or only report? (B-31)
+  latest completed: run 404  6f261d2  success  (2026-09-15T01:13:58Z)
+  all 8 required checks EXECUTED and passed; 'Upload debug APK' skipped by
+  design (B-25, workflow_dispatch). The gate is alive, not merely green.
+```
+
+## Milestone 4 — a green detector proves nothing; so it was run against the known-bad input
+
+A check that has only ever printed green is an **unproven** check, and shipping one here would
+repeat B-31 in a new shape. §4b therefore accepts `RUNZERO_GATE_RUN=<id>`, which pins one run
+instead of taking the latest, so the detector is **falsifiable by anyone**. Replaying run **402**
+(`34896487955`) — the dead gate B-31 was filed on — gives (**C-227-3**):
+
+```
+  PINNED (replay) : run 402  d8ca4fe  failure  (2026-09-14T21:02:30Z)
+  !! gate step NOT EXECUTED (skipped): Assert every cited C-/B- id resolves
+  !! gate step NOT EXECUTED (skipped): Assert :core has no Android dependency
+  !! gate step NOT EXECUTED (skipped): Assert vendored sync vectors match the pinned main-repo commit
+  !! gate step NOT EXECUTED (skipped): Unit tests (:core)
+  !! gate step NOT EXECUTED (skipped): Unit tests (:app, Robolectric)
+  !! gate step NOT EXECUTED (skipped): Assemble debug APK
+  !! gate step NOT EXECUTED (skipped): Lint
+  !! gate step NOT EXECUTED (skipped): Assert no analytics or tracking SDKs ship
+
+  THIS IS B-31's SIGNATURE, NOT B-25's. …
+EXIT=1
+```
+
+**The replay READS run 402's stored array; it does not re-run it.** Run 226 recorded that the log
+is the only copy of the evidence and must not be replaced, and that holds.
+
+## Milestone 5 — what happens when the check cannot run, which is the harder half
+
+§4b reads the API **anonymously**, and it works today only because the repo is publicly readable —
+which is **B-29**, an open owner decision this firing did **not** touch. So the failure mode had to
+be designed, not discovered later:
+
+- Unreadable API → `warn()`: prints `??`, sets a blind flag, prints the **exact MCP query** to run
+  instead, and **does not set `FAIL`**. The `VERDICT` block then prefixes its conclusion with three
+  `??` lines: *"THE GATE WAS NOT READ THIS FIRING … a dead gate would look exactly like this run
+  does."* Exit stays **0** (**C-227-4**).
+- **Why not fail?** Failing on an unreachable API would turn every firing red the moment B-29 lands
+  private or the egress policy tightens — the same signal-destroying staleness the baseline block
+  warns about, and the reason §3's plan-rot had to be pinned. **Why not stay silent? Because B-31
+  IS a silent absence.** Loud-but-not-failing is the only position that is neither.
+- **Measured honestly:** the path was exercised by pointing `GATE_REPO` at a repo this sandbox
+  cannot see, which answers **403** at the proxy. **The `404` branch is written but NOT exercised**
+  — this environment answers 403 before a 404 is observable. Both take the same path; only the
+  explanatory line differs. Said plainly so no one reads it as tested.
+
+## Milestone 6 — the records the edit obliged, in the same commit
+
+The script's **own header** asserted that two triggers "need the GitHub API, which a shell script
+here cannot reach". Leaving that in place while §4b executes would be exactly the doc/verifier
+drift the engine repo's `CLAUDE.md` names. Corrected in the same change, and it keeps the wrong
+sentence visible as the lesson. **B-31 likewise:** both halves now closed, with its superseded
+"smallest unblock" retained and labelled, because *the wrong premise is the finding*.
+
+## Milestone 7 — no trigger fired, and no escalation was sent
+
+Board re-queried by MCP after the fetch (**C-227-7**): **android 6 open** (#1–#6), every row
+`draft: true`, **zero android PRs have ever merged**; **engine 3 open** (#60, #58, #26), all draft.
+Both mains unmoved. Prompt unchanged. CI run **404** is a success on this branch's **own previous
+push** — the same own-push re-read class firings 223 and 224 correctly declined to call a new gate
+result; it corroborates run 226's repair on a second head and is recorded as such, not as news.
+**All triggers negative; the eighteenth escalation went yesterday at run 226, so neither arm of the
+predicate is due. Nothing sent.**
+
+## Boundary — what this run did NOT touch
+
+**One file of product was edited: `scripts/run-zero.sh`** — a new §4b, a `warn()` helper, the
+baseline block, the header paragraph it falsified, and §6's trigger-4 note. The three record files
+(`LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`) and `STATE.md` carry this entry. **Nothing else in
+either repository was modified.**
+
+**No vector byte was written**, no `VECTORS.lock` edit, **no pin moved**, no `generate.mjs` run in
+write mode, no `docs/Sync-Protocol.md` edit, **no C# and no Kotlin** — the two S5 appliers stay
+deferred, for the stated reason that neither can be compiled here and a compile-only claim is what
+this house forbids. **No `$ExpectedOfflineTotal` or `Verify-Alpha.ps1` edit**; the engine checkout
+was **read only** and this firing pushed nothing to it beyond the `autonomy/claude-state` heartbeat.
+
+**No gate was run and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`
+and `adb` are **ABSENT**, `ANDROID_HOME` **UNSET** (**C-227-6**). **§4b reads a result CI produced;
+it does not produce one**, and a session that mistakes the two has invented a gate. **B-7 was not
+routed around** — no mirror, no vendored AGP, no fabricated `ANDROID_HOME`.
+
+**No workflow was re-run or dispatched** — run 402's log is evidence and re-running would destroy
+it; the replay reads the stored array. **Nothing was merged, closed, undrafted, rebased,
+force-pushed or deleted** in either repository; the android repo stays **never-self-merge** and
+PR #6 stays **draft**. **No deploy of any kind.** The production relay was **not contacted at all**,
+not even `GET /v1/health`. **No Play/Google/OAuth console, no accounts, no purchases, no Gmail, no
+secret read or printed**, no `.appdata`. **B-29 was not acted on** — the visibility decision is the
+owner's, and §4b was built to degrade around it rather than depend on it silently.

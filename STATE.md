@@ -1,5 +1,27 @@
 # STATE — android tree
 
+> ## ✅ RUN 227 (2026-09-15) — B-31 IS FULLY CLOSED, AND THE PROBE NOW READS THE GATE ITSELF
+>
+> `run-zero.sh` has a new **§4b**: it reads the branch's latest CI run **and its step array**, checks
+> the **eight required gate steps by name**, and **can fail the verdict**. So the failure mode that
+> let firings 222–225 print `NOTHING MOVED` while their own pushes were dying in the toolchain step
+> is now **detected by the one command every firing already runs**.
+>
+> **Why it took until now is the finding worth carrying.** B-31's own "smallest unblock" said the
+> check *could not be done in bash* (`gh` is ABSENT) and so had to be a MANUAL paragraph plus an
+> owner decision. **Nobody had tested that.** `curl` reaches `api.github.com` from this sandbox
+> **anonymously — HTTP 200** — for both the runs list and the per-run step array (**C-227-1**).
+> That is §6's own *"read `gh ABSENT` narrowly"* rule, applied to a sentence this program wrote
+> about **itself**; run 221 found a 201-assertion doc error the same way from `dotnet ABSENT`.
+> **Before believing any "this sandbox cannot", check whether it was measured or assumed.**
+>
+> **It is proven in both directions, which a new detector must be:** green on the live run
+> (**C-227-2**), and **red on replay of the actual B-31 run** — `RUNZERO_GATE_RUN=34896487955
+> scripts/run-zero.sh ../careerseeker` prints eight `NOT EXECUTED (skipped)` lines and exits 1
+> (**C-227-3**). **One live caveat, and it is B-29's:** §4b reads the API with **no token**, so if
+> the owner lands the repo private it goes `??`-blind — loudly, in the VERDICT, never silently green
+> (**C-227-4**).
+
 > ## ⛔ IF YOUR FIRING IS EMPTY, DO NOT ADD A BANNER HERE — added at run 118 (2026-08-28)
 >
 > Run `scripts/run-zero.sh ../careerseeker`. If it says `NOTHING MOVED` and all five escalation
@@ -42,7 +64,10 @@
 > `skipped`** (**C-226-1** … **C-226-3**). Fixed in the same firing with one input, and **CONFIRMED
 > the same firing**: run 403 green, steps 1–13 all `success`, the drift guard executing again
 > (**C-226-11**). **B-31's gate half is closed; its blind-spot half — `run-zero.sh` cannot see CI —
-> stays open as a decision for the owner.**
+> stays open as a decision for the owner.** **SUPERSEDED AT RUN 227: the blind-spot half is CLOSED
+> and it was never the owner's decision to make — `run-zero.sh` CAN see CI (`curl`, anonymous, HTTP
+> 200, C-227-1) and now does, in §4b. No nineteenth message was sent: all triggers negative, and the
+> calendar arm is not due.**
 >
 > **Run 221 sent the seventeenth, on a positive finding and not the calendar arm** (which was not due
 > until 2026-09-16): a **201-assertion** error in three audit-facing documents that the drift trap had
@@ -3706,6 +3731,7 @@ in [`RETURN-DAY.md`](RETURN-DAY.md)**.
 | **Relay client** | `RelayResult.Conflict` now carries `latest` — the relay answers a refused push with `{"error":"replay_rejected","latest":N}` (`relay/src/channel.ts:167`) and `RelayClient` was returning before reading the body, so §6.1's reconciliation input was unreachable. Null on the pairing 409s (`{"error":"exists"}`), so `PairingFlow`'s ambiguity reading is unchanged. **The relay itself needs no change and was not touched**; its own suite does not assert this field, and the relay suite did not run here |
 | **Terra (Codex)** | R6(b) BLOCKED, PR #26 draft, files claimed: **none** — read at iteration start, no collision |
 | **`:core` suite** | **244 / 0 across 17 classes**, measured here 2026-08-12 (**twentieth** run) via `scripts/core-probe.sh --rerun` — up from **216 / 0 across 15**, which was **re-measured in the same session** (new files moved aside, source pristine) rather than quoted from the nineteenth run. The delta is **+28** from two new files, `core/src/test/…/crypto/HkdfTest.kt` (**13**) and `…/crypto/Base64UrlTest.kt` (**15**), and **no production Kotlin changed** — `git diff --stat -- core/src/main/` is empty after **eight** mutate-and-revert cycles. **The load-bearing measurement is M1:** with `counter++` deleted from `Hkdf.expand`, the **pre-existing 216 go 0-failed green** — the shared pairing vectors included — while the three RFC 5869 cases fail. **This is one of the android gate's four tasks, not a gate result.** Re-verify: C-CR-1, C-CR-7. *Previously:* **216 / 0 across 15 classes**, measured 2026-08-11 (**nineteenth** run) via `scripts/core-probe.sh --rerun` — up from **190 / 0 across 14**, which was **re-measured in the same session** rather than quoted from the eighteenth run. The delta is one new file, `core/src/test/.../EnvelopeReceiverTest.kt` (**26 tests**), and **no production Kotlin changed** — `git diff --stat -- core/src/main/` is empty after six mutate-and-revert cycles. **This is one of the android gate's four tasks, not a gate result.** Re-verify: C-ER-1, C-ER-4 |
+| **HEARTBEAT — TWO HUNDRED AND TWENTY-SEVENTH RUN (2026-09-15, Linux cloud sandbox). B-31's blind-spot half closed — and the thing that had kept it open was an untested sentence in B-31's own "smallest unblock".** | **Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md` (android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged). **The engine checkout was READ ONLY.** Android branch `claude/android-a0-probe`, draft PR [#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) refreshed and **it stays draft** — never-self-merge. **Rule one first:** `git fetch --all --prune` in both checkouts; the tree again arrived detached at docs-only `main` (`ebfaf81`); every count is post-fetch. **Ground state:** `scripts/run-zero.sh ../careerseeker` → `NOTHING MOVED`, exit **0** — pin **`11bb1f5`** unchanged, corpus **30/30** byte-identical, citations **1118/1119/2**, mains **`14469ad`** / **`ebfaf81`** unmoved, all three S5 commits on main as expected (**C-227-5**). **Assigned slice DECLINED** for the reason the mission banner gives, re-verified first-person, not quoted: S5's spec half is on engine `main` since 08-09/08-12, and rebuilding it is the cross-repo drift event the prompt forbids. **THE SLICE TAKEN: `run-zero.sh` §4b.** It reads the branch's latest completed CI run **and its step array**, checks the **eight required gate steps BY NAME** (names, not numbers — the array carries `Set up job` and three `Post …` entries and numbering is not contiguous), and **can fail the verdict**, which is the only thing that distinguishes it from the MANUAL paragraphs 225 firings read past. `Upload debug APK` is **deliberately not required** — `workflow_dispatch`-gated (**B-25**), skipped by design; that one legitimate skip beside eight mandatory ones is the exact B-25-vs-B-31 ambiguity, now **encoded** rather than left to memory. **Measured live:** run **404** (`34916439815`), head `6f261d2`, `success`, all eight EXECUTED (**C-227-2**). **Proven falsifiable, because a detector that has only printed green is unproven:** `RUNZERO_GATE_RUN=34896487955` replays the actual B-31 run → eight `!! gate step NOT EXECUTED (skipped)` lines, the B-31-not-B-25 paragraph, exit **1** (**C-227-3**). The replay **reads** run 402's stored array; **the workflow was not re-run** — its log is the evidence. **Degradation designed, not discovered:** an unreadable API prints `??`, sets a blind flag, prints the exact MCP query, and does **not** fail — the VERDICT then leads with *"THE GATE WAS NOT READ THIS FIRING"*. Failing would turn every firing red the moment **B-29** lands private; silence would reproduce B-31; loud-but-not-failing is neither (**C-227-4**). **Stated honestly: the `404` branch is written but NOT exercised** — this proxy answers 403 first. **The script's own header, which asserted the API was unreachable from bash, was corrected in the same commit** (doc/verifier drift discipline), and B-31 keeps its wrong premise visible as the lesson. **NO GATE RAN and none is claimed:** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` **ABSENT**, `ANDROID_HOME` **UNSET**; **§4b reads a result CI produced, it does not produce one** (**C-227-6**). B-7 honoured, not routed around. **Terra read first:** codex-state **COMPLETE**, files claimed **none** — no collision. **No trigger fired, no escalation sent** (**C-227-7**): android **6 open, all draft, zero ever merged**; engine **3 open** (#60, #58, #26), all draft; prompt unchanged with its two known-stale facts; CI 404 is an own-push re-read, the class 223/224 correctly declined to call news. **B-29 not acted on** — §4b was built to degrade around it, not to depend on it silently. **Nothing merged, closed, undrafted, rebased, force-pushed or deleted; no deploy; relay not contacted at all.** |
 
 ## Ladder
 
@@ -3833,6 +3859,22 @@ respectively and they can be done today.
 | **B-14** phone-side confirm assertion | **new 2026-08-15** (forty-first run). `:core` cannot assert `pairing-high-bit-confirm` because the vendored corpus is pinned at `679a317`, which **predates the vector** — the file is not in this repo. **Not B-7:** `:core` is Android-free and its tests run on the JVM here; the blocker is the **pin**, not the toolchain, which is why it has a human unblock and B-7 does not. Hand-vendoring was considered and **refused** (that is the drift event the mission forbids). Smallest unblock: merge PR #50, re-pin, re-run the drift check — both steps Brandon's. **PR #51's engine-side assertion does not depend on it** and is CI-green at 617/0 |
 
 ## Next intent (in order)
+
+**ADDED RUN 227 (2026-09-15) — TWO ITEMS, AND ONE OF THEM IS THE OBVIOUS EXTENSION OF §4b.**
+
+**NEW ITEM — the ENGINE repo's CI has the identical exposure, and §4b does not look at it.** This
+run's slice covered `careerseeker-android`'s `ci.yml` only. The engine's Windows CI is what pins
+`$ExpectedOfflineTotal` (**B-10**) and confirmed **816** at run 202 — if *it* started dying in a
+toolchain step, every firing would read the same `NOTHING MOVED` that B-31 was filed for, in the
+repository where the drift trap actually lives. **This is scope run 227 declined to keep the slice
+coherent, NOT a blocker:** the API answers for that repo too, so it needs no human. The work is a
+required-step list derived from the engine's own workflow — do not copy the android list, derive it.
+
+**NEW ITEM — decide whether §4b should ever hold a token.** It reads the API **anonymously**, which
+works only while the repo is publicly readable. That is **B-29**, open and the owner's. If B-29
+lands *private*, §4b degrades to a loud `??` and the gate becomes unwatchable from here again — the
+same blindness, arriving quietly through an unrelated decision. **Do not pre-empt B-29 to keep the
+check working**; record the coupling and let the owner decide.
 
 **ORDERED INTENT REVISED 2026-08-24 (ninety-fifth run) — NEW ITEM 2(b) IS CLOSED, AND IT PAID OUT
 TWICE. THE SANDBOX-RUNNABLE LANES ARE WIDER THAN THIS LIST HAS ASSUMED SINCE RUN 85.**

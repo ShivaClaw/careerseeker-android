@@ -22479,3 +22479,136 @@ conclusion is the answer to B-31.
 *Expected:* `conclusion: success` on the run; step 4 `success`; steps 5–13 `success`; step 14
 `skipped`. **This closes B-31's gate half.** The blind-spot half — `run-zero.sh` cannot see CI —
 remains open by design.
+
+---
+
+## Run 227 — 2026-09-15. B-31's blind-spot half: the probe now reads the gate, because bash could reach it all along
+
+Every claim below was produced in that firing. **C-227-1 … C-227-4** re-verify against the GitHub
+Actions API from an ordinary shell — no `gh`, no token, no toolchain. **C-227-5** and **C-227-6**
+re-verify in a checkout of this repo. **C-227-7** is a board re-query.
+
+**The finding that decided the slice is C-227-1**, and it is a correction to a sentence this
+program wrote about itself: B-31's "smallest human unblock" said the gate check *could not* be
+done in bash. Nobody had tried it.
+
+### C-227-1 — api.github.com answers this sandbox anonymously, so `gh ABSENT` never meant "no API"
+
+> **Claim.** From this container, with no `gh` binary, no token and no MCP server, plain `curl`
+> reaches `api.github.com` and receives **HTTP 200** for both endpoints the gate check needs: the
+> workflow-runs list for the branch, and the per-run **jobs/steps array**. B-31's stated reason for
+> leaving its blind-spot half to a MANUAL paragraph — *"It cannot do it in bash (`gh` is ABSENT —
+> §6's own limit)"* — is therefore **false**, and §6's own rule ("read `gh ABSENT` narrowly") is
+> what catches it. This works because the repo currently reads public, which is **B-29**, still the
+> owner's open decision; C-227-4 covers what happens when that changes.
+
+```bash
+A=https://api.github.com/repos/ShivaClaw/careerseeker-android
+curl -sS -o /dev/null -w "runs %{http_code}\n" \
+  "$A/actions/workflows/ci.yml/runs?branch=claude/android-a0-probe&per_page=3"
+curl -sS -o /dev/null -w "jobs %{http_code}\n" "$A/actions/runs/34916439815/jobs"
+```
+
+*Expected:* `runs 200` and `jobs 200`. Neither call is authenticated.
+
+### C-227-2 — §4b executes, and reports the live gate ALIVE rather than merely green
+
+> **Claim.** `run-zero.sh` now carries section **4b**, which reads the branch's latest completed CI
+> run and checks the **eight required gate steps by name** against its step array. Measured this
+> firing: run **404** (`34916439815`), head `6f261d2`, **success**, 2026-09-15T01:13:58Z, with all
+> eight — citation guard, `:core` Android-free, **vendored sync-vector drift guard**, `:core:test`,
+> `:app:test`, `assembleDebug`, `lintDebug`, tracker check — reporting `success`, and `Upload debug
+> APK` `skipped` **by design** (B-25's `workflow_dispatch` condition), which is why that one step is
+> deliberately not in the required list.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/4b\./,/^== 5/p'
+```
+
+*Expected:* a `latest completed:` line and `all 8 required checks EXECUTED and passed`. The run
+number will be **higher than 404** after any later push — the check is derived, not pinned, so a
+newer green run is the check working, not drift.
+
+### C-227-3 — the detector is falsifiable, and flags the actual B-31 run
+
+> **Claim.** A green detector proves nothing until it is run against a known-bad input, so §4b
+> accepts `RUNZERO_GATE_RUN=<id>` to replay one specific run. Replaying run **402**
+> (`34896487955`) — the dead gate B-31 was filed on — makes §4b print **eight** `!! gate step NOT
+> EXECUTED (skipped)` lines, name the signature as **B-31's and not B-25's**, and exit **1**. This
+> is the run-402 log being *read*, never re-run: the replay uses the completed run's stored array.
+
+```bash
+cd careerseeker-android && RUNZERO_GATE_RUN=34896487955 scripts/run-zero.sh ../careerseeker \
+  2>&1 | sed -n '/4b\./,/^== 5/p'; echo "EXIT=$?"
+```
+
+*Expected:* `PINNED (replay)`, `run 402  d8ca4fe  failure`, eight `NOT EXECUTED (skipped)` lines,
+the B-31-not-B-25 paragraph, and a non-zero exit from the script overall.
+
+### C-227-4 — an unreadable API degrades to LOUD-BUT-NOT-FAILING, and the VERDICT repeats it
+
+> **Claim.** When the API cannot be read, §4b prints `??`, sets the blind flag, prints the exact
+> MCP query to run instead, and **does not** set `FAIL`; the `VERDICT` block then prefixes its
+> conclusion with three `??` lines saying the gate was not read. Exit stays **0**. The reasoning is
+> written into `warn()`: failing the verdict on an unreachable API would turn every future firing
+> red the moment B-29 lands private or the egress policy tightens, which is the same
+> signal-destroying staleness the baseline block warns about — while silence would reproduce B-31
+> exactly. **Measured honestly:** the path was exercised by pointing `GATE_REPO` at a repository
+> this sandbox cannot see, which returns **403** at the proxy. **The `404` branch is written but
+> was NOT exercised** — this environment answers 403 before a 404 can be observed. Both codes take
+> the same warn-and-flag path; only the explanatory line differs.
+
+```bash
+cd careerseeker-android && cp scripts/run-zero.sh /tmp/rz.bak \
+  && sed -i 's/^GATE_REPO=careerseeker-android$/GATE_REPO=careerseeker-android-nope/' scripts/run-zero.sh \
+  && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/4b\./,/^== 5/p' \
+  && scripts/run-zero.sh ../careerseeker >/dev/null 2>&1; echo "EXIT=$?"; cp /tmp/rz.bak scripts/run-zero.sh
+```
+
+*Expected:* `?? GitHub API answered HTTP 403 — the gate was NOT checked this firing.`, the MCP
+query, `EXIT=0`, and a clean `git diff` after the restore.
+
+### C-227-5 — the whole probe still passes, and its own guards are green after the edit
+
+> **Claim.** `run-zero.sh` remains exit **0** end to end with §4b in place: pin `11bb1f5`
+> unchanged, corpus **30/30** byte-identical, both mains unmoved (`14469ad` / `ebfaf81`), the three
+> S5 slice commits each on main as expected, conflict markers clean in both repos. The citation
+> guard — CI step 6, which needs no toolchain — is green including this section's new ids.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker >/dev/null 2>&1; echo "run-zero EXIT=$?"
+./scripts/check-citations.sh --self-test && ./scripts/check-citations.sh
+```
+
+*Expected:* `run-zero EXIT=0`; `self-test: all cases passed`; an `OK:` line, exit 0.
+
+### C-227-6 — what this firing did NOT do, stated so it cannot be read as done
+
+> **Claim.** **No gate was run and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`,
+> `emulator`, `adb` ABSENT; `ANDROID_HOME` UNSET; the five-task android command and
+> `Verify-Alpha.ps1` were both unreachable and neither was attempted. §4b **reads a result CI
+> produced** — it does not produce one, and a session that mistakes the two has invented a gate.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/5. Toolchain/,/^$/p'
+```
+
+*Expected:* the six ABSENT lines and `ANDROID_HOME UNSET`.
+
+### C-227-7 — the board and the mains: no notification trigger fired this firing
+
+> **Claim.** Re-queried by MCP at firing start, after rule-one fetch: **android 6 open** (#1–#6),
+> **every row `draft: true`, and zero android PRs have ever merged**; **engine 3 open** (#60, #58,
+> #26), all draft. Both `main`s unmoved. The stored prompt is unchanged and still carries its two
+> known-stale facts (pin `679a317`, "S5 … NOT STARTED"). CI run **404** is a success on this
+> branch's own previous push — the same own-push re-read class firings 223 and 224 correctly
+> declined to call a new gate result — so **no trigger fired and no escalation was sent**.
+
+```bash
+# list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+# list_pull_requests owner=ShivaClaw repo=careerseeker         state=open
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/4. Both mains/,/^== 4b/p'
+```
+
+*Expected:* 6 android rows all `draft:true` with `merged:false`; 3 engine rows all `draft:true`;
+`engine  main unmoved  14469ad` and `android main unmoved  ebfaf81`.
