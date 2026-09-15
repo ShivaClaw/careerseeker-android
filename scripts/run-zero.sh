@@ -181,8 +181,44 @@ Assert sync vectors match their generator'
 GATE2_OPTIONAL_STEPS=''
 # ---------------------------------------------------------------------------
 
+# ---- repository SETTINGS, added run 230 (2026-09-15) — §4d -----------------
+# Run 228 recorded this as next intent, not as a blocker: "nothing in the firing routine
+# asserts a repository SETTING. Every drift check compares FILE CONTENTS." That is the same
+# shape as the gate blind spot §4b/§4c closed — an exposure with nothing watching it — and it
+# is measurable from the same anonymous API, so it is closed here rather than carried again.
+#
+# IT IS ALSO THE GAP B-29 WAS FOUND IN, AND B-29 IS WHY THE POLARITY BELOW IS NOT OBVIOUS.
+# `careerseeker-android/README.md:7` says "This repository is private, always." The live
+# setting has read `private: false` since at least 2026-09-04. Asserting the README's value
+# would therefore paint this section RED on every firing, forever, for a divergence the owner
+# already knows about (escalated run 203, C-203-1) and alone can decide. A check that is red
+# every run is not a check; it is the green-tick problem inverted, and it would break the
+# empty-firing rule at run 118 by making every firing look like a finding.
+#
+# SO THIS ASSERTS THE RECORDED BASELINE, NOT THE DOCUMENTED IDEAL -- exactly what §4 does for
+# the two mains. It answers one question only: HAS THE SETTING MOVED SINCE THE HOUSE LAST
+# LOOKED? A flip to private is the owner ANSWERING B-29, and that is a change worth the full
+# records. Staying public is the known open divergence, and it is printed every run as a
+# standing note that never goes quiet -- never as a pass of README.md:7, which it is not.
+#
+# The engine expectation is genuinely public and is load-bearing beyond B-29: §4b and §4c
+# read the Actions API with NO TOKEN, so an engine repo that went private takes both gate
+# checks blind with it. README.md's repo-split table gives the reason the engine is public
+# (the alpha ZIP is served from it, and the relay's whole audit claim is that anyone can read
+# it) -- so here the baseline and the documented ideal agree, and a flip is unambiguously a
+# finding.
+#
+# careerseeker-ios IS DELIBERATELY NOT CHECKED, and its absence is documented rather than
+# silent. Run 203 measured it alongside the android repo, but this session's GitHub scope is
+# the two repos below; a third would be read out of scope. B-29 covers both, and the ios half
+# stays a MANUAL §6 query for a session whose scope includes it.
+SETTING_REPOS='android:ShivaClaw:careerseeker-android:false
+engine:ShivaClaw:careerseeker:false'
+# ---------------------------------------------------------------------------
+
 FAIL=0
 GATE_BLIND=0
+SETTING_BLIND=0
 note()  { printf '  %s\n' "$*"; }
 head2() { printf '\n== %s\n' "$*"; }
 bad()   { printf '  !! %s\n' "$*"; FAIL=1; }
@@ -504,6 +540,95 @@ gate_check "engine" "$GATE2_OWNER" "$GATE2_REPO" "$GATE2_WORKFLOW" \
   'Assert sync vectors match their generator' is the engine-side half of the SAME
   cross-repo vector guard §4b watches. Do not read a green run conclusion over this."
 
+# setting_check <label> <owner> <repo> <expected-private: true|false>
+#
+# Same contract as gate_check: it READS, it can move the verdict, and it goes loudly ?? rather
+# than quietly green when it cannot perform the check. RUNZERO_SETTING_EXPECT overrides the
+# expectation for every repo at once -- it exists so the comparator can be proven to FIRE on
+# live input, the way RUNZERO_GATE_RUN proves §4b/§4c (C-230-2). It is a test hook, not a
+# configuration knob: the baselines live in SETTING_REPOS above.
+setting_check() {
+  local s_label=$1 s_owner=$2 s_repo=$3 s_expect=${RUNZERO_SETTING_EXPECT:-$4}
+  local s_api s_raw s_code s_body s_private s_vis s_updated
+
+  s_api="https://api.github.com/repos/$s_owner/$s_repo"
+  if ! command -v curl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+    warn "curl or python3 is ABSENT — $s_label setting NOT checked. Run it by hand:"
+    note "  get_repository owner=$s_owner repo=$s_repo   -> .private / .visibility"
+    SETTING_BLIND=1
+    return
+  fi
+
+  s_raw=$(curl -sS --max-time 25 -w '\n%{http_code}' "$s_api" 2>/dev/null)
+  s_code=$(printf '%s' "$s_raw" | tail -1)
+  s_body=$(printf '%s' "$s_raw" | sed '$d')
+
+  if [ "$s_code" = 404 ]; then
+    # 404 on a repo known to exist means it is no longer publicly readable. gate_check's own
+    # 404 branch says the same thing: out-of-scope repos answer 403 at the proxy, not 404.
+    if [ "$s_expect" = true ]; then
+      note "$s_label: HTTP 404 unauthenticated — private, which is the expected baseline."
+    else
+      bad "$s_label: HTTP 404 unauthenticated — the repo went PRIVATE. Baseline said public."
+      note "  This is B-29 ANSWERED, not a bug here. Record the answer, re-point the baseline"
+      note "  in SETTING_REPOS, and note that §4b/§4c read the Actions API with NO TOKEN — if"
+      note "  this is the ENGINE repo, both gate checks just went blind with it."
+    fi
+    return
+  fi
+  if [ "$s_code" != 200 ]; then
+    warn "$s_label: GitHub API answered HTTP ${s_code:-<none>} — the setting was NOT checked."
+    note "  403 is rate limiting or an egress denial (B-7's neighbourhood), not an answer."
+    SETTING_BLIND=1
+    return
+  fi
+
+  s_private=$(printf '%s' "$s_body" | python3 -c \
+    'import json,sys; print(str(json.load(sys.stdin).get("private")).lower())' 2>/dev/null)
+  s_vis=$(printf '%s' "$s_body" | python3 -c \
+    'import json,sys; print(json.load(sys.stdin).get("visibility"))' 2>/dev/null)
+  s_updated=$(printf '%s' "$s_body" | python3 -c \
+    'import json,sys; print(json.load(sys.stdin).get("updated_at"))' 2>/dev/null)
+
+  if [ -z "$s_private" ]; then
+    warn "$s_label: the API answered 200 but .private did not parse — NOT checked."
+    SETTING_BLIND=1
+    return
+  fi
+
+  printf '  %-8s private: %-5s visibility: %-8s updated_at: %s\n' \
+    "$s_label" "$s_private" "$s_vis" "$s_updated"
+
+  if [ "$s_private" = "$s_expect" ]; then
+    note "  unmoved against the recorded baseline (private: $s_expect)."
+  else
+    bad "$s_label: private is '$s_private', the recorded baseline is '$s_expect'. THE SETTING MOVED."
+    note "  A repository setting changed with no commit behind it, which is precisely why"
+    note "  file-content drift checks could never see this class. Re-derive B-29 before"
+    note "  recording NOTHING MOVED, and do NOT flip it back: visibility is the owner's call."
+  fi
+}
+
+head2 "4d. Repository SETTINGS — the class no file-content check can see (run 230)"
+while IFS=: read -r s_label s_owner s_repo s_expect; do
+  [ -n "$s_label" ] || continue
+  setting_check "$s_label" "$s_owner" "$s_repo" "$s_expect"
+done <<EOF
+$SETTING_REPOS
+EOF
+if [ -n "${RUNZERO_SETTING_EXPECT:-}" ]; then
+  note ""
+  note "RUNZERO_SETTING_EXPECT=$RUNZERO_SETTING_EXPECT is set — the baselines above were"
+  note "OVERRIDDEN. This is the falsifiability hook, not a real reading. Unset it."
+fi
+note ""
+note "B-29 IS OPEN AND THIS SECTION DOES NOT CLOSE IT. 'unmoved' above means the setting is"
+note "where the house last recorded it — it is NOT a pass of careerseeker-android/README.md:7,"
+note "which says 'This repository is private, always.' That sentence and a live 'private:"
+note "false' still contradict each other, the owner was told at run 203 (C-203-1), and only he"
+note "decides which side gives way. What this section adds is that if he DOES decide, or if"
+note "anything else moves a setting, the next firing finds out instead of reporting green."
+
 # --- 5. toolchain, so nothing is claimed that could not have run ------------
 head2 "5. Toolchain — stated so no claim can be misread"
 for t in dotnet pwsh sdkmanager avdmanager emulator adb gh node git java gradle; do
@@ -602,12 +727,22 @@ if [ "$GATE_BLIND" -ne 0 ]; then
     "blind to B-31 on that side: a dead gate would look exactly like this run does. Answer its" \
     "query through the session's GitHub path before recording NOTHING MOVED."
 fi
+if [ "$SETTING_BLIND" -ne 0 ]; then
+  printf '  ?? %s\n' \
+    "A REPOSITORY SETTING WAS NOT READ THIS FIRING (§4d). You are blind to the one drift" \
+    "class that leaves no commit behind, which is the class B-29 was found in. Answer" \
+    "get_repository through the session's GitHub path before recording NOTHING MOVED."
+fi
 if [ "$FAIL" -eq 0 ]; then
   cat <<'EOF'
-  NOTHING MOVED on every check this sandbox can run, and all five guards are green
+  NOTHING MOVED on every check this sandbox can run, and all six guards are green
   (citations, plan-rot against its pinned spent state, conflict markers, vectors,
-  and -- since run 227 -- the gates' own step arrays: §4b android, and §4c the engine
-  gate too, added at run 228).
+  the gates' own step arrays since run 227 -- §4b android, and §4c the engine gate
+  too, added at run 228 -- and, added at run 230, §4d's repository settings).
+
+  §4d IS 'UNMOVED', NOT 'CORRECT'. B-29 stays open: the android repo reads public
+  while its own README.md:7 says private, always. That is the owner's decision and
+  this script does not make it. See the note under §4d.
 
   READ THIS BEFORE CONCLUDING THE LANE IS STILL WHAT IT WAS. The ground state this
   script described for ~100 firings ended on 2026-09-10/11. The owner landed the
