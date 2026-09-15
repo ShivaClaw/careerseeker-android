@@ -6006,3 +6006,102 @@ measured 28 on Linux.
 `-IncludePublish` and `-IncludePackage`, which have run nowhere, and **the merge decision, which is
 the owner's**. Smallest human unblock, final form:
 `scripts\Verify-Alpha.ps1 -IncludePublish -IncludePackage` on Windows, then merge or don't.
+
+---
+
+## B-31 — The android gate stopped executing on 2026-09-14, and nothing in this program watches for that (run 226, 2026-09-15)
+
+**Filed 2026-09-15, run 226.** Two things in one entry, because they are the same gap seen from
+both ends: a **broken gate** (fixed in this push, unproven until CI says so) and a **blind spot**
+that let it break unnoticed (open, and the more valuable half).
+
+### Symptom
+
+**1. The gate.** `ci.yml`'s `Build and test` on `claude/android-a0-probe` has failed on every push
+since **2026-09-14T21:02Z**. It is **not** failing a check — it dies in step 4 of 14,
+`Set up Android SDK`, in seven seconds, and **steps 5–14 all report `skipped`** (**C-226-2**).
+`android-actions/setup-android@v3` defaults `packages` to `'tools platform-tools'`
+(**C-226-4**), installs them one at a time, and `tools` — the legacy SDK Tools package, deprecated
+since 2021 — is no longer in Google's repository: `Warning: Failed to find package 'tools'`, exit 1
+(**C-226-3**). The cause is **outside this repository**: run 401 passed and run 402 failed on the
+same workflow four hours apart, with one line of `FIRINGS.md` between them (**C-226-1**).
+
+**What that costs, and it is more than a red X.** Skipped step 8 is the **vendored sync-vector
+drift guard** — the only automated check anywhere that compares the phone's corpus against the
+engine's pinned copy, i.e. the exact cross-repo drift event the standing prompt forbids. Skipped
+step 6 is the **citation guard**, which exists because records-only commits "look too cheap to
+gate". Both have been quietly not running for a day.
+
+**2. The blind spot, and it is the part no push fixes.** **`run-zero.sh` has no section that looks
+at a workflow run.** §2 compares vectors, §4 compares both `main`s, §3 checks citations/plan-rot/
+conflict markers — **none of them can see CI**. §6 lists a gate result as a trigger the *session*
+must query, and 226 is the first firing in the 118-series to actually query it. Runs 222, 223, 224
+and 225 each recorded `NOTHING MOVED` and filed a one-line empty firing **while their own pushes
+were going red**; 223 and 224 even cite CI runs 399 and 400 as green re-reads, correctly, because
+those were the last two that passed. **Every firing's verdict has been structurally unable to
+notice its own broken gate.**
+
+**A trap that makes this worse, worth naming:** a reader who sees red on this branch is primed by
+**B-25** to think "APK artifact quota, not a gate failure, ignore". That inference is right for
+B-25 and **wrong here** — B-25's step is #14 and fails ~1s *after every check above it passed*,
+whereas here #14 is `skipped`. **B-25 is a red job with a green gate; B-31 is a red job with no
+gate at all.** The two are indistinguishable from the run list alone; only the step array separates
+them.
+
+### Attempts
+
+- **Root-caused from the job log rather than guessed**, and the log is the only copy: the action's
+  echoed inputs, both `sdkmanager` invocations, and the failure line (**C-226-3**). **The workflow
+  was deliberately NOT re-run** — re-running replaces the log, which is the evidence.
+- **Confirmed the default is the action's, not this repo's**, from `setup-android@v3`'s own
+  `action.yml` (**C-226-4**). `ci.yml` passed no `with:` block at all.
+- **Fixed with one input** — `packages: platform-tools` — and confirmed nothing in this repository
+  ever used `tools`: no step, script or Gradle file invokes `android`, `ddms` or `monitor`
+  (**C-226-6**).
+- **Proved no check was weakened**, because a toolchain failure is exactly where
+  `continue-on-error` or a deleted step is the tempting fix, and neither was used: the parsed job
+  still has **13 steps in the identical order** (**C-226-7**).
+- **Ran CI step 6 locally** — the citation guard needs no toolchain — self-test and real run both
+  green (**C-226-8**).
+- **Re-probed B-7 instead of carrying it forward**, per run 221's lesson: **unchanged**,
+  `dl.google.com` and `api.foojay.io` still 403 CONNECT-denied, Maven Central 200 (**C-226-9**).
+  Not routed around: no mirror, no vendored AGP, no fabricated `ANDROID_HOME`.
+
+### Why it is blocked here
+
+**The android gate cannot run in this sandbox — that is B-7, re-measured this firing and
+unchanged.** So this session **cannot** assert the fix works, and does not (**C-226-10**). The
+confirming evidence is the CI run on this push, on `ubuntu-latest`, with a real SDK.
+
+### Smallest human unblock
+
+**None for the gate half — it is self-answering, and no human action is needed.** Read the CI run
+triggered by this push:
+
+```
+actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android \
+  resource_id=ci.yml workflow_runs_filter='{"branch":"claude/android-a0-probe"}'
+```
+
+**Green** → the gate is restored, and the vector and citation guards are running again; B-31's
+first half closes. **Red** → read the step array: failing at step 4 again means `platform-tools`
+alone is not sufficient and the next thing to try is `cmdline-tools-version`; failing **below**
+step 4 means the toolchain is fixed and a real check is now speaking after a day of silence — which
+is a different, and welcome, problem.
+
+**For the blind-spot half, the smallest unblock is a decision, not a command:** whether
+`run-zero.sh` should gain a section that reads the branch's latest CI conclusion. It cannot do it
+in bash (`gh` is ABSENT — §6's own limit), so it would have to *print the query and the last known
+answer* the way §6 already does for the board, and rely on the session to run it. **This firing
+deliberately did not add that**: §6 already tells sessions to query triggers it cannot answer, and
+225 firings read past it. A fifth MANUAL paragraph is not obviously the fix, and changing the one
+command every firing trusts is not a change to make in the same push as the repair it would have
+caught. **Recorded as the open question it is.**
+
+### What is NOT blocked by this
+
+The **finding** needs no gate: the step array and the log are dispositive on their own, and both
+were read this firing. The **fix** is a strict improvement whether or not it is sufficient — with
+it, steps 5–14 can run; without it, they cannot. And **nothing about S5 changes**: its spec half is
+on engine `main`, its two appliers are built on both sides, and what is left is a landing decision,
+which is the owner's.

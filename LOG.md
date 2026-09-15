@@ -20343,3 +20343,192 @@ on Linux. **That row is arithmetic and is labelled so** — it is the only one l
 **B-30 now has nothing measurable left in it**: what remains is `-IncludePublish` /
 `-IncludePackage`, which have run nowhere, and the merge decision, which is the owner's. **Still not
 merged, not undrafted, and no workflow was re-run or dispatched by this session.**
+
+---
+
+# RUN 226 — 2026-09-15. The android gate has not run since 2026-09-14T21:02Z. It is not failing a test; it dies in the toolchain step, and every check below it reports `skipped`.
+
+**Heartbeat:** 2026-09-15, **two hundred and twenty-sixth** cloud iteration (Linux sandbox). Both
+checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+before any write: tip **COMPLETE**, **files claimed: none** → **no collision**, Terra keeps
+right-of-way. `scripts/run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**, four guards
+green; mains `14469ad`/`ebfaf81`, corpus **30/30** byte-identical at pin `11bb1f5`, citations
+`1106/1107/2`. The assigned S5 spec half is **on engine `main`** and was re-verified first-person —
+**declined, the 180th time**.
+
+**And then the probe's own §6 caught what §4 structurally cannot see.** `run-zero.sh` compares both
+`main`s and the vector corpus. **It does not look at CI.** Section 6 says so — the two triggers it
+cannot answer are for the session to query — and one of them is *a gate result*. Querying it found
+that the last push's gate **failed**, and had been failing since the previous evening.
+
+## Milestone 1 — the finding: a green-to-red with no cause in the diff (C-226-1)
+
+`ci.yml`'s `Build and test` on `claude/android-a0-probe`, five most recent runs:
+
+| run | id | head | firing | conclusion | duration |
+|---|---|---|---|---|---|
+| 398 | 34809262972 | `d07507e` | 221 | success | 5m 15s |
+| 399 | 34825761537 | `ffbaa04` | 222 | success | 5m 41s |
+| 400 | 34846805217 | `411ad26` | 223 | success | 5m 23s |
+| 401 | 34872214870 | `88cc151` | 224 | success | 5m 44s |
+| **402** | **34896487955** | **`d8ca4fe`** | **225** | **FAILURE** | **19s** |
+
+**Nineteen seconds against a five-and-a-half-minute baseline** is the shape of a job that dies
+before it does any work, not one that fails a check.
+
+**The diff rules itself out.** Firings 222–225 each changed **exactly one line of `FIRINGS.md`** and
+nothing else — `git show --stat` on all four reports `FIRINGS.md | 1 +`, `1 file changed`.
+`.github/workflows/ci.yml` was last touched at `e6f2d07`, long before any of them. So run 401 passed
+and run 402 failed **on the same workflow, four hours apart, with one line of Markdown between
+them**. Whatever changed is **outside this repository**.
+
+## Milestone 2 — where it dies, and what that costs (C-226-2)
+
+Job `104151782183`, step-by-step. Step 4 of 14 fails; **steps 5 through 14 all report `skipped`**:
+
+```
+1  Set up job                                              success
+2  Check out repository                                    success
+3  Set up JDK 17                                           success
+4  Set up Android SDK                                      FAILURE   (21:02:40 -> 21:02:47)
+5  Set up Gradle                                           skipped
+6  Assert every cited C-/B- id resolves                    skipped
+7  Assert :core has no Android dependency                  skipped
+8  Assert vendored sync vectors match the pinned commit    skipped
+9  Unit tests (:core)                                      skipped
+10 Unit tests (:app, Robolectric)                          skipped
+11 Assemble debug APK                                      skipped
+12 Lint                                                    skipped
+13 Assert no analytics or tracking SDKs ship               skipped
+14 Upload debug APK                                        skipped
+```
+
+**This is the part that matters more than the red X.** Step 8 is the **vendored-vector drift
+guard** — the only automated thing in either repository that checks the phone's corpus against the
+engine's pinned copy, and the prompt names that corpus as a cross-repo drift event if it moves.
+Step 6 is the **citation guard**, which exists precisely because records-only commits "look too
+cheap to gate" (its own comment). Both have been silently not running since 2026-09-14T21:02Z.
+
+A firing reading a red X on a records-only push would reasonably assume the APK-quota nuisance of
+**B-25**. It is not that: B-25's step is #14, it fails in about a second *after* every check above
+it has passed, and #14 is `skipped` here. **This red is the opposite of B-25's — B-25 is a red job
+with a green gate; this is a red job with no gate at all.**
+
+## Milestone 3 — root cause, read out of the log, not inferred (C-226-3)
+
+The action's inputs, echoed by the runner because `ci.yml` passed **no `with:` block** at all:
+
+```
+##[group]Run android-actions/setup-android@v3
+with:
+  cmdline-tools-version: 12266719
+  accept-android-sdk-licenses: true
+  log-accepted-android-sdk-licenses: true
+  packages: tools platform-tools
+```
+
+Two `sdkmanager` invocations follow, and only two:
+
+```
+[command]/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager --licenses
+  ... All SDK package licenses accepted
+
+[command]/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager tools
+  Warning: Failed to find package 'tools'
+Error: The process '.../sdkmanager' failed with exit code 1
+```
+
+**`packages` was never set by this repo — that string is the action's own default.**
+`android-actions/setup-android@v3`'s `action.yml` declares `packages` with default
+`'tools platform-tools'` (**C-226-4**), and installs the list **one package at a time**.
+
+`tools` is the **legacy SDK Tools package, deprecated since 2021**, and it is no longer in Google's
+repository — hence `Failed to find package 'tools'`. It is **first** in that default, so the step
+died there and **`platform-tools` was never attempted**. The log contains no `sdkmanager
+platform-tools` line at all.
+
+**Licences are not the cause and were not touched** — `--licenses` succeeded on the line above.
+
+## Milestone 4 — the fix, and why it is a one-word change (C-226-5)
+
+```yaml
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+```
+
+The whole repair is **pinning `packages` to drop one obsolete entry from a default**. Nothing in
+this repository ever used `tools`: it provided the legacy `android`, `ddms` and `monitor` binaries,
+and a grep across `.github/`, `scripts/` and all four Gradle files finds **no reference to any of
+them** (**C-226-6**). The platform and build-tools AGP actually needs are auto-downloaded under the
+licences the action accepts one step earlier.
+
+**THIS IS NOT A WEAKENED GATE, and the distinction is the reason to state it loudly**, because the
+failing step is a *toolchain* step and the cheap fixes for those are usually `continue-on-error` or
+a deleted step. Neither was used. **No check below step 4 is touched, relaxed, reordered or
+removed** — parsed and asserted locally: the job still has **13 steps in the identical order**
+(**C-226-7**). The change's entire effect is that steps 5–14 get to **run again**, which is the
+opposite of weakening: right now every one of them is skipped.
+
+## Milestone 5 — what is verified here, and what is not
+
+**Verified in this sandbox, first-person:**
+
+- `python3 -c "yaml.safe_load(...)"` parses the edited workflow, and the `setup-android` step
+  resolves to `{'uses': 'android-actions/setup-android@v3', 'with': {'packages': 'platform-tools'}}`
+  with all 13 steps in their original order (**C-226-7**).
+- `./scripts/check-citations.sh --self-test` → **all cases passed**, exit 0; the real run →
+  **`definitions: 1106  cited: 1107  documented-absent: 2` / OK**, exit 0 (**C-226-8**). This is CI
+  step 6 executed locally — it needs no toolchain, which is exactly why it can run here.
+- **B-7 re-probed this firing** rather than carried forward, per run 221's lesson about inherited
+  limits, and it is **UNCHANGED**: `dl.google.com` and `api.foojay.io` are both **403
+  CONNECT-denied**, `repo1.maven.org` answers **200** as the control (**C-226-9**). The SDK route
+  stays closed and was **not** routed around.
+
+**NOT verified here, and the PR says so in its own words:** that the fixed workflow goes green.
+**The android gate cannot run in this sandbox (B-7)** — no Android SDK, and the egress policy
+denies the host that would supply one. The authoritative evidence is **the CI run on this push**,
+which is what **B-7's own entry** already names as the unblock: *"CI already is the unblock."*
+**That is filed as B-31**, and this run does **not** claim a gate result it did not read.
+
+## Milestone 6 — a correction to a standing house position
+
+**B-7's closing line — "CI already is the unblock" — has been false since 2026-09-14T21:02Z, and
+this is the first firing to notice.** That sentence is what every iteration since the eighteenth has
+leaned on to justify shipping android work it could not compile: the cloud sandbox cannot run the
+gate, but *CI can*, so push and read the result. For roughly a day, **CI could not run it either**,
+and nothing in `run-zero.sh` would ever have said so — §4 compares `main`s, §2 compares vectors, and
+**no section of the probe looks at a workflow run**. The gap is now named in **B-31**.
+
+## Milestone 7 — the escalation: SENT, and on a positive trigger
+
+The predicate is *a positive state trigger, or five calendar days*. **The calendar arm is not
+due** — the seventeenth went on 2026-09-14 (run 221). **The positive arm is met: a gate result.**
+Trigger 4 of run 82's standing test is *"a gate result"*, and a gate that has stopped executing
+entirely is the strongest form of one. **Eighteenth message sent.** The ledger block in `STATE.md`
+is updated to **18** in this same firing, per the rule run 168 wrote (**C-168-2**).
+
+## Boundary — what this run did NOT touch
+
+**One file of product was edited: `.github/workflows/ci.yml`, one `with:` block and its comment.**
+Nothing else in either repository was modified.
+
+**No vector byte was written**, no `VECTORS.lock` edit, **no pin moved**, no `generate.mjs` run in
+write mode, no `docs/Sync-Protocol.md` edit, no C# and no Kotlin — the two appliers the prompt
+defers stay deferred, for the stated reason that neither can be compiled here and a compile-only
+claim is what this house forbids. **No `$ExpectedOfflineTotal` edit and no `Verify-Alpha.ps1` edit**
+— the engine repo was **read only**, never written, and this firing pushed nothing to it.
+
+**No gate was run and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`
+and `adb` are **ABSENT**; `ANDROID_HOME` is **UNSET**. **B-7 was re-probed and honoured, not routed
+around** — no mirror, no vendored AGP, no fabricated `ANDROID_HOME`. **No earlier firing's green is
+restated as this one's.**
+
+**Nothing was merged, closed, undrafted, rebased, force-pushed or deleted** in either repository;
+PR #60 was **read** (still draft, both jobs green on `e3e8848`) and **not** touched. **No workflow
+was re-run or dispatched** — run 402's log is the evidence, and re-running would destroy it. **No
+deploy of any kind.** The production relay was **not contacted at all**, not even `GET /v1/health`.
+**No Play/Google/OAuth console, no accounts, no purchases, no Gmail, no secret read or printed**,
+no `.appdata`. **B-29 was not acted on** — the repository-visibility decision is the owner's, and
+this firing did not flip it.

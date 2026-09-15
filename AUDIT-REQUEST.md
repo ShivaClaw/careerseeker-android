@@ -22277,3 +22277,186 @@ for l in s.split('\n'):
 
 *Expected:* the ten summary lines above and the 816 total. **Do not re-run the workflow to get
 them** — the log of the completed run is the evidence, and re-running would replace it.
+
+---
+
+## Run 226 — 2026-09-15. The android gate stopped executing, and the probe has no section that would see it
+
+Every claim below was produced in that firing. **C-226-1 … C-226-4** re-verify against the GitHub
+Actions API and need no toolchain; **C-226-5 … C-226-9** re-verify in a checkout of this repo.
+
+**A warning that applies to this whole section:** do **not** re-run workflow run `34896487955` to
+reproduce these. Re-running **replaces the log**, which is the only evidence that the gate was
+failing before the fix landed. Read the completed run.
+
+### C-226-1 — the gate went green-to-red with nothing in the diff to explain it
+
+> **Claim.** On `claude/android-a0-probe`, CI runs 398–401 succeeded in 5m15s–5m44s and run **402**
+> (`34896487955`, head `d8ca4fe`) **failed in 19 seconds** on 2026-09-14T21:02Z. Firings 222–225
+> each changed **exactly one line of `FIRINGS.md`**, and `.github/workflows/ci.yml` was last
+> modified at `e6f2d07`, well before all four. Run 401 and run 402 therefore ran the **same
+> workflow** four hours apart with one line of Markdown between them.
+
+```bash
+# the five runs, newest first
+#   actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android \
+#     resource_id=ci.yml workflow_runs_filter='{"branch":"claude/android-a0-probe"}'
+# then, in a checkout:
+cd careerseeker-android && git fetch --all --prune && git checkout claude/android-a0-probe
+for c in ffbaa04 411ad26 88cc151 d8ca4fe; do echo -n "$c: "; git show --stat --format="" $c | tr '\n' ' '; echo; done
+git log --oneline -1 -- .github/workflows/ci.yml
+```
+
+*Expected:* run 402 `conclusion: failure`, runs 398–401 `success`; each of the four commits reports
+`FIRINGS.md | 1 +` and `1 file changed`; the workflow's last touch is `e6f2d07`.
+
+### C-226-2 — the job dies at step 4 of 14, and every check below it is `skipped`
+
+> **Claim.** Job `104151782183` fails at step 4, `Set up Android SDK` (21:02:40Z → 21:02:47Z).
+> Steps 5–14 all report `skipped` — including step 6 (the citation guard), step 8 (**the vendored
+> sync-vector drift guard**), steps 9–10 (`:core:test`, `:app:test`), step 11 (`assembleDebug`),
+> step 12 (`lintDebug`) and step 13 (the tracker check). **No check in this workflow has executed
+> on this branch since 2026-09-14T21:02Z.**
+
+```bash
+# actions_list method=list_workflow_jobs owner=ShivaClaw repo=careerseeker-android \
+#   resource_id=34896487955
+# read the `steps` array: name, conclusion
+```
+
+*Expected:* steps 1–3 `success`, step 4 `failure`, steps 5–14 `skipped`.
+
+*Note the contrast with **B-25**, which is the red a reader is primed to expect on this branch:
+B-25's step is #14, it fails ~1s **after every check above it passed**, and here #14 is `skipped`.
+B-25 is a red job with a green gate; this is a red job with **no gate at all**.*
+
+### C-226-3 — the cause is the action's default `packages`, and `tools` no longer exists
+
+> **Claim.** `ci.yml` passed **no `with:` block**, so the runner echoed the action's defaults,
+> including `packages: tools platform-tools`. The step then ran exactly two commands:
+> `sdkmanager --licenses` (→ `All SDK package licenses accepted`) and `sdkmanager tools` →
+> `Warning: Failed to find package 'tools'` → `exit code 1`. `tools` is **first** in that list and
+> the action installs **one package at a time**, so **`platform-tools` was never attempted** — the
+> log contains no `sdkmanager platform-tools` line. Licences are **not** the cause.
+
+```bash
+# get_job_logs owner=ShivaClaw repo=careerseeker-android job_id=104151782183 return_content=true
+# then, over the saved log:
+python3 -c "
+import re,sys
+s=open(sys.argv[1]).read()
+for m in re.finditer(r'\[command\][^\\\\]*?sdkmanager[^\\\\]*', s): print(m.group(0)[:160])
+i=s.find('packages:'); print(s[i:i+60])
+print([l for l in s.split('\\\\n') if 'Failed to find package' in l])
+" <saved-log>
+```
+
+*Expected:* exactly two `sdkmanager` command lines (`--licenses`, then `tools`);
+`packages: tools platform-tools`; and `Warning: Failed to find package 'tools'`.
+
+### C-226-4 — `'tools platform-tools'` is the action's own declared default, not this repo's choice
+
+> **Claim.** `android-actions/setup-android@v3`'s `action.yml` declares an input `packages`,
+> `required: false`, default **`'tools platform-tools'`**.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/android-actions/setup-android/v3/action.yml | sed -n '/packages/,+4p'
+```
+
+*Expected:* the `packages` input with `default: 'tools platform-tools'`.
+
+### C-226-5 — the fix is one input, pinned to drop the obsolete package
+
+> **Claim.** The repair is `with: { packages: platform-tools }` on the `Set up Android SDK` step.
+> Nothing else in the workflow changed.
+
+```bash
+cd careerseeker-android && git diff e6f2d07..HEAD -- .github/workflows/ci.yml | grep -E '^[+-]' | grep -v '^[+-][+-]'
+```
+
+*Expected:* additions only — the `with:`/`packages:` pair and its comment block. **No deletion of
+any step, `run:` line, `if:` condition or assertion.**
+
+### C-226-6 — nothing in this repository ever used the `tools` package
+
+> **Claim.** No workflow step, script or Gradle file invokes `android`, `ddms`, `monitor`,
+> `$ANDROID_HOME/tools` or `sdk/tools` — the binaries the legacy `tools` package supplied.
+
+```bash
+cd careerseeker-android
+grep -rnE '\b(ddms|monitor|android (list|create|update)|\$ANDROID_HOME/tools|sdk/tools)\b' \
+  .github/ scripts/ app/build.gradle.kts core/build.gradle.kts build.gradle.kts settings.gradle.kts
+```
+
+*Expected:* **no matches** (exit 1).
+
+### C-226-7 — no check was weakened: 13 steps, identical order, nothing removed
+
+> **Claim.** The edited workflow parses, and `jobs.build.steps` still holds **13 steps in the same
+> order**, with the `setup-android` step resolving to
+> `{'uses': 'android-actions/setup-android@v3', 'with': {'packages': 'platform-tools'}}`.
+
+```bash
+cd careerseeker-android && python3 -c "
+import yaml,json
+d=yaml.safe_load(open('.github/workflows/ci.yml'))
+s=d['jobs']['build']['steps']
+print(len(s),'steps'); print([x.get('name') for x in s])
+print(json.dumps([x for x in s if 'setup-android' in str(x.get('uses',''))][0]))
+"
+"
+```
+
+*Expected:* `13 steps`, the order
+`Check out repository, Set up JDK 17, Set up Android SDK, Set up Gradle, Assert every cited C-/B- id
+resolves, Assert :core has no Android dependency, Assert vendored sync vectors match the pinned
+main-repo commit, Unit tests (:core), Unit tests (:app, Robolectric), Assemble debug APK, Lint,
+Assert no analytics or tracking SDKs ship, Upload debug APK`, and the step JSON above.
+
+### C-226-8 — CI step 6 was executed locally, and is green
+
+> **Claim.** `scripts/check-citations.sh` — the workflow's step 6, which needs no toolchain — runs
+> in this sandbox. Self-test: **all cases passed**. Real run: **`definitions: 1106   cited: 1107
+> documented-absent: 2`**, `OK: every cited C-/B- id resolves to an entry that exists.`, exit 0.
+> *(Counts are as measured **before** this run's own records were appended; the pushed tree's
+> counts are whatever the same command reports at `HEAD`, and CI step 6 is what pins them.)*
+
+```bash
+cd careerseeker-android && ./scripts/check-citations.sh --self-test && ./scripts/check-citations.sh
+```
+
+*Expected:* `self-test: all cases passed`, then an `OK:` line, exit 0 from both.
+
+### C-226-9 — B-7 re-probed this firing, and it is unchanged
+
+> **Claim.** The egress policy still denies the Android toolchain hosts. `dl.google.com` and
+> `api.foojay.io` are both **403 CONNECT-denied**; `repo1.maven.org` answers **200** as the
+> control. B-7 stands, was **honoured, not routed around**, and the local android gate remains
+> unreachable from this sandbox.
+
+```bash
+for u in https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.7.0/gradle-8.7.0.pom \
+         https://api.foojay.io/disco/v3.0/packages \
+         https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.0.21/kotlin-stdlib-2.0.21.pom; do
+  echo -n "$u -> "; curl -sS -o /dev/null -w "%{http_code}\n" --max-time 25 "$u" 2>&1 | tail -1
+done
+```
+
+*Expected:* the two Google/foojay URLs report `curl: (56) CONNECT tunnel failed, response 403` and
+code `000`; Maven Central reports `200`.
+
+### C-226-10 — the claim this run does NOT make
+
+> **Claim.** This firing **did not run the android gate** and does not assert the fix is green.
+> `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator` and `adb` are ABSENT and `ANDROID_HOME`
+> is UNSET. The confirming evidence is **the CI run on this push** — see **B-31**.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/5. Toolchain/,/^$/p'
+# then, after this push, read the NEW run's conclusion (do not re-run 34896487955):
+#   actions_list method=list_workflow_runs owner=ShivaClaw repo=careerseeker-android \
+#     resource_id=ci.yml workflow_runs_filter='{"branch":"claude/android-a0-probe"}'
+```
+
+*Expected:* the six ABSENT lines and `ANDROID_HOME UNSET`; and a run newer than 402 whose
+conclusion is the answer to B-31.
