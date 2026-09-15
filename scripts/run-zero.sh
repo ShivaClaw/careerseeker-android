@@ -212,8 +212,39 @@ GATE2_OPTIONAL_STEPS=''
 # silent. Run 203 measured it alongside the android repo, but this session's GitHub scope is
 # the two repos below; a third would be read out of scope. B-29 covers both, and the ios half
 # stays a MANUAL §6 query for a session whose scope includes it.
-SETTING_REPOS='android:ShivaClaw:careerseeker-android:false
-engine:ShivaClaw:careerseeker:false'
+#
+# RUN 231 WIDENED THIS SECTION FROM ONE FIELD TO FOUR, and found that run 230's own account of
+# what was reachable was half wrong. 230 recorded as next intent: "`archived`, `default_branch`
+# and branch protection are the same shape of silent event -- no commit, no file, no guard.
+# `archived` is the cheapest; branch protection ... needs a token and would go `??`-blind here."
+# The first clause is right and is closed below. THE SECOND IS THE ASSUMPTION THIS PROGRAM KEEPS
+# MAKING ABOUT ITS OWN REACH, for the third time (run 221 on `dotnet ABSENT`, run 227 on the
+# Actions API, this one). `/repos/O/R/branches/main/protection` IS 403 without a token. But
+# `/repos/O/R/branches/main` answers 200 ANONYMOUSLY and carries `.protected` plus
+# `.protection.required_status_checks.enforcement_level` -- which is the half that matters
+# (C-231-1). Measured before built, per run 228's rule.
+#
+# WHY EACH FIELD IS HERE. All four change with NO COMMIT BEHIND THEM, which is the blind class
+# §4d exists for:
+#   private         B-29's field. Run 230's.
+#   archived        an archived repo takes every push read-only. A firing would push, fail, and
+#                   the failure would look like the transport flaking, not like a decision.
+#   default_branch  LOAD-BEARING FOR THIS SCRIPT. §4 pins both mains by SHA, §4c reads the
+#                   engine gate on `main`. Repoint the default and those baselines keep
+#                   comparing a branch that is no longer the one anybody lands on -- green,
+#                   confidently, about the wrong ref.
+#   protected       the gates §4b/§4c watch are only worth what merging requires of them.
+#
+# THE POLARITY IS THE SAME ONE B-29 FORCED, and for `protected` it is NOT cosmetic. Both mains
+# measure `protected: false` with ZERO required status checks (C-231-2). Asserting the ideal --
+# that the gate enforcing $ExpectedOfflineTotal, the doc/verifier drift trap and the engine-side
+# half of the shared-vector guard should be REQUIRED to pass -- would paint this red on every
+# firing, forever, for a setting only the owner can change. So it asserts the RECORDED state and
+# prints the exposure as a standing note every run, exactly as B-29's is printed. That finding
+# is filed as B-32; it is not flipped here.
+SETTING_REPOS='android:ShivaClaw:careerseeker-android:false:false:main:false
+engine:ShivaClaw:careerseeker:false:false:main:false'
+#                label:owner:repo:private:archived:default_branch:protected
 # ---------------------------------------------------------------------------
 
 FAIL=0
@@ -540,16 +571,24 @@ gate_check "engine" "$GATE2_OWNER" "$GATE2_REPO" "$GATE2_WORKFLOW" \
   'Assert sync vectors match their generator' is the engine-side half of the SAME
   cross-repo vector guard §4b watches. Do not read a green run conclusion over this."
 
-# setting_check <label> <owner> <repo> <expected-private: true|false>
+# setting_check <label> <owner> <repo> <exp-private> <exp-archived> <exp-default-branch>
+#                <exp-protected>      (each true|false, except the branch name)
 #
 # Same contract as gate_check: it READS, it can move the verdict, and it goes loudly ?? rather
 # than quietly green when it cannot perform the check. RUNZERO_SETTING_EXPECT overrides the
 # expectation for every repo at once -- it exists so the comparator can be proven to FIRE on
 # live input, the way RUNZERO_GATE_RUN proves §4b/§4c (C-230-2). It is a test hook, not a
 # configuration knob: the baselines live in SETTING_REPOS above.
+#
+# RUN 231 added one hook per new field, same contract, same reason: a comparator exercised only
+# on green input is untested (run 228's rule). RUNZERO_ARCHIVED_EXPECT, RUNZERO_BRANCH_EXPECT
+# and RUNZERO_PROTECTED_EXPECT each override their field for every repo at once (C-231-3).
 setting_check() {
   local s_label=$1 s_owner=$2 s_repo=$3 s_expect=${RUNZERO_SETTING_EXPECT:-$4}
-  local s_api s_raw s_code s_body s_private s_vis s_updated
+  local s_exp_arch=${RUNZERO_ARCHIVED_EXPECT:-$5}
+  local s_exp_branch=${RUNZERO_BRANCH_EXPECT:-$6}
+  local s_exp_prot=${RUNZERO_PROTECTED_EXPECT:-$7}
+  local s_api s_raw s_code s_body s_private s_vis s_updated s_arch s_disabled s_branch
 
   s_api="https://api.github.com/repos/$s_owner/$s_repo"
   if ! command -v curl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
@@ -589,6 +628,12 @@ setting_check() {
     'import json,sys; print(json.load(sys.stdin).get("visibility"))' 2>/dev/null)
   s_updated=$(printf '%s' "$s_body" | python3 -c \
     'import json,sys; print(json.load(sys.stdin).get("updated_at"))' 2>/dev/null)
+  s_arch=$(printf '%s' "$s_body" | python3 -c \
+    'import json,sys; print(str(json.load(sys.stdin).get("archived")).lower())' 2>/dev/null)
+  s_disabled=$(printf '%s' "$s_body" | python3 -c \
+    'import json,sys; print(str(json.load(sys.stdin).get("disabled")).lower())' 2>/dev/null)
+  s_branch=$(printf '%s' "$s_body" | python3 -c \
+    'import json,sys; print(json.load(sys.stdin).get("default_branch"))' 2>/dev/null)
 
   if [ -z "$s_private" ]; then
     warn "$s_label: the API answered 200 but .private did not parse — NOT checked."
@@ -598,6 +643,8 @@ setting_check() {
 
   printf '  %-8s private: %-5s visibility: %-8s updated_at: %s\n' \
     "$s_label" "$s_private" "$s_vis" "$s_updated"
+  printf '  %-8s archived: %-5s disabled: %-5s default_branch: %s\n' \
+    "" "$s_arch" "$s_disabled" "$s_branch"
 
   if [ "$s_private" = "$s_expect" ]; then
     note "  unmoved against the recorded baseline (private: $s_expect)."
@@ -607,12 +654,103 @@ setting_check() {
     note "  file-content drift checks could never see this class. Re-derive B-29 before"
     note "  recording NOTHING MOVED, and do NOT flip it back: visibility is the owner's call."
   fi
+
+  # archived, added run 231. An archived repo is READ-ONLY: every push fails, and the failure
+  # surfaces as a transport error, not as a decision anybody made. `disabled` is read and
+  # printed alongside it but is NOT asserted -- it has no recorded baseline and this program
+  # has never seen it true, so asserting it would be pinning a value nobody measured moving.
+  if [ -z "$s_arch" ]; then
+    warn "$s_label: .archived did not parse — NOT checked."
+    SETTING_BLIND=1
+  elif [ "$s_arch" = "$s_exp_arch" ]; then
+    note "  unmoved against the recorded baseline (archived: $s_exp_arch)."
+  else
+    bad "$s_label: archived is '$s_arch', the recorded baseline is '$s_exp_arch'. THE SETTING MOVED."
+    note "  An ARCHIVED repository is read-only. If this is true, every push this routine makes"
+    note "  fails, and it fails looking like a network problem rather than an owner decision."
+  fi
+
+  # default_branch, added run 231. This one is load-bearing for the script reading it: §4 pins
+  # both mains by SHA and §4c reads the engine gate on `main`. Repoint the default and those
+  # checks keep comparing a ref nobody lands on any more, reporting green about the wrong branch.
+  if [ -z "$s_branch" ]; then
+    warn "$s_label: .default_branch did not parse — NOT checked."
+    SETTING_BLIND=1
+  elif [ "$s_branch" = "$s_exp_branch" ]; then
+    note "  unmoved against the recorded baseline (default_branch: $s_exp_branch)."
+  else
+    bad "$s_label: default_branch is '$s_branch', baseline is '$s_exp_branch'. THE SETTING MOVED."
+    note "  §4's pinned mains and §4c's gate read both name the OLD default. They will keep"
+    note "  reporting 'unmoved' about a branch that is no longer the one anybody lands on."
+  fi
+
+  protection_check "$s_label" "$s_owner" "$s_repo" "$s_branch" "$s_exp_prot"
 }
 
-head2 "4d. Repository SETTINGS — the class no file-content check can see (run 230)"
-while IFS=: read -r s_label s_owner s_repo s_expect; do
+# protection_check <label> <owner> <repo> <branch> <expected-protected: true|false>
+#
+# RUN 231, AND IT EXISTS BECAUSE RUN 230 GUESSED WRONG ABOUT ITS OWN REACH. 230 wrote that
+# branch protection "needs a token and would go ??-blind here". Half true, and the wrong half
+# was never measured: the dedicated endpoint
+#   GET /repos/O/R/branches/B/protection   -> 403 "Resource not accessible by integration"
+# but the branch object itself
+#   GET /repos/O/R/branches/B              -> 200, anonymously
+# carries `.protected` and `.protection.required_status_checks.enforcement_level` (C-231-1).
+# That is the third time this program has recorded a limit it never tested -- run 221 on
+# `dotnet ABSENT`, run 227 on the Actions API, run 230 here. Section 6's rule generalises:
+# before believing any "this sandbox cannot", check whether it was measured or assumed.
+#
+# WHAT IT STILL CANNOT SEE, stated so nothing here is overread: the anonymous branch object
+# gives the BOOLEAN and the enforcement level. It does NOT give required reviewers, dismissal
+# rules, force-push or deletion settings, or the required-checks CONTEXT LIST when protection
+# is on. So this can prove protection is OFF, and can detect it being switched on; it cannot
+# audit the contents of a protection rule. That needs a token and stays out of reach (B-32).
+protection_check() {
+  local p_label=$1 p_owner=$2 p_repo=$3 p_branch=$4 p_expect=$5
+  local p_raw p_code p_body p_protected p_level
+
+  [ -n "$p_branch" ] || return
+
+  p_raw=$(curl -sS --max-time 25 -w '\n%{http_code}' \
+    "https://api.github.com/repos/$p_owner/$p_repo/branches/$p_branch" 2>/dev/null)
+  p_code=$(printf '%s' "$p_raw" | tail -1)
+  p_body=$(printf '%s' "$p_raw" | sed '$d')
+
+  if [ "$p_code" != 200 ]; then
+    warn "$p_label: branch object answered HTTP ${p_code:-<none>} — protection NOT checked."
+    SETTING_BLIND=1
+    return
+  fi
+
+  p_protected=$(printf '%s' "$p_body" | python3 -c \
+    'import json,sys; print(str(json.load(sys.stdin).get("protected")).lower())' 2>/dev/null)
+  p_level=$(printf '%s' "$p_body" | python3 -c \
+    'import json,sys; d=json.load(sys.stdin).get("protection") or {}
+print((d.get("required_status_checks") or {}).get("enforcement_level"))' 2>/dev/null)
+
+  if [ -z "$p_protected" ]; then
+    warn "$p_label: .protected did not parse — protection NOT checked."
+    SETTING_BLIND=1
+    return
+  fi
+
+  printf '  %-8s %s protected: %-5s required_status_checks: %s\n' \
+    "" "$p_branch" "$p_protected" "${p_level:-<none>}"
+
+  if [ "$p_protected" = "$p_expect" ]; then
+    note "  unmoved against the recorded baseline (protected: $p_expect)."
+  else
+    bad "$p_label: $p_branch protected is '$p_protected', baseline is '$p_expect'. THE SETTING MOVED."
+    note "  Protection changing is worth the full records in EITHER direction: switched on"
+    note "  answers B-32, switched off removes a merge requirement nothing else here watches."
+  fi
+}
+
+head2 "4d. Repository SETTINGS — the class no file-content check can see (run 230, widened 231)"
+while IFS=: read -r s_label s_owner s_repo s_expect s_exp_arch s_exp_branch s_exp_prot; do
   [ -n "$s_label" ] || continue
-  setting_check "$s_label" "$s_owner" "$s_repo" "$s_expect"
+  setting_check "$s_label" "$s_owner" "$s_repo" "$s_expect" \
+                "$s_exp_arch" "$s_exp_branch" "$s_exp_prot"
 done <<EOF
 $SETTING_REPOS
 EOF
@@ -628,6 +766,15 @@ note "which says 'This repository is private, always.' That sentence and a live 
 note "false' still contradict each other, the owner was told at run 203 (C-203-1), and only he"
 note "decides which side gives way. What this section adds is that if he DOES decide, or if"
 note "anything else moves a setting, the next firing finds out instead of reporting green."
+note ""
+note "B-32 IS OPEN TOO, AND 'protected: false' ABOVE IS THE RECORDED STATE, NOT AN ENDORSEMENT."
+note "NEITHER main is protected and NEITHER has a required status check. So the two gates §4b"
+note "and §4c read — the ones enforcing \$ExpectedOfflineTotal, the doc/verifier drift trap, and"
+note "the engine-side half of the shared-vector guard — are ADVISORY. Nothing requires them to"
+note "be green before a commit lands on either main. That is not a contradiction the way B-29"
+note "is; it is a gap between what this program's records treat as load-bearing and what the"
+note "repositories actually enforce. Like B-29 it is one setting, and like B-29 an agent is"
+note "not the one to flip it. See BLOCKED.md B-32."
 
 # --- 5. toolchain, so nothing is claimed that could not have run ------------
 head2 "5. Toolchain — stated so no claim can be misread"
@@ -738,11 +885,24 @@ if [ "$FAIL" -eq 0 ]; then
   NOTHING MOVED on every check this sandbox can run, and all six guards are green
   (citations, plan-rot against its pinned spent state, conflict markers, vectors,
   the gates' own step arrays since run 227 -- §4b android, and §4c the engine gate
-  too, added at run 228 -- and, added at run 230, §4d's repository settings).
+  too, added at run 228 -- and, added at run 230 and widened at run 231, §4d's
+  repository settings: private, archived, default_branch and branch protection).
 
-  §4d IS 'UNMOVED', NOT 'CORRECT'. B-29 stays open: the android repo reads public
-  while its own README.md:7 says private, always. That is the owner's decision and
-  this script does not make it. See the note under §4d.
+  §4d IS 'UNMOVED', NOT 'CORRECT'. TWO open blockers live behind that word, and
+  neither is a firing's to close:
+
+    B-29  the android repo reads public while its own README.md:7 says private,
+          always. The owner was told at run 203.
+    B-32  NEITHER main is protected and NEITHER has a required status check, so
+          the gates §4b/§4c read are advisory -- nothing requires them green
+          before a commit lands. Found at run 231, and the reason it was never
+          found earlier is that run 230 recorded branch protection as needing a
+          token WITHOUT MEASURING IT. It does not: the branch object is public.
+
+  The second is the reusable one. Three times now this program has written down a
+  limit it never tested (run 221 `dotnet ABSENT`, run 227 the Actions API, run 230
+  branch protection). Before believing any "this sandbox cannot", check whether it
+  was measured or assumed.
 
   READ THIS BEFORE CONCLUDING THE LANE IS STILL WHAT IT WAS. The ground state this
   script described for ~100 firings ended on 2026-09-10/11. The owner landed the
