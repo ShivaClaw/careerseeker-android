@@ -44,6 +44,13 @@
 # (C-227-1). So "a gate result" — trigger 4, and the one B-31 was filed on —
 # is no longer MANUAL. It is §4b, it executes, and it can fail the verdict.
 #
+# RUN 228 FINISHED THAT THOUGHT. Run 227 watched ONE of the two gates and said so,
+# recording the engine repo's identical exposure as next intent. §4c now reads it:
+# the same check, the same verb (read, never ran), pointed at engine `main`, where
+# `Verify-Alpha.ps1` enforces $ExpectedOfflineTotal and the doc/verifier drift trap
+# and the relay job runs the engine-side copy of the shared-vector guard. Watching
+# one end of a cross-repo invariant is not watching it.
+#
 # BASELINES
 #
 # The recorded-state constants below are what "unmoved" means. They are pinned
@@ -56,13 +63,14 @@
 # USAGE
 #
 #   scripts/run-zero.sh [<engine-checkout>]      # default ../careerseeker
-#   RUNZERO_GATE_RUN=<workflow run id> scripts/run-zero.sh   # §4b replay, see below
+#   RUNZERO_GATE_RUN=<run id> scripts/run-zero.sh          # §4b replay (android)
+#   RUNZERO_ENGINE_GATE_RUN=<run id> scripts/run-zero.sh   # §4c replay (engine)
 #
 # Exit 0  — NOTHING MOVED, and every local check passed.
 # Exit 1  — something moved, or a local check failed. Read the report; do not
 #           proceed on the strength of the last recorded run's conclusions.
 #
-# §4b can also print '??' without failing: that is "the gate could not be READ",
+# §4b/§4c can also print '??' without failing: that is "the gate could not be READ",
 # which is not "the gate is fine". The VERDICT repeats it for that reason.
 
 set -uo pipefail
@@ -136,6 +144,41 @@ Assemble debug APK
 Lint
 Assert no analytics or tracking SDKs ship'
 GATE_OPTIONAL_STEPS='Upload debug APK'   # B-25: workflow_dispatch-gated, skipped by design
+
+# ---- the ENGINE gate, added run 228 (2026-09-15) — §4b's other half --------
+# Run 227 built §4b for the android repo and recorded, as next intent rather than a blocker,
+# that "the engine repo's CI has the identical exposure and is NOT yet watched". This is that
+# half, and the exposure is worse there than here, for a reason specific to what that CI runs.
+#
+# The android gate guards a build. The ENGINE gate is where `Verify-Alpha.ps1` executes, and
+# that script is the enforcement point for the engine repo's two documented failure modes:
+# `$ExpectedOfflineTotal` (a dropped harness assertion becomes a hard failure instead of a
+# quiet count drop) and the doc/verifier drift trap. Its relay job separately runs
+# `node docs/sync-vectors/generate.mjs --check` -- the SAME cross-repo vector guard that
+# §4b watches on the android side. So the corpus this program pins has a guard at each end,
+# and until this section existed the firing routine watched exactly one of them.
+#
+# Branch is `main`, not a work branch: main is where the drift trap has to hold. Nothing here
+# is claimed to have RUN in this sandbox -- Verify-Alpha.ps1 needs Windows (B-7). This READS
+# what windows-latest reported, which is the same verb §4b uses.
+#
+# Required steps verified first-person against .github/workflows/ci.yml at engine main
+# 14469ad and against the live step arrays of runs 495 and 497 (C-228-1). Two jobs:
+# 'Build and offline harnesses' on windows-latest, 'Blind relay (Worker)' on ubuntu-latest.
+# There is NO legitimate skip in this workflow -- no workflow_dispatch-gated step, no B-25
+# analogue -- so GATE2_OPTIONAL_STEPS is deliberately empty and ANY skip is a finding.
+GATE2_OWNER=ShivaClaw
+GATE2_REPO=careerseeker
+GATE2_WORKFLOW=ci.yml
+GATE2_BRANCH=main
+GATE2_REQUIRED_STEPS='Build Release with warnings as errors
+Run offline alpha verification
+Typecheck
+Test
+Validate config (no deploy)
+Assert the relay has no decryption path
+Assert sync vectors match their generator'
+GATE2_OPTIONAL_STEPS=''
 # ---------------------------------------------------------------------------
 
 FAIL=0
@@ -284,21 +327,40 @@ check_main() {
 check_main "$ENGINE"  "engine " "$BASE_ENGINE_MAIN"
 check_main "$ANDROID" "android" "$BASE_ANDROID_MAIN"
 
-# --- 4b. the gate: did CI EXECUTE, or merely report? (B-31) -----------------
-head2 "4b. The gate — did CI EXECUTE on this branch, or only report? (B-31)"
-gate_branch=$(git -C "$ANDROID" rev-parse --abbrev-ref HEAD 2>/dev/null)
-if [ -z "$gate_branch" ] || [ "$gate_branch" = HEAD ]; then
-  gate_branch=$GATE_BRANCH
-  note "checkout is detached — falling back to the pinned branch $gate_branch"
-fi
-gate_tip=$(git -C "$ANDROID" rev-parse "$gate_branch" 2>/dev/null)
-gate_api="https://api.github.com/repos/$GATE_OWNER/$GATE_REPO"
-gate_manual="actions_list method=list_workflow_runs owner=$GATE_OWNER repo=$GATE_REPO \\
-    resource_id=$GATE_WORKFLOW workflow_runs_filter='{\"branch\":\"$gate_branch\"}'"
+# --- 4b/4c. the gates: did CI EXECUTE, or merely report? (B-31) -------------
+#
+# RUN 228 MADE THIS A FUNCTION AND CALLED IT TWICE. Run 227 wrote it inline for the android
+# repo and left the engine repo unwatched as declared next intent. Parameterising was the
+# honest way to take that up: a SECOND hand-written copy of a detector is how the two halves
+# drift apart, and this house already has a name for that failure -- it is the doc/verifier
+# trap in the engine's CLAUDE.md, applied to a script instead of a doc.
+#
+# The refactor is behaviour-preserving for §4b BY TEST, not by inspection: the known-bad
+# replay that proved the detector at run 227 (C-227-3) is re-run against this version and
+# must still go red. A refactor of a detector that is only ever exercised on green input is
+# an untested detector, whatever the diff looks like.
+#
+# ONE REAL BEHAVIOUR CHANGE, and the engine gate is why. The old matcher took the FIRST
+# occurrence of a step name and stopped (`awk ... {print $1; exit}`). That is safe for one
+# job; the engine workflow has TWO, so a name appearing in both could report the first job's
+# conclusion while the second one's copy of that step was skipped or red. This version reads
+# EVERY occurrence and takes the worst. No android step name repeats, so §4b is unaffected.
 
 gate_fetch() {  # $1 url -> body on stdout, HTTP code as exit-carrying last line
   curl -sS --max-time 25 -w '\n%{http_code}' "$1" 2>/dev/null
 }
+
+# gate_check <label> <owner> <repo> <workflow> <branch> <tip-sha|""> <pinned-run|"">
+#            <required-steps (newline-separated)> <optional-steps|""> <signature-note>
+gate_check() {
+  local gate_label_hdr=$1 GATE_OWNER=$2 GATE_REPO=$3 GATE_WORKFLOW=$4
+  local gate_branch=$5 gate_tip=$6 gate_pin=$7
+  local GATE_REQUIRED_STEPS=$8 GATE_OPTIONAL_STEPS=$9 gate_signature=${10}
+  local gate_api gate_manual
+
+  gate_api="https://api.github.com/repos/$GATE_OWNER/$GATE_REPO"
+  gate_manual="actions_list method=list_workflow_runs owner=$GATE_OWNER repo=$GATE_REPO \\
+    resource_id=$GATE_WORKFLOW workflow_runs_filter='{\"branch\":\"$gate_branch\"}'"
 
 if ! command -v curl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
   warn "curl or python3 is ABSENT — this check needs both. Run it by hand:"
@@ -321,13 +383,14 @@ else
     note "  $gate_manual"
     GATE_BLIND=1
   else
-    # RUNZERO_GATE_RUN pins one run id instead of taking the branch's latest. It exists so this
+    # The caller may pin one run id instead of taking the branch's latest. It exists so this
     # check is FALSIFIABLE: a green section proves nothing about a detector until someone runs it
     # against a known-bad input. Replay the dead gate B-31 was filed on and watch §4b go red:
     #   RUNZERO_GATE_RUN=34896487955 scripts/run-zero.sh ../careerseeker   # run 402, C-227-3
-    if [ -n "${RUNZERO_GATE_RUN:-}" ]; then
-      note "REPLAY — RUNZERO_GATE_RUN=$RUNZERO_GATE_RUN pinned; the branch's latest is ignored."
-      gate_body=$(gate_fetch "$gate_api/actions/runs/$RUNZERO_GATE_RUN" | sed '$d')
+    # and RUNZERO_ENGINE_GATE_RUN does the same for §4c.
+    if [ -n "$gate_pin" ]; then
+      note "REPLAY — run $gate_pin pinned; the branch's latest is ignored."
+      gate_body=$(gate_fetch "$gate_api/actions/runs/$gate_pin" | sed '$d')
       gate_body="{\"workflow_runs\":[$gate_body]}"
     fi
     gate_out=$(printf '%s' "$gate_body" | python3 -c '
@@ -354,10 +417,10 @@ print("RUN\t%s\t%s\t%s\t%s\t%s"%(r["run_number"],r["id"],r["head_sha"],r["conclu
       GATE_BLIND=1
     else
       gate_label="latest completed"
-      [ -n "${RUNZERO_GATE_RUN:-}" ] && gate_label="PINNED (replay) "
+      [ -n "$gate_pin" ] && gate_label="PINNED (replay) "
       note "$gate_label: run $gate_num  ${gate_sha:0:7}  $gate_conc  ($gate_when)"
       [ -n "$gate_pend" ] && note "in flight       : run $gate_pend"
-      if [ "$gate_sha" != "$gate_tip" ]; then
+      if [ -n "$gate_tip" ] && [ "$gate_sha" != "$gate_tip" ]; then
         note "branch tip is ${gate_tip:0:7} — this run does NOT cover it (a push not yet gated,"
         note "which is the ordinary state mid-firing; the NEXT firing reads the run for it)."
       fi
@@ -376,10 +439,19 @@ for j in d.get("jobs",[]):
     for s in j.get("steps",[]):
         print("%s\t%s"%(s.get("conclusion"),s.get("name")))
 ')
-        gate_missing=0 gate_skipped=0 gate_failed=0
+        gate_missing=0 gate_skipped=0 gate_failed=0 gate_want_n=0
         while IFS= read -r want; do
           [ -z "$want" ] && continue
-          got=$(printf '%s\n' "$gate_steps" | awk -F'\t' -v n="$want" '$2==n{print $1; exit}')
+          gate_want_n=$((gate_want_n + 1))
+          # EVERY occurrence, worst-first — see the run-228 note above. A step name that
+          # appears in two jobs must not be cleared by whichever job happens to be listed
+          # first; `skipped` in either copy is still a check that did not execute.
+          got=$(printf '%s\n' "$gate_steps" | awk -F'\t' -v n="$want" '
+            $2==n { c=$1
+                    if (c=="failure"||c=="cancelled"||c=="timed_out") { worst=c; exit }
+                    if (c=="skipped") worst="skipped"
+                    else if (worst=="") worst="success" }
+            END   { print worst }')
           case "$got" in
             success)  ;;
             skipped)  bad "gate step NOT EXECUTED (skipped): $want"; gate_skipped=1 ;;
@@ -391,21 +463,46 @@ $GATE_REQUIRED_STEPS
 EOF
         if [ $gate_skipped = 1 ] || [ $gate_missing = 1 ]; then
           note ""
-          note "THIS IS B-31's SIGNATURE, NOT B-25's. A skipped or absent check did not pass;"
-          note "the vendored-vector drift guard is among the eight, so cross-repo drift is"
-          note "UNPROTECTED while this holds. Do not file it as the APK-quota red X."
+          note "$gate_signature"
         elif [ $gate_failed = 1 ]; then
           note ""
           note "The toolchain is fine and a REAL check is failing — a different, and better,"
           note "problem than B-31. Read the job log before touching anything."
-        else
-          note "all 8 required checks EXECUTED and passed; '$GATE_OPTIONAL_STEPS' skipped by"
+        elif [ -n "$GATE_OPTIONAL_STEPS" ]; then
+          note "all $gate_want_n required checks EXECUTED and passed; '$GATE_OPTIONAL_STEPS' skipped by"
           note "design (B-25, workflow_dispatch). The gate is alive, not merely green."
+        else
+          note "all $gate_want_n required checks EXECUTED and passed, and this workflow has NO"
+          note "skipped-by-design step, so any skip here would be a finding. Alive, not merely green."
         fi
       fi
     fi
   fi
 fi
+}
+
+head2 "4b. The android gate — did CI EXECUTE on this branch, or only report? (B-31)"
+a_branch=$(git -C "$ANDROID" rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ -z "$a_branch" ] || [ "$a_branch" = HEAD ]; then
+  a_branch=$GATE_BRANCH
+  note "checkout is detached — falling back to the pinned branch $a_branch"
+fi
+gate_check "android" "$GATE_OWNER" "$GATE_REPO" "$GATE_WORKFLOW" \
+  "$a_branch" "$(git -C "$ANDROID" rev-parse "$a_branch" 2>/dev/null)" \
+  "${RUNZERO_GATE_RUN:-}" "$GATE_REQUIRED_STEPS" "$GATE_OPTIONAL_STEPS" \
+  "THIS IS B-31's SIGNATURE, NOT B-25's. A skipped or absent check did not pass;
+  the vendored-vector drift guard is among the eight, so cross-repo drift is
+  UNPROTECTED while this holds. Do not file it as the APK-quota red X."
+
+head2 "4c. The engine gate — is Verify-Alpha.ps1 still EXECUTING on main? (run 228)"
+gate_check "engine" "$GATE2_OWNER" "$GATE2_REPO" "$GATE2_WORKFLOW" \
+  "$GATE2_BRANCH" "$(git -C "$ENGINE" rev-parse "origin/$GATE2_BRANCH" 2>/dev/null)" \
+  "${RUNZERO_ENGINE_GATE_RUN:-}" "$GATE2_REQUIRED_STEPS" "$GATE2_OPTIONAL_STEPS" \
+  "B-31's SIGNATURE, IN THE ENGINE REPO. A skipped or absent step did not pass, and
+  two of the seven are load-bearing beyond this repo: 'Run offline alpha verification'
+  is where \$ExpectedOfflineTotal and the doc/verifier drift trap are enforced, and
+  'Assert sync vectors match their generator' is the engine-side half of the SAME
+  cross-repo vector guard §4b watches. Do not read a green run conclusion over this."
 
 # --- 5. toolchain, so nothing is claimed that could not have run ------------
 head2 "5. Toolchain — stated so no claim can be misread"
@@ -500,15 +597,17 @@ head2 "VERDICT"
 # of what that costs. This does not set FAIL -- see warn()'s comment for why.
 if [ "$GATE_BLIND" -ne 0 ]; then
   printf '  ?? %s\n' \
-    "THE GATE WAS NOT READ THIS FIRING (§4b). Whatever the line below says, you are" \
-    "blind to B-31: a dead gate would look exactly like this run does. Answer §4b's" \
+    "A GATE WAS NOT READ THIS FIRING (§4b android, §4c engine — the line above says" \
+    "which). Whatever the verdict below says, you are" \
+    "blind to B-31 on that side: a dead gate would look exactly like this run does. Answer its" \
     "query through the session's GitHub path before recording NOTHING MOVED."
 fi
 if [ "$FAIL" -eq 0 ]; then
   cat <<'EOF'
   NOTHING MOVED on every check this sandbox can run, and all five guards are green
   (citations, plan-rot against its pinned spent state, conflict markers, vectors,
-  and -- since run 227 -- the gate's own step array, §4b).
+  and -- since run 227 -- the gates' own step arrays: §4b android, and §4c the engine
+  gate too, added at run 228).
 
   READ THIS BEFORE CONCLUDING THE LANE IS STILL WHAT IT WAS. The ground state this
   script described for ~100 firings ended on 2026-09-10/11. The owner landed the
