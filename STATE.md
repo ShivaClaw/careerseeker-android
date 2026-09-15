@@ -1,5 +1,67 @@
 # STATE — android tree
 
+> ## ✅ RUN 231 (2026-09-15) — **§4d WIDENED TO FOUR FIELDS, AND BOTH `main` BRANCHES TURN OUT TO BE UNPROTECTED (B-32).**
+>
+> **Heartbeat:** 2026-09-15, **two hundred and thirty-first** cloud iteration (Linux sandbox). Both
+> checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+> before any write: tip `0c6ed69`, rung **COMPLETE**, **files claimed: none** → **no collision**;
+> Terra retains right-of-way. `run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**, zero `!!`
+> lines; mains `14469ad`/`ebfaf81` unmoved, corpus **30/30** byte-identical at pin `11bb1f5`.
+> Assigned S5 spec half is **on engine `main`** — **declined, the 184th time**, re-verified in the
+> files rather than quoted (**C-231-7**), and its nominated check run first-person:
+> `generate.mjs --check` → `OK: 30 vector files match the generator.`, exit 0.
+>
+> **Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`
+> (android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged). **Nothing
+> else in the engine repo was written — it was READ ONLY.** **No rung's status changed.**
+>
+> **The slice: run 230's declared next intent — and the first thing it found was run 230 being
+> wrong about its own reach.** 230 recorded branch protection as the field that *"needs a token and
+> would go `??`-blind here"*. Nobody tested it. `GET /repos/O/R/branches/main/protection` **is** 403
+> unauthenticated — so the prediction is defensible about the endpoint it names — but
+> `GET /repos/O/R/branches/main` answers **200 anonymously** and carries `.protected` and
+> `.protection.required_status_checks.enforcement_level` (**C-231-1**). **That is the third recorded
+> limit this program never measured** (run 221 `dotnet ABSENT`, run 227 the Actions API, run 230
+> this). Each was written by this program, about itself, in records whose selling point is that
+> every claim carries a re-verification command. **The claims carry commands; the limits never did**
+> — and that asymmetry is worth more than the check it produced.
+>
+> **THE FINDING, AND IT IS NEW IN 230 RUNS: both `main` branches are `protected: false` with
+> `enforcement_level: off` and zero required contexts** (**C-231-2**). **Nothing requires either
+> gate green before a commit lands.** The gates §4b/§4c watch are the ones enforcing
+> `$ExpectedOfflineTotal`, the **doc/verifier drift trap**, and the **engine-side half of the
+> shared-vector guard** — cross-repo invariants with a guard at each end, **and neither end is
+> required**. This does **not** contradict the engine `CLAUDE.md`, and the distinction is the whole
+> finding: that file is right about **execution** (§4c re-measured it green), and says nothing about
+> **enforcement**. *A hard failure that no merge consults is a notification.* This program's records
+> have called those gates barriers; they are notifications. Filed **B-32**, **not flipped** — one
+> click away and deliberately left to the owner, with declining recorded as a legitimate answer.
+>
+> **Wired in with B-29's polarity** — assert the *recorded* state, print the exposure as a standing
+> note every run, because asserting the ideal would paint the section red forever and break run
+> 118's empty-firing law (**C-231-4**). **Proven in both directions:** three new hooks each fire on
+> live input for both repos and exit 1, run 230's `RUNZERO_SETTING_EXPECT` is behaviour-preserved,
+> and the run-227 known-bad replay still prints 8 skipped lines and exits 1 (**C-231-3**).
+> **Honestly bounded** (**C-231-5**): the blind path was exercised under a `python3`-less shim, that
+> shim run's exit 1 comes from `repin-vectors.sh` and **not** from §4d, and `protection_check`'s
+> non-200 branch is **claimed as code, not measured** — only its premise (a bogus branch → 404) was.
+>
+> **No trigger fired; no escalation sent. ESCALATION LEDGER stays at 18.** All five negative
+> (**C-231-8**): mains unmoved; board **3 engine + 6 android open, every row draft, zero android PRs
+> ever merged**; prompt unchanged with its three known-stale facts; both gate reads are re-reads of
+> a prior push's own CI; calendar arm **not due** (re-arms on or after **2026-09-20**). **B-32 did
+> not fire one either, and that is what an auditor should attack first** — it is a real finding, so
+> the full records apply and this is not an empty firing, but it is none of the four trigger
+> subjects, nothing regressed today, and the owner already holds one unanswered settings decision
+> (B-29). A nineteenth message adding a second is the fatigue the ledger exists to prevent.
+>
+> **NEXT INTENT.** What remains is **inside** a protection rule — required reviewers, dismissal
+> rules, force-push and deletion settings, the required-checks context list — none of it on the
+> branch object, and all of it relevant the moment B-32 is answered *yes*. It needs a token, and
+> **this run declines to predict whether one is obtainable here**: predicting reach without
+> measuring it is the exact mistake this run was spent correcting. **Measure first.** B-18's
+> smallest human unblock is unchanged: a human stops or repoints the schedule.
+
 > ## ✅ RUN 230 (2026-09-15) — **§4d: THE ROUTINE CAN NOW SEE A DRIFT CLASS THAT LEAVES NO COMMIT BEHIND.**
 >
 > **Heartbeat:** 2026-09-15, **two hundred and thirtieth** cloud iteration (Linux sandbox). Both

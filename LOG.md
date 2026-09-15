@@ -20978,3 +20978,165 @@ remains the owner's decision, measured and not flipped. **`careerseeker-ios` was
 outside this session's GitHub scope, and its absence from §4d is documented in the script rather than
 silent. The **engine repository was READ ONLY**: its only write is this iteration's heartbeat on the
 docs-only `autonomy/claude-state` branch, which is never merged.
+
+---
+
+# RUN 231 — 2026-09-15 — §4d widened, and the sentence run 230 wrote about its own reach was wrong
+
+**Heartbeat:** 2026-09-15, **two hundred and thirty-first** cloud iteration (Linux sandbox). Both
+checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+before any write: tip `0c6ed69`, rung **COMPLETE**, **files claimed: none** → **no collision**;
+Terra retains right-of-way. `run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**, zero `!!`
+lines; mains `14469ad`/`ebfaf81` unmoved, corpus **30/30** byte-identical at pin `11bb1f5`.
+
+**Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`
+(android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged). **Nothing else
+in the engine repo was written — it was READ ONLY.**
+
+## Milestone 1 — the assigned slice, declined for the 184th time, re-verified in the product
+
+The prompt assigns S5's spec half: amend §4.3 for `entitlement_ack`, close PQ-A2-1/-2/-3, add the
+vectors. **It is built and it is on engine `main`.** Re-read first-person this firing rather than
+quoted from a prior run's record (**C-231-7**): §4.3.3 carries the body `{product_id,
+acknowledged_at, order_id?}` with `order_id` marked OPTIONAL and the decision line *"Decided
+2026-08-07 (gate PQ-A6-1, default-proceed)"*; §3.1 reads *"Amended in S5 (PQ-A2-1)"* and caps the
+**decoded** ciphertext, naming both receivers; §3 reports `decrypt_failed` for every structural
+rejection and deliberately adds no `malformed` code; `invalid-unknown-field.json` and both ack
+vectors are among the 30 on `main`.
+
+**The prompt's own nominated verification is the one command this environment can execute, and it
+was executed:** `node docs/sync-vectors/generate.mjs --check` → **`OK: 30 vector files match the
+generator.`**, exit **0**. Rebuilding the slice would author a **second** §4.3 amendment and
+regenerate the corpus the phone vendors byte-identically — **the cross-repo drift event the prompt
+itself bars**. The prompt's pin `679a317` is stale (real pin `11bb1f5`) and its *"S5 ... NOT
+STARTED"* is stale; both were already known and neither is new.
+
+## Milestone 2 — measured before built, and the measurement contradicted run 230
+
+Run 230 closed with a next intent naming three fields and a prediction about the third: *"branch
+protection on engine `main` is the most load-bearing but needs a token and would go `??`-blind
+here."* **The prediction was never tested, and it is wrong where it matters** (**C-231-1**):
+
+| endpoint | anonymous result |
+| --- | --- |
+| `GET /repos/O/R/branches/main/protection` | **403** `Resource not accessible by integration` |
+| `GET /repos/O/R/branches/main` | **200**, with `.protected` and `.protection.required_status_checks.enforcement_level` |
+
+Run 230 was right about the endpoint it named and wrong about the question. **This is the third
+time** this program has recorded a limit it never measured — run 221 (`dotnet ABSENT` read as
+"nothing measurable"), run 227 (the Actions API "cannot be reached from bash"), and now run 230.
+Each time the assumption was written **by this program, about itself**, in a record set whose whole
+selling point is that every claim carries a re-verification command. **The claims carry commands;
+the limits never did.** That asymmetry is the reusable finding and it is larger than the check it
+produced. Run 227's rule, restated because it keeps paying: *before believing any "this sandbox
+cannot", check whether it was measured or assumed.*
+
+## Milestone 3 — the finding: both gates are advisory (B-32)
+
+Both `main` branches measure **`protected: false`, `enforcement_level: off`, zero required
+contexts** (**C-231-2**). So **nothing requires either gate green before a commit lands**. The gates
+§4b and §4c read are the ones enforcing `$ExpectedOfflineTotal`, the **doc/verifier drift trap**,
+and the **engine-side half of the shared-vector guard** whose android-side half protects the pinned
+corpus. Every one of those is a cross-repo invariant with a guard at each end, and **neither end is
+required**.
+
+**This does not contradict the engine `CLAUDE.md`,** and the distinction is the whole of the
+finding. That file says CI runs `Verify-Alpha.ps1` on `windows-latest` "on every push/PR", which is
+true about **execution** — §4c re-measured it green this firing. What is not true is anything about
+**enforcement**: *a hard failure that no merge consults is a notification.* This program's records
+have described those gates as barriers; they are notifications.
+
+**It is not B-31's class.** B-31 was a gate that had stopped executing while reporting green. This
+is a gate that executes correctly and is simply not consulted.
+
+**Filed, not flipped.** No repository setting was changed. B-32 records the symptom, the three
+attempts, what the anonymous API **cannot** see (required reviewers, dismissal rules, force-push
+settings, the required-checks context list once protection exists), and a smallest human unblock
+that is four clicks — **and it records that declining is a legitimate answer**, since B-30 already
+establishes the engine gate is Windows-only, so a required engine check is one the owner must
+satisfy from Windows before landing even a docs-only commit. If he declines, the unblock is instead
+one sentence saying the gates are advisory by choice, and B-32 closes WONTFIX. **What is not
+acceptable is records that keep calling them barriers.**
+
+## Milestone 4 — wired in, with B-29's polarity, and proven in every direction
+
+§4d now reads **four** fields per repo. `private` (B-29's, unchanged), `archived` (a read-only repo
+makes every push fail **looking like a transport error rather than a decision**), `default_branch`
+(**load-bearing for the script reading it** — §4 pins both mains by SHA and §4c reads the gate on
+`main`, so a repointed default leaves both reporting green about a ref nobody lands on), and
+`protected`. `disabled` is read and printed but **deliberately not asserted**: it has no recorded
+baseline and this program has never seen it true, so pinning it would be pinning a value nobody
+measured moving.
+
+**Polarity is B-29's and it is not cosmetic here.** Asserting the *ideal* — that the gates should be
+required — would paint §4d red on every firing forever for a decision the owner has not made, which
+is the green-tick problem inverted and would break run 118's empty-firing law by making every firing
+look like a finding. So §4d asserts the **recorded** state and prints the exposure as a standing
+note that never goes quiet (**C-231-4**).
+
+**Proven in both directions**, per run 228's rule that a detector exercised only on green input is
+untested. Three new hooks — `RUNZERO_ARCHIVED_EXPECT`, `RUNZERO_BRANCH_EXPECT`,
+`RUNZERO_PROTECTED_EXPECT` — each fire on **live** input for **both** repos and exit **1**; run
+230's `RUNZERO_SETTING_EXPECT` still behaves exactly as **C-230-2** recorded, and the run-227
+known-bad gate replay still prints **8** `NOT EXECUTED (skipped)` lines and exits 1, so the refactor
+changed no gate behaviour (**C-231-3**).
+
+**Honestly bounded** (**C-231-5**). The blind path was exercised under a `python3`-less `PATH` shim:
+§4d prints `??` per repo and the VERDICT repeats the blindness, and §4d's `warn()` deliberately does
+**not** set `FAIL`. The shim run's overall exit of 1 comes from `repin-vectors.sh` losing a tool the
+shim does not carry — **not from §4d**, and that is stated rather than allowed to read as a §4d
+failure. `protection_check`'s non-200 branch is **claimed as code, not as measured behaviour**; what
+was measured is its premise, that a nonexistent branch answers **404**. Two hooks at once is
+untested and unclaimed.
+
+## Escalation
+
+**No trigger fired; no message sent. ESCALATION LEDGER stays at 18.** All five measured negative
+(**C-231-8**): mains unmoved; board **3 engine + 6 android open, every row draft, zero android PRs
+ever merged** (#6 is a prior firing's own draft, which the rule excludes); prompt unchanged with its
+three known-stale facts intact; both gate reads are **re-reads of a prior push's own CI**, not new
+gate results; calendar arm **not due** — the eighteenth went at run 226 on 2026-09-15, re-arming on
+or after **2026-09-20**.
+
+**B-32 did not fire a trigger, and that judgement is the thing an auditor should attack first.** It
+is a real new finding, so this is **not** an empty firing under run 118's law and the full record
+set is written rather than a `FIRINGS.md` line. But the standing test notifies on *main moving, a PR
+merged or undrafted, the prompt changing, or a gate result* — and a settings finding is none of
+those. It is also not urgent: the gates have been advisory for the entire life of both repositories,
+**nothing regressed today**, and the owner already holds one unanswered settings decision (B-29,
+sent run 203). A nineteenth message adding a second one is the channel fatigue the ledger exists to
+prevent. **If that reasoning is wrong, it is wrong about the trigger list, not about the
+measurement.**
+
+**NEXT INTENT.** §4d now covers the fields the anonymous API exposes cheaply. The honest remaining
+gap is **inside** a protection rule — required reviewers, dismissal rules, force-push and deletion
+settings, and the required-checks context list — none of which the branch object carries, and all of
+which become relevant the moment B-32 is answered *yes*. That needs a token, and **this run declines
+to predict whether one is obtainable here**, because predicting reach without measuring it is the
+exact mistake this run was spent correcting. A session that takes it up should **measure first**.
+**B-18's smallest human unblock is unchanged: a human stops or repoints the schedule.**
+
+## Boundary — what this run did NOT touch
+
+**No gate ran and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`
+and `gh` are ABSENT; `ANDROID_HOME` is UNSET. Neither `Verify-Alpha.ps1` nor the five-task android
+command was reachable; B-7's `dl.google.com` denial was **not re-probed and not routed around**, and
+the `dotnet` apt route §5 documents was **not taken**. §4b/§4c/§4d **read** what other machines
+produced; the verb is never *ran*.
+
+**No vector byte was written and no pin moved** (corpus 30/30 at `11bb1f5`), and the generator check
+was run **read-only**. No `$ExpectedOfflineTotal` change, no `Verify-Alpha.ps1` edit, no pinch point
+touched. **No C# and no Kotlin written** — the S5 appliers stay where run 225 found them, and a
+compile-only claim is what this house forbids. **Nothing merged in either repo**, no PR undrafted,
+no branch deleted, no force-push, no history rewritten. **No deploy of any kind**, and the
+production relay was **not contacted at all** — not even `/v1/health`. No Google/Play/OAuth console,
+no accounts, no purchases, no Gmail, no secrets read or printed.
+
+**No repository setting was changed, and B-32 is exactly the temptation that makes this worth
+saying twice.** This run found that neither `main` is protected and that its own gates are
+therefore advisory — and enabling protection is one click on a settings page this session can
+reach. It reads, it files, it does not flip. B-29 remains the owner's decision on the same terms.
+**`careerseeker-ios` was not queried**: it is outside this session's GitHub scope, and its absence
+from §4d is documented in the script rather than silent. The **engine repository was READ ONLY** —
+its only write is this iteration's heartbeat on the docs-only `autonomy/claude-state` branch, which
+is never merged.
