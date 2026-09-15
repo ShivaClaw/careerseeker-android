@@ -22780,3 +22780,188 @@ cd ../careerseeker && git status --porcelain && git log --oneline -1 origin/main
 
 *Expected:* `dotnet/pwsh/sdkmanager/avdmanager/emulator/adb/gh ABSENT`, `ANDROID_HOME UNSET`,
 `node/git/java/gradle PRESENT`; a clean engine worktree with `origin/main` at `14469ad`.
+
+---
+
+## Run 230 — 2026-09-15. §4d: the drift class that leaves no commit behind
+
+Every claim below was produced in that firing. **C-230-1 … C-230-4** re-verify by running
+`run-zero.sh` in a checkout of this repo; they reach `api.github.com` unauthenticated, with no
+`gh`, no token and no toolchain. **C-230-5** is the boundary.
+
+**The gap this closes was named by run 228 as next intent, not as a blocker**, and its one-line
+statement is the whole case: *every drift check in both repositories compares FILE CONTENTS.*
+A repository setting changes with no commit behind it, so the entire guard set was structurally
+incapable of seeing the class **B-29 was found in** — and B-29 was found by a human reading, not
+by the routine.
+
+**Read C-230-3 before reading C-230-1 as good news.** §4d asserts the RECORDED BASELINE, not the
+documented ideal. `unmoved` is not a pass of `README.md:7`.
+
+### C-230-1 — §4d reads both repositories' settings, and both are unmoved
+
+> **Claim.** `run-zero.sh` **§4d** reads `GET https://api.github.com/repos/ShivaClaw/<repo>`
+> unauthenticated for both repos in scope and compares `.private` against the baseline pinned in
+> `SETTING_REPOS`. Measured this firing: **android** `private: false` / `visibility: public` /
+> `updated_at: 2026-09-04T17:33:24Z`, and **engine** `private: false` / `visibility: public` /
+> `updated_at: 2026-09-11T01:22:12Z`. Both match their baseline of `false`, so **no setting moved**.
+> The android figures are **byte-identical to run 228's** measurement of the same fields, which is
+> what makes the baseline a baseline rather than a guess. The verb is **read**; nothing was changed,
+> and **visibility was not flipped in either direction** — that is the owner's call (B-29).
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 4d/,/^== 5\./p'
+```
+
+*Expected:* two `private: false visibility: public` lines, each followed by `unmoved against the
+recorded baseline (private: false)`, then the standing B-29 paragraph. **`updated_at` moves when
+the owner touches repository metadata — that is the check working, not drift. Only `.private`
+is asserted.**
+
+### C-230-2 — §4d is falsifiable, and the comparator was proven to FIRE on live input
+
+> **Claim.** A detector exercised only on passing input is an untested detector — the rule run 228
+> applied to its own refactor (**C-228-3**). §4d accepts `RUNZERO_SETTING_EXPECT` to override the
+> baseline for every repo at once. Setting it to `true` against the live (public) reading makes §4d
+> print **two** `!! ... THE SETTING MOVED.` lines, flip the VERDICT to `SOMETHING MOVED`, and exit
+> **1**. The reading is real and live; only the expectation is overridden, so this proves the
+> comparator on the actual API response rather than on a fixture.
+
+```bash
+cd careerseeker-android && RUNZERO_SETTING_EXPECT=true scripts/run-zero.sh ../careerseeker \
+  2>&1 | sed -n '/^== 4d/,/^== 5\./p'
+RUNZERO_SETTING_EXPECT=true scripts/run-zero.sh ../careerseeker >/dev/null 2>&1; echo "EXIT=$?"
+```
+
+*Expected:* `!! android: private is 'false', the recorded baseline is 'true'. THE SETTING MOVED.`
+and the same for `engine`, the `RUNZERO_SETTING_EXPECT=true is set` hook warning, and `EXIT=1`.
+
+### C-230-3 — §4d does NOT close B-29, and says so in its own output
+
+> **Claim.** The polarity here is deliberate and is the one design decision in this slice worth
+> attacking. `careerseeker-android/README.md:7` says *"This repository is private, always."* The
+> live setting reads `private: false`. Asserting the README's value would paint §4d **red on every
+> firing, forever**, for a divergence the owner already knows about (escalated run 203, **C-203-1**)
+> and alone can decide — and a check that is red every run is not a check. It would also break
+> run 118's empty-firing rule by making every firing look like a finding. So §4d asserts the recorded
+> baseline, exactly as §4 does for the two mains, and answers one question: **has the setting moved
+> since the house last looked?** The contradiction is printed **every run** as a standing note that
+> never goes quiet, and `unmoved` is never presented as a pass of `README.md:7`.
+
+```bash
+cd careerseeker-android && sed -n '7p' README.md
+scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/B-29 IS OPEN AND THIS SECTION/,/reporting green/p'
+scripts/run-zero.sh ../careerseeker 2>&1 | sed -n "/§4d IS 'UNMOVED'/,/note under §4d/p"
+```
+
+*Expected:* the README line asserting private-always; then §4d's standing paragraph naming the
+contradiction and C-203-1; then the VERDICT's own repetition of it. **If the owner has answered
+B-29, the answer decides which way this check should assert — re-point `SETTING_REPOS` and record
+it; do not flip the repository.**
+
+### C-230-4 — §4d goes loudly blind rather than quietly green
+
+> **Claim.** A check that cannot be PERFORMED must not read as a check that passed — `warn()`'s rule,
+> written at run 227 for §4b. §4d follows it: when `curl` or `python3` is missing it prints `??`, sets
+> `SETTING_BLIND`, and the VERDICT repeats the blindness in its own paragraph. Measured by running
+> the whole probe under a `PATH` shim containing every binary it uses **except `python3`**: §4d
+> printed two `?? ... setting NOT checked` lines naming the manual `get_repository` query, and the
+> VERDICT printed `A REPOSITORY SETTING WAS NOT READ THIS FIRING (§4d)`. **Honest scope of this
+> measurement:** `warn()` does not set `FAIL`, and the `EXIT=1` seen under the shim came from a
+> *different* guard — `repin-vectors.sh --check`, which needs `python3` too — not from §4d. **The
+> HTTP-404 branch (the repo went private) and the non-200 branch are NOT exercised by execution
+> here** and are claimed only as code, not as measured behaviour; reaching 404 honestly would require
+> the setting to actually change, and probing a repo outside this session's scope to force one is
+> the kind of shortcut this house does not take.
+
+```bash
+cd careerseeker-android
+SHIM=$(mktemp -d); for b in bash sh git curl sed awk grep cut tail head sort uniq tr wc \
+  date printf cat basename dirname mktemp rm find xargs node; do \
+  p=$(command -v $b) && ln -sf "$p" $SHIM/$b; done
+env PATH=$SHIM scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 4d/,/^== 5\./p'
+env PATH=$SHIM scripts/run-zero.sh ../careerseeker 2>&1 | grep 'REPOSITORY SETTING WAS NOT READ'
+```
+
+*Expected:* two `?? curl or python3 is ABSENT — <label> setting NOT checked` lines each followed by
+the `get_repository owner=ShivaClaw repo=...` manual query, and the VERDICT's `?? A REPOSITORY
+SETTING WAS NOT READ THIS FIRING (§4d)` paragraph. **The shim also breaks `repin-vectors.sh`; that
+red is the shim's, not a real drift event. Do not read it as one.**
+
+### C-230-5 — what this firing did NOT do, stated so it cannot be read as done
+
+> **Claim.** **No gate ran and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`,
+> `emulator`, `adb` and `gh` are ABSENT here and `ANDROID_HOME` is UNSET, so neither
+> `Verify-Alpha.ps1` nor the five-task android command was reachable; B-7's `dl.google.com` CONNECT
+> denial was **not re-probed and not routed around**, and the `dotnet` apt route §5 documents was
+> **not taken**. §4b/§4c/§4d **read** what other machines produced. **The assigned S5 spec slice was
+> declined for the 183rd time and re-verified first-person rather than quoted** — see C-230-6. **No
+> vector byte was written and no pin moved** (corpus 30/30 at `11bb1f5`); no `$ExpectedOfflineTotal`
+> touched, no `Verify-Alpha.ps1` edit, no C# and no Kotlin written, **nothing merged in either
+> repo**, no branch deleted, no force-push, no history rewritten, no deploy of any kind, and the
+> production relay was **not contacted at all** — not even `/v1/health`. **No repository setting was
+> changed**: §4d reads, and B-29 stays the owner's. The **engine repository was READ ONLY** — its
+> only write is this iteration's heartbeat on the docs-only `autonomy/claude-state` branch.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 5\./,/^== 6\./p'
+cd ../careerseeker && git status --porcelain && git log --oneline -1 origin/main
+```
+
+*Expected:* `dotnet/pwsh/sdkmanager/avdmanager/emulator/adb/gh ABSENT`, `ANDROID_HOME UNSET`,
+`node/git/java/gradle PRESENT`; a clean engine worktree with `origin/main` at `14469ad`.
+
+### C-230-6 — the assigned slice, re-verified in the files and not quoted from the records
+
+> **Claim.** The stored prompt assigns S5's spec half and names four gates. **All four are already
+> closed on engine `main` `14469ad`**, read first-person this firing rather than carried forward:
+> **PQ-A6-1** — `docs/Sync-Protocol.md:608` carries §4.3.3 with the
+> `{product_id, acknowledged_at, order_id?}` body under *"Decided 2026-08-07 (gate PQ-A6-1,
+> default-proceed)"*, `order_id` marked OPTIONAL; **PQ-A2-1** — the amended cap at :356–:359 says
+> both implementations measure the **decoded** size; **PQ-A2-2** — :327–:331 names `decrypt_failed`
+> as the structural-rejection code and records why v1 adds no `malformed`; **PQ-A2-3** —
+> `invalid-unknown-field.json` sits in the 30-file corpus beside both ack vectors. The prompt's own
+> nominated verification, **the one command this environment can actually execute**, was run and
+> passed: `node docs/sync-vectors/generate.mjs --check` → `OK: 30 vector files match the generator.`,
+> exit 0. **Rebuilding any of it would author a second §4.3 amendment and regenerate the corpus the
+> phone vendors — the cross-repo drift event the prompt itself bars.** The prompt's pin `679a317`
+> is stale (real pin `11bb1f5`) and its "S5 NOT STARTED" is stale; both were already known.
+
+```bash
+cd careerseeker && git fetch --all --prune
+git show origin/main:docs/Sync-Protocol.md | sed -n '608,624p'   # PQ-A6-1 body
+git show origin/main:docs/Sync-Protocol.md | sed -n '356,360p'   # PQ-A2-1 decoded cap
+git show origin/main:docs/Sync-Protocol.md | sed -n '327,331p'   # PQ-A2-2 decrypt_failed
+git ls-tree origin/main docs/sync-vectors/v1/ --name-only | grep -c . # 30
+node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+```
+
+*Expected:* the `entitlement_ack body = {product_id, acknowledged_at, order_id}` block with
+`order_id` marked OPTIONAL; the decoded-size amendment naming both receivers; the `decrypt_failed`
+paragraph; `30`; and `OK: 30 vector files match the generator.` with `EXIT=0`.
+
+### C-230-7 — the five escalation triggers, each measured negative
+
+> **Claim.** No message was sent and the **ESCALATION LEDGER stays at 18**. All five triggers were
+> measured, not assumed. **(1) mains** — engine `14469ad`, android `ebfaf81`, both unmoved against
+> their pinned baselines (§4). **(2) a PR merged or undrafted** — board re-queried by MCP this
+> firing: engine **3 open** (#60, #58, #26), android **6 open** (#1–#6), **every row `draft: true`
+> and `merged: false`**, and zero android PRs have ever merged; #60 is a prior firing's own draft,
+> which the trigger rule excludes. **(3) the stored prompt** — unchanged, with all three known-stale
+> facts intact (pin `679a317`, "S5 NOT STARTED", the S-ladder summary). **(4) a gate result** —
+> §4b reads android run **408** on `c3af6e2`, which is firing 229's own head, and §4c reads engine
+> run **495** on `14469ad`; both are re-reads of a prior push's own CI, the class runs 223–225
+> established is **not** a new gate result. **(5) the calendar arm** — not due: the eighteenth
+> message went at run **226 on 2026-09-15**, and the predicate is five calendar days, so the arm
+> re-arms on or after **2026-09-20**.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 4\./,/^== 5\./p'
+# board, via the GitHub MCP server (no gh binary required — read section 6's note narrowly):
+#   list_pull_requests owner=ShivaClaw repo=careerseeker         state=open
+#   list_pull_requests owner=ShivaClaw repo=careerseeker-android state=open
+grep -n 'Messages sent:' STATE.md | head -1
+```
+
+*Expected:* both mains `unmoved`; both gates reporting all required steps EXECUTED; every PR row
+`draft: true`; and the ledger line reading **18**.

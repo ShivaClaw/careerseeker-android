@@ -5894,6 +5894,42 @@ script deliberately cannot reach (its §6 MANUAL limit), so it would have to be 
 rather than a shell one. **Not written this run**, because the right shape depends on the owner's
 answer above: if the repo is meant to be public, the check asserts the opposite.
 
+### Update, run 230 (2026-09-15) — the check is WRITTEN, and both halves of the reason it was not are wrong
+
+**The blocker itself is unchanged and still the owner's.** `private: false` / `visibility: public`,
+`updated_at` **`2026-09-04T17:33:24Z`** — re-measured this run, identical to run 228's reading
+(**C-230-1**). Nothing was flipped. What changed is the *detector*, and the paragraph above is worth
+re-reading as a specimen: **it gave two reasons for not writing one, and neither survived contact.**
+
+1. *"It would have to be a session-level check rather than a shell one."* **False, and it is run
+   227's lesson repeating one entry later.** `curl` reaches `api.github.com` **anonymously, HTTP
+   200**, for `GET /repos/{owner}/{repo}` exactly as it does for the Actions endpoints §4b/§4c now
+   use. The sentence above was written in the same week that discovery was made and still inherited
+   the old premise. **Before believing any "this has to be a session-level check", check whether
+   that was measured or assumed** — this program has now been wrong about it twice.
+2. *"The right shape depends on the owner's answer: if the repo is meant to be public, the check
+   asserts the opposite."* **This is the sharper error, because it sounds correct.** It assumes the
+   check must assert *correctness*. It does not, and it must not: asserting `README.md:7` would
+   paint the section red on every firing forever, which is not a check. §4d asserts **movement
+   against a recorded baseline** — the same thing §4 does for the two mains — and therefore needs no
+   answer from the owner at all. **A detector that reports change does not need the decision that a
+   detector reporting compliance would need**, and conflating the two is what deferred this for
+   twenty-seven firings.
+
+**Consequence for this blocker:** if the owner answers B-29 in either direction, §4d **fails the
+verdict on the next firing** and the answer gets recorded instead of missed. Whoever records it must
+re-point `SETTING_REPOS` in `scripts/run-zero.sh` and say so — **and must not flip the repository**.
+
+**What is still not covered, stated rather than left silent.** §4d checks `.private` **only**, and
+**only for the two repos in this session's GitHub scope**. `ShivaClaw/careerseeker-ios` — public on
+the same 22-second bulk flip this entry infers — is **outside that scope and was not queried this
+run**; it stays a MANUAL §6 query for a session whose scope includes it. The 404 branch (the repo
+having gone private) is **claimed as code and not as measured behaviour** (**C-230-4**).
+
+**Smallest human unblock — unchanged.** One decision: is `careerseeker-android` meant to be public?
+If not, flip it to private in repository settings; if so, amend `README.md:7`, which has said
+"private, always" throughout. Either way, the routine will now notice.
+
 ---
 
 ## B-30 — PR #60's fix is complete and cannot be proven: the gate that would confirm it is Windows-only (run 221, 2026-09-14)

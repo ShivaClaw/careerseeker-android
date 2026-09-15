@@ -20855,3 +20855,126 @@ deploy of any kind**, and the production relay was **not contacted at all** — 
 No Google/Play/OAuth console, no accounts, no purchases, no Gmail, no secrets read or printed.
 **B-29 was measured, not changed.** The **engine repository was READ ONLY**: its only write is this
 iteration's heartbeat on the docs-only `autonomy/claude-state` branch, which is never merged.
+
+---
+
+# Run 230 — 2026-09-15. §4d: the routine can now see the one drift class that leaves no commit behind
+
+**Heartbeat.** 2026-09-15, **two hundred and thirtieth** cloud iteration (Linux sandbox). Both
+checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+before any write: rung **COMPLETE**, **files claimed: none** → **no collision**; Terra retains
+right-of-way. `run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**; mains `14469ad`/`ebfaf81`
+unmoved, corpus **30/30** byte-identical at pin `11bb1f5`, citations **1133 / 1134 / 2** before this
+run's writes.
+
+**Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`
+(android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged). **Nothing else
+in the engine repo was written — it was READ ONLY.**
+
+## The slice: run 228's declared next intent, taken up
+
+Run 228 closed the gate blind spot at both ends and then wrote down, as **next intent rather than a
+blocker**, the gap it had noticed while doing so: *"Nothing in the firing routine asserts a
+repository **setting** (B-29's gap) — every drift check compares file contents."* That sentence is
+the whole case. A repository setting changes with **no commit behind it**, so every guard this
+program owns — citations, plan-rot, conflict markers, the vendored-vector corpus, both gates' step
+arrays — was structurally incapable of seeing it. **B-29 was found by a human reading the repo at
+run 203, not by the routine**, and nothing had changed since to make the routine able to find the
+next one.
+
+**§4d is that check** (**C-230-1**). It reads `GET /repos/ShivaClaw/<repo>` unauthenticated for both
+repos in scope, compares `.private` against a baseline pinned in `SETTING_REPOS`, and **can fail the
+verdict**. Same contract as §4b/§4c: it *reads*, it moves the verdict, and it goes loudly `??` rather
+than quietly green when it cannot perform the check.
+
+**Measured, and both settings are unmoved.** android `private: false` / `visibility: public` /
+`updated_at` **`2026-09-04T17:33:24Z`**; engine `private: false` / `public` /
+`2026-09-11T01:22:12Z`. The android figures are **byte-identical to run 228's** reading of the same
+fields, which is what makes the baseline a baseline rather than a guess (**C-230-1**).
+
+## The one design decision here, and it is the one to attack first
+
+**The polarity is not obvious, and getting it wrong would have been worse than leaving the gap
+open.** `README.md:7` says *"This repository is private, always."* The live setting says
+`private: false`. The naive check asserts the README — and would then be **red on every firing,
+forever**, for a divergence the owner already knows about (escalated run 203, **C-203-1**) and alone
+can decide. **A check that is red every run is not a check**; it is the green-tick problem inverted,
+and it would have broken run 118's empty-firing rule by making every firing look like a finding.
+
+So §4d asserts **the recorded baseline, not the documented ideal** — exactly what §4 already does
+for the two mains — and answers one question: **has the setting moved since the house last looked?**
+A flip to private is the owner *answering* B-29, and that is a change worth the full records. The
+contradiction with `README.md:7` is printed **every run** as a standing note that never goes quiet,
+and in the VERDICT too, so `unmoved` can never be misread as a pass of that sentence (**C-230-3**).
+
+**B-29 is not closed by this and this run did not flip anything.** Visibility is the owner's call.
+
+## Proven in both directions, because a detector exercised only on green input is untested
+
+That is run 228's own rule applied to this run's work (**C-228-3**). §4d takes
+`RUNZERO_SETTING_EXPECT` — a **test hook, not a configuration knob** — which overrides the baseline
+while leaving the reading live. Forced to `true` against the real public reading it prints **two**
+`!! ... THE SETTING MOVED.` lines, flips the VERDICT to `SOMETHING MOVED`, and exits **1**
+(**C-230-2**). The comparator is therefore proven on an actual API response, not on a fixture.
+
+**The blind path was exercised too**, under a `PATH` shim carrying every binary the probe uses
+**except `python3`**: §4d printed `??`, named the manual `get_repository` query, and the VERDICT
+printed its own `A REPOSITORY SETTING WAS NOT READ THIS FIRING (§4d)` paragraph (**C-230-4**).
+**Stated honestly and not padded:** the `EXIT=1` under that shim came from `repin-vectors.sh`, which
+also needs `python3`, **not** from §4d — `warn()` does not set `FAIL`. And the **404 branch (the repo
+went private) and the non-200 branch are claimed as code, not as measured behaviour**; forcing a 404
+would mean either changing the setting or probing a repo outside this session's scope, and neither is
+a shortcut this house takes.
+
+## The assigned slice, declined for the 183rd time — and re-verified, not quoted
+
+All four assigned gates were **already closed on engine `main` before this firing started**, read in
+the files this run rather than carried forward from the records (**C-230-6**): PQ-A6-1 at
+`docs/Sync-Protocol.md:608` with the `{product_id, acknowledged_at, order_id?}` body under *"Decided
+2026-08-07 (gate PQ-A6-1, default-proceed)"*; PQ-A2-1's decoded-size cap at :356; PQ-A2-2's
+`decrypt_failed` at :327; PQ-A2-3's `invalid-unknown-field.json` in the 30-file corpus. The prompt's
+own nominated verification — **the one command this environment can actually execute** — was run
+first-person: `node docs/sync-vectors/generate.mjs --check` → `OK: 30 vector files match the
+generator.`, **exit 0**. **Rebuilding any of it authors a second §4.3 amendment and regenerates the
+corpus the phone vendors: the cross-repo drift event the prompt itself bars.** The two appliers stay
+deferred and, per run 225, are in any case already built at both ends.
+
+## Escalation: no message sent, and the ledger stays at 18
+
+All five triggers measured negative (**C-230-7**): mains unmoved; board re-queried by MCP — engine
+**3 open**, android **6 open**, **every row `draft: true` / `merged: false`**, zero android PRs ever
+merged, #60 a prior firing's own draft which the rule excludes; the stored prompt unchanged with its
+three known-stale facts intact; both gate reads are re-reads of a prior push's own CI, not new gate
+results; and the calendar arm is **not due** — the eighteenth message went at run 226 on 2026-09-15,
+so the arm re-arms on or after **2026-09-20**.
+
+This is **not** an empty firing under run 118's law — real work landed and a new check executes — so
+the full record set is written rather than a `FIRINGS.md` line.
+
+**NEXT INTENT.** §4d watches `.private` and nothing else. The same API answers `archived`,
+`default_branch`, `allow_force_push` and the branch-protection state, and **`default_branch` moving
+or protection dropping would be the same shape of silent event** — no commit, no file, no guard. The
+cheapest of those is `archived`; the most load-bearing is branch protection on engine `main`, but
+that endpoint needs a token and would go `??`-blind here, so it should be added only with an honest
+account of what it can and cannot read anonymously. **B-18's smallest human unblock is unchanged: a
+human stops or repoints the schedule.**
+
+## Boundary — what this run did NOT touch
+
+**No gate ran and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`
+and `gh` are ABSENT; `ANDROID_HOME` is UNSET. Neither `Verify-Alpha.ps1` nor the five-task android
+command was reachable; B-7's `dl.google.com` denial was **not re-probed and not routed around**, and
+the `dotnet` apt route §5 documents was **not taken**. §4b/§4c/§4d **read** what other machines
+produced; the verb is never *ran*, and no earlier run's green is restated as this firing's.
+
+**No vector byte was written and no pin moved** (corpus 30/30 at `11bb1f5`). No
+`$ExpectedOfflineTotal` change, no `Verify-Alpha.ps1` edit, no pinch point touched. **No C# and no
+Kotlin written** — the S5 appliers stay where run 225 found them, and a compile-only claim is what
+this house forbids. **Nothing merged in either repo**, no PR undrafted, no branch deleted, no
+force-push, no history rewritten. **No deploy of any kind**, and the production relay was **not
+contacted at all** — not even `/v1/health`. No Google/Play/OAuth console, no accounts, no purchases,
+no Gmail, no secrets read or printed. **No repository setting was changed** — §4d reads, and B-29
+remains the owner's decision, measured and not flipped. **`careerseeker-ios` was not queried**: it is
+outside this session's GitHub scope, and its absence from §4d is documented in the script rather than
+silent. The **engine repository was READ ONLY**: its only write is this iteration's heartbeat on the
+docs-only `autonomy/claude-state` branch, which is never merged.

@@ -1,5 +1,66 @@
 # STATE — android tree
 
+> ## ✅ RUN 230 (2026-09-15) — **§4d: THE ROUTINE CAN NOW SEE A DRIFT CLASS THAT LEAVES NO COMMIT BEHIND.**
+>
+> **Heartbeat:** 2026-09-15, **two hundred and thirtieth** cloud iteration (Linux sandbox). Both
+> checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+> before any write: rung **COMPLETE**, **files claimed: none** → **no collision**; Terra retains
+> right-of-way. `run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**, all guards green; mains
+> `14469ad`/`ebfaf81` unmoved, corpus **30/30** byte-identical at pin `11bb1f5`, citations
+> **1140 / 1141 / 2** after this run's writes. Assigned S5 spec half is **on engine `main`** —
+> **declined, the 183rd time**, re-verified in the files rather than quoted (**C-230-6**).
+>
+> **Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`
+> (android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged). **Nothing
+> else in the engine repo was written — it was READ ONLY.**
+>
+> **The slice: run 228's declared next intent, taken up.** Every drift check this program owns
+> compares **file contents**. A repository setting changes with **no commit behind it**, so the whole
+> guard set was structurally blind to the class **B-29 was found in** — and B-29 was found by a human
+> reading the repo, not by the routine. **§4d** now reads `GET /repos/ShivaClaw/<repo>`
+> unauthenticated for both repos in scope, compares `.private` against a pinned baseline, and **can
+> fail the verdict** (**C-230-1**). Same contract as §4b/§4c: the verb is **read**, and it goes loudly
+> `??` rather than quietly green when it cannot perform the check (**C-230-4**).
+>
+> **Measured, and nothing moved.** android `private: false` / `public` / `updated_at`
+> **`2026-09-04T17:33:24Z`** — **byte-identical to run 228's** reading, which is what makes the
+> baseline a baseline; engine `private: false` / `public` / `2026-09-11T01:22:12Z`.
+>
+> **The one design decision, and it is what an auditor should attack first.** `README.md:7` says
+> *"This repository is private, always."* The live setting says otherwise. **Asserting the README
+> would paint this section red on every firing, forever** — which is not a check, and which would
+> break run 118's empty-firing rule by making every firing look like a finding. So §4d asserts
+> **movement against a recorded baseline**, exactly as §4 does for the two mains, and prints the
+> `README.md:7` contradiction **every run** — in the section and again in the VERDICT — so `unmoved`
+> can never be misread as a pass of that sentence (**C-230-3**). **B-29 stays open, and this firing
+> flipped nothing: visibility is the owner's call.**
+>
+> **Proven in both directions**, per run 228's own rule that a detector exercised only on green input
+> is untested: `RUNZERO_SETTING_EXPECT=true` against the live public reading prints two
+> `!! ... THE SETTING MOVED.` lines, flips the VERDICT, and exits **1** (**C-230-2**). **Honestly
+> bounded:** the blind path was exercised under a `python3`-less `PATH` shim, but the **404 and
+> non-200 branches are claimed as code, not as measured behaviour** (**C-230-4**).
+>
+> **B-29's own tail predicted this slice and was wrong twice** — it said the check "would have to be
+> a session-level check rather than a shell one" (false: `curl` reaches the repos endpoint
+> anonymously, run 227's lesson repeating one entry later) and that its shape "depends on the owner's
+> answer" (it does not — **a detector that reports change needs no decision that a detector reporting
+> compliance would need**). Both are written up in `BLOCKED.md` B-29, because the shape of the
+> mistake is more reusable than the fix.
+>
+> **No trigger fired; no escalation sent. ESCALATION LEDGER stays at 18.** All five negative
+> (**C-230-7**): mains unmoved; board **3 engine + 6 android open, every row draft, zero android PRs
+> ever merged** (#60 is a prior firing's own draft, which the rule excludes); prompt unchanged with
+> its three known-stale facts intact; both gate reads are **re-reads of a prior push's own CI**, not
+> new gate results; calendar arm **not due** — the eighteenth went at run 226 on 2026-09-15, so it
+> re-arms on or after **2026-09-20**.
+>
+> **NEXT INTENT.** §4d watches `.private` and nothing else. `archived`, `default_branch` and branch
+> protection are the same shape of silent event — no commit, no file, no guard. `archived` is the
+> cheapest; branch protection on engine `main` is the most load-bearing but needs a token and would
+> go `??`-blind here, so add it only with an honest account of what it can read anonymously.
+> **B-18's smallest human unblock is unchanged: a human stops or repoints the schedule.**
+
 > ## ✅ RUN 228 (2026-09-15) — **§4c: THE ENGINE GATE IS WATCHED TOO. B-31 IS NOW CLOSED IN BOTH REPOSITORIES.**
 >
 > **Heartbeat:** 2026-09-15, **two hundred and twenty-eighth** cloud iteration (Linux sandbox). Both
@@ -3791,6 +3852,14 @@ in [`RETURN-DAY.md`](RETURN-DAY.md)**.
 | **HEARTBEAT — TWO HUNDRED AND TWENTY-SEVENTH RUN (2026-09-15, Linux cloud sandbox). B-31's blind-spot half closed — and the thing that had kept it open was an untested sentence in B-31's own "smallest unblock".** | **Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md` (android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged). **The engine checkout was READ ONLY.** Android branch `claude/android-a0-probe`, draft PR [#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) refreshed and **it stays draft** — never-self-merge. **Rule one first:** `git fetch --all --prune` in both checkouts; the tree again arrived detached at docs-only `main` (`ebfaf81`); every count is post-fetch. **Ground state:** `scripts/run-zero.sh ../careerseeker` → `NOTHING MOVED`, exit **0** — pin **`11bb1f5`** unchanged, corpus **30/30** byte-identical, citations **1118/1119/2**, mains **`14469ad`** / **`ebfaf81`** unmoved, all three S5 commits on main as expected (**C-227-5**). **Assigned slice DECLINED** for the reason the mission banner gives, re-verified first-person, not quoted: S5's spec half is on engine `main` since 08-09/08-12, and rebuilding it is the cross-repo drift event the prompt forbids. **THE SLICE TAKEN: `run-zero.sh` §4b.** It reads the branch's latest completed CI run **and its step array**, checks the **eight required gate steps BY NAME** (names, not numbers — the array carries `Set up job` and three `Post …` entries and numbering is not contiguous), and **can fail the verdict**, which is the only thing that distinguishes it from the MANUAL paragraphs 225 firings read past. `Upload debug APK` is **deliberately not required** — `workflow_dispatch`-gated (**B-25**), skipped by design; that one legitimate skip beside eight mandatory ones is the exact B-25-vs-B-31 ambiguity, now **encoded** rather than left to memory. **Measured live:** run **404** (`34916439815`), head `6f261d2`, `success`, all eight EXECUTED (**C-227-2**). **Proven falsifiable, because a detector that has only printed green is unproven:** `RUNZERO_GATE_RUN=34896487955` replays the actual B-31 run → eight `!! gate step NOT EXECUTED (skipped)` lines, the B-31-not-B-25 paragraph, exit **1** (**C-227-3**). The replay **reads** run 402's stored array; **the workflow was not re-run** — its log is the evidence. **Degradation designed, not discovered:** an unreadable API prints `??`, sets a blind flag, prints the exact MCP query, and does **not** fail — the VERDICT then leads with *"THE GATE WAS NOT READ THIS FIRING"*. Failing would turn every firing red the moment **B-29** lands private; silence would reproduce B-31; loud-but-not-failing is neither (**C-227-4**). **Stated honestly: the `404` branch is written but NOT exercised** — this proxy answers 403 first. **The script's own header, which asserted the API was unreachable from bash, was corrected in the same commit** (doc/verifier drift discipline), and B-31 keeps its wrong premise visible as the lesson. **NO GATE RAN and none is claimed:** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` **ABSENT**, `ANDROID_HOME` **UNSET**; **§4b reads a result CI produced, it does not produce one** (**C-227-6**). B-7 honoured, not routed around. **Terra read first:** codex-state **COMPLETE**, files claimed **none** — no collision. **No trigger fired, no escalation sent** (**C-227-7**): android **6 open, all draft, zero ever merged**; engine **3 open** (#60, #58, #26), all draft; prompt unchanged with its two known-stale facts; CI 404 is an own-push re-read, the class 223/224 correctly declined to call news. **B-29 not acted on** — §4b was built to degrade around it, not to depend on it silently. **Nothing merged, closed, undrafted, rebased, force-pushed or deleted; no deploy; relay not contacted at all.** |
 
 ## Ladder
+
+> **Unchanged at run 230 (2026-09-15), and that is the accurate entry.** Run 230's slice was **§4d**,
+> a repository-settings check in `run-zero.sh` — **infrastructure, not a rung**, the same class as
+> run 93's B-25 and runs 227/228's gate sections. **No rung moved, no rung's status was re-derived,
+> and nothing in the table below was edited to look like progress.** The assigned S5 slice was
+> declined for the **183rd** time on evidence re-derived first-person this run (**C-230-6**); S5's row
+> already reflects what is built and what is left. The rows remain **understated** for the reason the
+> run-204 warning below gives, and this run had no gate with which to upgrade any of them.
 
 > **Unchanged at run 93 (2026-08-24), and that is the accurate entry.** Run 93's slice was
 > **B-25** — the account-wide artifact-quota failure that had been concluding this branch's CI as
