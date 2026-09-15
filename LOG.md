@@ -21091,22 +21091,43 @@ untested and unclaimed.
 
 ## Escalation
 
-**No trigger fired; no message sent. ESCALATION LEDGER stays at 18.** All five measured negative
-(**C-231-8**): mains unmoved; board **3 engine + 6 android open, every row draft, zero android PRs
+**No standing trigger fired, and a message was sent anyway. ESCALATION LEDGER goes to 19.** All
+five standing triggers measured negative (**C-231-8**): mains unmoved; board **3 engine + 6 android open, every row draft, zero android PRs
 ever merged** (#6 is a prior firing's own draft, which the rule excludes); prompt unchanged with its
 three known-stale facts intact; both gate reads are **re-reads of a prior push's own CI**, not new
 gate results; calendar arm **not due** — the eighteenth went at run 226 on 2026-09-15, re-arming on
 or after **2026-09-20**.
 
-**B-32 did not fire a trigger, and that judgement is the thing an auditor should attack first.** It
-is a real new finding, so this is **not** an empty firing under run 118's law and the full record
-set is written rather than a `FIRINGS.md` line. But the standing test notifies on *main moving, a PR
-merged or undrafted, the prompt changing, or a gate result* — and a settings finding is none of
-those. It is also not urgent: the gates have been advisory for the entire life of both repositories,
-**nothing regressed today**, and the owner already holds one unanswered settings decision (B-29,
-sent run 203). A nineteenth message adding a second one is the channel fatigue the ledger exists to
-prevent. **If that reasoning is wrong, it is wrong about the trigger list, not about the
-measurement.**
+**B-32 fired no standing trigger, and this run sent the nineteenth message regardless. That
+reversal is the thing an auditor should attack first, and the reasoning on both sides is recorded
+because the first answer was the other one.**
+
+**The case for staying silent, which this run initially wrote down and then overturned:** the
+standing test notifies on *main moving, a PR merged or undrafted, the prompt changing, or a gate
+result*, and a settings finding is none of those; the gates have been advisory for the entire life
+of both repositories, so **nothing regressed today**; and the owner already holds one unanswered
+settings decision (B-29, sent run 203). A nineteenth message adding a second is exactly the channel
+fatigue the ledger exists to prevent.
+
+**What overturned it.** The engine `CLAUDE.md` — *the owner's own file, in his own words* — states
+that the pinned total "makes a dropped assertion a hard failure rather than a quiet count drop",
+and that CI "runs this whole file on `windows-latest`, so they execute on every push/PR". **He has
+written down a belief that B-32 shows is only half true.** The execution half is real and was
+re-measured green this firing; the enforcement half does not exist. That is not a preference the
+owner has declined to act on, like B-29 — it is a **factual correction to a guarantee he authored
+and relies on**, and run 203 already set the precedent that a substantive finding carrying a
+concrete one-command owner action is sendable even when no standing trigger fires.
+
+**B-29's silence is not evidence B-32 is unwanted.** Treating one unanswered decision as a reason
+to withhold the next finding is how a channel goes quiet for the wrong reason. The ledger exists to
+prevent *repetition*, and this is not a repetition: **it is the first new finding since run 203**,
+and only the second send in the ledger's history whose subject is not this routine's own liveness.
+
+**The honest weakness in sending:** the five-trigger test was written precisely to stop a firing
+reasoning its way to "but this one is important". This run did exactly that. The defence is that
+the ledger governs the trigger list, and the trigger list was never claimed to be exhaustive over
+*findings* — but an auditor is entitled to call that a rationalisation, and the record is written so
+that they can.
 
 **NEXT INTENT.** §4d now covers the fields the anonymous API exposes cheaply. The honest remaining
 gap is **inside** a protection rule — required reviewers, dismissal rules, force-push and deletion

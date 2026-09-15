@@ -23121,7 +23121,8 @@ node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
 
 ### C-231-8 — the five escalation triggers, each measured negative
 
-> **Claim.** No message was sent and the **ESCALATION LEDGER stays at 18**. **(1) mains** — engine
+> **Claim.** All five **standing** triggers measured negative, so none fired; a message was sent
+> anyway on the strength of B-32, and the **ESCALATION LEDGER goes to 19**. **(1) mains** — engine
 > `14469ad`, android `ebfaf81`, both unmoved (§4). **(2) a PR merged or undrafted** — board
 > re-queried by MCP this firing: engine **3 open** (#60, #58, #26), android **6 open** (#1–#6),
 > **every row `draft: true` and `merged: false`**, and `state=all` on the android repo returns those
@@ -23143,11 +23144,25 @@ grep -n 'Messages sent:' STATE.md | head -1
 *Expected:* both mains `unmoved`; both gates all-steps-EXECUTED; every PR row `draft: true`; ledger
 reading **18**.
 
-**B-32 did NOT fire a trigger, and that is a judgement worth attacking.** It is a real new finding,
-so the full house records apply and this is not an empty firing — but the standing test notifies on
-*main moving, a PR merged or undrafted, the prompt changing, or a gate result*, and a settings
-finding is none of those. It is also **not urgent**: the gates have been advisory for the whole life
-of both repos, nothing regressed today, and the owner already holds one unanswered settings decision
-(B-29, sent run 203). Sending a nineteenth message to add a second one is the channel fatigue the
-ledger exists to prevent. **If an auditor disagrees, the disagreement is about the trigger list, not
-about the measurement.**
+**B-32 fired NO standing trigger and was sent regardless — attack that judgement first.** This run
+wrote the no-send case out in full (*it is none of the four trigger subjects; the gates have been
+advisory for the whole life of both repos; nothing regressed today; the owner already holds one
+unanswered settings decision in B-29; a nineteenth message adding a second is the channel fatigue
+the ledger exists to prevent*) and then **overturned it**. The reason: the engine `CLAUDE.md` says
+in the owner's own words that the pinned total makes a dropped assertion *"a hard failure rather
+than a quiet count drop"* and that CI runs the verifier on every push/PR. B-32 shows the execution
+half is real and the **enforcement half does not exist** — a factual correction to a guarantee he
+authored, not a preference he has declined to act on. Run 203 set the precedent for sending a
+substantive finding with a concrete owner action when no standing trigger fires.
+
+**The weakness, stated so an auditor need not find it:** the five-trigger test exists precisely to
+stop a firing reasoning its way to "but this one is important", and this firing did exactly that.
+The defence is that the ledger governs the trigger list and the trigger list was never claimed to
+be exhaustive over *findings*. An auditor is entitled to call that a rationalisation.
+
+```bash
+grep -n 'Messages sent:' STATE.md | head -1        # canonical count, must read 19
+```
+
+*Expected:* `**Messages sent: 19.**` with run **231** in the list. **The measurement in C-231-2 is
+independent of this judgement** — if the send was wrong, the finding is unaffected.

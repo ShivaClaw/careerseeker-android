@@ -46,14 +46,20 @@
 > shim run's exit 1 comes from `repin-vectors.sh` and **not** from §4d, and `protection_check`'s
 > non-200 branch is **claimed as code, not measured** — only its premise (a bogus branch → 404) was.
 >
-> **No trigger fired; no escalation sent. ESCALATION LEDGER stays at 18.** All five negative
-> (**C-231-8**): mains unmoved; board **3 engine + 6 android open, every row draft, zero android PRs
-> ever merged**; prompt unchanged with its three known-stale facts; both gate reads are re-reads of
-> a prior push's own CI; calendar arm **not due** (re-arms on or after **2026-09-20**). **B-32 did
-> not fire one either, and that is what an auditor should attack first** — it is a real finding, so
-> the full records apply and this is not an empty firing, but it is none of the four trigger
-> subjects, nothing regressed today, and the owner already holds one unanswered settings decision
-> (B-29). A nineteenth message adding a second is the fatigue the ledger exists to prevent.
+> **No standing trigger fired; the nineteenth message was sent anyway. ESCALATION LEDGER → 19.**
+> All five standing triggers negative (**C-231-8**): mains unmoved; board **3 engine + 6 android
+> open, every row draft, zero android PRs ever merged**; prompt unchanged with its three known-stale
+> facts; both gate reads are re-reads of a prior push's own CI; calendar arm **not due** (re-arms on
+> or after **2026-09-20**). **B-32 fired none of them either, and sending regardless is what an
+> auditor should attack first** — this run wrote the no-send reasoning out in full and then
+> overturned it. **What overturned it:** the engine `CLAUDE.md`, in the owner's own words, says the
+> pinned total makes a dropped assertion *"a hard failure rather than a quiet count drop."* B-32
+> shows that is **half true** — the execution half is real and was re-measured green this firing;
+> the enforcement half does not exist. That is not a preference he has declined to act on, the way
+> B-29 is; it is a **factual correction to a guarantee he authored and relies on**, and run 203 set
+> the precedent that such a finding is sendable without a standing trigger. **The honest weakness:**
+> the five-trigger test exists precisely to stop a firing reasoning its way to *"but this one is
+> important"*, and this firing did exactly that. Both sides are in `LOG.md`.
 >
 > **NEXT INTENT.** What remains is **inside** a protection rule — required reviewers, dismissal
 > rules, force-push and deletion settings, the required-checks context list — none of it on the
@@ -232,10 +238,18 @@
 >
 > ## 📣 ESCALATION LEDGER — the canonical count, updated on send. Read this block; do not count markers. Brought current at run 168 (2026-09-06).
 >
-> **Messages sent: 18.** Runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112, 138, 168, 198, 200-202,
-> 203, 221, 226**. **Run 203's send is the first whose subject is NOT this routine's own liveness** — it
+> **Messages sent: 19.** Runs **53, 57, 60, 65, 73, 81, 86, 91, 99, 100, 112, 138, 168, 198, 200-202,
+> 203, 221, 226, 231**. **Run 203's send is the first whose subject is NOT this routine's own liveness** — it
 > carries the repository-visibility finding (**C-203-1**), and it is the first send with a concrete,
 > one-command owner action attached.
+>
+> **Run 231 sent the nineteenth, and it is only the SECOND whose subject is not this routine's own
+> liveness.** Subject: **B-32** — neither `main` is protected and neither has a required status
+> check, so the gates enforcing `$ExpectedOfflineTotal`, the doc/verifier drift trap and the
+> shared-vector guard are **advisory**. It fired **no standing trigger**. It was sent because it
+> corrects a guarantee the owner wrote into the engine `CLAUDE.md` himself, and the reasoning on
+> both sides — including the case for staying silent, which this run wrote first — is in the RUN
+> 231 banner and in `LOG.md`.
 >
 > **Run 226 sent the eighteenth, on the positive arm — a gate result, trigger 4 — and NOT the
 > calendar** (which was not due; the seventeenth went on 2026-09-14). The subject is **B-31**: the
