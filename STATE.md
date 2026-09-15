@@ -1,5 +1,62 @@
 # STATE — android tree
 
+> ## ✅ RUN 228 (2026-09-15) — **§4c: THE ENGINE GATE IS WATCHED TOO. B-31 IS NOW CLOSED IN BOTH REPOSITORIES.**
+>
+> **Heartbeat:** 2026-09-15, **two hundred and twenty-eighth** cloud iteration (Linux sandbox). Both
+> checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+> before any write: tip `0c6ed69`, rung **COMPLETE**, **files claimed: none** → **no collision**;
+> Terra retains right-of-way. `run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**, all
+> guards green; mains `14469ad`/`ebfaf81` unmoved, corpus **30/30** byte-identical at pin
+> `11bb1f5`, citations **1133 / 1134 / 2**. Assigned S5 spec half is **on engine `main`** —
+> **declined, the 181st time**, for the reason the prompt itself gives: rebuilding it authors a
+> second §4.3 amendment and regenerates the corpus the phone vendors.
+>
+> **Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`
+> (android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged). **Nothing
+> else in the engine repo was written — it was READ ONLY.**
+>
+> **The slice: run 227's declared next intent, taken up.** 227 built §4b to read the *android*
+> gate's step array and recorded that the *engine* repo had the identical exposure with nothing
+> watching it. §4c now reads it — engine `main`, **seven required steps by name**, same verb
+> (**read**, never *ran*), same non-failing `??` when the API is unreadable (**C-228-1**).
+>
+> **Measured before built, and the engine gate is HEALTHY.** Runs 495/497 read clean: every step
+> `success`, no skips, across both jobs; `ci.yml` puts `Verify-Alpha.ps1` on **`windows-latest`**,
+> exactly as the engine `CLAUDE.md` claims — **checked, not assumed**. So this closes an exposure;
+> it does **not** report an outage, and it is not a finding (**C-228-1**).
+>
+> **Why the engine side is the one that mattered more.** That gate is where `Verify-Alpha.ps1`
+> enforces `$ExpectedOfflineTotal` and the doc/verifier drift trap, and its relay job runs the
+> **engine-side copy of the shared-vector guard** §4b already watched. The corpus this program pins
+> has a guard at each end and the routine was watching one of them.
+>
+> **§4b and §4c are ONE FUNCTION called twice** — a second hand-written copy is how two halves of a
+> detector drift apart, which is the engine `CLAUDE.md` doc/verifier trap applied to a script. The
+> refactor is **behaviour-preserving by test**: the run-227 known-bad replay still prints eight
+> `NOT EXECUTED (skipped)` lines and exits 1 (**C-228-3**). One real change — the matcher reads
+> **every** occurrence of a step name and takes the worst, because the engine workflow has two jobs
+> (**C-228-4**).
+>
+> **The new detector's known-bad is the best one this program has found.** Engine run **1**
+> (`29631552312`) reports **`conclusion: success`** while **six of seven** required steps are
+> **absent from the run** — B-31's whole thesis in one screen: a green tick over a gate that never
+> ran the checks anyone cares about (**C-228-2**).
+>
+> **No trigger fired; no escalation sent. ESCALATION LEDGER stays at 18.** All five negative
+> (**C-228-6**): mains unmoved; board **3 engine + 6 android open, every row draft, zero android
+> PRs ever merged**, unchanged since run 222 (#60 is a prior firing's own draft, which the trigger
+> rule excludes); prompt unchanged with its three known-stale facts intact; both gates green and
+> both are **re-reads of a prior push's own CI**, the class runs 223–225 established is not a new
+> gate result. **B-29 re-measured: `private: false` / `visibility: public`, `updated_at`
+> `2026-09-04T17:33:24Z` — unchanged since run 203, still the owner's open decision, not flipped
+> here.**
+>
+> **NEXT INTENT.** Nothing in the firing routine asserts a repository *setting* (B-29's gap) — every
+> drift check compares file contents. That is the same shape as the gate blind spot §4b/§4c just
+> closed, it is measurable here from the same anonymous API, and it is recorded as next intent
+> rather than a blocker. **B-18's smallest human unblock is unchanged: a human stops or repoints
+> the schedule.**
+
 > ## ✅ RUN 227 (2026-09-15) — B-31 IS FULLY CLOSED, AND THE PROBE NOW READS THE GATE ITSELF
 >
 > `run-zero.sh` has a new **§4b**: it reads the branch's latest CI run **and its step array**, checks
@@ -3784,6 +3841,13 @@ in [`RETURN-DAY.md`](RETURN-DAY.md)**.
 > that window; the last genuinely green run is **401** (`34872214870`, head `88cc151`,
 > 2026-09-14T17:01Z). Repaired in this firing with one input (**C-226-5**); whether that is
 > sufficient is answered by the CI run on this push, and by nothing in this sandbox (**B-7**).
+>
+> **RESOLVED — the window closed. Runs 226/227/228 each read a green run with all eight required
+> checks EXECUTING**: run 403 (`8c96e4f`), run 405 (`41b33f6`), run 406 (`ec25cd7`). Rows whose
+> evidence is "CI green on the push" are trustworthy again from 2026-09-15 onward; the
+> 2026-09-14T21:02Z → 2026-09-15T04:xxZ window stays **unrefreshed** and no row was upgraded on it.
+> **Still no row's status changed at run 228** — §4b/§4c watch whether a gate RUNS, not what it
+> proves, and the five-task android command remains unreachable here (**B-7**, **B-4**).
 
 
 **Consumer for that corpus change, 2026-08-15 (forty-first run) — the engine half, done and

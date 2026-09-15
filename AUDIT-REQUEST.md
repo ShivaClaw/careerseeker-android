@@ -22632,3 +22632,151 @@ curl -sS https://api.github.com/repos/ShivaClaw/careerseeker-android/actions/run
 
 *Expected:* steps 1–13 `success`, step 14 `skipped`. **A later push makes §4b report a run newer
 than 405 — that is the check working, not drift; it is derived, never pinned.**
+
+---
+
+## Run 228 — 2026-09-15. §4c: the engine gate is watched too, and the refactor is proven by replay
+
+Every claim below was produced in that firing. **C-228-1, C-228-2 and C-228-6** re-verify against
+the GitHub Actions API from an ordinary shell — no `gh`, no token, no toolchain. **C-228-3 …
+C-228-5** re-verify in a checkout of this repo. **C-228-7** is the boundary.
+
+**The finding that decided the slice is C-228-2**, and it is the clearest demonstration this
+program has of why a run conclusion is not a gate: engine CI run **1** reports
+`"conclusion": "success"` while **six of the seven** steps §4c requires are **absent from the
+run entirely**. A reader checking the green tick would have seen nothing wrong.
+
+### C-228-1 — the engine gate is EXECUTING on main, not merely reporting green
+
+> **Claim.** `run-zero.sh` **§4c** reads the latest completed `ci.yml` run on `ShivaClaw/careerseeker`
+> `main` — run **495** (`34550381957`), head **`14469ad`**, `success` — and confirms all **seven**
+> required steps carry `conclusion: success`: `Build Release with warnings as errors`,
+> `Run offline alpha verification`, `Typecheck`, `Test`, `Validate config (no deploy)`,
+> `Assert the relay has no decryption path`, `Assert sync vectors match their generator`. The head
+> it covers is **exactly** the `BASE_ENGINE_MAIN` this probe pins, so the gate covers current main.
+> The required list was derived first-person from `.github/workflows/ci.yml` at engine main, which
+> puts `Run offline alpha verification` (`shell: pwsh`, `./scripts/Verify-Alpha.ps1`) on
+> **`windows-latest`** — matching what the engine `CLAUDE.md` drift-trap section asserts about its
+> own CI, checked rather than assumed. **Nothing here RAN in this sandbox**; `Verify-Alpha.ps1`
+> needs Windows (B-7). The verb is **read**.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 4c/,/^== 5\./p'
+```
+
+*Expected:* `latest completed: run 495  14469ad  success`, then `all 7 required checks EXECUTED and
+passed, and this workflow has NO skipped-by-design step`.
+
+### C-228-2 — §4c is falsifiable, and the known-bad input is a run that reported SUCCESS
+
+> **Claim.** §4c accepts `RUNZERO_ENGINE_GATE_RUN=<id>` to replay one run. Replaying engine run **1**
+> (`29631552312`, 2026-07-18, which predates the relay job and the vector guard) makes §4c print
+> **six** `!! gate step ABSENT from the run` lines and exit **1** — *while that run's own conclusion
+> is `success`*. That is the whole thesis of B-31 in one output: a green conclusion over a gate that
+> did not run the checks anyone cares about. The replay **reads** the stored step array of a
+> completed 2026-07 run; nothing is re-executed.
+
+```bash
+cd careerseeker-android && RUNZERO_ENGINE_GATE_RUN=29631552312 scripts/run-zero.sh ../careerseeker \
+  2>&1 | sed -n '/^== 4c/,/^== 5\./p'; RUNZERO_ENGINE_GATE_RUN=29631552312 \
+  scripts/run-zero.sh ../careerseeker >/dev/null 2>&1; echo "EXIT=$?"
+```
+
+*Expected:* `PINNED (replay) : run 1  6272f65  success`, six `gate step ABSENT from the run` lines
+naming every required step except `Build Release with warnings as errors`, the engine-side B-31
+signature paragraph, and `EXIT=1`.
+
+### C-228-3 — the refactor did not blunt §4b: the run-227 known-bad still goes red
+
+> **Claim.** §4b and §4c are now **one function called twice**, not two hand-written copies. A
+> refactor of a detector exercised only on green input is an untested detector, so the known-bad
+> replay from **C-227-3** was re-run against the refactored version: it still prints **eight**
+> `!! gate step NOT EXECUTED (skipped)` lines for run **402** (`34896487955`), still names the
+> signature as **B-31's and not B-25's**, and still exits **1**. Behaviour-preserving **by test**,
+> not by inspection of the diff.
+
+```bash
+cd careerseeker-android && RUNZERO_GATE_RUN=34896487955 scripts/run-zero.sh ../careerseeker \
+  2>&1 | sed -n '/^== 4b/,/^== 4c/p'; RUNZERO_GATE_RUN=34896487955 \
+  scripts/run-zero.sh ../careerseeker >/dev/null 2>&1; echo "EXIT=$?"
+```
+
+*Expected:* `PINNED (replay) : run 402  d8ca4fe  failure`, eight `NOT EXECUTED (skipped)` lines, the
+B-31-not-B-25 paragraph, `EXIT=1`.
+
+### C-228-4 — one real behaviour change: every occurrence of a step name, worst-first
+
+> **Claim.** The run-227 matcher took the **first** occurrence of a step name and stopped
+> (`awk ... {print $1; exit}`). That is safe for a single-job workflow; the engine workflow has
+> **two** jobs (`Build and offline harnesses` on `windows-latest`, `Blind relay (Worker)` on
+> `ubuntu-latest`), so a name present in both could be cleared by whichever job the API listed
+> first while the other copy was `skipped` or red. The matcher now scans **every** occurrence and
+> takes the worst (`failure`/`cancelled`/`timed_out` > `skipped` > `success`). **No android step
+> name repeats across jobs**, so §4b's behaviour is unchanged — which is what C-228-3 measures.
+
+```bash
+cd careerseeker-android && sed -n '/EVERY occurrence, worst-first/,/END   { print worst }/p' \
+  scripts/run-zero.sh
+```
+
+*Expected:* the `awk` block that assigns `worst` across all matching rows, with no `exit` on the
+first `success`.
+
+### C-228-5 — the whole probe still passes, and its own guards are green after the edit
+
+> **Claim.** After the §4c edit, `bash -n` parses clean and a full ordinary invocation exits **0**
+> with every guard green: citations resolve, plan-rot is at its pinned spent state, no conflict
+> markers, the vendored corpus is **30/30 byte-identical** at pin **`11bb1f5`**, both mains unmoved
+> (engine **`14469ad`**, android **`ebfaf81`**), and **both** gates report alive.
+
+```bash
+cd careerseeker-android && bash -n scripts/run-zero.sh && echo "SYNTAX OK" && \
+  scripts/run-zero.sh ../careerseeker >/dev/null 2>&1; echo "EXIT=$?"
+```
+
+*Expected:* `SYNTAX OK` and `EXIT=0`.
+
+### C-228-6 — the board, B-29 and the mains: no notification trigger fired this firing
+
+> **Claim.** All five triggers negative. Both mains unmoved (§4 of the probe). Board by MCP:
+> engine **3 open** (#60 harness-count drift, #58 gate lexical hardening, #26 SBOM), android
+> **6 open** (#1–#6), **every row `draft: true`**, and **zero android PRs have ever merged** —
+> unchanged from runs 222–227; #60 is a prior firing's own draft, which the trigger rule excludes.
+> The stored prompt is unchanged and still carries its three known-stale facts (pin `679a317`, "S5
+> … NOT STARTED", and B-2's `/pair` which landed in #42). **B-29 re-measured repo-scoped:**
+> `careerseeker-android` reports `"private": false` / `"visibility": "public"` with
+> `updated_at: 2026-09-04T17:33:24Z` — **unchanged since run 203**, still contradicting its own
+> description ("Private always."), still open and still the owner's decision, not a firing's.
+> `careerseeker-ios` NOT queried: this session's GitHub scope is engine + android only.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 4\./,/^== 4b/p'
+# board + visibility, via the session's GitHub MCP path (no gh binary here):
+#   list_pull_requests owner=ShivaClaw repo=careerseeker         state=open
+#   list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+#   search_repositories query='repo:ShivaClaw/careerseeker-android' minimal_output=false
+```
+
+*Expected:* both mains `unmoved`; three engine rows and six android rows, all `draft:true`, none
+merged; `"private": false` with `updated_at` `2026-09-04T17:33:24Z`.
+
+### C-228-7 — what this firing did NOT do, stated so it cannot be read as done
+
+> **Claim.** **No gate ran and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`,
+> `emulator`, `adb` and `gh` are ABSENT here and `ANDROID_HOME` is UNSET, so neither
+> `Verify-Alpha.ps1` nor the five-task android command was reachable, and B-7's `dl.google.com`
+> CONNECT denial was not re-probed and not routed around. §4b/§4c **read results CI produced**;
+> they do not run a gate, and no earlier run's green is restated here as this firing's. **No vector
+> byte was written, no pin moved** (corpus 30/30 at `11bb1f5`), no `$ExpectedOfflineTotal` touched,
+> no `Verify-Alpha.ps1` edit, no C# and no Kotlin written, nothing merged in either repo, no branch
+> deleted, no force-push, no history rewritten, no deploy of any kind, and the production relay was
+> **not contacted at all** — not even `/v1/health`. The **engine repository was READ ONLY**: the
+> only write to it is this iteration's heartbeat on the docs-only `autonomy/claude-state` branch.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 5\./,/^== 6\./p'
+cd ../careerseeker && git status --porcelain && git log --oneline -1 origin/main
+```
+
+*Expected:* `dotnet/pwsh/sdkmanager/avdmanager/emulator/adb/gh ABSENT`, `ANDROID_HOME UNSET`,
+`node/git/java/gradle PRESENT`; a clean engine worktree with `origin/main` at `14469ad`.

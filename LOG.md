@@ -20747,3 +20747,111 @@ run against a known-bad input; this is the other half — it is also unproven un
 
 **The verb is still `read`, not `ran`.** The android gate remains unreachable here (B-7,
 unchanged); `ubuntu-latest` with a real SDK is the authority, and this session is its reader.
+
+---
+
+# Run 228 — 2026-09-15. §4c: the engine gate joins the watch, and the refactor is proven by replay
+
+**Slice:** finish what run 227 declared as next intent — the engine repo's CI had the identical
+B-31 exposure and nothing in the firing routine looked at it. Chosen because it is genuinely
+verifiable *here*: `curl` and `python3` are present, `api.github.com` answers 200 anonymously, and
+the detector is falsifiable by replay. No claim in this entry needs a gate this sandbox cannot run.
+
+## Milestone 1 — re-derivation, and the assigned slice declined for the 179th time
+
+`scripts/run-zero.sh ../careerseeker` → **exit 0, NOTHING MOVED.** Corpus **30/30** byte-identical
+at pin **`11bb1f5`**, generator OK, citations resolve, no conflict markers, plan-rot at its pinned
+spent state, both mains unmoved (engine **`14469ad`**, android **`ebfaf81`**).
+
+The prompt's assigned S5 spec half is **landed on engine main** and has been since 2026-08-09/12 —
+`8575539`, `22b028e`, `7328a0b` each report `on main (expected)` in §1. Rebuilding it would author
+a second divergent §4.3 amendment and regenerate the corpus the phone vendors: the cross-repo drift
+event the prompt itself bars. Declined, as at runs 210–227. The prompt's three known-stale facts
+(pin `679a317`, "S5 … NOT STARTED", B-2's `/pair`) are all still present, so the prompt is
+**unchanged** — trigger 3 negative.
+
+## Milestone 2 — the engine gate, measured first-person before anything was built
+
+Run 227 named the exposure but did not measure it. This firing did, before writing a line of
+script: the step arrays of engine runs **495** (main, `14469ad`) and **497** (`claude/harness-count-drift`)
+read clean — **every step `success`, no skips, no absences**, across both jobs. `.github/workflows/ci.yml`
+at engine main puts `Run offline alpha verification` (`shell: pwsh`, `./scripts/Verify-Alpha.ps1`) on
+**`windows-latest`**, which is exactly what the engine `CLAUDE.md` drift-trap section claims about its
+own CI — **checked, not assumed** (**C-228-1**).
+
+So the engine gate is **healthy**, and this is **not a finding**. It is the reason the watch is worth
+having rather than the alarm that forced it: the exposure was real, the state behind it was fine, and
+the honest record says so plainly instead of dressing a prophylactic up as a rescue.
+
+## Milestone 3 — §4b became a function, because a second copy is how halves drift
+
+The obvious implementation was to paste §4b and change the constants. That is the failure this house
+already has a name for — the engine `CLAUDE.md` doc/verifier trap, applied to a script instead of a
+doc: two copies of one detector, and the next person fixes one of them. So §4b is now `gate_check()`,
+called twice — **§4b** android, **§4c** engine (`main`, seven required steps).
+
+`GATE2_OPTIONAL_STEPS` is **deliberately empty**. The android workflow has one legitimate skip
+(`Upload debug APK`, `workflow_dispatch`-gated, B-25); the engine workflow has **no** skipped-by-design
+step, so **any** skip there is a finding, and §4c says so in its own output rather than leaving it to a
+reader's memory (**C-228-1**).
+
+## Milestone 4 — one real behaviour change, and the engine gate is why
+
+The run-227 matcher took the **first** occurrence of a step name and stopped. Safe for one job; the
+engine workflow has **two**, so a name in both jobs could be cleared by whichever the API listed first
+while the other copy was `skipped` or red. It now reads **every** occurrence and takes the worst
+(**C-228-4**). No android step name repeats across jobs, so §4b is unaffected — asserted, then
+measured in Milestone 5.
+
+## Milestone 5 — a refactored detector is an untested detector until the known-bad still goes red
+
+Two replays, both reading stored arrays of completed runs, neither re-executing anything:
+
+**§4b, the run-227 known-bad (C-227-3 re-run):** run **402** (`34896487955`) → eight
+`!! gate step NOT EXECUTED (skipped)` lines, the B-31-not-B-25 signature, **exit 1**. The refactor is
+behaviour-preserving **by test**, not by reading the diff (**C-228-3**).
+
+**§4c, a new known-bad:** engine run **1** (`29631552312`, 2026-07-18, predating the relay job) → six
+`!! gate step ABSENT from the run` lines, **exit 1** — **while that run's own conclusion is `success`**
+(**C-228-2**). That output is B-31's whole thesis in one screen: a green tick over a gate that never
+ran the checks anyone cares about. A detector proven on a genuinely green-but-hollow run is worth more
+than one proven on a red one.
+
+## Milestone 6 — the records the edit obliged, in the same commit
+
+`AUDIT-REQUEST.md` gains C-228-1 … C-228-7, each with its re-verification command.
+`check-citations.sh` → **definitions 1133, cited 1134, documented-absent 2, OK** — every cited id
+resolves. B-31's "Not covered, deliberately" paragraph named this as declined scope; it is amended to
+record it as taken, because an entry that still reads *declined* after the work is done is the same
+class of wrong sentence that kept B-31's second half open for a firing (C-227-1's lesson).
+
+## Milestone 7 — no trigger fired, and no escalation was sent
+
+All five negative (**C-228-6**). Mains unmoved. Board: engine **3 open** (#60, #58, #26), android
+**6 open** (#1–#6), **every row draft**, **zero android PRs ever merged** — unchanged since run 222;
+#60 is a prior firing's own draft, which the trigger rule excludes. Prompt unchanged. Gates: android
+run **406** green on run 227's own head, engine run **495** green on main — both **re-reads of a prior
+push's own CI**, the class runs 223–225 established is not a new gate result. **B-29 re-measured:**
+`private: false` / `visibility: public`, `updated_at` **`2026-09-04T17:33:24Z`** — unchanged since run
+203, still contradicting the repo's own "Private always." description, still the owner's open decision
+and **not flipped by this firing**.
+
+This is **not** an empty firing under run 118's law — real work landed and a new check executes — so
+the full record set is written rather than a `FIRINGS.md` line.
+
+## Boundary — what this run did NOT touch
+
+**No gate ran and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`
+and `gh` are ABSENT; `ANDROID_HOME` is UNSET. Neither `Verify-Alpha.ps1` nor the five-task android
+command was reachable, B-7's `dl.google.com` denial was not re-probed and not routed around, and no
+earlier run's green is restated here as this firing's. §4b/§4c **read** what CI reported; the verb is
+never *ran*.
+
+**No vector byte was written and no pin moved** (corpus 30/30 at `11bb1f5`). No `$ExpectedOfflineTotal`
+change, no `Verify-Alpha.ps1` edit, no pinch point touched. **No C# and no Kotlin written** — the S5
+appliers stay where run 225 found them, and a compile-only claim is what this house forbids. Nothing
+merged in either repo, no PR undrafted, no branch deleted, no force-push, no history rewritten. **No
+deploy of any kind**, and the production relay was **not contacted at all** — not even `/v1/health`.
+No Google/Play/OAuth console, no accounts, no purchases, no Gmail, no secrets read or printed.
+**B-29 was measured, not changed.** The **engine repository was READ ONLY**: its only write is this
+iteration's heartbeat on the docs-only `autonomy/claude-state` branch, which is never merged.

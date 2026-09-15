@@ -6032,6 +6032,19 @@ the owner's**. Smallest human unblock, final form:
 > not look at it. That is scope this slice declined, not a blocker; it is recorded as next intent
 > in `STATE.md`.
 >
+> **TAKEN UP AT RUN 228 (2026-09-15) — that paragraph is now spent.** `run-zero.sh` **§4c** reads
+> the engine gate on `main` the same way §4b reads the android one: seven required steps by name
+> against the latest run's step array (**C-228-1**), falsifiable by `RUNZERO_ENGINE_GATE_RUN=`
+> replay (**C-228-2**), same non-failing `??` degradation when the API is unreadable. §4b and §4c
+> are **one function called twice**, and the run-227 known-bad replay was re-run to prove the
+> refactor did not blunt the original detector (**C-228-3**). The engine gate measured **healthy**
+> — all seven executing on run 495, `Verify-Alpha.ps1` on `windows-latest` as the engine
+> `CLAUDE.md` claims — so this closes an exposure, it does not report an outage.
+>
+> **B-29's caveat above applies to §4c identically**, and the engine repo is public today for the
+> same reason. **This entry is now CLOSED at both ends and in both repositories.** It is kept for
+> the lesson in its superseded text: the wrong sentence, not the dead gate, is what cost the time.
+>
 > **Superseded text follows, kept because the wrong premise is the lesson.** *(Run 226: the GATE
 > HALF IS CLOSED; the BLIND-SPOT HALF STAYS OPEN.)*
 > Run **403** (`34916050850`), head `8c96e4f`, `ubuntu-latest` → **`success` in 4m28s**, with
