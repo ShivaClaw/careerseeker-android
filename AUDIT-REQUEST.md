@@ -22612,3 +22612,23 @@ cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/4
 
 *Expected:* 6 android rows all `draft:true` with `merged:false`; 3 engine rows all `draft:true`;
 `engine  main unmoved  14469ad` and `android main unmoved  ebfaf81`.
+
+### C-227-8 — §4b's first live use was on the push that added it, and the gate executed
+
+> **Claim.** CI run **405** (`34931535850`), head `41b33f6` — this firing's own records commit —
+> concluded **`success`**, with steps **1–13 all `success`** (the citation guard and the vendored
+> sync-vector drift guard among them) and step 14 `skipped` on B-25's `workflow_dispatch`
+> condition. **§4b then read that run itself**, unprompted, on the next invocation: *"latest
+> completed: run 405 41b33f6 success … all 8 required checks EXECUTED and passed."* This is a gate
+> result **read**, not run: the android gate remains unreachable from this sandbox (B-7), and the
+> authority here is `ubuntu-latest` with a real SDK.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/4b\./,/^== 5/p'
+# and the step array behind it:
+curl -sS https://api.github.com/repos/ShivaClaw/careerseeker-android/actions/runs/34931535850/jobs \
+  | python3 -c "import json,sys;[print(s['number'],s['conclusion'],s['name']) for j in json.load(sys.stdin)['jobs'] for s in j['steps'][:14]]"
+```
+
+*Expected:* steps 1–13 `success`, step 14 `skipped`. **A later push makes §4b report a run newer
+than 405 — that is the check working, not drift; it is derived, never pinned.**

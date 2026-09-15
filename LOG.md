@@ -20731,3 +20731,19 @@ PR #6 stays **draft**. **No deploy of any kind.** The production relay was **not
 not even `GET /v1/health`. **No Play/Google/OAuth console, no accounts, no purchases, no Gmail, no
 secret read or printed**, no `.appdata`. **B-29 was not acted on** — the visibility decision is the
 owner's, and §4b was built to degrade around it rather than depend on it silently.
+
+## Milestone 8 — CONFIRMED, same firing: the gate executed on this run's own push, and §4b read it (C-227-8)
+
+**Run 405 (`34931535850`), head `41b33f6`, `ubuntu-latest`: `success`.** Steps **1–13 all
+`success`** — step 6 the citation guard over the records this entry belongs to, **step 8 the
+vendored sync-vector drift guard** — and step 14 `skipped` on B-25's `workflow_dispatch`
+condition, the one correct skip.
+
+**Then §4b read that run on its own**, on the next ordinary invocation, printing *"latest
+completed: run 405 41b33f6 success … all 8 required checks EXECUTED and passed."* The check's
+first live use was on the push that introduced it. Milestone 4 argued a detector is unproven until
+run against a known-bad input; this is the other half — it is also unproven until it reports a
+**real** run it was not handed.
+
+**The verb is still `read`, not `ran`.** The android gate remains unreachable here (B-7,
+unchanged); `ubuntu-latest` with a real SDK is the authority, and this session is its reader.
