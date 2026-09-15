@@ -27,17 +27,22 @@
 # slice is worth taking — it establishes the ground state a run needs before it
 # can decide, and it says out loud which checks it cannot perform here.
 #
-# Two of the four notification triggers need the GitHub API, which a shell script
-# here cannot reach: `gh` is absent from this sandbox (B-7's neighbourhood; see
-# C-97-7). Those are printed as a MANUAL section with the exact queries and the
-# last verified answers, never guessed at and never folded into the verdict as
-# though they had been checked.
+# Some notification triggers are printed as a MANUAL section with the exact
+# queries and the last verified answers, never guessed at and never folded into
+# the verdict as though they had been checked.
 #
-# Read that limit as the script's, not the session's. Run 99 answered both
+# Read that limit as the script's, not the session's. Run 99 answered the board
 # queries through the GitHub MCP server — no `gh` involved — and section 6 now
 # says so, because "gh ABSENT" had been read for three runs as "unanswerable"
 # when it only ever meant "not answerable from bash". A probe that overstates
 # what is out of reach costs as much as one that overstates what it checked.
+#
+# RUN 227 APPLIED THAT LESSON TO THIS SCRIPT ITSELF, AND IT COST A TRIGGER'S
+# WORTH OF BLINDNESS TO LEARN. The paragraph above used to say the API was
+# unreachable from bash. Nobody had tried: `curl` reaches api.github.com
+# anonymously, HTTP 200, for both the runs list and the per-run step array
+# (C-227-1). So "a gate result" — trigger 4, and the one B-31 was filed on —
+# is no longer MANUAL. It is §4b, it executes, and it can fail the verdict.
 #
 # BASELINES
 #
@@ -51,10 +56,14 @@
 # USAGE
 #
 #   scripts/run-zero.sh [<engine-checkout>]      # default ../careerseeker
+#   RUNZERO_GATE_RUN=<workflow run id> scripts/run-zero.sh   # §4b replay, see below
 #
 # Exit 0  — NOTHING MOVED, and every local check passed.
 # Exit 1  — something moved, or a local check failed. Read the report; do not
 #           proceed on the strength of the last recorded run's conclusions.
+#
+# §4b can also print '??' without failing: that is "the gate could not be READ",
+# which is not "the gate is fine". The VERDICT repeats it for that reason.
 
 set -uo pipefail
 
@@ -93,12 +102,54 @@ BASE_MERGED_SINCE_RUN95=16                                  # the S-series landi
 # state" pattern SLICE_LANDED already uses above. Retired, not silenced: a 7th rot still fires.
 BASE_PLAN_ROT=6
 BASE_PLAN_ROWS=6
+
+# ---- the gate check, added run 227 (2026-09-15) — B-31's open half ---------
+# B-31 recorded that NO section of this script looks at a workflow run, so runs 222-225 each
+# printed NOTHING MOVED while their own pushes were dying in step 4 of 14 and every check
+# below it reported `skipped`. B-31's "smallest unblock" said the fix could not be done in
+# bash because `gh` is ABSENT, and therefore had to be a fifth MANUAL paragraph relying on the
+# session to act -- which §6 already does, and which 225 firings read past.
+#
+# THAT PREMISE IS FALSE, AND §6's OWN RULE IS WHAT CATCHES IT: 'gh ABSENT' means the gh BINARY
+# is not on PATH, never that this container has no GitHub API path. Run 227 measured it --
+# api.github.com answers 200 unauthenticated for both the runs list and the per-run step array
+# (C-227-1). So this is NOT a fifth advisory paragraph. It is a check that RUNS, and it can
+# move the verdict, which is the only difference that mattered.
+#
+# It matches steps BY NAME, never by number: the job's step array also carries 'Set up job'
+# and three 'Post ...' entries, and their numbering is not contiguous (1-14, then 26-29).
+#
+# 'Upload debug APK' is deliberately NOT required. It is gated on workflow_dispatch (B-25), so
+# on an ordinary push it is skipped BY DESIGN. That one legitimate skip beside eight mandatory
+# ones is exactly the B-25/B-31 ambiguity -- 'a red job with a green gate' vs 'a red job with
+# no gate at all' -- so the distinction is encoded here rather than left to a reader's memory.
+GATE_OWNER=ShivaClaw
+GATE_REPO=careerseeker-android
+GATE_WORKFLOW=ci.yml
+GATE_BRANCH=claude/android-a0-probe     # fallback only; the checked-out branch wins
+GATE_REQUIRED_STEPS='Assert every cited C-/B- id resolves
+Assert :core has no Android dependency
+Assert vendored sync vectors match the pinned main-repo commit
+Unit tests (:core)
+Unit tests (:app, Robolectric)
+Assemble debug APK
+Lint
+Assert no analytics or tracking SDKs ship'
+GATE_OPTIONAL_STEPS='Upload debug APK'   # B-25: workflow_dispatch-gated, skipped by design
 # ---------------------------------------------------------------------------
 
 FAIL=0
+GATE_BLIND=0
 note()  { printf '  %s\n' "$*"; }
 head2() { printf '\n== %s\n' "$*"; }
 bad()   { printf '  !! %s\n' "$*"; FAIL=1; }
+# warn() is loud but does NOT set FAIL. Added run 227 for exactly one situation: a check that
+# could not be PERFORMED, as against one that was performed and failed. Failing the verdict on
+# an unreachable API would make every firing red the moment the repo goes private (B-29) or the
+# egress policy tightens -- the same signal-destroying staleness the baseline block above warns
+# about. Silence would be worse: B-31 IS a silent absence. So it prints ?? here and the VERDICT
+# repeats it, because a firing that is blind must know it is blind.
+warn()  { printf '  ?? %s\n' "$*"; }
 
 if [ ! -d "$ENGINE/.git" ]; then
   echo "run-zero: '$ENGINE' is not a git checkout. Pass the engine clone as \$1." >&2
@@ -233,6 +284,129 @@ check_main() {
 check_main "$ENGINE"  "engine " "$BASE_ENGINE_MAIN"
 check_main "$ANDROID" "android" "$BASE_ANDROID_MAIN"
 
+# --- 4b. the gate: did CI EXECUTE, or merely report? (B-31) -----------------
+head2 "4b. The gate — did CI EXECUTE on this branch, or only report? (B-31)"
+gate_branch=$(git -C "$ANDROID" rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ -z "$gate_branch" ] || [ "$gate_branch" = HEAD ]; then
+  gate_branch=$GATE_BRANCH
+  note "checkout is detached — falling back to the pinned branch $gate_branch"
+fi
+gate_tip=$(git -C "$ANDROID" rev-parse "$gate_branch" 2>/dev/null)
+gate_api="https://api.github.com/repos/$GATE_OWNER/$GATE_REPO"
+gate_manual="actions_list method=list_workflow_runs owner=$GATE_OWNER repo=$GATE_REPO \\
+    resource_id=$GATE_WORKFLOW workflow_runs_filter='{\"branch\":\"$gate_branch\"}'"
+
+gate_fetch() {  # $1 url -> body on stdout, HTTP code as exit-carrying last line
+  curl -sS --max-time 25 -w '\n%{http_code}' "$1" 2>/dev/null
+}
+
+if ! command -v curl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+  warn "curl or python3 is ABSENT — this check needs both. Run it by hand:"
+  note "  $gate_manual"
+  GATE_BLIND=1
+else
+  gate_raw=$(gate_fetch "$gate_api/actions/workflows/$GATE_WORKFLOW/runs?branch=$gate_branch&per_page=10")
+  gate_code=$(printf '%s' "$gate_raw" | tail -1)
+  gate_body=$(printf '%s' "$gate_raw" | sed '$d')
+  if [ "$gate_code" != 200 ]; then
+    warn "GitHub API answered HTTP ${gate_code:-<none>} — the gate was NOT checked this firing."
+    case "$gate_code" in
+      404) note "404 on a repo that exists means it is no longer publicly readable — B-29's" ;
+           note "visibility decision landing. That is an ANSWER, not a bug here; record it." ;;
+      403) note "403 is rate limiting or an egress denial (B-7's neighbourhood). Note that a" ;
+           note "repo outside this sandbox's scope also answers 403 at the proxy, not 404." ;;
+    esac
+    note "This probe reads the API ANONYMOUSLY and holds no token, so none of these is"
+    note "recoverable here. Re-run the query through the session's GitHub MCP path:"
+    note "  $gate_manual"
+    GATE_BLIND=1
+  else
+    # RUNZERO_GATE_RUN pins one run id instead of taking the branch's latest. It exists so this
+    # check is FALSIFIABLE: a green section proves nothing about a detector until someone runs it
+    # against a known-bad input. Replay the dead gate B-31 was filed on and watch §4b go red:
+    #   RUNZERO_GATE_RUN=34896487955 scripts/run-zero.sh ../careerseeker   # run 402, C-227-3
+    if [ -n "${RUNZERO_GATE_RUN:-}" ]; then
+      note "REPLAY — RUNZERO_GATE_RUN=$RUNZERO_GATE_RUN pinned; the branch's latest is ignored."
+      gate_body=$(gate_fetch "$gate_api/actions/runs/$RUNZERO_GATE_RUN" | sed '$d')
+      gate_body="{\"workflow_runs\":[$gate_body]}"
+    fi
+    gate_out=$(printf '%s' "$gate_body" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+runs=[r for r in d.get("workflow_runs",[]) if r.get("status")=="completed"]
+pend=[r for r in d.get("workflow_runs",[]) if r.get("status")!="completed"]
+for r in pend[:1]:
+    print("PENDING\t%s\t%s\t%s"%(r["run_number"],r["head_sha"],r["status"]))
+if not runs:
+    print("NORUNS"); sys.exit(0)
+r=runs[0]
+print("RUN\t%s\t%s\t%s\t%s\t%s"%(r["run_number"],r["id"],r["head_sha"],r["conclusion"],r["created_at"]))
+')
+    gate_run_id=$(printf '%s\n' "$gate_out" | awk -F'\t' '$1=="RUN"{print $3}')
+    gate_num=$(printf   '%s\n' "$gate_out" | awk -F'\t' '$1=="RUN"{print $2}')
+    gate_sha=$(printf   '%s\n' "$gate_out" | awk -F'\t' '$1=="RUN"{print $4}')
+    gate_conc=$(printf  '%s\n' "$gate_out" | awk -F'\t' '$1=="RUN"{print $5}')
+    gate_when=$(printf  '%s\n' "$gate_out" | awk -F'\t' '$1=="RUN"{print $6}')
+    gate_pend=$(printf  '%s\n' "$gate_out" | awk -F'\t' '$1=="PENDING"{print $2" ("$4") on "substr($3,1,7)}')
+
+    if [ -z "$gate_run_id" ]; then
+      warn "no COMPLETED run of $GATE_WORKFLOW on $gate_branch — the gate has never reported here."
+      GATE_BLIND=1
+    else
+      gate_label="latest completed"
+      [ -n "${RUNZERO_GATE_RUN:-}" ] && gate_label="PINNED (replay) "
+      note "$gate_label: run $gate_num  ${gate_sha:0:7}  $gate_conc  ($gate_when)"
+      [ -n "$gate_pend" ] && note "in flight       : run $gate_pend"
+      if [ "$gate_sha" != "$gate_tip" ]; then
+        note "branch tip is ${gate_tip:0:7} — this run does NOT cover it (a push not yet gated,"
+        note "which is the ordinary state mid-firing; the NEXT firing reads the run for it)."
+      fi
+      # The step array is the whole point: `skipped` is not `passed`, and a job that dies in
+      # its toolchain reports BOTH as one red X that B-25 has trained this house to ignore.
+      gate_jraw=$(gate_fetch "$gate_api/actions/runs/$gate_run_id/jobs")
+      gate_jcode=$(printf '%s' "$gate_jraw" | tail -1)
+      if [ "$gate_jcode" != 200 ]; then
+        warn "step array unreadable (HTTP $gate_jcode) — conclusion above is ALL that was checked."
+        GATE_BLIND=1
+      else
+        gate_steps=$(printf '%s' "$gate_jraw" | sed '$d' | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+for j in d.get("jobs",[]):
+    for s in j.get("steps",[]):
+        print("%s\t%s"%(s.get("conclusion"),s.get("name")))
+')
+        gate_missing=0 gate_skipped=0 gate_failed=0
+        while IFS= read -r want; do
+          [ -z "$want" ] && continue
+          got=$(printf '%s\n' "$gate_steps" | awk -F'\t' -v n="$want" '$2==n{print $1; exit}')
+          case "$got" in
+            success)  ;;
+            skipped)  bad "gate step NOT EXECUTED (skipped): $want"; gate_skipped=1 ;;
+            "")       bad "gate step ABSENT from the run: $want"; gate_missing=1 ;;
+            *)        bad "gate step $got: $want"; gate_failed=1 ;;
+          esac
+        done <<EOF
+$GATE_REQUIRED_STEPS
+EOF
+        if [ $gate_skipped = 1 ] || [ $gate_missing = 1 ]; then
+          note ""
+          note "THIS IS B-31's SIGNATURE, NOT B-25's. A skipped or absent check did not pass;"
+          note "the vendored-vector drift guard is among the eight, so cross-repo drift is"
+          note "UNPROTECTED while this holds. Do not file it as the APK-quota red X."
+        elif [ $gate_failed = 1 ]; then
+          note ""
+          note "The toolchain is fine and a REAL check is failing — a different, and better,"
+          note "problem than B-31. Read the job log before touching anything."
+        else
+          note "all 8 required checks EXECUTED and passed; '$GATE_OPTIONAL_STEPS' skipped by"
+          note "design (B-25, workflow_dispatch). The gate is alive, not merely green."
+        fi
+      fi
+    fi
+  fi
+fi
+
 # --- 5. toolchain, so nothing is claimed that could not have run ------------
 head2 "5. Toolchain — stated so no claim can be misread"
 for t in dotnet pwsh sdkmanager avdmanager emulator adb gh node git java gradle; do
@@ -269,6 +443,12 @@ cat <<EOF
   Run 82's standing test notifies on: main moving (checked above, section 4),
   a PR merged or undrafted, the stored prompt changing, or a gate result.
   It does NOT fire on another firing, and NOT on another draft PR.
+
+  ONE OF THE FOUR LEFT THIS SECTION AT RUN 227. 'A gate result' is now measured in
+  §4b -- conclusion AND step array, anonymously, no gh and no token -- because the
+  belief that bash could not reach the API was never tested (C-227-1). The two PR
+  queries below are still MANUAL, but read that as 'not yet attempted from bash',
+  which is what 'gh ABSENT' meant for the gate too, for 226 firings.
 
   READ SECTION 5's 'gh ABSENT' NARROWLY. It means the gh BINARY is not on PATH
   in this container — it does NOT mean your session has no GitHub API path.
@@ -315,10 +495,20 @@ EOF
 
 # --- verdict ----------------------------------------------------------------
 head2 "VERDICT"
+# Run 227: printed BEFORE the verdict text, because it qualifies it. A firing that could not
+# read the gate has not established that its own last push was checked, and B-31 is the record
+# of what that costs. This does not set FAIL -- see warn()'s comment for why.
+if [ "$GATE_BLIND" -ne 0 ]; then
+  printf '  ?? %s\n' \
+    "THE GATE WAS NOT READ THIS FIRING (§4b). Whatever the line below says, you are" \
+    "blind to B-31: a dead gate would look exactly like this run does. Answer §4b's" \
+    "query through the session's GitHub path before recording NOTHING MOVED."
+fi
 if [ "$FAIL" -eq 0 ]; then
   cat <<'EOF'
-  NOTHING MOVED on every check this sandbox can run, and all four guards are green
-  (citations, plan-rot against its pinned spent state, conflict markers, vectors).
+  NOTHING MOVED on every check this sandbox can run, and all five guards are green
+  (citations, plan-rot against its pinned spent state, conflict markers, vectors,
+  and -- since run 227 -- the gate's own step array, §4b).
 
   READ THIS BEFORE CONCLUDING THE LANE IS STILL WHAT IT WAS. The ground state this
   script described for ~100 firings ended on 2026-09-10/11. The owner landed the
