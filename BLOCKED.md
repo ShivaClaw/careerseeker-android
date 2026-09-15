@@ -6184,3 +6184,125 @@ were read this firing. The **fix** is a strict improvement whether or not it is 
 it, steps 5–14 can run; without it, they cannot. And **nothing about S5 changes**: its spec half is
 on engine `main`, its two appliers are built on both sides, and what is left is a landing decision,
 which is the owner's.
+
+---
+
+## B-32 — Neither `main` is protected, so both gates this program relies on are advisory (run 231, 2026-09-15)
+
+**Filed 2026-09-15, run 231.** Like B-29 this is an **owner decision**, not a technical
+obstruction: the fix is a repository setting, and an agent must not be the one to change it.
+Unlike B-29 it is not a contradiction between a document and a setting — it is a gap between what
+this program's records treat as load-bearing and what the repositories actually enforce.
+
+### Symptom
+
+Measured, not inferred (**C-231-2**). For **both** repositories in scope:
+
+| repo | branch | `protected` | `required_status_checks.enforcement_level` | required contexts |
+| --- | --- | --- | --- | --- |
+| `ShivaClaw/careerseeker` | `main` | `false` | `off` | `[]` |
+| `ShivaClaw/careerseeker-android` | `main` | `false` | `off` | `[]` |
+
+So **nothing requires either gate to be green before a commit lands on either `main`.** The two
+gates §4b and §4c read are the ones that enforce:
+
+- `$ExpectedOfflineTotal` and the **doc/verifier drift trap** (engine `CLAUDE.md` names this as the
+  mechanism that stops a dropped harness assertion becoming a quiet count drop);
+- the **engine-side half of the shared-vector guard**, whose android-side half protects the corpus
+  the phone vendors byte-identically at pin `11bb1f5`;
+- the android gate's ten checks, `vendored-vector drift` among them.
+
+Every one of those is a *cross-repo* invariant with a guard at each end, and **neither end is
+required**. A push with red CI merges. The engine `CLAUDE.md` says CI "runs this whole file on
+`windows-latest`, so they execute on every push/PR, and the pinned total makes a dropped assertion
+a hard failure rather than a quiet count drop." That sentence is true about **execution** and this
+blocker does not contradict it — the gate does run, §4c re-measured it this firing. What is not
+true is anything about **enforcement**: a hard failure that no merge consults is a notification.
+
+### Scope — what this is and is not
+
+**This is not an exploitation claim and no unauthorised access is implied.** Both repositories are
+single-owner; the practical exposure is that the owner (or an agent acting on his branches) can
+land a commit past a red gate **without being stopped**, and that the records in this repo describe
+those gates as though they were barriers. It is a **records-accuracy and safety-net** finding.
+
+It is also **not** the same class as B-31. B-31 was a gate that had stopped executing while
+reporting green. This is a gate that executes correctly and is simply not consulted by anything.
+
+### How it was found, and the part worth reusing
+
+**Run 230 wrote this blocker's own premise down as unreachable, and never tested it.** Its NEXT
+INTENT paragraph reads: *"branch protection on engine `main` is the most load-bearing but needs a
+token and would go `??`-blind here, so add it only with an honest account of what it can read
+anonymously."* The honest account turns out to be (**C-231-1**):
+
+- `GET /repos/O/R/branches/main/protection` → **403** `Resource not accessible by integration`.
+  Run 230's prediction is correct **about this endpoint**.
+- `GET /repos/O/R/branches/main` → **200, anonymously**, carrying `.protected` and
+  `.protection.required_status_checks.enforcement_level`.
+
+The boolean that matters is public. **This is the third recorded instance of the same mistake
+shape** — a limit written into the records without being measured:
+
+| run | the sentence | what measurement showed |
+| --- | --- | --- |
+| 221 | `dotnet ABSENT` read as "nothing measurable" | installable; all ten offline harnesses run here (B-10) |
+| 227 | "a gate result cannot be checked from bash" | `curl` reaches the Actions API anonymously (C-227-1) |
+| 231 | "branch protection needs a token" | the branch object is public (**C-231-1**) |
+
+Run 227 already drew the general rule and it is repeated here because it keeps paying: **before
+believing any "this sandbox cannot", check whether it was measured or assumed.** Note the shape —
+each time, the assumption was written by the *same program*, about *itself*, in a document whose
+whole selling point is that every claim carries a re-verification command. The claims carry
+commands; the **limits** did not. That asymmetry is the reusable finding, and it is bigger than
+this blocker.
+
+### Attempts
+
+- **Measured both repos directly** rather than inheriting run 230's prediction (**C-231-2**).
+- **Checked whether the records already knew.** `grep -rniE 'branch protection|required status
+  check|rulesets?'` across `STATE.md`, `LOG.md`, `BLOCKED.md`, `AUDIT-REQUEST.md`, `FIRINGS.md` and
+  `RETURN-DAY.md`, on the tree **as it stood before this run**, returns exactly **two** hits —
+  `STATE.md:60` and `LOG.md:20957`, **both of them run 230's own next-intent sentence predicting it
+  needed a token** (**C-231-6**). So in 230 runs the subject was raised once, as a thing that could
+  not be done, and never as a measurement. **No prior finding exists**, and the single prior mention
+  is the one this blocker corrects.
+- **Wired it into the one command every firing runs**, with B-29's polarity: §4d asserts the
+  *recorded* state (`protected: false`) and prints the exposure as a standing note every run, so it
+  cannot go quiet and cannot paint the section red forever for a decision the owner has not made
+  (**C-231-4**).
+- **Not acted on, deliberately.** No repository setting was changed. Enabling branch protection is
+  an outward-facing change to the owner's account that would immediately alter how *he* merges —
+  and, since this program pushes to `claude/android-a0-probe`, potentially how its own firings land.
+  That is exactly the class this program's boundary forbids an agent to decide unilaterally.
+
+### What this firing could NOT determine
+
+The anonymous branch object gives the boolean and the enforcement level. It does **not** give
+required reviewers, dismissal rules, force-push or deletion settings, or the required-checks
+*context list* when protection is on. So §4d can prove protection is **off** and can detect it
+being switched **on** — it cannot audit the contents of a protection rule once one exists. If the
+owner enables protection, **the next firing must re-derive what §4d can still see**, and should
+expect to need a token for the detail. Recorded so that a later session does not read a green
+`protected: true` as "the rule is correct".
+
+### Smallest human unblock
+
+A decision, and if the answer is yes, four clicks:
+
+> **ShivaClaw/careerseeker → Settings → Branches → Add branch ruleset** (or classic *Branch
+> protection rule*) for `main`, with **Require status checks to pass before merging** and the
+> `Verify-Alpha` job selected as required. Repeat for `ShivaClaw/careerseeker-android` with the
+> android gate's checks.
+
+Re-verify with the command in **C-231-2**; `protected` flips to `true` and §4d goes red against its
+recorded baseline, **which is the correct behaviour** — the run that sees it re-points
+`SETTING_REPOS` in the same commit, exactly as the baseline block prescribes.
+
+**The decision is genuinely open, and a reasonable owner may decline.** Requiring checks on a
+single-owner repo adds friction to his own merges, and B-30 already records that the engine gate is
+Windows-only, so a required engine check is a check *he* must satisfy from Windows before landing
+anything — including docs-only commits. **Declining is a legitimate answer; leaving the records
+describing advisory gates as barriers is not.** If the answer is no, the smallest unblock instead
+is one sentence in `docs/CareerSeeker-Project-Summary.md` saying the gates are advisory by choice,
+and this blocker closes as WONTFIX rather than staying open.

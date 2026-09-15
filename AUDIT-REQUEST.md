@@ -22965,3 +22965,189 @@ grep -n 'Messages sent:' STATE.md | head -1
 
 *Expected:* both mains `unmoved`; both gates reporting all required steps EXECUTED; every PR row
 `draft: true`; and the ledger line reading **18**.
+
+---
+
+## Run 231 — §4d widened to four fields, and B-32
+
+### C-231-1 — branch protection IS readable anonymously; run 230 said it was not
+
+> **Claim.** Run 230's next-intent sentence — *"branch protection on engine `main` ... needs a token
+> and would go `??`-blind here"* — is **half wrong, and the load-bearing half is wrong**. The
+> dedicated protection endpoint is indeed 403 without a token. The **branch object** is public and
+> carries the boolean: `GET /repos/O/R/branches/main` answers **200 anonymously** with `.protected`
+> and `.protection.required_status_checks.enforcement_level`. Measured before the check was built,
+> per run 228's rule.
+
+```bash
+# the endpoint run 230 was right about — 403 without a token
+curl -sS -o /dev/null -w 'protection endpoint: HTTP %{http_code}\n' \
+  https://api.github.com/repos/ShivaClaw/careerseeker/branches/main/protection
+
+# the endpoint it never tried — 200, anonymously, with the field that matters
+curl -sS https://api.github.com/repos/ShivaClaw/careerseeker/branches/main |
+  python3 -c 'import json,sys; d=json.load(sys.stdin); p=d.get("protection") or {}
+print("protected:", d.get("protected"))
+print("enforcement_level:", (p.get("required_status_checks") or {}).get("enforcement_level"))'
+```
+
+*Expected:* `protection endpoint: HTTP 403`; then `protected: False` and `enforcement_level: off`.
+**Both lines are the claim** — the 403 is what makes run 230's prediction defensible, and the 200 is
+what makes it wrong.
+
+### C-231-2 — neither `main` is protected, and neither has a required status check (B-32)
+
+> **Claim.** `ShivaClaw/careerseeker` and `ShivaClaw/careerseeker-android` both report `protected:
+> false`, `enforcement_level: off`, and an **empty** required-contexts list on `main`. Nothing
+> requires either gate green before a commit lands. This is the finding B-32 is filed on.
+
+```bash
+for r in careerseeker careerseeker-android; do
+  printf '%-24s ' "$r"
+  curl -sS "https://api.github.com/repos/ShivaClaw/$r/branches/main" |
+    python3 -c 'import json,sys; d=json.load(sys.stdin); p=d.get("protection") or {}
+r=(p.get("required_status_checks") or {})
+print("protected=%s enforcement=%s contexts=%s checks=%s" % (
+  d.get("protected"), r.get("enforcement_level"), r.get("contexts"), r.get("checks")))'
+done
+```
+
+*Expected:* both rows `protected=False enforcement=off contexts=[] checks=[]`.
+
+**If a row reads `protected=True`, the owner has acted and B-32 is ANSWERED** — do not treat it as a
+regression. Re-point `SETTING_REPOS` in `scripts/run-zero.sh` in the same commit that records it,
+and read B-32's *"What this firing could NOT determine"* before describing the rule as correct: the
+anonymous object proves protection exists, not what it requires.
+
+### C-231-3 — all four §4d comparators fire on live input, and run 230's still behaves as recorded
+
+> **Claim.** Each field's comparator was exercised **against the live API** with a deliberately
+> wrong expectation, and each prints `!! ... THE SETTING MOVED.` for **both** repos and exits **1**.
+> Run 230's existing `RUNZERO_SETTING_EXPECT` hook is **behaviour-preserved** (C-230-2 still holds),
+> and the run-227 known-bad gate replay is unaffected by the refactor.
+
+```bash
+cd careerseeker-android
+for hook in RUNZERO_ARCHIVED_EXPECT=true RUNZERO_BRANCH_EXPECT=develop \
+            RUNZERO_PROTECTED_EXPECT=true RUNZERO_SETTING_EXPECT=true; do
+  out=$(env $hook scripts/run-zero.sh ../careerseeker 2>&1); rc=$?
+  echo "$hook -> fired=$(echo "$out" | grep -cE '^\s+!! .*THE SETTING MOVED') exit=$rc"
+done
+# and the run-227 known-bad, to prove this run's edits changed no gate behaviour
+RUNZERO_GATE_RUN=34896487955 scripts/run-zero.sh ../careerseeker 2>&1 |
+  grep -c 'NOT EXECUTED (skipped)'
+```
+
+*Expected:* `fired=2 exit=1` on all four hooks, and `8` skipped lines from the known-bad replay
+(which also exits 1). **Two hooks at once is not tested and is not claimed.**
+
+### C-231-4 — the widened §4d is green on live input and does not fail the verdict
+
+> **Claim.** With no hooks set, §4d reads four fields for each of the two repos, reports every one
+> `unmoved against the recorded baseline`, and the whole script exits **0** with **zero** `!!` lines.
+> B-29's standing note and B-32's new standing note both print every run.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker > /tmp/rz.txt 2>&1; echo "EXIT=$?"
+sed -n '/^== 4d/,/^== 5\./p' /tmp/rz.txt
+grep -cE '^\s+!! ' /tmp/rz.txt
+```
+
+*Expected:* `EXIT=0`; eight `unmoved against the recorded baseline` lines (four fields × two repos);
+`archived: false disabled: false default_branch: main` and `main protected: false
+required_status_checks: off` for each repo; both the `B-29 IS OPEN` and `B-32 IS OPEN TOO` notes;
+and `0` failing lines.
+
+### C-231-5 — §4d's blind path goes loudly `??` and does NOT silently pass
+
+> **Claim.** Under a `PATH` shim with no `python3`, §4d prints `?? curl or python3 is ABSENT` per
+> repo, sets `SETTING_BLIND`, and the VERDICT repeats the blindness. **Honestly bounded:** the
+> script's overall exit under that shim is **1**, but that comes from `repin-vectors.sh` losing a
+> tool the shim does not carry — **not** from §4d, whose `warn()` deliberately does not set `FAIL`.
+> `protection_check`'s non-200 branch is **claimed as code, not as measured behaviour**; what *was*
+> measured is its premise, that a nonexistent branch answers 404.
+
+```bash
+cd careerseeker-android
+mkdir -p /tmp/shim && for b in curl git node awk sed grep bash env printf sort uniq \
+  head tail cut tr wc date basename dirname mktemp rm cat comm xargs find ls; do
+  ln -sf "$(command -v $b)" /tmp/shim/$b 2>/dev/null; done
+PATH=/tmp/shim scripts/run-zero.sh ../careerseeker 2>&1 | grep -E '^\s+(\?\?|!!) ' | head
+# the premise of the non-200 branch, measured:
+curl -sS -o /dev/null -w 'bogus branch: HTTP %{http_code}\n' \
+  https://api.github.com/repos/ShivaClaw/careerseeker/branches/no-such-branch-231
+```
+
+*Expected:* two `?? curl or python3 is ABSENT — <label> setting NOT checked` lines, the
+`?? A REPOSITORY SETTING WAS NOT READ THIS FIRING (§4d)` block, and exactly **one** `!!` line, which
+names `repin-vectors.sh` and not §4d. Then `bogus branch: HTTP 404`.
+
+### C-231-6 — 230 runs never measured branch protection; the one prior mention is run 230's prediction
+
+> **Claim.** Before this run, the record set mentions branch protection **twice** — `STATE.md:60`
+> and `LOG.md:20957` — and **both are run 230's own next-intent sentence saying it needs a token**.
+> There is no prior measurement and no prior finding.
+
+```bash
+cd careerseeker-android
+git grep -niE 'branch protection|required status check|rulesets?' \
+  b7ef9b2^ -- STATE.md LOG.md BLOCKED.md AUDIT-REQUEST.md FIRINGS.md RETURN-DAY.md
+```
+
+*Expected:* exactly two lines, both containing *"needs a token"*. `b7ef9b2^` is this run's parent —
+searching the tree **after** run 231 will of course hit B-32 itself.
+
+### C-231-7 — the assigned S5 slice is still on engine `main`, re-verified in the files
+
+> **Claim.** The prompt's assigned slice is **built and merged**, for the **184th** consecutive
+> firing. Verified first-person in the product on `origin/main` `14469ad`, not quoted from a prior
+> run's record: §4.3.3 carries the `entitlement_ack` body `{product_id, acknowledged_at, order_id?}`
+> (PQ-A6-1), §3.1 caps the **decoded ciphertext** (PQ-A2-1), §3 reports `decrypt_failed` on
+> structural rejection (PQ-A2-2), and `invalid-unknown-field.json` plus both ack vectors are among
+> the 30 on `main` (PQ-A2-3). The prompt's pin `679a317` and its *"S5 ... NOT STARTED"* remain the
+> known-stale facts.
+
+```bash
+cd careerseeker && git fetch --all --prune
+git show origin/main:docs/Sync-Protocol.md | sed -n '608,624p'   # PQ-A6-1 body
+git show origin/main:docs/Sync-Protocol.md | sed -n '356,360p'   # PQ-A2-1 decoded cap
+git show origin/main:docs/Sync-Protocol.md | sed -n '327,331p'   # PQ-A2-2 decrypt_failed
+git ls-tree origin/main docs/sync-vectors/v1/ --name-only | grep -c .
+node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+```
+
+*Expected:* the three amendments present; `30`; and `OK: 30 vector files match the generator.` with
+`EXIT=0`.
+
+### C-231-8 — the five escalation triggers, each measured negative
+
+> **Claim.** No message was sent and the **ESCALATION LEDGER stays at 18**. **(1) mains** — engine
+> `14469ad`, android `ebfaf81`, both unmoved (§4). **(2) a PR merged or undrafted** — board
+> re-queried by MCP this firing: engine **3 open** (#60, #58, #26), android **6 open** (#1–#6),
+> **every row `draft: true` and `merged: false`**, and `state=all` on the android repo returns those
+> six and nothing else, so **zero android PRs have ever merged**; #6 is a prior firing's own draft,
+> which the trigger rule excludes. **(3) the stored prompt** — unchanged, all three known-stale facts
+> intact. **(4) a gate result** — §4b reads android run **409** on `78badf4`, run 230's own head, and
+> §4c reads engine run **495** on `14469ad`; both are **re-reads of a prior push's own CI**, the
+> class runs 223–225 established is not a new gate result. **(5) the calendar arm** — not due: the
+> eighteenth went at run **226 on 2026-09-15**, and the five-day predicate re-arms on or after
+> **2026-09-20**.
+
+```bash
+cd careerseeker-android && scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 4\./,/^== 5\./p'
+#   list_pull_requests owner=ShivaClaw repo=careerseeker         state=open
+#   list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+grep -n 'Messages sent:' STATE.md | head -1
+```
+
+*Expected:* both mains `unmoved`; both gates all-steps-EXECUTED; every PR row `draft: true`; ledger
+reading **18**.
+
+**B-32 did NOT fire a trigger, and that is a judgement worth attacking.** It is a real new finding,
+so the full house records apply and this is not an empty firing — but the standing test notifies on
+*main moving, a PR merged or undrafted, the prompt changing, or a gate result*, and a settings
+finding is none of those. It is also **not urgent**: the gates have been advisory for the whole life
+of both repos, nothing regressed today, and the owner already holds one unanswered settings decision
+(B-29, sent run 203). Sending a nineteenth message to add a second one is the channel fatigue the
+ledger exists to prevent. **If an auditor disagrees, the disagreement is about the trigger list, not
+about the measurement.**
