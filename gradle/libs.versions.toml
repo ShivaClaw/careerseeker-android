@@ -18,6 +18,22 @@ ksp = "2.3.10"
 robolectric = "4.16.1"
 androidxTestCore = "1.7.0"
 coroutinesTest = "1.11.0"
+# Ktor 3.1.3, NOT the newest.
+#
+# 3.2.0 is newer and was tried first; it cannot be dexed at this project's minSdk 26. Its
+# io.ktor.client.plugins.Messages class carries a field literally named `use streaming syntax`,
+# and D8 rejects space characters in member names before DEX version 040 (minSdk 30+):
+#
+#   D8: Space characters in SimpleName 'use streaming syntax' are not allowed prior to DEX
+#       version 040 (field name `use streaming syntax` on class io.ktor.client.plugins.Messages)
+#
+# The JVM tests pass on 3.2.0 because unit tests are never dexed -- only assembleDebug fails,
+# which is exactly why the APK is built every milestone rather than at the end.
+#
+# Raising minSdk to 30 would "fix" it by dropping Android 8-10 devices, which is a product
+# decision and not a build workaround, so the dependency moved instead. :core uses the
+# engine-agnostic client only; the platform engine is supplied by :app.
+ktor = "3.1.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -41,12 +57,21 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 # room-ktx is deliberately absent — its coroutine/Flow APIs merged into room-runtime in 2.7.
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+# room-testing supplies MigrationTestHelper. Test-only: it must never reach a release classpath.
+androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 androidx-test-core-ktx = { group = "androidx.test", name = "core-ktx", version.ref = "androidxTestCore" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
 # Compose screen tests run on the JVM under Robolectric — versions ride the Compose BOM.
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+# Relay transport (Sync-Protocol.md §2). ktor-client-core carries no engine, so :core states
+# WHAT it speaks and :app decides HOW it reaches the network.
+ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
+# MockEngine: the whole relay protocol is testable offline and deterministically. The relay is
+# production infrastructure -- unit tests must never dial it.
+ktor-client-mock = { group = "io.ktor", name = "ktor-client-mock", version.ref = "ktor" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

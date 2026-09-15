@@ -36,11 +36,22 @@ vectors, which is how cross-repo drift gets caught in CI.
 
 ## Status
 
-**P0 — scaffold.** No product features yet. `:core` holds the Sync Protocol v1 constants
-and rules; `:app` renders a placeholder that proves the toolchain assembles and that
-`:core` is reachable. Pairing starts in P1.
+**Read-only dashboard, offline-complete.** `:core` implements the Sync Protocol v1 envelope
+codec (AES-256-GCM, ECDH/ECDSA P-256, HKDF) and the receiving state machine, proven against
+the shared cross-language test vectors. `:app` holds a Room replica, the envelope applier,
+and five read-only Compose screens rendering it.
+
+Not built yet: the pairing UI and the live relay transport (both device-bound), outcome
+marking, and the entitlement surface.
 
 Phase plan, gate decisions, and exit criteria: [`docs/P0-Runbook.md`](docs/P0-Runbook.md).
+Session-by-session executed evidence: [`LOG.md`](LOG.md); the re-verification commands
+behind every claim: [`AUDIT-REQUEST.md`](AUDIT-REQUEST.md).
+
+> **`applicationId` is PROVISIONAL.** It is currently `app.careerseeker.dashboard`. A Play
+> application id is **permanent once published** and cannot be changed afterwards, so it is
+> Brandon's call to confirm before any upload. Nothing in this repo uploads anything, and the
+> package namespace may keep matching the id either way.
 
 ### Toolchain
 
@@ -78,8 +89,11 @@ checksums published by services.gradle.org; `distributionSha256Sum` is pinned in
 `gradle-wrapper.properties` so every future download is verified too.
 
 ```bash
-./gradlew checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug
+./gradlew checkCoreIsAndroidFree :core:test :app:test :app:assembleDebug :app:lintDebug
 ```
+
+Add `--rerun-tasks` when you are verifying a claim rather than iterating: Gradle otherwise
+reports `UP-TO-DATE` and you are reading a cache, not an execution.
 
 `:core` targets JVM 17 via `jvmToolchain(17)` — have a JDK 17 available (Android
 Studio's bundled JBR works for running Gradle itself).

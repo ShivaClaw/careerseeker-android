@@ -1,0 +1,237 @@
+package app.careerseeker.core
+
+import app.careerseeker.core.crypto.Base64Url
+import app.careerseeker.core.crypto.SyncCrypto
+
+/**
+ * The five outcomes a **phone** may set (§4.3, p2e `outcome`).
+ *
+ * Deliberately not the same set the wire carries back in a snapshot: §4.3.1's application
+ * summary uses the *store's superset*, which additionally has `no_reply` — a desktop-set
+ * observation, not something a user taps. Modelling the phone-settable subset as its own type
+ * is what stops a future screen offering "no reply" as a button the engine would reject.
+ */
+enum class Outcome(val wire: String) {
+    SENT("sent"),
+    REPLIED("replied"),
+    INTERVIEW("interview"),
+    OFFER("offer"),
+    REJECTED("rejected"),
+    ;
+
+    companion object {
+        fun fromWire(value: String): Outcome? = entries.firstOrNull { it.wire == value }
+
+        /**
+         * Values that may arrive from the engine but that the phone must never *send*.
+         * Rendering one is fine; offering it as a control is not.
+         */
+        val ENGINE_ONLY = setOf("no_reply")
+    }
+}
+
+/** Signs the §5.4 input with the device key. Implemented in `:app` by an Android Keystore key. */
+fun interface DeviceSigner {
+    /** ECDSA-P256-SHA256 over [input], returned as raw 64-byte `r||s` (not DER). */
+    fun sign(input: String): ByteArray
+}
+
+/**
+ * Builds phone→engine envelopes.
+ *
+ * Three rules this type exists to make unbreakable:
+ *
+ *  1. **A state-changing kind is signed, or it is not built.** `doc_edit`, `outcome`, and
+ *     `entitlement` require the envelope `sig` (§5.4). Here that is not a caller's
+ *     responsibility to remember — [build] refuses to produce an unsigned envelope for those
+ *     kinds. The audit chain's ability to prove *which paired device* asked for a change
+ *     depends on it.
+ *  2. **The sequence number is owned, not passed in.** §6.1 requires the sender's counter to be
+ *     monotonic and persisted across restarts. The factory takes a [SeqSource] rather than a
+ *     number so a caller cannot reuse one — a reused p2e seq is silently dropped by the engine
+ *     as a replay, which looks exactly like "the outcome didn't save".
+ *  3. **Every field this type interpolates is escaped here, not by a caller.** The body was
+ *     F-67-1; the header — `pairing`, `key_id`, `ts` — was F-69-1. Escaping is the cure in the
+ *     JSON and the wrong tool in §4.1's `|`-delimited AAD, so the two surfaces get two
+ *     treatments: [jsonString] for the envelope, [requireUnambiguous] for the AAD — and the
+ *     second is applied to exactly one field, for a reason stated at its own site.
+ *
+ * There is no payload kind here that can cause an email to be sent, and there cannot be: §8.1
+ * is a protocol property, and [Protocol.STATE_CHANGING_KINDS] plus the v1 kind set is the whole
+ * vocabulary.
+ */
+class OutboundEnvelopeFactory(
+    private val pairing: String,
+    private val keyId: String,
+    private val keyPhoneToEngine: ByteArray,
+    private val seqSource: SeqSource,
+    private val signer: DeviceSigner?,
+    private val nonces: NonceSource = NonceSource.secureRandom(),
+) {
+    /** Supplies the next p2e sequence number. Must persist across process restarts (§6.1). */
+    fun interface SeqSource {
+        fun next(): Long
+    }
+
+    /** 12 fresh CSPRNG bytes per envelope. Never counter-derived (§5.1). */
+    fun interface NonceSource {
+        fun next(): ByteArray
+
+        companion object {
+            fun secureRandom() = NonceSource {
+                ByteArray(Protocol.NONCE_BYTES).also { java.security.SecureRandom().nextBytes(it) }
+            }
+        }
+    }
+
+    class UnsignableEnvelope(kind: String) : IllegalStateException(
+        "kind '$kind' changes engine state and requires a device signature (§5.4), " +
+            "but no signer is configured — refusing to build an envelope the engine must reject",
+    )
+
+    init {
+        // F-69-1's second half. `pairing` was validated by everything that *handles* an envelope
+        // — `RelayClient` on the way out, `EnvelopeJson` and `PairingSession` on the way in — and
+        // by nothing that *builds* one. A protection that lives one layer out from the invariant
+        // it protects is a convention, not an invariant.
+        require(isValidPairingId(pairing)) { "pairing '$pairing' is not a valid pairing id (§3)" }
+        // `keyId` is deliberately NOT checked here — see [requireUnambiguous].
+    }
+
+    /** Serialised envelope JSON, ready for `RelayClient.push`. */
+    fun build(kind: String, bodyJson: String, timestamp: String): String {
+        require(PayloadKind.fromWire(kind) != null) { "unknown payload kind '$kind'" }
+        requireUnambiguous("ts", timestamp)
+
+        val stateChanging = Protocol.STATE_CHANGING_KINDS.contains(kind)
+        if (stateChanging && signer == null) throw UnsignableEnvelope(kind)
+
+        val seq = seqSource.next()
+        val nonce = nonces.next()
+        require(nonce.size == Protocol.NONCE_BYTES) { "nonce must be 12 bytes" }
+
+        val header = EnvelopeHeader(Protocol.VERSION, pairing, Direction.PHONE_TO_ENGINE, seq, timestamp, keyId)
+        val aad = header.aad()
+        val plaintext = """{"kind":"$kind","body":$bodyJson}"""
+        val ciphertext = SyncCrypto.seal(keyPhoneToEngine, nonce, aad, plaintext.toByteArray(Charsets.UTF_8))
+
+        val nonceB64u = Base64Url.encode(nonce)
+        val sig = if (stateChanging) {
+            Base64Url.encode(signer!!.sign(PairingDerivation.signatureInput(aad, nonceB64u, ciphertext)))
+        } else {
+            null
+        }
+
+        return buildString {
+            append("""{"v":${Protocol.VERSION},"pairing":${jsonString(pairing)},"dir":"p2e","seq":$seq,""")
+            append(""""ts":${jsonString(timestamp)},"key_id":${jsonString(keyId)},"nonce":"$nonceB64u",""")
+            append(""""ciphertext":"${Base64Url.encode(ciphertext)}"""")
+            if (sig != null) append(""","sig":"$sig"""")
+            append("}")
+        }
+    }
+
+    /**
+     * `outcome` (§4.3): `{app_id, outcome, at}`. Always signed.
+     *
+     * [appId] and [at] go through [jsonString] for the same reason every field of [entitlement]
+     * does. Raw interpolation here was F-67-1: a `"` or `\` in [appId] yields a malformed body
+     * the receiver rejects as `unknown_kind` — a mark the user made, signed, and had silently
+     * dropped — and a crafted value that stays *valid* JSON can open a second `outcome` key,
+     * leaving two implementations free to resolve the duplicate differently.
+     *
+     * [Outcome.wire] is not escaped and must not need to be: it is a closed enum of five ASCII
+     * literals, and that is the invariant `the phone can only send the five outcomes it is
+     * allowed to set` pins.
+     */
+    fun outcome(appId: String, outcome: Outcome, at: String, timestamp: String = at): String =
+        build(
+            "outcome",
+            """{"app_id":${jsonString(appId)},"outcome":"${outcome.wire}","at":${jsonString(at)}}""",
+            timestamp,
+        )
+
+    /**
+     * `entitlement` (§4.3.2): the phone is a **courier**. `original_json` is forwarded verbatim
+     * because the RSA signature covers those exact bytes — it is embedded as a JSON string
+     * without being re-parsed or re-serialised.
+     */
+    fun entitlement(originalJson: String, playSignature: String, timestamp: String): String =
+        build(
+            "entitlement",
+            """{"original_json":${jsonString(originalJson)},"signature":${jsonString(playSignature)}}""",
+            timestamp,
+        )
+
+    /**
+     * `pull_request` (§4.3.4): ask the engine to re-publish the whole dashboard as a fresh
+     * `snapshot`. Not signed — it changes no engine state (§5.4), so it needs no device key.
+     *
+     * This KDoc used to say "re-publish from a sequence point", copied from §4.3's old row.
+     * §4.3.4 has since made `since_seq` **reserved**: a sender MUST set `0`, a receiver MUST
+     * ignore it and answer with a full snapshot, and a receiver MUST NOT reject a non-zero value.
+     * The parameter stays on the signature because the field is still on the wire; the only value
+     * v1 sends is [PullPolicy.SINCE_SEQ_FULL_REPUBLISH]. See PQ-S4-1 in `docs/protocol-questions.md`.
+     */
+    fun pullRequest(sinceSeq: Long, timestamp: String): String =
+        build("pull_request", """{"since_seq":$sinceSeq}""", timestamp)
+
+    /**
+     * Refuses a header field that would make [EnvelopeHeader.aad] ambiguous.
+     *
+     * **Refusal rather than escaping, and that is the whole point of this method.** The header's
+     * two surfaces need two different fixes. In the JSON, a `"` is a bug and [jsonString] is the
+     * cure. In the AAD there is no JSON: it is `v=…|pairing=…|dir=…|seq=…|ts=…|key_id=…`, a fixed
+     * ASCII string the C# engine builds byte-for-byte, and a `|` inside a field moves the boundary
+     * between two of them — so two *different* headers can produce one AAD, which is the single
+     * thing the AAD exists to prevent. That is **PQ-AAD-1 Half 2**, filed 2026-08-12; the test
+     * `two distinct headers can collide on one AAD` makes it executable.
+     *
+     * Escaping the AAD would be a unilateral change to a normative cross-implementation wire
+     * input — the drift trap `CLAUDE.md` governs, and F-69-1's deliberately deferred half.
+     * Refusing to *build* such a header is sender-side only: it cannot change one byte of any
+     * envelope that was ever legal, and it cannot make a receiver reject anything it used to
+     * accept. `=` is deliberately allowed: fields are `|`-separated and split on their first `=`,
+     * so an `=` inside a value is unambiguous, and base64 padding routinely carries one.
+     *
+     * **Called for `ts` and for nothing else, on purpose.** `timestamp` is minted by the phone at
+     * call time, so this is the sender declining to construct something only it could have
+     * constructed. `pairing` needs no separator check — §3's `p_`+16-base64url shape, now enforced
+     * in `init`, excludes `|` by construction. **`keyId` is engine-issued** and §5.3 constrains its
+     * charset nowhere; PQ-AAD-1's answer puts that constraint in §3 for `ts` and `key_id` together
+     * as one coordinated, wire-visible change, explicitly *"a gate for Brandon"*. Refusing an
+     * engine-issued `key_id` here would let the engine's choice brick this phone's send path — the
+     * phone made stricter than the engine, unilaterally. Pinned by
+     * `a key_id carrying the AAD separator is still accepted, deliberately`.
+     */
+    private fun requireUnambiguous(field: String, value: String) =
+        require(!value.contains(AAD_SEPARATOR)) {
+            "$field '$value' contains the AAD field separator '$AAD_SEPARATOR' (§4.1) — refusing " +
+                "to build an envelope whose AAD would not uniquely determine its header"
+        }
+
+    /** Minimal JSON string escaping — enough for the fields v1 carries, and exact. */
+    private fun jsonString(raw: String): String = buildString {
+        append('"')
+        for (c in raw) {
+            when (c) {
+                '"' -> append("\\\"")
+                '\\' -> append("\\\\")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> if (c < ' ') append("\\u%04x".format(c.code)) else append(c)
+            }
+        }
+        append('"')
+    }
+
+    companion object {
+        /**
+         * §4.1's AAD field separator. Named here rather than spelled `'|'` at the two call sites
+         * because it is a property of the wire format, not of this class — if it ever moves it
+         * moves in `docs/Sync-Protocol.md` and in the C# engine on the same day.
+         */
+        const val AAD_SEPARATOR = '|'
+    }
+}
