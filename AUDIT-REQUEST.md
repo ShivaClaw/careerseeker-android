@@ -23166,3 +23166,113 @@ grep -n 'Messages sent:' STATE.md | head -1        # canonical count, must read 
 
 *Expected:* `**Messages sent: 19.**` with run **231** in the list. **The measurement in C-231-2 is
 independent of this judgement** — if the send was wrong, the finding is unaffected.
+
+---
+
+## Run 238 — 2026-09-17. A ledger field is not a re-pin: §6's board narrative had been wrong for sixteen firings
+
+The probe's verdict was `NOTHING MOVED` and all five escalation triggers were negative, so by the
+run-118 house law this firing owed **one line in `FIRINGS.md` and nothing else**. It is recorded
+here instead of only there because it **changed `scripts/run-zero.sh`**, and a changed file with no
+re-verification command is the bug this document exists to prevent. `STATE.md`, `LOG.md` and
+`BLOCKED.md` were **not** written: no ladder row moved and no blocker opened, closed or narrowed.
+
+### C-238-1 — `BASE_ENGINE_DRAFTS` read 2 while the board read 3, for sixteen consecutive firings
+
+> **Claim.** Engine open drafts went **2 → 3** when PR #60 (`claude/harness-count-drift`) opened at
+> run 221/222. Run 222's ledger line is the first to say `board 3+6 open` (`FIRINGS.md:166`) and
+> **every line from 222 to 237 says the same** — sixteen firings. Over those same sixteen firings
+> `scripts/run-zero.sh`'s §6 printed *"Engine 2 open (#58 …; #26 …) — **both** draft"*, under the
+> stamp *"Last VERIFIED (run 204, 2026-09-11, MCP)"*, because `BASE_ENGINE_DRAFTS` was never moved
+> off 2. The board itself never drifted; **the probe's account of it did**, and it did so in the one
+> register that does not look uncertain — a dated, sourced "last verified" line. Measured this
+> firing by MCP: engine **3 open** — #60, #58, #26 — **all three `draft: true`**. Re-pinned to 3,
+> and §6's prose corrected to name #60 and say "all three draft".
+>
+> **This is the same defect run 204 fixed, in the same block, one line down.** Run 203 recorded the
+> `origin/main` move to `14469ad` without re-pinning `BASE_ENGINE_MAIN`; run 204 repaired it and
+> wrote the rule in capitals — *the run that records a move re-pins the constant, in the same
+> commit*. Sixteen firings then recorded this move in `FIRINGS.md` and left the constant behind.
+> **Writing a value into the ledger is not re-pinning the baseline that narrates it**, and the rule
+> now says so explicitly at the constant.
+
+```bash
+cd careerseeker-android && grep -n 'BASE_ENGINE_DRAFTS=' scripts/run-zero.sh
+scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/^== 6\. MANUAL/,/^  TWO TRAPS/p'
+grep -c 'board 3+6 open' FIRINGS.md
+#   list_pull_requests owner=ShivaClaw repo=careerseeker state=open   -> 3 rows, all draft:true
+```
+
+*Expected:* `BASE_ENGINE_DRAFTS=3`; §6 reads **"Engine 3 open (#60 … #58 … #26 …) — all three
+draft"** and carries the "was 2 until run 238" paragraph; the `board 3+6 open` count is **17** with
+this run's line included (16 before it).
+
+### C-238-2 — §6 is an unquoted heredoc, so a backtick there **executes**
+
+> **Claim.** This run first wrote the C-238-1 paragraph into §6 with backticks around the ledger
+> field `board 3+6 open`. §6 is emitted from an **unquoted** heredoc — that is deliberate, it is how
+> `${BASE_ENGINE_DRAFTS}` interpolates — so the backticks ran as a command substitution and the
+> probe printed **`scripts/run-zero.sh: line 822: board: command not found`** into its own §6, while
+> still exiting 0 and still printing `NOTHING MOVED`. **A probe that reports a shell error inside
+> the section a firing is told to read, and passes anyway, is the run-226 failure shape in
+> miniature.** Caught and fixed inside this same run by re-running the probe after the edit rather
+> than trusting it; the backticks are now double quotes and the trap is written into §6 for the next
+> editor of that text. Recorded rather than quietly fixed because the defect was **self-inflicted in
+> the same commit that fixes C-238-1**, and an auditor should see that the verification caught it.
+
+```bash
+cd careerseeker-android && bash -n scripts/run-zero.sh; echo "syntax $?"
+scripts/run-zero.sh ../careerseeker 2>&1 | grep -n 'command not found'
+```
+
+*Expected:* syntax `0`; **exactly one** match, and it is the literal prose *"board: command not
+found"* inside §6's warning paragraph — **not** a `scripts/run-zero.sh: line NNN:` error prefix. Any
+line carrying that prefix is a live regression of this defect.
+
+### C-238-3 — the assigned S5 spec half, re-verified first-person for the 191st time
+
+> **Claim.** Read at engine `origin/main` `14469ad` by `git show`, not quoted from these records.
+> `docs/Sync-Protocol.md:608` opens §4.3.3; `:618`–`:622` give the body
+> `{product_id, acknowledged_at, order_id}` with `order_id` marked **OPTIONAL**, under `:610`
+> *"Decided 2026-08-07 (gate PQ-A6-1, default-proceed)"*, and `:639` records that the ack has **no
+> negative form** (**PQ-A6-1**). `:337`–`:340` cap the **decoded ciphertext** at 1 MiB and refuse
+> `too_large` *before* any cryptography, with `:358` stamping it *"Amended in S5 (PQ-A2-1)"*.
+> `:329` and the `:1112` error table both report **every** structural rejection as `decrypt_failed`,
+> v1 deliberately adding no `malformed` code so the observable set does not grow, reconciled at
+> `:1168` (**PQ-A2-2**). `invalid-unknown-field.json` sits in the 30-file corpus, pinned at `:1219`
+> *"Added in S5 (PQ-A2-3)"*. **All four asks in the stored prompt are closed and landed.** Building
+> them would author a second, divergent §4.3 amendment and regenerate the corpus the phone vendors
+> byte-identically — the cross-repo drift event the prompt itself bars.
+
+```bash
+cd careerseeker && git fetch --all --prune
+git show origin/main:docs/Sync-Protocol.md | sed -n '608,622p;337,340p;358p;329p;1112p;1168,1169p;1219p'
+git ls-tree -r --name-only origin/main docs/sync-vectors/v1/ | wc -l    # 30
+node docs/sync-vectors/generate.mjs --check                            # ran this firing, exit 0
+```
+
+*Expected:* the §4.3.3 body block with `order_id` **OPTIONAL**; the decoded-ciphertext cap;
+`decrypt_failed` as the sole structural-rejection code; **30** vector files; and
+`OK: 30 vector files match the generator.`
+
+### What an auditor should attack first, in this run's own order
+
+1. **The law says one line; this run wrote three claims.** The run-118 rule is binary — `NOTHING
+   MOVED` plus five negative triggers means `FIRINGS.md` **only**. This firing kept `STATE.md`,
+   `LOG.md` and `BLOCKED.md` shut but opened this file anyway, on the ground that it changed a
+   tracked script and every claim owes a command. **That is an interpretation, not the text**, and
+   an auditor is entitled to call it the same "but this one is important" reasoning C-231-2 already
+   admitted to. The defence: the law governs the **write cost of restating unchanged state**, and
+   none of the three claims above restates unchanged state.
+2. **Whether C-238-1 is a finding at all.** Nothing shipped wrong; no product, protocol or board
+   fact moved. It is a defect in the **instrument**, and only matters if a future firing would have
+   acted on §6's number. It nearly is one: §6 is the section that tells a firing the board is
+   drained, and a firing that trusted it would have under-counted its own open PR.
+3. **The count "sixteen".** It is derived from `grep -c 'board 3+6 open' FIRINGS.md` minus this
+   run's own line, and from run 222 being the first such line. Run 221 wrote a full entry rather
+   than a ledger line, so the true 2 → 3 transition may sit at 221; the claim says "run 221/222"
+   for that reason and the sixteen counts **ledger lines**, not firings.
+4. **No gate ran, and nothing here claims one did.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`,
+   `emulator`, `adb` and `gh` are ABSENT; `ANDROID_HOME` is UNSET. §4b/§4c **read** CI (android run
+   417 on `5dc6296`, engine run 495 on `14469ad`) — read, never ran. The apt `dotnet` route run 221
+   documented was **not** taken this firing.
