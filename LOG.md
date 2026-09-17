@@ -21568,3 +21568,170 @@ write is this iteration's heartbeat on the docs-only `autonomy/claude-state` bra
 
 **The container was modified** — `dotnet-sdk-8.0` was installed. That is a change to the sandbox,
 not to either repository, and it is named because Milestones 2 and 3 depend on it.
+
+---
+
+# Run 242 — 2026-09-17. **B-7's re-verification command had pointed at a host with no DNS record for 196 firings. The blocker was real; the command could never have told us otherwise (C-242-1).**
+
+**Heartbeat:** 2026-09-17, **two hundred and forty-second** cloud iteration (Linux sandbox). Both
+checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+before any write: rung **COMPLETE**, **files claimed: none**, heartbeat
+`2026-08-12T20:28:36-06:00` — stopped 36 days ago. **No collision**; Terra retains right-of-way.
+`run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**, six guards green.
+
+## Milestone 1 — the assignment, declined for the 195th time
+
+The stored prompt assigns S5's spec half: amend `docs/Sync-Protocol.md` §4.3 for `entitlement_ack`,
+add the vector, close PQ-A2-1/-2/-3. **All four are on engine `main`.** `run-zero.sh` §1 reports
+`8575539`, `22b028e` and `7328a0b` each `on main (expected)`, and the nominated check ran
+first-person: `node docs/sync-vectors/generate.mjs --check` → **`OK: 30 vector files match the
+generator.`**, exit **0**. Rebuilding it would author a second divergent §4.3 amendment and
+regenerate the corpus the phone vendors — the cross-repo drift event the prompt itself bars.
+**B-18's 195th firing.** The prompt's three known-stale facts are unchanged (pin `679a317`, S5
+`NOT STARTED`, the `/pair` page "does not exist" — it landed in #42).
+
+## Milestone 2 — THE FINDING (C-242-1), and it came from taking this house's own advice
+
+`run-zero.sh`'s VERDICT carries a standing instruction: *"Before believing any 'this sandbox
+cannot', check whether it was measured or assumed."* Three instances are named (run 221 `dotnet
+ABSENT`, run 227 the Actions API, run 230 branch protection). **The largest untested-looking
+'cannot' left on the board is B-7**, which gates `:app`, and therefore S3/S4/S6. So I checked it —
+and found the blocker sound but its **evidence** hollow.
+
+Run 46 recorded **C-ENV-1** under the headline *"the android gate's absence is measured here, not
+assumed"*. Its one network measurement:
+
+```
+curl -s -o /dev/null -w "%{http_code}\n" https://dsl.maven.google.com/ --max-time 15
+```
+
+reported `000` for *"Google's Maven host — unreachable"*, and **that command has been B-7's
+re-verification command in `AUDIT-REQUEST.md` ever since** (`:9377`).
+
+**`dsl.maven.google.com` does not exist.** Measured two ways: `getent hosts` → exit 2, no output;
+Python `getaddrinfo` → `gaierror: [Errno -2] Name or service not known`. The three real hosts
+(`dl.google.com`, `maven.google.com`, `repo1.maven.org`) resolve normally in the same breath, so it
+is that one name, not the resolver. **A name that does not resolve returns `000` whether the egress
+policy denies Google Maven or allows it.** The command could not distinguish a denial from a typo,
+and it would have kept printing `000` — reading as *"B-7 unchanged"* — on the day the policy was
+widened.
+
+**Same defect class as C-227-1, C-238-2, C-239-1, C-240-1 and C-241-1** — a probe asserting about
+something it did not look at. **It is the first instance that was never valid rather than gone
+stale**, and the first sitting in `AUDIT-REQUEST.md`, whose single purpose is to let someone
+re-check a claim.
+
+## Milestone 3 — what was NOT wrong, stated before the correction is read as bigger than it is
+
+**B-7 holds, and its `BLOCKED.md` entry was sound from the day it was filed.** That entry names
+`dl.google.com`, shows the real `curl: (56) CONNECT tunnel failed, response 403`, and quotes the
+proxy's own `connect_rejected` for `dl.google.com:443`. Run 46's contribution was a **redundant**
+re-measurement that happened to be bogus; it never propagated into the blocker's own evidence.
+
+Re-measured first-person this run, at the **artifact path** rather than a host root — the pinned
+AGP pom `com/android/tools/build/gradle/9.3.0/gradle-9.3.0.pom`, which Gradle's `google()`
+repository must fetch before `:app` can configure at all:
+
+| probe | result |
+|---|---|
+| `dl.google.com/dl/android/maven2/…gradle-9.3.0.pom` | `CONNECT tunnel failed, response 403` → `HTTP 000` |
+| `maven.google.com/…gradle-9.3.0.pom` | `CONNECT tunnel failed, response 403` → `HTTP 000` |
+| control `repo1.maven.org/maven2/` | reached (tunnel open) |
+
+The proxy attributed it unprompted: `dl.google.com:443 — connect_rejected (the egress proxy denied
+the CONNECT (organization policy) …) ×2`. **AGP cannot resolve → `:app` cannot configure → no
+android gate result may be claimed here.** Unchanged, and **not routed around**:
+`/root/.ccr/README.md` is explicit that a 403/407 CONNECT is an organization policy decision to be
+reported, not worked around.
+
+## Milestone 4 — the trap that makes the obvious fix worse than the bug (C-242-2)
+
+The naive correction is to point the probe at `maven.google.com`. **Do not.**
+`maven.google.com` answers **`HTTP 301` at its host root**, so a root probe reads *reachable* — and
+a firing would record *"Google Maven is open"*, which is worse than the typo, because it looks like
+a measurement. It is false: the 301 redirects into the denied host, proven from curl's own
+`final=` field on the artifact fetch:
+
+```
+final=https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/9.3.0/gradle-9.3.0.pom
+```
+
+**A probe of a host root is not a probe of a repository.** I walked into this myself at the top of
+the run — `maven.google.com -> HTTP 301` was, for about a minute, a candidate finding that B-7 had
+lifted. It is recorded because the next firing applying the VERDICT's lesson will reach for exactly
+that curl.
+
+## Milestone 5 — the fix: one instrument, proven in three directions
+
+`scripts/b7-probe.sh` (new). §1 DNS, including the phantom host kept deliberately so *"does not
+exist"* stays visually distinct from *"is denied"*; §2 the host roots, printed **only** to warn that
+they are not the answer; §3 the artifact path on both real hosts — the question that actually
+decides B-7; §4 a reachable control. Proven by replay, **not by inspection**, in the established
+`RUNZERO_JVM_DIR` idiom:
+
+- **ARM A**, live → `B-7 HOLDS`, control reached, **exit 0**.
+- **ARM B**, `B7_CONTROL_URL` at a denied host → the dead-control warning fires and **still exits
+  0**. That polarity is deliberate and matches run 240's `JDK17 ABSENT` choice (C-231-4): an
+  environmental condition must not paint every firing red.
+- **ARM C**, `B7_BASES`/`B7_ARTIFACT_PATH` replayed against Maven Central → `HTTP 200 bytes=2842`,
+  `B-7 MAY HAVE LIFTED`, **exit 1**. The arm that matters on the day the policy changes is proven
+  now, not assumed then.
+
+`bash -n` clean. `AUDIT-REQUEST.md`'s C-ENV-1 command was **corrected in place** — a command that
+cannot re-verify is a live defect, not history — with the original quoted above the replacement and
+the reason stated. `run-zero.sh` §5 gains a pointer so the next firing reads the trap **before**
+rolling its own curl, carrying a `Last VERIFIED (run 242 …)` stamp per run 241's rule. Citations
+moved 1160/1161 → **1162/1163**, guard still green.
+
+## Milestone 6 — one wrinkle, recorded because it is this run's own error class
+
+The probe's control originally tested `== 200`. Maven Central **rate-limited** the root that
+moment (`HTTP 429`), so the live run printed a false *"general network fault"* warning. **429 proves
+the CONNECT tunnel opened** — you cannot be rate-limited by a server you never reached — and in the
+same run an artifact under that same host returned `HTTP 200` (arm C). The control now tests
+`!= 000`. Caught and fixed **before commit**, and recorded because it is **C-242-1's own error
+class**: treating a status code nobody thought about as the one being tested for.
+
+## Milestone 7 — what was NOT concluded
+
+**No rung advanced, and this run does not dress that up.** S3/S4/S6 remain gate-blocked by B-7 and
+B-4; nothing here makes `:app` buildable. What the run buys is that B-7 is now **falsifiable** — the
+board's one genuinely-measured "cannot" can, for the first time, report its own change.
+
+**How many firings read that broken command and were reassured by it is UNMEASURED** and is not
+claimed. It entered at run 46 and no run between 46 and 241 is recorded as having executed it.
+
+**No blocker was filed.** B-7 already exists and its status entry is the right home for this; filing
+a new one would manufacture the phantom B-27 was withdrawn for.
+
+## Boundary — what this run did NOT touch
+
+**No gate ran and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`
+and `gh` are **ABSENT**; `ANDROID_HOME` is **UNSET**; `JDK17(:core)` is **ABSENT**, so
+`scripts/core-probe.sh` was **not run this firing** — run 240's install does not persist into this
+container. Neither `Verify-Alpha.ps1` nor the five-task android command was reachable, and §4b/§4c/§4d
+are **read**, never *ran*. **Nothing was installed this run** — unlike runs 240 and 241, the
+container is unmodified.
+
+**No source file was written in either repository.** No Kotlin and no C#: nothing in `src/`,
+`tests/`, `relay/`, `core/` or `app/` was edited. The S5 appliers were **not** re-read or rewritten.
+**`docs/Sync-Protocol.md` was not opened this run.**
+
+**No vector byte was written and no pin moved** — corpus **30/30** byte-identical at `11bb1f5`; the
+generator check ran **read-only**. **No `$ExpectedOfflineTotal` change, no `Verify-Alpha.ps1` edit,
+no doc count corrected** — **#60** owns the 201-assertion drift and was deliberately not duplicated.
+
+**B-7 was NOT routed around.** No mirror, no vendored AGP, no fabricated `ANDROID_HOME`, and the
+denied CONNECT was not retried beyond the single measurement each host needed. The proxy's status
+endpoint was read; nothing about the proxy was reconfigured, and TLS verification was never
+disabled.
+
+**Nothing merged, closed, undrafted, deleted or force-pushed** in either repository; no history
+rewritten, no CI re-run triggered, **no test skipped, disabled or quarantined**. **No deploy of any
+kind**, and the production relay was **not contacted at all** — not even `/v1/health`. No
+Google/Play/OAuth console, no accounts, no purchases, no Gmail, **no secrets read or printed**.
+
+**No repository setting was changed** — **B-29** (public vs. `README.md:7`) and **B-32** (neither
+`main` protected) remain the owner's decisions; read, flipped nothing. **`careerseeker-ios` was not
+queried** — outside this session's GitHub scope. The **engine repository was READ ONLY**; its only
+write is this iteration's heartbeat on the docs-only `autonomy/claude-state` branch, never merged.

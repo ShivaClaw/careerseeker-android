@@ -6469,3 +6469,51 @@ queued behind a human, like everything else on the board.
 **Still the owner's, still untouched:** **B-4** (no `sdkmanager`/emulator), **B-7** (Google egress),
 **B-22** (`:app` Robolectric flake), **B-29** (repo reads public vs. `README.md:7`), **B-32**
 (neither `main` protected, so both gates are advisory).
+
+---
+
+## B-7 status 2026-09-17 (run 242) — unchanged, and for the first time re-verifiable
+
+**No new blocker.** Recorded because B-7's *re-verification command* was defective, not its
+conclusion, and because the naive fix for it is worse than the defect.
+
+**What was wrong (C-242-1).** Run 46 recorded `C-ENV-1` under the headline *"the android gate's
+absence is measured here, not assumed"*. Its one network measurement was
+`curl … https://dsl.maven.google.com/`, reported as `000` for *"Google's Maven host —
+unreachable"*, and that command sat in `AUDIT-REQUEST.md` as B-7's re-verification command for 196
+firings. **`dsl.maven.google.com` has no DNS record** (run 242, measured two ways: `getent hosts`
+→ exit 2, Python `getaddrinfo` → `gaierror -2`; the three real hosts resolve fine). A name that
+does not resolve returns `000` regardless of egress policy, so the command could not tell a denial
+from a typo — and would have kept printing `000`, reading as "B-7 unchanged", on the day the policy
+was widened. **A self-confirming probe**, and the same defect class as C-227-1, C-238-2, C-239-1,
+C-240-1 and C-241-1 — but the first instance that was **never valid** rather than gone stale.
+
+**What was right, and is not being revised.** **B-7 holds.** The entry above it named the real host
+with the real `403` and the proxy's own `connect_rejected` the day it was filed, and that was always
+sound evidence. Run 242 re-measured it first-person at the **artifact path**:
+`com/android/tools/build/gradle/9.3.0/gradle-9.3.0.pom` returns `curl: (56) CONNECT tunnel failed,
+response 403` on **both** `dl.google.com` and `maven.google.com`, while the control `repo1.maven.org`
+answers over an open tunnel. AGP cannot resolve → `:app` cannot configure → **no android gate result
+may be claimed here**, unchanged.
+
+**The trap the fix had to avoid (C-242-2).** `maven.google.com` answers **`HTTP 301`** at its host
+root. A firing that "corrects" the phantom host to `maven.google.com` and probes the **root** would
+read `301` and could record *"Google Maven is reachable"* — worse than the typo, because it looks
+like a measurement. It is not: the 301 redirects into `dl.google.com/dl/android/maven2/…`, the denied
+host, which run 242 proved from curl's own `final=` field. **Probe an artifact path, never a host
+root.** A probe of a host root is not a probe of a repository.
+
+**The smallest human unblock is unchanged** and is the owner's, not a firing's: widen the session's
+egress policy to include `dl.google.com` (and `api.foojay.io`, for `:core`'s pinned JDK 17
+toolchain), or accept that the android gate runs only on the owner's machine and on GitHub's
+runners. **Not routed around** — `/root/.ccr/README.md` is explicit that a 403/407 CONNECT is an
+organization policy decision to be reported, and no mirror, vendored AGP or fabricated
+`ANDROID_HOME` was attempted this run either.
+
+**New instrument:** `scripts/b7-probe.sh`, one command, proven in three directions (live → `B-7
+HOLDS` exit 0; dead control → warns, still exit 0; replayed reachable artifact → `B-7 MAY HAVE
+LIFTED` exit 1). It is the re-verification command of record for B-7's reach from now on. It is
+**not a gate** and it builds nothing.
+
+**Not re-tested this run and carried forward unchanged:** B-4, B-5, B-6, B-22, B-29, B-32. Nothing
+in this slice touched the Android SDK, Robolectric, a repository setting or a pinch point.

@@ -1,5 +1,86 @@
 # STATE — android tree
 
+> ## ✅ RUN 242 (2026-09-17) — **B-7'S RE-VERIFICATION COMMAND POINTED AT A HOST WITH NO DNS RECORD FOR 196 FIRINGS. THE BLOCKER IS REAL; THE COMMAND COULD NEVER HAVE TOLD US OTHERWISE (C-242-1).**
+>
+> **Heartbeat:** 2026-09-17, **two hundred and forty-second** cloud iteration (Linux sandbox). Both
+> checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+> before any write: rung **COMPLETE**, **files claimed: none**, heartbeat
+> `2026-08-12T20:28:36-06:00` — stopped 36 days ago → **no collision**; Terra retains right-of-way.
+> `run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**, six guards green; mains
+> `14469ad`/`ebfaf81` unmoved, corpus **30/30** byte-identical at pin `11bb1f5`, citations
+> **1162 / 1163 / 2** after this run's writes. Assigned S5 spec half is **on engine `main`** —
+> **declined, the 195th time**, and its nominated check run first-person:
+> `generate.mjs --check` → `OK: 30 vector files match the generator.`, exit 0.
+>
+> **Files claimed:** `scripts/b7-probe.sh` (new), `scripts/run-zero.sh`, `LOG.md`,
+> `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md` (android); `STATE.md` on `autonomy/claude-state`
+> (engine, docs-only, never merged). **Nothing else in the engine repo was written — it was READ
+> ONLY.** **No rung's status changed.**
+>
+> **THE FINDING (C-242-1), and it came from taking this house's own advice.** §5/VERDICT carry a
+> standing instruction: *"Before believing any 'this sandbox cannot', check whether it was measured
+> or assumed."* The largest such claim left is **B-7**, which gates `:app` and therefore S3/S4/S6.
+> Checked — and the blocker is **sound** while its run-46 evidence is **hollow**. `C-ENV-1`, under
+> the headline *"the android gate's absence is measured here, not assumed"*, measured
+> **`dsl.maven.google.com`** → `000`, called it *"Google's Maven host — unreachable"*, and that
+> command has been B-7's re-verification command in `AUDIT-REQUEST.md:9377` ever since. **That host
+> has no DNS record** — `getent hosts` → exit 2, Python `getaddrinfo` → `gaierror -2`, while the
+> three real hosts resolve in the same breath. **A name that does not resolve returns `000` whether
+> the policy denies Google Maven or allows it**, so the command could not tell a denial from a typo
+> and would have kept reading *"B-7 unchanged"* on the day the policy was widened. **Same class as
+> C-227-1, C-238-2, C-239-1, C-240-1, C-241-1 — but the first instance that was NEVER VALID rather
+> than gone stale, and the first sitting in the document whose only job is re-checking claims.**
+>
+> **WHAT WAS NOT WRONG, SAID BEFORE THE CORRECTION IS READ AS BIGGER THAN IT IS. B-7 HOLDS**, and
+> its `BLOCKED.md` entry was sound the day it was filed — it names `dl.google.com`, the real
+> `403`, and the proxy's own `connect_rejected`. Run 46's was a **redundant** re-measurement that
+> never propagated into the blocker's evidence. **Re-measured first-person at the ARTIFACT path**
+> (the pinned AGP pom `gradle-9.3.0.pom`, which `google()` must fetch before `:app` configures):
+> `CONNECT tunnel failed, response 403` → `HTTP 000` on **both** `dl.google.com` and
+> `maven.google.com`, control `repo1.maven.org` reached. **AGP cannot resolve → `:app` cannot
+> configure → no android gate result may be claimed here.** **Not routed around** — a 403/407
+> CONNECT is an organization policy decision per `/root/.ccr/README.md`.
+>
+> **THE TRAP THE FIX HAD TO AVOID (C-242-2).** `maven.google.com` answers **`HTTP 301` at its host
+> root**, so the naive correction — repoint the probe there, probe the root — reads *reachable* and
+> would be recorded as *"Google Maven is open"*: **worse than the typo, because it looks like a
+> measurement.** The 301 lands on the denied host, proven from curl's own `final=` field. **A probe
+> of a host root is not a probe of a repository.** I walked into it myself at the top of this run.
+>
+> **THE SLICE: `scripts/b7-probe.sh`, proven in THREE directions by replay, not inspection.**
+> ARM A live → `B-7 HOLDS`, exit 0. ARM B (`B7_CONTROL_URL` at a denied host) → dead-control
+> warning fires and **still exits 0** — run 240's `JDK17 ABSENT` polarity (C-231-4), since an
+> environmental condition must not paint every firing red. ARM C (`B7_BASES`/`B7_ARTIFACT_PATH`
+> replayed against Maven Central) → `HTTP 200 bytes=2842`, `B-7 MAY HAVE LIFTED`, **exit 1** — the
+> arm that matters on the day the policy changes is proven **now**. `bash -n` clean. C-ENV-1's
+> command **corrected in place** (original quoted above it) because a command that cannot
+> re-verify is a live defect, not history; §5 gains the trap and a `Last VERIFIED (run 242 …)` stamp.
+>
+> **ONE WRINKLE, AND IT IS THIS RUN'S OWN ERROR CLASS.** The control first tested `== 200`; Maven
+> Central rate-limited the root (`429`) and the live run printed a false *"general network fault"*.
+> **429 proves the tunnel opened** — and arm C got `200` from that same host the same run. Control
+> now tests `!= 000`. Fixed **before commit**, recorded because it is C-242-1's error exactly:
+> treating a status code nobody thought about as the one being tested for.
+>
+> **NO RUNG ADVANCED, and that is not dressed up.** S3/S4/S6 stay gate-blocked (B-7, B-4); nothing
+> here makes `:app` buildable. What the run buys is that **B-7 is now falsifiable**. **How many
+> firings read the broken command and were reassured is UNMEASURED** and not claimed.
+>
+> **NO NOTIFICATION SENT.** All five triggers negative: mains unmoved; board **3 engine (#60, #58,
+> #26) + 6 android**, **all nine draft**, zero android PRs ever merged (MCP, this run) — unchanged
+> since run 238; prompt unchanged; gate run **422** on `d137f60` **success**, 8/8 executed — green
+> on this branch's own commit, not an adverse change. **C-242-1 is a correction to our own records,
+> not news to the owner**, and it changes no blocker's status.
+>
+> **No gate ran and none is claimed** — `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`,
+> `adb`, `gh` **ABSENT**, `ANDROID_HOME` **UNSET**, `JDK17(:core)` **ABSENT** so `core-probe.sh` was
+> **not run this firing**. **Nothing was installed** — unlike runs 240/241 the container is
+> unmodified. **No source file written in either repo** — no Kotlin, no C#; `docs/Sync-Protocol.md`
+> was not opened. **No vector byte written, no pin moved, no `$ExpectedOfflineTotal` change, no
+> pinch point touched** — **#60** owns the 201-assertion drift and was not duplicated. **Nothing
+> merged, undrafted, deleted or force-pushed; no CI re-run; no test skipped or quarantined; no
+> deploy; the relay was NOT contacted at all.** **B-29**/**B-32** read, flipped nothing.
+
 > ## ✅ RUN 241 (2026-09-17) — **RUN 240'S OWN BOUNDARY SAID C# "CANNOT BE COMPILED HERE". IT CAN — AND §5, FOUR SECTIONS ABOVE THE BLOCK IT WAS EDITING, HAD SAID SO FOR TWENTY RUNS (C-241-1).**
 >
 > **Heartbeat:** 2026-09-17, **two hundred and forty-first** cloud iteration (Linux sandbox). Both
