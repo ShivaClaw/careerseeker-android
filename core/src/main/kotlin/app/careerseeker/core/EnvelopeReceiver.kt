@@ -2,6 +2,9 @@ package app.careerseeker.core
 
 import app.careerseeker.core.crypto.Base64Url
 import app.careerseeker.core.crypto.SyncCrypto
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /** An envelope as parsed off the wire, fields still in their string forms. */
 data class ReceivedEnvelope(
@@ -37,6 +40,20 @@ class EnvelopeReceiver(
     private val seq = SequenceTracker()
 
     fun highestAccepted(dir: Direction): Long = seq.highestAccepted(dir)
+
+    /**
+     * Receive an envelope straight off the wire.
+     *
+     * This is the entry point transport code should use: it applies §3's strict parse —
+     * including the unknown-top-level-field rejection — before the state machine sees
+     * anything. Taking a pre-built [ReceivedEnvelope] instead lets a caller construct one
+     * from JSON it parsed leniently, which is exactly the gap §3 warns about.
+     */
+    fun receiveWire(wire: String, keyForDir: (String) -> ByteArray): ReceiveResult {
+        val parsed = EnvelopeJson.parse(wire)
+        val envelope = parsed.envelope ?: return reject(parsed.error ?: ErrorCode.DECRYPT_FAILED)
+        return receive(envelope, keyForDir)
+    }
 
     fun receive(env: ReceivedEnvelope, keyForDir: (String) -> ByteArray): ReceiveResult {
         if (env.v != Protocol.VERSION) return reject(ErrorCode.VERSION_UNSUPPORTED)
@@ -87,19 +104,23 @@ class EnvelopeReceiver(
 
     private fun reject(e: ErrorCode) = ReceiveResult(e, null, null)
 
-    /** Minimal top-level "kind" extraction — enough to route, without a JSON dependency. */
-    private fun kindOf(plaintext: ByteArray): String? {
-        val text = plaintext.toString(Charsets.UTF_8)
-        val marker = "\"kind\""
-        val i = text.indexOf(marker)
-        if (i < 0) return null
-        var j = text.indexOf(':', i + marker.length)
-        if (j < 0) return null
-        j++
-        while (j < text.length && text[j].isWhitespace()) j++
-        if (j >= text.length || text[j] != '"') return null
-        val end = text.indexOf('"', j + 1)
-        if (end < 0) return null
-        return text.substring(j + 1, end)
+    /**
+     * Top-level `kind` extraction, by actually parsing the JSON.
+     *
+     * This used to scan the decrypted text for the first `"kind"` substring to avoid a JSON
+     * dependency. That is unsafe *here specifically*: the decrypted body is where untrusted
+     * job and recruiter text lives (§8.6), so a carried string containing `"kind":"snapshot"`
+     * ahead of the real field would have chosen the route. Untrusted text must not be able to
+     * influence dispatch — parsing is the fix, not a longer scanner.
+     *
+     * Returns null for malformed JSON, a missing `kind`, or a non-string `kind`; the caller
+     * maps that to `unknown_kind`, which matches the engine's `JsonDocument.Parse` behaviour
+     * so both implementations classify a garbage body identically.
+     */
+    private fun kindOf(plaintext: ByteArray): String? = try {
+        val root = Json.parseToJsonElement(plaintext.toString(Charsets.UTF_8)) as? JsonObject
+        (root?.get("kind") as? JsonPrimitive)?.takeIf { it.isString }?.content
+    } catch (_: IllegalArgumentException) {
+        null
     }
 }
