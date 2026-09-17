@@ -100,7 +100,18 @@ SLICE_COMMITS="8575539 22b028e 7328a0b"                     # the assigned S5 sl
 # same signal-destroying staleness the BASE_ENGINE_MAIN comment describes. So record which
 # ones are EXPECTED on main; section 1 now flags only a DEVIATION from this expectation.
 SLICE_LANDED="8575539 22b028e 7328a0b"                      # expected ancestors of origin/main
-BASE_ENGINE_DRAFTS=2                                        # run 204, MCP-measured: #58, #26 only
+#
+# 2026-09-17, run 238: the SECOND time a firing recorded a move and left the constant behind --
+# the same defect run 204 fixed on BASE_ENGINE_MAIN, in the same block, on a different line.
+# Engine drafts went 2 -> 3 when #60 (harness-count drift) opened; run 222 was the first firing
+# whose LEDGER LINE says `board 3+6 open` (FIRINGS.md:166) and every line since says the same,
+# so SIXTEEN firings recorded the move while §6 below kept printing "Engine 2 open ... both
+# draft" -- a generated narrative contradicting, word for word, the ledger written beside it.
+# It read as authoritative because it is stamped "Last VERIFIED (run 204, MCP)", which is how a
+# stale baseline does its damage: it does not look uncertain. Re-pinned to the MCP-measured 3,
+# and the rule restated because it has now been missed twice: THE RUN THAT RECORDS A MOVE
+# RE-PINS THE CONSTANT, in the same commit -- a ledger field is not a re-pin.
+BASE_ENGINE_DRAFTS=3                                        # run 238, MCP-measured: #60, #58, #26
 BASE_ANDROID_DRAFTS=6
 BASE_MERGED_SINCE_RUN95=16                                  # the S-series landing, #32..#59
 # Run 204: RETURN-DAY.md §3's landing plan is EXECUTED, so fleet-probe reports ROT 6/6 and exits 1
@@ -831,11 +842,22 @@ cat <<EOF
     list_pull_requests owner=ShivaClaw repo=careerseeker         state=all
     list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
 
-  Last VERIFIED (run 204, 2026-09-11, MCP): THE CASCADE IS OVER AND THE QUEUE IS
-  DRAINED. Engine ${BASE_ENGINE_DRAFTS} open (#58 audit F01/F02, awaiting Codex; #26 SBOM, human
-  queue Q07) -- both draft. Android ${BASE_ANDROID_DRAFTS} open, all draft, and ZERO android PRs have
-  EVER merged. ~${BASE_MERGED_SINCE_RUN95} engine PRs landed 2026-09-10/11 (#32..#59). The queue went 18 -> 2,
+  Last VERIFIED (run 238, 2026-09-17, MCP): THE CASCADE IS OVER AND THE QUEUE IS
+  DRAINED. Engine ${BASE_ENGINE_DRAFTS} open (#60 harness-count drift, opened by a firing; #58 audit
+  F01/F02, awaiting Codex; #26 SBOM, human queue Q07) -- all three draft. Android
+  ${BASE_ANDROID_DRAFTS} open, all draft, and ZERO android PRs have EVER merged.
+  ~${BASE_MERGED_SINCE_RUN95} engine PRs landed 2026-09-10/11 (#32..#59). The queue went 18 -> 3,
   which is the thing 150+ firings were waiting on: the LANDING problem is SOLVED.
+
+  THE 3 ABOVE WAS 2 UNTIL RUN 238, AND WAS WRONG FOR SIXTEEN FIRINGS. #60 opened at run 221/222
+  and every ledger line from 222 on says "board 3+6 open", but this paragraph -- stamped "Last
+  VERIFIED (run 204, MCP)" -- kept saying 2 and "both draft". Recording a move in FIRINGS.md is
+  NOT re-pinning the constant that narrates it. See the BASELINES block above.
+
+  THIS SECTION IS AN UNQUOTED HEREDOC: it interpolates, so a backtick here EXECUTES. Run 238
+  first wrote the paragraph above with backticks around that ledger field, and the probe printed
+  "board: command not found" into its own §6. Caught and fixed inside the same run, and recorded
+  because the next editor of this text will reach for backticks too. Use double quotes in §6.
 
   TWO TRAPS when you re-query, both measured, both costly:
    1. 'merged' reads false for PRs that demonstrably merged (C-89-2).
