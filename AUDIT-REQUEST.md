@@ -9372,16 +9372,37 @@ shebang** — it proved nothing, and re-running it as `bash -e` is what made it 
 
 ### C-ENV-1 — the android gate's absence is measured here, not assumed
 
+> **⛔ THE COMMAND BELOW WAS CORRECTED AT RUN 242 (C-242-1). The original was:**
+>
+> ```bash
+> curl -s -o /dev/null -w "%{http_code}\n" https://dsl.maven.google.com/ --max-time 15
+> ```
+>
+> **`dsl.maven.google.com` has no DNS record** — it is not a Google host and never was. Run 242
+> measured that two ways (`getent hosts` and Python `getaddrinfo`, both fail to resolve). A name
+> that does not resolve returns `000` whether the egress policy denies Google Maven or allows it,
+> so as written this command **could not distinguish a policy denial from a typo**, and it would
+> keep printing `000` — reading as "B-7 unchanged" — on the day the policy is widened.
+>
+> **B-7's conclusion was never in doubt and is not being revised.** `BLOCKED.md`'s B-7 entry named
+> the real host (`dl.google.com`) with the real `403` and the proxy's own `connect_rejected` from
+> the day it was filed, and run 242 re-measured it first-person at the artifact level. What was
+> defective was this **redundant re-measurement** and the fact that it became the re-verification
+> command of record. Replaced with `scripts/b7-probe.sh`, which probes an **artifact path** on both
+> real Google hosts plus a reachable control.
+
 ```bash
 java -version; gradle --version | head -3
-curl -s -o /dev/null -w "%{http_code}\n" https://dsl.maven.google.com/ --max-time 15
+scripts/b7-probe.sh; echo "EXIT=$?"
 ```
 
-*Expected, and **observed**:* JDK **21.0.10** (the build pins **17**), Gradle **8.14.3** (the build
-pins **9.6.1**), and `000` for Google's Maven host — **unreachable**, against `200` for
-`repo1.maven.org`. So **B-7 holds by measurement this run**, and every android-side claim above is
-either runner-sourced or shell-level; **no `:core`, `:app`, `assembleDebug` or `lintDebug` result is
-claimed, because none was run.**
+*Observed run 46:* JDK **21.0.10** (the build pins **17**), Gradle **8.14.3** (the build pins
+**9.6.1**). Those two readings stand — they were measured correctly.
+
+*Observed run 242 for the network half:* `B-7 HOLDS`, **exit 0** — `dl.google.com` and
+`maven.google.com` both return `000` on the pinned AGP pom with `curl: (56) CONNECT tunnel failed,
+response 403`, while the control `repo1.maven.org` answers over an open tunnel. **No `:core`,
+`:app`, `assembleDebug` or `lintDebug` result is claimed, because none was run.**
 
 ### C-CI-9 — the edited step ran on a runner too, and passed
 
@@ -23729,3 +23750,132 @@ prompt unchanged. **Notification withheld.**
 6. **The withheld notification is a judgement call.** Four triggers negative is the house test, but
    B-18 is on its **194th** firing. An auditor may reasonably say the test itself is the bug.
 7. **No gate ran.** Every §4b/§4c/§4d number is **read** from what another machine produced.
+
+---
+
+# Run 242 — 2026-09-17. B-7's re-verification command pointed at a host that does not exist
+
+Every claim below was run first-person in this container. `scripts/b7-probe.sh` is new this run and
+is the instrument the claims rest on; it is **not a gate** and it builds nothing.
+
+### Claim 1 — `dsl.maven.google.com` has no DNS record (C-242-1)
+
+```bash
+getent hosts dsl.maven.google.com; echo "GETENT=$?"
+python3 -c "import socket; socket.getaddrinfo('dsl.maven.google.com',443)"
+```
+
+*Observed run 242:* `GETENT=2` with no output, and `gaierror: [Errno -2] Name or service not known`.
+The same two checks resolve `dl.google.com`, `maven.google.com` and `repo1.maven.org` normally, so
+this is that one name, not a broken resolver. **That name is what `C-ENV-1` measured `000` from and
+called "Google's Maven host".**
+
+### Claim 2 — B-7 holds, measured at the artifact path on both real hosts
+
+```bash
+cd careerseeker-android && scripts/b7-probe.sh; echo "EXIT=$?"
+```
+
+*Observed run 242:* `B-7 HOLDS`, **exit 0**. Both
+`https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/9.3.0/gradle-9.3.0.pom` and
+the same path under `maven.google.com` return `curl: (56) CONNECT tunnel failed, response 403` /
+`HTTP 000  bytes=0`. The proxy attributes it: `dl.google.com:443 — connect_rejected (the egress
+proxy denied the CONNECT (organization policy) …) ×2`. **Not routed around**, per
+`/root/.ccr/README.md`.
+
+### Claim 3 — `maven.google.com` answers 301 at its root, and that is a trap (C-242-2)
+
+```bash
+curl -s -o /dev/null -w "root  HTTP %{http_code}\n" --max-time 25 https://maven.google.com/
+curl -sS -L -o /dev/null -w "artifact  HTTP %{http_code}  final=%{url_effective}\n" --max-time 40 \
+  https://maven.google.com/com/android/tools/build/gradle/9.3.0/gradle-9.3.0.pom
+```
+
+*Observed run 242:* root → **`HTTP 301`**; artifact → `CONNECT tunnel failed, response 403`,
+`HTTP 000`, **`final=https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/9.3.0/gradle-9.3.0.pom`**.
+The `final=` field is the evidence: the redirect lands on the denied host. **So the naive correction
+to C-ENV-1 — point it at `maven.google.com` and probe the root — reads `301` and would be recorded
+as "Google Maven is reachable", which is worse than the typo it replaced.** This is why
+`b7-probe.sh` §3 probes an artifact path and why §2 prints the root only to warn about it.
+
+### Claim 4 — the new detector is proven in all three directions, not inspected
+
+```bash
+cd careerseeker-android && bash -n scripts/b7-probe.sh; echo "SYNTAX=$?"
+scripts/b7-probe.sh >/dev/null; echo "ARM_A=$?"                          # live
+B7_CONTROL_URL=https://dl.google.com/ scripts/b7-probe.sh 2>&1 | grep -c "NO HTTP RESPONSE"
+B7_BASES=https://repo1.maven.org/maven2 \
+  B7_ARTIFACT_PATH=org/jetbrains/kotlin/kotlin-stdlib/2.0.0/kotlin-stdlib-2.0.0.pom \
+  scripts/b7-probe.sh >/dev/null; echo "ARM_C=$?"                        # replayed 'lifted'
+```
+
+*Observed run 242:* `SYNTAX=0`; `ARM_A=0` (`B-7 HOLDS`, control reached); the grep prints **1** —
+arm B's dead-control warning fires and **still exits 0**; `ARM_C=1` with `HTTP 200  bytes=2842` and
+`B-7 MAY HAVE LIFTED`. Arm B's polarity is deliberate and matches run 240's `JDK17 ABSENT` choice
+(C-231-4): an environmental condition must not paint a firing red.
+
+### Claim 5 — 429 is a reached server, not a failed control
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" --max-time 25 https://repo1.maven.org/maven2/
+```
+
+*Observed run 242:* **`429`** — and in Claim 4's arm C, an artifact under that same host returned
+`HTTP 200` in the same run. A rate limit proves the CONNECT tunnel **opened**; only `000` is "no
+HTTP response at all". The probe's control therefore tests `!= 000`, not `== 200`. The first draft
+of this script tested `== 200`, printed a false "general network fault" warning on the live run, and
+was corrected before commit — **recorded because it is C-242-1's own error class**: treating a
+status code nobody thought about as the one being tested for.
+
+### Claim 6 — re-derivation: nothing else moved
+
+```bash
+cd careerseeker-android && bash scripts/run-zero.sh ../careerseeker; echo "EXIT=$?"
+# and, via the GitHub MCP server:
+#   list_pull_requests owner=ShivaClaw repo=careerseeker         state=open
+#   list_pull_requests owner=ShivaClaw repo=careerseeker-android state=all
+```
+
+*Observed run 242:* `NOTHING MOVED`, **exit 0**, six guards green; mains `14469ad` / `ebfaf81`
+unmoved; corpus **30/30** byte-identical at pin `11bb1f5`; citations **1160 / 1161 / 2**; generator
+`OK: 30 vector files match the generator.` Board **3 engine (#60, #58, #26) + 6 android (#6, #5,
+#4, #3, #2, #1)**, **all nine draft**, **zero android PRs have ever merged** — unchanged since run
+238. Gate run **422** on `d137f60` **success**, 8/8 executed. Stored prompt **unchanged** (still
+pins `679a317`, still says S5 `NOT STARTED`, still says the `/pair` page does not exist).
+
+### Claim 7 — the assigned S5 slice is still on engine `main` (declined, 195th)
+
+```bash
+cd careerseeker && git fetch --all --prune
+git log --oneline origin/main --  docs/sync-vectors/v1/entitlement-ack-minimal.json | tail -2
+sed -n '608,618p' docs/Sync-Protocol.md
+node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+```
+
+*Observed run 242:* `run-zero.sh` §1 reports all three S5 commits `on main (expected)` —
+`8575539`, `22b028e`, `7328a0b` — and the generator check prints `OK: 30 vector files match the
+generator.`, **exit 0**. Not rebuilt: doing so would author a second divergent §4.3 amendment and
+regenerate the corpus the phone vendors, which is the cross-repo drift event the prompt itself bars.
+
+### What an external auditor should attack first, run 242
+
+1. **The finding is about a command, not about B-7 — check I did not inflate it.** B-7 is real and
+   always was; `BLOCKED.md`'s entry named the right host with the right `403` on day one. If you
+   read my entry as "B-7 was never measured", I wrote it badly — attack that framing first.
+2. **`getent`/`getaddrinfo` are this container's resolver, not the DNS ground truth.** I did not
+   query an authoritative nameserver (no `dig`/`nslookup` in this image, and `dns.google` is in the
+   denied neighbourhood). A corporate split-horizon resolver could in principle hide a real record.
+   Two independent local paths agreeing is weaker evidence than one authoritative query.
+3. **"It would read `000` forever" is a prediction.** I could not test the widened-policy case,
+   because I cannot widen the policy. The reasoning is sound but the counterfactual is untested.
+4. **Arm C proves the detector, not the world.** It fires exit 1 against Maven Central. It does not
+   prove `b7-probe.sh` would fire on a *Google* 200, because I cannot produce one.
+5. **The 429 control is luck-adjacent.** Maven Central rate-limited the root and served the
+   artifact in the same run. If it had returned `000` for an unrelated reason, arm A's reassurance
+   would have been a false negative. The `!= 000` test is better than `== 200`, not sound.
+6. **Nothing in the ladder moved, and I am claiming that plainly.** This run fixed an audit command
+   and added a probe. No rung advanced, S3/S4/S6 are still gate-blocked, and if you think a firing
+   that cannot advance a rung should write less rather than more, that is B-18's argument and it is
+   a fair hit.
+7. **No gate ran.** Every §4b/§4c/§4d number is **read** from what another machine produced, and
+   `core-probe.sh` did not run this firing (`JDK17(:core) ABSENT`).
