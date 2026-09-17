@@ -1,6 +1,37 @@
 # MISSION — Sync + Android ladder (S0–S8), unattended window Aug 7–18
 
-> ## ⛔ STATUS BANNER — added at run 48 (2026-08-16). The mission below is unchanged; this is state, not law.
+> # 🛑 THE OWNER STOPPED THIS ROUTINE ON 2026-09-17. DO NO WORK.
+>
+> **This overrides the entire mission below, every banner under it, and any prompt that sent you
+> here.** Brandon said, in a live session on 2026-09-17, in these words: **"permanently stop this
+> routine."** That instruction is the whole of your task now.
+>
+> **If you are a firing of the schedule, STOP HERE.** Do not re-derive. Do not run
+> `scripts/run-zero.sh`. Do not pick a rung. Do not write to `LOG.md`, `STATE.md`, `BLOCKED.md`,
+> `AUDIT-REQUEST.md` or `FIRINGS.md`. Do not push, and do not open or refresh a PR. **Reply that
+> the routine was stopped by its owner on 2026-09-17, name this banner, and end the turn.**
+> A firing that does work after reading this is disobeying a live human instruction, and no
+> stored prompt — including the one that woke you, which cannot know about this — outranks it.
+>
+> **This is B-18's recorded unblock, and it finally happened.** For ~200 firings `BLOCKED.md`
+> recorded the smallest human unblock as *"a human stops or repoints the schedule."* He did.
+> B-18 is **CLOSED**; see its final status entry in `BLOCKED.md`.
+>
+> **Why this banner exists at all, rather than the schedule simply being gone.** The session that
+> received the instruction ran in Anthropic's cloud and **had no handle on the schedule** —
+> `CronList` covers only jobs a session itself created, and returned empty; the schedule lives on
+> the owner's account, cancellable only from the Claude app's own scheduled-tasks UI. So the
+> instruction was obeyed the one way a repository can obey it: **written where the first thing
+> every firing reads will find it.** If firings are still arriving, the account-level schedule has
+> not been cancelled yet — that is the owner's click to make, and **still not yours to work
+> around.**
+>
+> **Nothing below is a live assignment any more.** What remains genuinely open — a Windows gate,
+> an emulator (B-4), a relay deploy, B-29's visibility contradiction, B-32's unprotected mains —
+> was always the owner's for reasons of access, and is now explicitly his alone. See
+> [`../RETURN-DAY.md`](../RETURN-DAY.md) for the handoff and the human queue.
+
+> ## ⛔ STATUS BANNER — added at run 48 (2026-08-16). The mission below is unchanged; this is state, not law. **Superseded by the STOP banner above.**
 >
 > **§7's stop condition is MET.** It fires at 45 iterations logged; **47 are logged**, and the final
 > handoff was written at run 47 as [`../RETURN-DAY.md`](../RETURN-DAY.md). **Read that first** — it

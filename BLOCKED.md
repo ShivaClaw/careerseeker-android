@@ -6517,3 +6517,49 @@ LIFTED` exit 1). It is the re-verification command of record for B-7's reach fro
 
 **Not re-tested this run and carried forward unchanged:** B-4, B-5, B-6, B-22, B-29, B-32. Nothing
 in this slice touched the Android SDK, Robolectric, a repository setting or a pinch point.
+
+---
+
+## B-18 — **CLOSED 2026-09-17 by the owner, in a live session. The unblock this entry named for ~200 firings is the one that happened.**
+
+**Status: CLOSED.** Not worked around, not mitigated, not re-scoped — **answered**, by the exact
+action every attempt against this entry said was required.
+
+**The symptom, restated one last time.** A schedule kept firing a stored prompt that assigned S5's
+spec half — a slice built on 2026-08-09 and on engine `main` since the owner's 2026-09-10/11
+landing cascade — and kept describing a ground state that had stopped being true. 243 iterations
+ran. Seven attempts were logged against this entry, and **every one of them lowered the cost of a
+firing rather than ending it**: a banner where the reader looks (run 48), the facts pushed outside
+the repository (run 53), `run-zero.sh` to reach ground state in one command (run 96–98's lesson),
+`firing-line.sh` and the one-line ledger to cut the write cost (run 118). They worked, and none of
+them could stop anything, because **none of them was the unblock this entry had named from the
+start.**
+
+**The smallest human unblock, as recorded here since the beginning:** *"a human stops or repoints
+the schedule."*
+
+**What happened.** On 2026-09-17, in a live session — not a firing — the owner said, in these
+words: **"permanently stop this routine."** That is the instruction, and it is now law for
+anything that reads these records.
+
+**What the receiving session could and could not do, stated precisely so nobody re-opens this on a
+false premise.**
+
+- **Could:** write the stop where it will actually be read — a 🛑 banner at the top of
+  `docs/CLAUDE-ANDROID-MISSION.md` (the first document every firing is told to open) and at the top
+  of `STATE.md`, instructing any future firing to do no work and end its turn.
+- **Could not:** cancel the schedule itself. **`CronList` returned `No scheduled jobs`** — it
+  covers only jobs a session created via `CronCreate`, and this routine is configured at the
+  **account** level and is cancelled from the Claude app's scheduled-tasks UI. A filesystem sweep
+  of `~/.claude` and the working tree found no schedule handle either. **This was measured, not
+  assumed** — which is the standard this house spent runs 221, 227, 230 and 242 learning to apply
+  to every "this sandbox cannot."
+
+**So the close is honest about its own limit.** B-18's *instruction* is answered. If firings are
+still arriving, the account-level cancellation has not been performed yet, and **that remains the
+owner's click** — the one thing 243 iterations could never do for him. A future firing that finds
+this entry must **still not work around it**: the banner says stop, and stopping is the whole task.
+
+**No re-open condition.** Do not file B-18 again, and do not open a successor to it. If the
+schedule fires after this date, that is not a new blocker and not a new finding — it is this entry,
+already closed, plus an uncancelled schedule. Stand down and say so.

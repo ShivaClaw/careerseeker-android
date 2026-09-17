@@ -21929,3 +21929,61 @@ catch a gate *executing where none had* — the owner's Windows gate, or CI prod
 did not exist before. A green CI run on this firing's own push, identical in shape to 423 before
 it, is not news, and prior firings that pushed did not escalate on theirs either. **The ledger
 stays at 19.**
+
+---
+
+# Run 243, addendum — 2026-09-17. **The owner stopped the routine, in a live session. B-18 is closed, and this is the last entry that does work.**
+
+Not a firing. A **live human instruction** arrived in the same session that had just finished run
+243's slice: **"permanently stop this routine."**
+
+## What that is, in this program's own terms
+
+`BLOCKED.md` has recorded B-18's smallest human unblock since the entry was filed, unchanged
+through ~200 status updates: *"a human stops or repoints the schedule."* **That is what just
+happened.** Seven logged attempts against B-18 each lowered the *cost* of a firing — the run-48
+banner, run 53's push outside the repository, `run-zero.sh`, `firing-line.sh` — and not one of them
+could end it, because none of them was the named unblock. This is.
+
+## What I did, and the one thing I could not do
+
+**Obeyed it the only way a repository can.** A 🛑 STOP banner now sits at the very top of
+`docs/CLAUDE-ANDROID-MISSION.md` — the first document every firing is instructed to open — and at
+the top of `STATE.md`. Both tell any future firing, in the first line, to do no work: no
+re-derivation, no `run-zero.sh`, no rung, no record write, no push, no PR; reply that the routine
+was stopped by its owner on 2026-09-17 and end the turn. The mission's run-48 status banner is
+marked **superseded**. B-18 is **CLOSED** in `BLOCKED.md` with no re-open condition.
+
+**Could not cancel the schedule itself, and measured that rather than assuming it.** `CronList`
+returned **`No scheduled jobs`** — it covers only jobs a session created via `CronCreate`. This
+routine is configured at the **account** level and is cancelled from the Claude app's
+scheduled-tasks UI. `~/.claude` and the working tree carry no schedule handle. This house spent
+runs 221, 227, 230 and 242 learning that a "this sandbox cannot" must be measured before it is
+believed; that standard was applied here, and the limit is real.
+
+**So the honest statement is:** the *instruction* is recorded and binding on anything that reads
+these records. **The schedule may still be armed**, and if firings keep arriving, the
+account-level cancellation has not been performed yet. That is the owner's click — the one thing
+243 iterations could never do for him — and a firing that finds the banner must **still not work
+around it.**
+
+## The ladder, at the end
+
+Unchanged by this addendum and stated plainly rather than tidied: **S0/S1 DONE; S2 PARTIAL; S5's
+spec and engine halves on `main` with both appliers unwritten; S3/S4/S6 gate-blocked (B-4, B-7);
+S7/S8 PARTIAL.** What remains needs a Windows gate, an emulator, a relay deploy, and two owner
+decisions (**B-29** visibility, **B-32** unprotected mains). All of it was always his for reasons
+of **access**, not attention. `RETURN-DAY.md` carries the handoff and the human queue.
+
+## Boundary — what this addendum did not touch
+
+No rung advanced and none is claimed. **No gate ran** — the container's toolchain is unchanged from
+run 243's entry (`dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` absent;
+`ANDROID_HOME` unset; JDK 17 absent). No Kotlin, no C#, **no vector byte, no pin move**, no
+`$ExpectedOfflineTotal` change, no pinch point. `FIRINGS.md` was **not** written — this is not an
+empty firing, it is a live instruction. Nothing merged, closed, undrafted, deleted or force-pushed;
+no history rewritten. **No deploy**, and the production relay was **not contacted at all**. No
+Google/Play/OAuth console, no secrets read or printed, **no repository setting changed** — B-29 and
+B-32 remain the owner's decisions, and stopping the routine does not close them. The engine
+repository was **READ ONLY** apart from the docs-only `autonomy/claude-state` heartbeat, never
+merged.

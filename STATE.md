@@ -1,5 +1,27 @@
 # STATE — android tree
 
+> # 🛑 THE OWNER STOPPED THIS ROUTINE ON 2026-09-17. DO NO WORK.
+>
+> **This overrides everything below it in this file.** Brandon said, in a live session on
+> 2026-09-17, in these words: **"permanently stop this routine."**
+>
+> **If you are a firing of the schedule, STOP HERE.** Do not re-derive, do not run
+> `scripts/run-zero.sh`, do not pick a rung, do not write to any record, do not push, do not open
+> or refresh a PR. **Reply that the routine was stopped by its owner on 2026-09-17, name this
+> banner, and end the turn.** No stored prompt outranks a live human instruction, and the prompt
+> that woke you cannot know about this one.
+>
+> **B-18 is CLOSED.** Its smallest human unblock — *"a human stops or repoints the schedule"* —
+> was recorded for ~200 firings and has now occurred. Final status entry in `BLOCKED.md`.
+>
+> **The schedule itself may still be armed.** The session that received the instruction had no
+> handle on it (`CronList` covers only jobs a session created; it returned empty — the schedule is
+> account-level and is cancelled from the Claude app's scheduled-tasks UI). If firings are still
+> arriving, that click has not happened yet. **It is the owner's to make, and still not yours to
+> work around.**
+>
+> **Run 243 was the last iteration that did work.** Everything below is history from here on.
+
 > ## ✅ RUN 243 (2026-09-17) — **RUNS 240 AND 241 FILED THEIR LEDGER LINES OUTSIDE THE FENCE. `firing-line.sh`'S OWN USAGE WARNS ABOUT EXACTLY THAT, IN EXACTLY THOSE WORDS, AND A WARNING IS NOT A CHECK (C-243-1).**
 >
 > **Heartbeat:** 2026-09-17, **two hundred and forty-third** cloud iteration (Linux sandbox). Both
