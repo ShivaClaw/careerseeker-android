@@ -21300,3 +21300,128 @@ both remain the owner's decisions; this run read them and flipped nothing. **`ca
 not queried** — outside this session's GitHub scope. The **engine repository was READ ONLY**; its
 only write is this iteration's heartbeat on the docs-only `autonomy/claude-state` branch, which is
 never merged.
+
+---
+
+# Run 240 — 2026-09-17 — the one gate task this sandbox can run had gone dark, and §5 said otherwise
+
+**Two hundred and fortieth cloud iteration** (Linux sandbox). Both checkouts `git fetch --all
+--prune`d **before any count** (rule one). `run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit
+0**, six guards green; mains `14469ad`/`ebfaf81` unmoved; corpus **30/30** byte-identical at pin
+`11bb1f5`; citations **1159 / 1160 / 2** after this run's writes. Terra read before any write: tip
+`0c6ed69`, rung **COMPLETE**, **files claimed: none** → **no collision**, right-of-way retained.
+
+## Milestone 1 — the assigned slice is landed, and is declined for the 193rd time
+
+Re-verified **first-person in the files** at engine `origin/main` `14469ad`, not quoted from these
+records (**C-240-3**): `8575539`, `22b028e`, `7328a0b` are each an ancestor of `origin/main`;
+`docs/Sync-Protocol.md:619-621` carries the `entitlement_ack` body with `order_id` **OPTIONAL**
+(PQ-A6-1); `:337-340` cap the **decoded ciphertext** at 1 MiB and refuse `too_large` before any
+cryptography, stamped at `:358` (PQ-A2-1); `:329` reports structural rejection as `decrypt_failed`
+(PQ-A2-2); `invalid-unknown-field.json` sits among the 30 (PQ-A2-3). Its nominated check was run
+first-person: `node docs/sync-vectors/generate.mjs --check` → **`OK: 30 vector files match the
+generator.`**, exit 0.
+
+Rebuilding it would author a **second, divergent 4.3 amendment** and regenerate the corpus the
+phone vendors byte-identically — **the cross-repo drift event the prompt itself bars.**
+
+## Milestone 2 — §4b moved, and it moved the right way
+
+Run 239 recorded the android gate's latest completed run as **418** on `08a8168`, **`failure`** —
+B-22's Robolectric flake. This firing reads run **420** on `f7b117d`: **`success`**, all 8 required
+checks **EXECUTED** and passed, `Upload debug APK` skipped by design (B-25). **B-22 did not recur**,
+which is what a flake looks like and is **not** evidence it is fixed. §4c: engine gate run **495**
+on `14469ad`, success, 7/7 executed. No re-run was spent and none was needed.
+
+## Milestone 3 — the finding: `java PRESENT` is not `:core` is runnable (C-240-1)
+
+The slice began as *"run the one gate task this sandbox can run."* It would not run.
+
+`scripts/core-probe.sh` → **exit 1**, *"core-probe: no JDK 17 found under /usr/lib/jvm."* — its own
+guard, firing **before Gradle starts**. `:core` pins `jvmToolchain(17)`
+(`core/build.gradle.kts:9`), Gradle cannot auto-provision (api.foojay.io is denied with
+`dl.google.com`, **B-7**), and this image ships **JDK 21 only**: `java -version` → `21.0.10`,
+`/usr/lib/jvm` holding three 21-flavoured directories and no 17.
+
+Meanwhile **§5 printed `java PRESENT`** and asserted, unconditionally, *"scripts/core-probe.sh runs
+`:core:test` — ONE of those five."* **The single android-gate task this program has ever executed
+here was dead, and the instrument whose entire purpose is that no claim can be misread said it was
+alive.** `command -v` answers *"a binary exists"*; it never answers *"the build this repo pins can
+run."*
+
+**Same defect class as C-227-1, C-238-2 and C-239-1** — the probe asserting about something it did
+not look at. Reachability never tested; a board count never re-read; a guard whose result sat
+unparsed in the step array; and now a **toolchain version** hidden behind a presence check.
+
+## Milestone 4 — fixed, and proven in both directions by replay
+
+§5 gains a **`JDK17(:core)`** row whose detection is `core-probe.sh`'s guard
+**character-for-character** (`ls -d /usr/lib/jvm/*17*`), so the two **cannot** disagree; the header
+comment says so and says to change both. The "core-probe runs" sentence is now **conditional**:
+RUNNABLE when 17 is present; when absent, the `apt` line the probe itself prints, plus an explicit
+**"Do NOT record 'the core lane is gone'."**
+
+Proven on a `RUNZERO_JVM_DIR` hook in the established idiom, **not by inspection**:
+
+- **ARM A**, 17 present → `JDK17(:core) PRESENT` and *"the JDK17 line above says it is RUNNABLE."*
+- **ARM B**, `RUNZERO_JVM_DIR` at an empty dir, replaying this container's real pre-install state →
+  `JDK17(:core) ABSENT`, *"NOT RUNNABLE THIS FIRING"*, the `apt` fix, the do-not-record line — and
+  **exit 0**.
+
+**The ABSENT arm must not fail the verdict, and does not.** That is B-29's and C-231-4's polarity,
+chosen deliberately: failing it would paint every firing on a 17-less image red and break run 118's
+empty-firing law, for a condition that is an **install**, not a defect. `bash -n` clean.
+
+## Milestone 5 — with 17 installed, `:core` is green, and that is a RE-VERIFICATION
+
+`apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless`
+(~10s, exit 0), then `scripts/core-probe.sh` → **BUILD SUCCESSFUL in 37s**, `5 actionable tasks: 5
+executed`, **348 tests, 0 failed, 0 skipped, across 22 classes**, 22 JUnit XML files (**C-240-2**).
+
+**These are the eleven prior recordings' numbers exactly** (run 220 last). It is a
+**re-verification, not a finding**, and it is **1 of the gate's 5 tasks — NOT a gate result**:
+`checkCoreIsAndroidFree`, `:app:assembleDebug`, `:app:lintDebug` and the `:app` Robolectric suite
+did not run and are not claimed.
+
+**One wrinkle, recorded because it cost a retry.** The first post-install attempt died at dependency
+resolution on **HTTP 429 Too Many Requests** from `repo.maven.apache.org` for
+`kotlin-gradle-plugin:2.4.10`. That is a **transient rate-limit through the agent proxy** — **not**
+an egress denial and **not B-7**, which is a 403/000 policy refusal against `dl.google.com`. A
+retry ~45s later went green. Diagnosed by retry, **not root-caused**; a firing that sees 429 here
+should retry before recording anything.
+
+## Milestone 6 — what was NOT concluded
+
+**How long the lane was dark is UNMEASURED and is not claimed.** This run proves it was dark *now*
+and green at *run 220* (2026-09-14). Runs 221–239 neither ran `core-probe.sh` nor recorded a JDK
+version, so the interval cannot be recovered from these records. **No blocker was filed**: this is
+one `apt` away and `core-probe.sh` already prints the fix — filing it would manufacture the phantom
+B-27 was withdrawn for.
+
+## Boundary — what this run did NOT touch
+
+**No gate ran and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`
+and `gh` are ABSENT; `ANDROID_HOME` is UNSET. Neither `Verify-Alpha.ps1` nor the five-task android
+command was reachable. **`scripts/core-probe.sh` is ONE of those five and its result is reported as
+itself** — the verb for §4b/§4c/§4d is **read**, never *ran*. **B-7's `dl.google.com` denial was
+not re-probed and not routed around**, and the `dotnet` apt route §5 documents was **not taken**.
+
+**No `:app` or `:core` source was written.** No Kotlin and no C#: the S5 appliers stay where run 225
+found them, and **the prompt is right that they cannot be compiled here** — `:core` compiles,
+`:app` does not. `ScreensFromFixtureTest.kt` was **not opened this run**. **No CI re-run was
+triggered**, no job re-dispatched, and **no test was skipped, disabled or quarantined**.
+
+**No vector byte was written and no pin moved** (corpus 30/30 at `11bb1f5`); the generator check ran
+**read-only**. No `$ExpectedOfflineTotal` change, no `Verify-Alpha.ps1` edit, no pinch point
+touched. **Nothing merged in either repo**, no PR undrafted, no branch deleted, no force-push, no
+history rewritten. **No deploy of any kind**, and the production relay was **not contacted at all** —
+not even `/v1/health`. No Google/Play/OAuth console, no accounts, no purchases, no Gmail, no secrets
+read or printed.
+
+**No repository setting was changed.** B-29 (public vs. README) and B-32 (neither `main` protected)
+remain the owner's decisions; this run read them and flipped nothing. **`careerseeker-ios` was not
+queried** — outside this session's GitHub scope. The **engine repository was READ ONLY**; its only
+write is this iteration's heartbeat on the docs-only `autonomy/claude-state` branch, never merged.
+
+**The container was modified** — `openjdk-17-jdk-headless` was installed. That is a change to the
+sandbox, not to either repository, and it is named here because the `:core` green depends on it.

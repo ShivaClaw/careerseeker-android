@@ -1,5 +1,71 @@
 # STATE — android tree
 
+> ## ✅ RUN 240 (2026-09-17) — **THE ONE GATE TASK THIS SANDBOX CAN RUN HAD GONE DARK, AND §5 SAID OTHERWISE (C-240-1). FIXED, PROVEN BOTH WAYS, AND THE LANE IS GREEN AGAIN.**
+>
+> **Heartbeat:** 2026-09-17, **two hundred and fortieth** cloud iteration (Linux sandbox). Both
+> checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+> before any write: tip `0c6ed69`, rung **COMPLETE**, **files claimed: none** → **no collision**;
+> Terra retains right-of-way. `run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**, six
+> guards green; mains `14469ad`/`ebfaf81` unmoved, corpus **30/30** byte-identical at pin
+> `11bb1f5`, citations **1159 / 1160 / 2** after this run's writes. Assigned S5 spec half is **on
+> engine `main`** — **declined, the 193rd time**, re-verified in `docs/Sync-Protocol.md` rather than
+> quoted (**C-240-3**), and its nominated check run first-person: `generate.mjs --check` →
+> `OK: 30 vector files match the generator.`, exit 0.
+>
+> **Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`,
+> `FIRINGS.md` (android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged).
+> **Nothing else in the engine repo was written — it was READ ONLY.** **No rung's status changed.**
+>
+> **THE FINDING (C-240-1) — and like the last three, it is about the instrument.** The slice began
+> as *"run the one gate task this sandbox can run."* **It would not run.** `scripts/core-probe.sh`
+> exited **1** on its own guard, *"no JDK 17 found under /usr/lib/jvm"*, **before Gradle started**:
+> `:core` pins `jvmToolchain(17)` (`core/build.gradle.kts:9`), Gradle cannot auto-provision
+> (api.foojay.io is denied with `dl.google.com`, **B-7**), and this image ships **JDK 21 only**
+> (`java -version` → `21.0.10`; three 21-flavoured dirs, no 17). Meanwhile **§5 printed `java
+> PRESENT`** — true of any JDK — and asserted unconditionally that *"scripts/core-probe.sh runs
+> `:core:test`"*. **The single android-gate task this program has ever executed here was dead, and
+> the section whose entire purpose is that no claim can be misread said it was alive.** `command -v`
+> answers *"a binary exists"*, never *"the build this repo pins can run."* **Same defect class as
+> C-227-1, C-238-2 and C-239-1**: the probe asserting about something it did not look at.
+>
+> **Fixed, and proven by replay rather than inspection.** §5 gains a **`JDK17(:core)`** row whose
+> detection is `core-probe.sh`'s guard **character-for-character**, so the two cannot disagree, and
+> the "core-probe runs" sentence is now conditional — RUNNABLE when 17 is present; when absent, the
+> `apt` line the probe itself prints plus an explicit *"Do NOT record 'the core lane is gone'."*
+> **ARM A** (17 present) prints PRESENT/RUNNABLE; **ARM B** (`RUNZERO_JVM_DIR` at an empty dir,
+> replaying this container's real pre-install state) prints ABSENT, the fix, and **exits 0**.
+> **The ABSENT arm must not fail the verdict and does not** — B-29's and C-231-4's polarity, because
+> failing it would paint every firing on a 17-less image red and break run 118's empty-firing law,
+> for a condition that is an **install**, not a defect. `bash -n` clean.
+>
+> **The lane is green again, and that part is a RE-VERIFICATION, not a finding (C-240-2).** After
+> `apt-get install -y --no-install-recommends openjdk-17-jdk-headless` (~10s), `core-probe.sh` →
+> **BUILD SUCCESSFUL**, **348 tests, 0 failed, 0 skipped, 22 classes** — **the eleven prior
+> recordings' numbers exactly** (run 220 last). It is **1 of the gate's 5 tasks and is NOT a gate
+> result**. One wrinkle: the first attempt died on **HTTP 429** from `repo.maven.apache.org` — a
+> transient proxy rate-limit, **not** B-7's 403/000 policy denial — and a retry went green.
+> **Diagnosed by retry, not root-caused.**
+>
+> **NOT filed as a blocker, deliberately.** One `apt` clears it and the probe already prints the
+> fix; filing it would manufacture the phantom **B-27** was withdrawn for. **How long the lane was
+> dark is UNMEASURED and not claimed** — dark now, green at run 220; runs 221–239 neither ran the
+> probe nor recorded a JDK version.
+>
+> **§4b moved and moved the right way.** Run 239 read gate run **418** on `08a8168` **failure**
+> (B-22); this firing reads run **420** on `f7b117d` **success**, all 8 required checks EXECUTED.
+> **B-22 did not recur — which is what a flake looks like, and is NOT evidence it is fixed.** Its
+> revised unblock (v2 `createComposeRule`, 20/20) is untouched and needs `:app`, which B-7 denies.
+> **No re-run spent; no test skipped, disabled or quarantined.**
+>
+> **No gate ran and none is claimed** — `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`,
+> `adb`, `gh` **ABSENT**, `ANDROID_HOME` **UNSET**; §4b/§4c/§4d **read** what other machines
+> produced. **No `:app`/`:core` source, no Kotlin, no C#** (the prompt is right that the appliers
+> cannot be compiled here — `:core` compiles, `:app` does not). **No vector byte, no pin move, no
+> repository setting** (B-29/B-32 remain the owner's), **nothing merged, closed, undrafted or
+> force-pushed, no deploy, relay not contacted at all.** **The container was modified** — JDK 17
+> installed — which is a change to the sandbox, not to either repository.
+
+
 > ## ✅ RUN 239 (2026-09-17) — **§4b CALLED A WORKING GATE A DEAD ONE, ON ITS COMMONEST INPUT (C-239-1). FIXED AND PROVEN BY REPLAY BOTH WAYS.**
 >
 > **Heartbeat:** 2026-09-17, **two hundred and thirty-ninth** cloud iteration (Linux sandbox). Both
@@ -4034,6 +4100,14 @@ in [`RETURN-DAY.md`](RETURN-DAY.md)**.
 > overstated ladder is worse than a stale one. A session with the Windows gate should re-derive
 > S1–S6 row by row against `main` at `14469ad` and rewrite them with measurements. **B-4** (no
 > emulator) and the gate remain the real blockers; neither moved.
+
+> **RUN 240 (2026-09-17) CHANGED NO ROW, AND THAT IS A RESULT, NOT AN OMISSION.** This firing's
+> slice was the instrument (**C-240-1**, §5's `JDK17(:core)` blind spot), not a rung. The one
+> rung-relevant measurement it made — `core-probe.sh` green at **348 / 0 / 0 / 22** — is **1 of the
+> android gate's 5 tasks** and reproduces the eleven prior recordings exactly, so it **re-verifies
+> S-rows that already rest on it and upgrades none**. The standing instruction above still holds:
+> **S1–S6 want a row-by-row re-derivation against `main` at `14469ad` by a session with the Windows
+> gate.** No firing in this sandbox can do it, and none should pretend to.
 
 | Rung | Status | Evidence / reason |
 | --- | --- | --- |

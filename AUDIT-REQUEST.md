@@ -23462,3 +23462,143 @@ byte-identical to pin `11bb1f5`, 30/30.
 5. **Whether C-239-1 mattered in practice.** No firing is known to have *acted* on the false
    "UNPROTECTED" line — they declined their slice for other reasons. The harm is prospective: a
    firing that believed it would have chased B-31 while B-22 sat in front of it.
+
+---
+
+## Run 240 (2026-09-17) — the one gate task this sandbox can run had gone dark, and §5 said otherwise
+
+### C-240-1 — `java PRESENT` is not `:core` is runnable: §5 asserted a lane that exits 1 before Gradle starts
+
+> **Claim.** §5's toolchain table is eleven `command -v` probes. `java` answers **PRESENT** on any
+> JDK, and §5 then asserts, unconditionally, *"scripts/core-probe.sh runs `:core:test` — ONE of
+> those five."* **In this container that sentence was false.** `:core` pins `jvmToolchain(17)`
+> (`core/build.gradle.kts:9`); Gradle cannot auto-provision a toolchain here because `api.foojay.io`
+> is denied by the same egress policy as `dl.google.com` (**B-7**); and this image ships **JDK 21
+> only** — `java -version` reads `21.0.10`, and `/usr/lib/jvm` held `java-21-openjdk-amd64`,
+> `java-1.21.0-openjdk-amd64` and `openjdk-21`, with **no 17**.
+>
+> Measured first-person **before** anything was changed: `scripts/core-probe.sh` → **exit 1**,
+> *"core-probe: no JDK 17 found under /usr/lib/jvm."* — the script's own guard, firing ahead of
+> Gradle. So the single android-gate task this sandbox has ever been able to run was **not
+> runnable**, while §5 printed `java PRESENT` and said it was.
+>
+> **This is NOT a new blocker and NOT B-7.** It is one `apt` away, and the fix is the one
+> `core-probe.sh` already prints. What was broken is the **instrument**, not the lane.
+>
+> **Fixed** by giving §5 a `JDK17(:core)` row that reuses `core-probe.sh`'s guard
+> character-for-character — `ls -d /usr/lib/jvm/*17*` — so the two **cannot** disagree, and by
+> making the "core-probe runs" sentence conditional: RUNNABLE when 17 is present, and when it is
+> absent, the `apt` line plus an explicit *"Do NOT record 'the core lane is gone'."*
+>
+> **Polarity is B-29's / C-231-4's, deliberately.** The ABSENT arm **reports** and does **not**
+> fail the verdict. Failing it would paint every firing on a 17-less image red and break run 118's
+> empty-firing law, for a condition that is an install rather than a defect.
+
+```bash
+cd careerseeker-android
+bash -n scripts/run-zero.sh                        # -> clean
+
+# ARM A — 17 present (this container, after the install below)
+scripts/run-zero.sh ../careerseeker | sed -n '/^== 5\./,/^  READ THE TWO/p'
+#   -> "JDK17(:core) PRESENT" and "the JDK17 line above says it is RUNNABLE."
+
+# ARM B — 17 absent: replay THIS container's real pre-install state
+mkdir -p /tmp/nojvm
+RUNZERO_JVM_DIR=/tmp/nojvm scripts/run-zero.sh ../careerseeker | sed -n '/^== 5\./,/^  READ THE TWO/p'
+#   -> "JDK17(:core) ABSENT", "NOT RUNNABLE THIS FIRING", the apt fix, and the
+#      "Do NOT record 'the core lane is gone'" line.
+RUNZERO_JVM_DIR=/tmp/nojvm scripts/run-zero.sh ../careerseeker >/dev/null; echo $?
+#   -> 0. The ABSENT arm must NOT fail the verdict.
+
+# the guard §5 now shares with core-probe.sh, and the pin it is about
+ls -d /usr/lib/jvm/*17* ; grep -n jvmToolchain core/build.gradle.kts
+```
+
+*Observed run 240:* `bash -n` clean. Both arms ran first-person and printed as above; the ABSENT
+arm exited **0**. Before the install, `/usr/lib/jvm` listed three 21-flavoured directories and no
+17, and `core-probe.sh` exited **1** on its own guard.
+
+**Why this is the same defect class as C-227-1, C-238-2 and C-239-1.** All four are the probe
+asserting about something it did not look at: reachability never tested, a board count never
+re-read, a guard whose result sat unparsed in the step array, and now a **toolchain version** behind
+a `command -v` that cannot see one. **`command -v` answers "a binary exists", never "the build this
+repo pins can run"** — and §5's whole purpose is that no claim can be misread.
+
+### C-240-2 — `:core` is green here: 348 / 0 / 0 across 22 classes, and this is a RE-VERIFICATION, not a finding
+
+> **Claim.** After `apt-get install -y --no-install-recommends openjdk-17-jdk-headless`,
+> `scripts/core-probe.sh` completed **BUILD SUCCESSFUL** and reported **348 tests, 0 failed, 0
+> skipped, across 22 classes**, with 22 JUnit XML files under `core/build/test-results/test/`.
+>
+> **These are the same numbers as the eleven recordings before it** (run 220 last, 2026-09-14). It
+> is a re-verification and is **explicitly not** a new finding. It is **1 of the android gate's 5
+> tasks** and is **NOT a gate result**: `checkCoreIsAndroidFree`, `:app:assembleDebug`,
+> `:app:lintDebug` and the `:app` Robolectric suite did **not** run and are not claimed.
+>
+> **One honest wrinkle, recorded because it cost a retry.** The first attempt after the install
+> failed at dependency resolution with **HTTP 429 Too Many Requests** from
+> `repo.maven.apache.org` on `kotlin-gradle-plugin:2.4.10` — a **transient rate-limit through the
+> agent proxy, not an egress denial** and **not B-7**, which is a 403/000 `dl.google.com` policy
+> refusal. A second attempt ~45s later resolved and went green. A firing that sees 429 here should
+> retry before recording anything.
+
+```bash
+cd careerseeker-android
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+scripts/core-probe.sh; echo "EXIT=$?"
+#   -> "core-probe: 348 tests, 0 failed, 0 skipped, across 22 classes", EXIT=0
+ls core/build/test-results/test/*.xml | wc -l      # -> 22
+```
+
+*Observed run 240:* exit 0, `BUILD SUCCESSFUL in 37s`, `5 actionable tasks: 5 executed`, and the
+348/0/0/22 line. One 429 retry as described.
+
+### C-240-3 — the assigned S5 spec half is on engine `main`, declined for the 193rd time, re-verified first-person
+
+> **Claim.** The stored prompt's assigned slice is landed. Re-verified **in the files at engine
+> `origin/main` `14469ad`**, not quoted from these records:
+>
+> - `8575539`, `22b028e`, `7328a0b` each `merge-base --is-ancestor origin/main` → **ancestor**.
+> - **PQ-A6-1**: `docs/Sync-Protocol.md:619-621` gives the body `product_id`, `acknowledged_at`,
+>   `order_id`, with `order_id` marked **OPTIONAL**; `:1169` reconciles it to S5 / gate PQ-A6-1,
+>   default-proceed.
+> - **PQ-A2-1**: `:337-340` cap the **decoded ciphertext** (AEAD output incl. the 16-byte tag) at
+>   1 MiB and reject `too_large` *before* any cryptography; `:358` stamps *"Amended in S5
+>   (PQ-A2-1)"*.
+> - **PQ-A2-2**: `:329` reports structural rejection as `decrypt_failed`, with v1 deliberately
+>   adding no `malformed` code.
+> - **PQ-A2-3**: `docs/sync-vectors/v1/invalid-unknown-field.json` is present among the **30**.
+>
+> **Rebuilding it would author a second, divergent 4.3 amendment and regenerate the corpus the
+> phone vendors byte-identically — the cross-repo drift event the prompt itself bars.**
+
+```bash
+cd careerseeker
+for c in 8575539 22b028e 7328a0b; do git merge-base --is-ancestor $c origin/main && echo "$c ancestor"; done
+git show origin/main:docs/Sync-Protocol.md | sed -n '619,621p;337,340p;358p;329p'
+node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+#   -> "OK: 30 vector files match the generator.", EXIT=0
+```
+
+*Observed run 240:* all three ancestors; every line as quoted; generator check
+**"OK: 30 vector files match the generator."**, exit **0**; corpus 30/30 byte-identical at pin
+`11bb1f5`.
+
+### What an external auditor should attack first, run 240
+
+1. **The install is the confound.** `:core` was green **only after** this firing changed the
+   container. The 348/0/0/22 is a real measurement, but it is not a measurement of the sandbox *as
+   delivered* — as delivered, the lane was dead. Anyone reproducing must install 17 first.
+2. **`ls -d /usr/lib/jvm/*17*` is a weak oracle, and it is now in two places.** It matches on a
+   path substring, not on a working compiler: a `17`-named directory that is broken, or a JDK 17
+   installed anywhere else, both fool it. It was copied deliberately so §5 and `core-probe.sh`
+   agree — which means a wrong answer is now wrong **consistently, in two files**.
+3. **`RUNZERO_JVM_DIR` proves the branch, not the world.** ARM B redirects a path; it does not
+   remove a JDK. The reported ABSENT text is genuine, but the thing replayed is the guard's input.
+4. **The 429 was diagnosed, not root-caused.** "Transient rate-limit" is inference from a retry
+   succeeding. If Maven Central through this proxy is systematically throttled, the core lane is
+   flakier here than one green run suggests, and no firing has sampled it more than twice.
+5. **How long was the lane dark?** This run proves it was dark **now** and green at **run 220**. It
+   does **not** establish when the image changed; runs 221–239 neither ran `core-probe.sh` nor
+   recorded a JDK version, so the interval is **unmeasured** and is not claimed.
+6. **No gate ran.** Every §4b/§4c/§4d number is **read** from what another machine produced.

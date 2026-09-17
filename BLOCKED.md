@@ -6380,3 +6380,57 @@ a third synchronization tweak. On the Windows box, or any machine with the SDK, 
 
 **B-22 stays OPEN.** Every `:app` claim in these records remains a single sample, and with 17
 occurrences behind it that qualification is now measured rather than asserted.
+
+---
+
+## No new blocker arose 2026-09-17 (run 240) — and the JDK 17 absence is deliberately NOT filed
+
+**Run 240 found the one android-gate task this sandbox can run (`scripts/core-probe.sh`, `:core:test`)
+unable to start: the image ships JDK 21 only, and `:core` pins `jvmToolchain(17)`.** That is
+**not** filed as a blocker, and the reason is worth stating so the next firing does not re-file it.
+
+**It is one `apt` away, and it was taken within this run:**
+
+```bash
+apt-get update -qq && apt-get install -y --no-install-recommends openjdk-17-jdk-headless
+scripts/core-probe.sh    # -> 348 tests, 0 failed, 0 skipped, 22 classes, exit 0
+```
+
+~10 seconds, exit 0, and the lane came back with **the same numbers as its eleven prior
+recordings**. A blocker entry for a condition an ordinary install clears would be the phantom
+**B-27** was withdrawn for — and this program's own standing warning is that *calling something
+BLOCKED when nothing actually blocks it sends the next session hunting*.
+
+**What WAS wrong is the instrument, and it is fixed, not filed** (**C-240-1**): §5 printed
+`java PRESENT` — true of any JDK — and then asserted the core lane runs. §5 now carries a
+`JDK17(:core)` row using `core-probe.sh`'s own guard, and prints the `apt` fix when 17 is absent.
+Proven both ways via `RUNZERO_JVM_DIR`; the ABSENT arm reports and **does not** fail the verdict.
+
+### Relationship to B-7 — they are NOT the same thing
+
+**B-7 is an egress *policy* denial** (`dl.google.com`, `api.foojay.io`: 403/000). It is why Gradle
+cannot auto-provision a toolchain, and it is unchanged and unfixable from here. **The JDK 17
+absence is a missing *package*** on the image, and the sandbox's own `archive.ubuntu.com` is
+reachable. **B-7 makes the absence matter; B-7 is not the absence.** Conflating them would promote
+an install into an unfixable policy denial.
+
+A second, smaller distinction measured this run: `repo.maven.apache.org` returned **HTTP 429 Too
+Many Requests** on the first post-install attempt and resolved on a retry ~45s later. **429 is a
+transient rate-limit, not B-7.** Retry before recording anything.
+
+### Existing blockers, status this run
+
+- **B-22** — the `:app` Robolectric flake. Run 239 saw gate run **418** red on it; this firing reads
+  run **420** on `f7b117d` **green**, all 8 required checks executed. **Non-recurrence on the next
+  run is what a flake looks like and is NOT evidence of a fix.** B-22's revised unblock is unchanged
+  and untouched: the **v2 `createComposeRule`** migration, proven by **20/20** repetition. It needs
+  `:app`, which needs the Android SDK, which **B-7** denies here. **Still OPEN.** No test was
+  skipped, disabled or quarantined; no re-run spent.
+- **B-29** (android repo public vs. its README's "private, always") and **B-32** (neither `main`
+  protected, so both gates are advisory) — **read, unchanged, flipped by nothing.** Both are the
+  owner's single-setting decisions and no firing's to make.
+- **B-30** — PR #60. Narrowed to nothing this session could measure: what remains is
+  `scripts\Verify-Alpha.ps1 -IncludePublish -IncludePackage` on **Windows**, then the owner's merge
+  decision. **Unchanged; this session is forbidden to merge and did not.**
+- **B-4** (no `sdkmanager`/`avdmanager`), **B-5** (Room 2.8.4 under Robolectric), **B-2** (desktop
+  `/pair` half) — untouched this run; nothing measured against them.
