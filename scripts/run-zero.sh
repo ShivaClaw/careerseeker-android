@@ -833,9 +833,40 @@ for t in dotnet pwsh sdkmanager avdmanager emulator adb gh node git java gradle;
   printf '  %-12s %s\n' "$t" "$(command -v "$t" >/dev/null 2>&1 && echo PRESENT || echo ABSENT)"
 done
 printf '  %-12s %s\n' "ANDROID_HOME" "${ANDROID_HOME:-UNSET}"
+
+# JDK 17, added run 240 (2026-09-17) -- C-240-1.
+#
+# 'java PRESENT' above is a command -v check and says NOTHING about which JDK.
+# :core pins jvmToolchain(17) (core/build.gradle.kts:9), Gradle cannot
+# auto-provision one (api.foojay.io is denied with dl.google.com, B-7), so the
+# ONE gate task this sandbox can run needs a 17 that 'java PRESENT' does not
+# imply. This container ships JDK 21 ONLY: java -version reads 21.0.10 and
+# /usr/lib/jvm held 21 alone, so core-probe.sh exited 1 before Gradle started
+# while §5 went on printing 'java PRESENT' and asserting the probe runs.
+#
+# Detection is character-for-character core-probe.sh's own guard, so the two
+# CANNOT disagree. If you change one, change both.
+CORE_JVM_DIR="${RUNZERO_JVM_DIR:-/usr/lib/jvm}"
+if ls -d "$CORE_JVM_DIR"/*17* >/dev/null 2>&1; then CORE_JDK=PRESENT; else CORE_JDK=ABSENT; fi
+printf '  %-12s %s\n' "JDK17(:core)" "$CORE_JDK"
 note ""
 note "No gate is reachable from here: neither Verify-Alpha.ps1 nor the five-task"
-note "android command. scripts/core-probe.sh runs :core:test — ONE of those five."
+if [ "$CORE_JDK" = PRESENT ]; then
+  note "android command. scripts/core-probe.sh runs :core:test — ONE of those five,"
+  note "and the JDK17 line above says it is RUNNABLE. Run it; do not report a gate."
+else
+  note "android command. AND scripts/core-probe.sh — the ONE of those five that"
+  note "normally runs here — is NOT RUNNABLE THIS FIRING: JDK17(:core) is ABSENT,"
+  note "so it exits 1 before Gradle starts. This is NOT a new blocker and NOT B-7."
+  note "It is one apt away, and the probe prints the same fix when you run it:"
+  note ""
+  note "  apt-get update -qq && apt-get install -y --no-install-recommends \\"
+  note "      openjdk-17-jdk-headless"
+  note ""
+  note "Measured run 240 (C-240-1): that install took ~10s and core-probe.sh then"
+  note "reported 348 tests / 0 failed / 0 skipped / 22 classes, the same numbers as"
+  note "the eleven recordings before it. Do NOT record 'the core lane is gone'."
+fi
 note ""
 note "READ THE TWO ABSENT LINES ABOVE THE WAY §6 TELLS YOU TO READ 'gh ABSENT':"
 note "they mean NOT PREINSTALLED, not unobtainable. Run 221 measured both (C-221-6):"
