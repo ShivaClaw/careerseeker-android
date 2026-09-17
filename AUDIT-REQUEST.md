@@ -23276,3 +23276,175 @@ node docs/sync-vectors/generate.mjs --check                            # ran thi
    `emulator`, `adb` and `gh` are ABSENT; `ANDROID_HOME` is UNSET. §4b/§4c **read** CI (android run
    417 on `5dc6296`, engine run 495 on `14469ad`) — read, never ran. The apt `dotnet` route run 221
    documented was **not** taken this firing.
+
+## Run 239 — 2026-09-17. §4b called a working gate a dead one, on its commonest input
+
+**This firing is not an empty one and does not take the run-118 line.** `scripts/run-zero.sh`
+returned **exit 1** with the VERDICT *"SOMETHING MOVED, or a local check failed"*: the android
+gate's latest completed run, **418** on `08a8168`, is **`failure`**. The house law's condition is
+`NOTHING MOVED` plus five negative triggers; it was not met, so the four records are written.
+
+What the firing then found is a defect in **the probe**, not in the product: §4b's report of that
+red run was wrong, and wrong in the direction that overstates the program's exposure.
+
+### C-239-1 — §4b's `gate_failed` arm was unreachable, so a caught failure was narrated as a dead gate
+
+> **Claim.** §4b's reporting chain tested `gate_skipped`/`gate_missing` **before** `gate_failed`.
+> CI runs all eight required checks in **one sequential job**, so a step that fails leaves every
+> later required step `skipped` **as its consequence**. The skip arm therefore won on every failure
+> except one in the *last* required step, and the `gate_failed` arm — whose own text reads *"The
+> toolchain is fine and a REAL check is failing — a different, and better, problem than B-31"* —
+> **could not print**. In its place the probe printed B-31's signature, and with it the claim that
+> *"the vendored-vector drift guard is among the eight, so cross-repo drift is UNPROTECTED"*.
+>
+> **On run 418 that claim was false.** The drift guard is step **8**; the failing `:app` test is
+> step **10**. Steps 6, 7, 8 and 9 all report `success`, so the guard had **executed and passed**
+> before anything skipped. Only *Assemble debug APK*, *Lint* and *Assert no analytics* did not run.
+>
+> **Fixed** by deciding a failed required step first and printing a per-step ledger, so a reader
+> sees which guards ran instead of taking a sentence's word for it. B-31's signature is now
+> reserved for skips/absences with **no** required step failing — what a dead toolchain actually
+> looks like.
+>
+> **Proven in both directions by replay, not by inspection**, on the hook the script already
+> carries. The known-bad input is run **402** (`d8ca4fe`), the dead gate B-31 was filed on: it
+> fails at *"Set up Android SDK"*, a step that is **not** required, and all eight skip.
+
+```bash
+cd careerseeker-android
+# the step array that settles it: 6,7,8,9 success; 10 failure; 11,12,13 skipped
+curl -sS https://api.github.com/repos/ShivaClaw/careerseeker-android/actions/runs/35169287642/jobs \
+  | jq -r '.jobs[].steps[]|"\(.number)\t\(.conclusion)\t\(.name)"'
+
+# the fix must NOT weaken B-31: run 402 stays byte-identical to its pre-fix report
+RUNZERO_GATE_RUN=34896487955 scripts/run-zero.sh ../careerseeker | sed -n '/4b\./,/^== 4c/p'
+#   -> all eight "NOT EXECUTED (skipped)", then "THIS IS B-31's SIGNATURE, NOT B-25's."
+
+# and run 418 must now be narrated as what it is
+RUNZERO_GATE_RUN=35169287642 scripts/run-zero.sh ../careerseeker | sed -n '/4b\./,/^== 4c/p'
+#   -> "A REQUIRED CHECK FAILED. That is NOT B-31 and NOT B-25", then the ledger with
+#      "passed       Assert vendored sync vectors match the pinned main-repo commit"
+```
+
+*Observed run 239:* both replays ran first-person. Run 402's §4b output `diff`s **empty** against
+the pre-fix capture; run 418's prints the four `passed` rows, the one `FAILED` row and the three
+`NOT EXECUTED` rows. `bash -n scripts/run-zero.sh` → clean. The verdict still exits **1** on run
+418, which is correct: a required check really did fail.
+
+**Why this is the same defect class as C-227-1 and C-238-2.** All three are the probe asserting
+about something it did not look at — reachability it never tested, a board count it never re-read,
+and now a guard whose own result was sitting in the step array being parsed. **A failure the gate
+CAUGHT is the gate working**, and a probe that cannot tell that from a gate that never ran will
+send the next firing after the wrong blocker.
+
+### C-239-2 — the failure-mode census of run numbers 222–418: the mis-narrated case was the commonest one
+
+> **Claim.** The window is the full population **after** B-22's mitigation `30908de`, which was
+> gated by run **221**. All **197** run numbers 222–418 are present and completed: **165 decisive**
+> (`success`|`failure`) and **32 `cancelled`** (`ci.yml`'s `cancel-in-progress`, C-107-6 — not
+> evidence either way). Of the **22** failures, the failing **step** partitions:
+>
+> | failing step | runs | n |
+> | --- | --- | --- |
+> | `Unit tests (:app, Robolectric)` | 224, 227, 234, 262, 267, 274, 280, 282, 284, 300, 305, 306, 320, 322, 345, 394, 418 | **17** |
+> | `Upload debug APK` (B-25 quota) | 242, 245, 246 | 3 |
+> | `Assert every cited C-/B- id resolves` | 243 | 1 |
+> | `Set up Android SDK` (B-31) | 402 | 1 |
+>
+> So **17 of 22 failures — 10.3% of the 165 decisive runs — are the `:app` red**, and every one of
+> them is a failure in a *required* step with the drift guard already passed two steps earlier.
+> **§4b was mis-narrating its single most frequent input**, and had been since run 227 built it.
+>
+> **The attribution is honest about its two tiers.** The *step* is measured for all 22 from the
+> jobs API. The *B-22 signature inside the step* is read first-person from the job log for runs
+> **224** and **418**, and is already recorded for **262** and **267** (C-107-7). The other 13 are
+> attributed **by step name only** — not by log — and this entry does not claim more.
+
+```bash
+R=ShivaClaw/careerseeker-android
+for p in 1 2 3; do curl -sS "https://api.github.com/repos/$R/actions/runs?branch=claude/android-a0-probe&status=completed&per_page=100&page=$p" \
+  | jq -r '.workflow_runs[]|"\(.run_number)\t\(.conclusion)\t\(.head_sha[0:7])\t\(.id)"'; done > /tmp/runs.txt
+awk -F'\t' '$1>=222 && $1<=418 && ($2=="success"||$2=="failure")' /tmp/runs.txt | wc -l   # 165
+awk -F'\t' '$1>=222 && $1<=418 && $2=="failure"'                  /tmp/runs.txt | wc -l   # 22
+# and the per-failure step, which is what partitions them:
+for n in $(awk -F'\t' '$2=="failure" && $1>=222 {print $1}' /tmp/runs.txt); do
+  id=$(awk -F'\t' -v n=$n '$1==n{print $4}' /tmp/runs.txt)
+  printf '%s ' "$n"; curl -sS "https://api.github.com/repos/$R/actions/runs/$id/jobs" \
+    | jq -r '[.jobs[].steps[]|select(.conclusion=="failure")|.name]|join(",")'
+done
+```
+
+*Observed run 239:* the counts above, exactly as tabulated. Run 224's log —
+`ComposeTimeoutException at ScreensFromFixtureTest.kt:72`, **two** assertions failing, `35 tests
+completed, 2 failed, 3 skipped` — is the **first** run gated after the mitigation landed.
+
+### C-239-3 — B-22 is not new, was not fixed here, and the reason is the standing rule
+
+> **Claim.** The red on `08a8168` is **B-22**, in the post-fix timeout mode already recorded at
+> `LOG.md:16374-16386` and `BLOCKED.md:4570`. Nothing about it is a discovery: `STATE.md:1337`
+> already states that *"`30908de` changed the failure **mode**, not the **rate**"*, and C-239-2
+> only widens the window that says so from 24 decisive runs to 165. **The finding this run files
+> is C-239-1, about the instrument — not B-22, about the product.**
+>
+> **It was not fixed and no fix was pushed.** The patch is an `:app` file; `:app` needs the Android
+> SDK and AGP from `dl.google.com`, which this sandbox's egress denies (**B-7**). Pushing an
+> uncompiled synchronization change into the very suite whose reliability is in question is what
+> B-22's own entry forbids, and `08a8168`'s diff is **records + one bash script** — it cannot reach
+> `:app` by any causal path, so the failure is not this run's to own either.
+>
+> **No re-run was spent.** B-22's entry settled that at run 75: the same-commit red-then-green is
+> already proven and a second sample buys nothing.
+
+```bash
+cd careerseeker-android
+git diff --stat 5dc6296..08a8168     # AUDIT-REQUEST.md, FIRINGS.md, scripts/run-zero.sh — no :app
+grep -n '30908de. changed the failure' STATE.md
+sed -n '4570,4575p' BLOCKED.md
+```
+
+### C-239-4 — the assigned S5 spec half, re-verified first-person for the 192nd time
+
+> **Claim.** The prompt's assigned slice is **built and on engine `main`** (`14469ad`), unchanged.
+> `docs/Sync-Protocol.md` §4.3.3 opens at **:608** under the decision line **:610** *"Decided
+> 2026-08-07 (gate PQ-A6-1, default-proceed)"*, with the body at **:618-:622** giving
+> `{product_id, acknowledged_at, order_id}` and `order_id` marked OPTIONAL. **:337-340** cap the
+> **decoded ciphertext** at 1 MiB and refuse `too_large` before any cryptography, **:358** stamping
+> it *"Amended in S5 (PQ-A2-1)"*. **:329** and the **:1112** error table both report every
+> structural rejection as `decrypt_failed` (PQ-A2-2). `invalid-unknown-field.json` is in the
+> 30-file corpus, pinned at **:1219** *"Added in S5 (PQ-A2-3)"*.
+>
+> **Building it would be the cross-repo drift event the prompt itself bars** — a second, divergent
+> §4.3 amendment and a regenerated corpus that the phone vendors byte-identically.
+
+```bash
+cd careerseeker && git fetch --all --prune
+git show origin/main:docs/Sync-Protocol.md | sed -n '608,622p;337,358p;1219p'
+node docs/sync-vectors/generate.mjs --check     # -> "OK: 30 vector files match the generator." exit 0
+cd ../careerseeker-android && scripts/repin-vectors.sh --check
+```
+
+*Observed run 239:* `generate.mjs --check` was **run first-person** in the engine checkout at
+`14469ad` → **`OK: 30 vector files match the generator.`**, exit **0**. The vendored corpus is
+byte-identical to pin `11bb1f5`, 30/30.
+
+### What an auditor should attack first, in this run's own order
+
+1. **The fix reorders a detector, and reordering a detector is how detectors get weakened.** The
+   whole defence is that run 402 still goes red with B-31's signature — but that is **one**
+   known-bad input. An auditor should construct the case this run did not: a run where a required
+   step fails **and** an unrelated required step was genuinely never reachable. The new code puts
+   such a run in the `FAILED` arm and lists the unreachable ones as `NOT EXECUTED` rows, which is
+   believed correct, but it is **untested** because no such run exists in 300 samples.
+2. **"17 of 22 are B-22" leans on step names for 13 of the 17.** Only 224 and 418 were read
+   first-person this run; 262 and 267 come from C-107-7. A different failure inside the same step
+   would be counted as B-22 by this census and should not be.
+3. **The census window's left edge.** It starts at 222 because `30908de` was gated by run 221. If
+   the mitigation's effect is better measured from the commit's *merge* rather than its *gating
+   run*, the boundary moves and the rate moves with it.
+4. **This run changed a tracked script and ran no gate.** `dotnet`, `pwsh`, `sdkmanager`,
+   `avdmanager`, `emulator`, `adb` and `gh` are ABSENT; `ANDROID_HOME` is UNSET. §4b/§4c **read**
+   CI — read, never ran. `scripts/run-zero.sh` is exercised only by its own replay hook, and
+   `bash -n`; there is no test suite for it, which is a standing weakness of every run-zero change.
+5. **Whether C-239-1 mattered in practice.** No firing is known to have *acted* on the false
+   "UNPROTECTED" line — they declined their slice for other reasons. The harm is prospective: a
+   firing that believed it would have chased B-31 while B-22 sat in front of it.

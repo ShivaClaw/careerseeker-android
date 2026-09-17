@@ -21161,3 +21161,142 @@ reach. It reads, it files, it does not flip. B-29 remains the owner's decision o
 from §4d is documented in the script rather than silent. The **engine repository was READ ONLY** —
 its only write is this iteration's heartbeat on the docs-only `autonomy/claude-state` branch, which
 is never merged.
+
+---
+
+# Run 239 — 2026-09-17. The probe called a working gate a dead one, on its commonest input
+
+**Heartbeat:** 2026-09-17, **two hundred and thirty-ninth** cloud iteration (Linux sandbox). Both
+checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+before any write: tip `0c6ed69`, rung **COMPLETE**, **files claimed: none** → **no collision**;
+Terra retains right-of-way. `run-zero.sh ../careerseeker` → **exit 1**, VERDICT *"SOMETHING MOVED,
+or a local check failed"*; mains `14469ad`/`ebfaf81` unmoved, corpus **30/30** byte-identical at pin
+`11bb1f5`, citation guard green.
+
+**This is not an empty firing and it does not take the run-118 line.** That law's condition is
+`NOTHING MOVED` plus five negative triggers. The verdict was not `NOTHING MOVED`: the android
+gate's latest completed run, **418** on `08a8168`, is **`failure`**.
+
+**Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`
+(android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged). **Nothing else
+in the engine repo was written — it was READ ONLY.**
+
+## Milestone 1 — the assigned slice, declined for the 192nd time, re-verified in the product
+
+The prompt assigns S5's spec half: amend §4.3 for `entitlement_ack`, close PQ-A2-1/-2/-3, add the
+vectors. **It is built and it is on engine `main`** (`14469ad`), and it was re-read first-person in
+`docs/Sync-Protocol.md` this firing rather than quoted from a prior run's record (**C-239-4**):
+§4.3.3 at **:608** under the decision line **:610**, its body at **:618-:622** with `order_id`
+OPTIONAL; the 1 MiB cap on the **decoded ciphertext** at **:337-340** with **:358** stamping the S5
+amendment; `decrypt_failed` as the sole structural-rejection code at **:329** and the **:1112**
+table; `invalid-unknown-field.json` in the corpus at **:1219**.
+
+**The prompt's own nominated verification is the one command this environment can execute, and it
+was executed:** `node docs/sync-vectors/generate.mjs --check` → **`OK: 30 vector files match the
+generator.`**, exit **0**. Rebuilding the slice would author a **second** §4.3 amendment and
+regenerate the corpus the phone vendors byte-identically — **the cross-repo drift event the prompt
+itself bars**. The prompt's pin `679a317` and its *"S5 … NOT STARTED"* remain stale; neither is new.
+
+## Milestone 2 — the red, and what the probe said about it
+
+§4b read run **418** (`08a8168`) as `failure` and printed:
+
+```
+  !! gate step failure: Unit tests (:app, Robolectric)
+  !! gate step NOT EXECUTED (skipped): Assemble debug APK
+  !! gate step NOT EXECUTED (skipped): Lint
+  !! gate step NOT EXECUTED (skipped): Assert no analytics or tracking SDKs ship
+
+  THIS IS B-31's SIGNATURE, NOT B-25's. A skipped or absent check did not pass;
+  the vendored-vector drift guard is among the eight, so cross-repo drift is
+  UNPROTECTED while this holds.
+```
+
+**The last sentence is false, and the step array being parsed already said so.** The drift guard is
+step **8**; the failing `:app` test is step **10**. Steps 6, 7, 8 and 9 all report `success` — the
+guard **executed and passed** before anything skipped. Three checks did not run: *Assemble debug
+APK*, *Lint*, *Assert no analytics*. Cross-repo drift was guarded the whole time.
+
+**The red itself is B-22**, in the post-fix `ComposeTimeoutException` mode already recorded at
+`LOG.md:16374-16386` and `BLOCKED.md:4570`. `08a8168`'s diff is records + one bash script and cannot
+reach `:app` by any causal path (**C-239-3**).
+
+## Milestone 3 — the finding: a caught failure and a dead gate were indistinguishable (C-239-1)
+
+§4b's reporting chain tested `gate_skipped`/`gate_missing` **before** `gate_failed`. CI runs the
+eight required checks in **one sequential job**, so a failing step leaves every later required step
+`skipped` **as its consequence** — which means the skip arm won on every failure except one in the
+*last* required step, and the `gate_failed` arm was **unreachable**. Its own text, never printed:
+*"The toolchain is fine and a REAL check is failing — a different, and better, problem than B-31."*
+
+**Measured before fixed, and the measurement is what makes it worth fixing (C-239-2).** Across the
+full post-mitigation population — all **197** run numbers 222–418, **165 decisive**, 32 `cancelled`
+— there are **22** failures, partitioned by reading each failing job's step array:
+
+| failing step | n |
+| --- | --- |
+| `Unit tests (:app, Robolectric)` | **17** |
+| `Upload debug APK` (B-25 quota) | 3 |
+| `Assert every cited C-/B- id resolves` | 1 |
+| `Set up Android SDK` (B-31, run 402) | 1 |
+
+**17 of 22 — 10.3% of decisive runs — are the `:app` red**, every one of them a *required* step
+failing with the drift guard already passed two steps earlier. §4b has been mis-narrating its
+single most frequent input since run 227 built it. **This is the defect class of C-227-1 and
+C-238-2**: the probe asserting about something it did not look at. A failure the gate **caught** is
+the gate working, and an instrument that cannot tell that from a gate that never ran sends the next
+firing after the wrong blocker.
+
+## Milestone 4 — fixed, and proven in both directions by replay
+
+A failed required step is now decided **first** and reported as itself, with a per-step ledger
+printed so the reader sees which guards ran. B-31's signature is reserved for skips/absences with
+**no** required step failing — what a dead toolchain actually looks like.
+
+Proven on the replay hook the script already carries, **not by inspection**:
+
+- **Known-bad, run 402** (`d8ca4fe`, the dead gate B-31 was filed on — it fails at *"Set up Android
+  SDK"*, a step that is **not** required, and all eight skip): §4b output `diff`s **empty** against
+  the pre-fix capture. All eight `NOT EXECUTED`, B-31's signature intact. **The detector is not
+  weakened.**
+- **Run 418**: now prints *"A REQUIRED CHECK FAILED. That is NOT B-31 and NOT B-25"*, then the
+  ledger — four `passed` rows including `Assert vendored sync vectors match the pinned main-repo
+  commit`, one `FAILED`, three `NOT EXECUTED`.
+
+`bash -n scripts/run-zero.sh` clean; citation guard **1156/1157/2**, every cited id resolving. The
+verdict still exits **1** on run 418, which is correct: a required check really did fail.
+
+## Milestone 5 — B-22 not fixed, and the reason is the standing rule, not an oversight
+
+The patch is an `:app` file; `:app` needs the Android SDK and AGP from `dl.google.com`, which this
+sandbox's egress denies (**B-7**). Pushing an uncompiled synchronization change into the very suite
+whose reliability is in question is what B-22's own entry forbids. **No re-run was spent** — run 75
+settled that with the same-commit red-then-green, and a second sample buys nothing. B-22's entry is
+updated with this occurrence and with the widened rate, and stays **OPEN**.
+
+## Boundary — what this run did NOT touch
+
+**No gate ran and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`
+and `gh` are ABSENT; `ANDROID_HOME` is UNSET. Neither `Verify-Alpha.ps1` nor the five-task android
+command was reachable; B-7's `dl.google.com` denial was **not re-probed and not routed around**, and
+the `dotnet` apt route §5 documents was **not taken**. §4b/§4c/§4d **read** what other machines
+produced; the verb is never *ran*.
+
+**No `:app` or `:core` source was written.** `ScreensFromFixtureTest.kt` was **read and not edited**
+— the temptation was live this run, it is the file the red is in, and the rule against shipping an
+uncompiled fix into an unreliable suite is exactly a rule for runs like this one. **No C# and no
+Kotlin written** — the S5 appliers stay where run 225 found them. **No CI re-run was triggered**, no
+job re-dispatched, and no test was skipped, disabled or quarantined.
+
+**No vector byte was written and no pin moved** (corpus 30/30 at `11bb1f5`); the generator check ran
+**read-only**. No `$ExpectedOfflineTotal` change, no `Verify-Alpha.ps1` edit, no pinch point
+touched. **Nothing merged in either repo**, no PR undrafted, no branch deleted, no force-push, no
+history rewritten. **No deploy of any kind**, and the production relay was **not contacted at all** —
+not even `/v1/health`. No Google/Play/OAuth console, no accounts, no purchases, no Gmail, no secrets
+read or printed.
+
+**No repository setting was changed.** B-29 (public vs. README) and B-32 (neither `main` protected)
+both remain the owner's decisions; this run read them and flipped nothing. **`careerseeker-ios` was
+not queried** — outside this session's GitHub scope. The **engine repository was READ ONLY**; its
+only write is this iteration's heartbeat on the docs-only `autonomy/claude-state` branch, which is
+never merged.

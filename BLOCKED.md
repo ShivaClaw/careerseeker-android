@@ -6306,3 +6306,72 @@ anything — including docs-only commits. **Declining is a legitimate answer; le
 describing advisory gates as barriers is not.** If the answer is no, the smallest unblock instead
 is one sentence in `docs/CareerSeeker-Project-Summary.md` saying the gates are advisory by choice,
 and this blocker closes as WONTFIX rather than staying open.
+
+---
+
+## RUN 239 status — 2026-09-17. No blocker opened; B-22 fired again and its rate is now measured over the whole post-fix population
+
+**No new blocker was filed this run.** The finding it carries (**C-239-1** — §4b narrating a caught
+failure as a dead gate) was **fixed in the same run** and proven by replay in both directions, so it
+is a LOG entry and not a blocker. Nothing was attempted twice and abandoned.
+
+### B-22 status 2026-09-17 (two hundred and thirty-ninth run) — it fired again, and the recorded rate is now a 165-run sample
+
+**Symptom, unchanged.** Android CI run **418**, head **`08a8168`**, `Unit tests (:app, Robolectric)`
+→ `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab FAILED`,
+**`androidx.compose.ui.test.ComposeTimeoutException at ScreensFromFixtureTest.kt:72`**, `35 tests
+completed, 1 failed, 3 skipped`. Line 72 is inside `awaitText`, the helper `30908de` added **as
+B-22's own mitigation**. `08a8168`'s diff is `AUDIT-REQUEST.md`, `FIRINGS.md` and
+`scripts/run-zero.sh` — **records and one bash script**, which cannot reach `:app` by any causal
+path. It is B-22, not a regression, and not this run's to own.
+
+**What is new is only the denominator (C-239-2).** `STATE.md:1337` already records that *"`30908de`
+changed the failure **mode**, not the **rate**"*, and C-107-7 measured a 30-run window. This run
+measured the **whole post-mitigation population** — all 197 run numbers 222–418, **165 decisive**
+(`success`|`failure`), 32 `cancelled`:
+
+| failing step | runs | n |
+| --- | --- | --- |
+| `Unit tests (:app, Robolectric)` | 224, 227, 234, 262, 267, 274, 280, 282, 284, 300, 305, 306, 320, 322, 345, 394, 418 | **17** |
+| `Upload debug APK` (B-25 quota) | 242, 245, 246 | 3 |
+| `Assert every cited C-/B- id resolves` | 243 | 1 |
+| `Set up Android SDK` (B-31) | 402 | 1 |
+
+**17 in 165 decisive runs — 10.3%.** B-22's original pre-patch figure was **2 in 24 (~8%)** over run
+numbers 172–201. **The mitigation did not lower the rate; on the widest sample available it is
+marginally higher.** Run **224** — the *first* run gated after `30908de` landed — already failed
+with `ComposeTimeoutException at :72` on **both** provenance assertions, read first-person this run.
+The `waitUntil` form converted an early `AssertionError` into a 5-second timeout and left the
+underlying race alone.
+
+**Attribution, in two honest tiers.** The failing *step* is measured from the jobs API for all 22.
+The *B-22 signature inside the step* is read first-person for **224** and **418**, and is already
+recorded for **262** and **267** (C-107-7). The other **13 are attributed by step name only** — not
+by log — and nothing here claims more.
+
+**Attempts this run: none, deliberately, and it is the standing rule rather than an oversight.** The
+fix is an `:app` file; `:app` needs the Android SDK and AGP from `dl.google.com`, which this
+sandbox's egress denies (**B-7**). Pushing an uncompiled synchronization change into the very suite
+whose reliability is in question is what this entry already forbids. **No re-run was spent** — run
+75 settled the nondeterminism with a same-commit red-then-green and a second sample buys nothing.
+**No test was skipped, disabled or quarantined.**
+
+**Smallest human unblock — REVISED, because the one on record has been applied and did not work.**
+The `waitUntil` form this entry previously nominated **is in the tree** (`30908de`, on the branch
+since 2026-08-22) and the 165-run sample above is what it bought. So the next attempt should not be
+a third synchronization tweak. On the Windows box, or any machine with the SDK, in `:app`:
+
+1. **Migrate off the deprecated rule**, which is what its own compiler warning has been asking for
+   in every build log: `androidx.compose.ui.test.junit4.createComposeRule` →
+   `androidx.compose.ui.test.junit4.v2.createComposeRule`. The v2 dispatcher **queues** rather than
+   executing immediately, which is the behaviour these Room-`Flow`-backed trees actually need, and
+   it is a real behaviour change rather than a longer wait.
+2. **Prove it by repetition, not by one green:** `./gradlew :app:testDebugUnitTest --rerun-tasks`
+   **twenty times**, expecting 20/20. At a 10.3% per-run rate the current tree would be expected to
+   fail roughly twice in twenty, so twenty runs is enough to tell the two apart.
+3. If v2 is declined as too large, the fallback is to find out **what the wait is waiting on** —
+   instrument `awaitText` to dump the semantics tree on timeout — rather than to raise the 5-second
+   bound, which only makes the failure slower.
+
+**B-22 stays OPEN.** Every `:app` claim in these records remains a single sample, and with 17
+occurrences behind it that qualification is now measured rather than asserted.

@@ -1,5 +1,66 @@
 # STATE — android tree
 
+> ## ✅ RUN 239 (2026-09-17) — **§4b CALLED A WORKING GATE A DEAD ONE, ON ITS COMMONEST INPUT (C-239-1). FIXED AND PROVEN BY REPLAY BOTH WAYS.**
+>
+> **Heartbeat:** 2026-09-17, **two hundred and thirty-ninth** cloud iteration (Linux sandbox). Both
+> checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+> before any write: tip `0c6ed69`, rung **COMPLETE**, **files claimed: none** → **no collision**;
+> Terra retains right-of-way. `run-zero.sh ../careerseeker` → **exit 1**, VERDICT *"SOMETHING MOVED,
+> or a local check failed"*; mains `14469ad`/`ebfaf81` unmoved, corpus **30/30** byte-identical at
+> pin `11bb1f5`, citations **1156 / 1157 / 2** after this run's writes. Assigned S5 spec half is
+> **on engine `main`** — **declined, the 192nd time**, re-verified in `docs/Sync-Protocol.md` rather
+> than quoted (**C-239-4**), and its nominated check run first-person: `generate.mjs --check` →
+> `OK: 30 vector files match the generator.`, exit 0.
+>
+> **THIS IS NOT AN EMPTY FIRING and it does not take the run-118 line.** That law needs `NOTHING
+> MOVED` plus five negative triggers. The android gate's latest completed run, **418** on
+> `08a8168`, is **`failure`**.
+>
+> **Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`
+> (android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged). **Nothing
+> else in the engine repo was written — it was READ ONLY.** **No rung's status changed.**
+>
+> **THE FINDING (C-239-1) — and it is about the instrument, not the product.** §4b's reporting chain
+> tested `gate_skipped`/`gate_missing` **before** `gate_failed`. CI runs the eight required checks in
+> **one sequential job**, so a failing step leaves every later required step `skipped` **as its
+> consequence** — which made the `gate_failed` arm **unreachable** for any failure but one in the
+> last required step. In its place §4b printed B-31's signature and its claim that *"the
+> vendored-vector drift guard is among the eight, so cross-repo drift is UNPROTECTED"*. **On run 418
+> that was false**: the drift guard is step **8**, the failing `:app` test step **10**; steps 6-9 all
+> report `success`, so the guard **executed and passed**. Only *Assemble debug APK*, *Lint* and
+> *Assert no analytics* did not run. **A failure the gate CAUGHT is the gate working**, and the probe
+> could not tell that from a gate that never ran.
+>
+> **It was mis-narrating its most frequent input (C-239-2).** Across the whole post-mitigation
+> population — all **197** run numbers 222–418, **165 decisive**, 32 `cancelled` — there are **22**
+> failures: **17** `Unit tests (:app, Robolectric)`, 3 `Upload debug APK` (B-25), 1 citation guard,
+> 1 `Set up Android SDK` (B-31, run 402). **17 of 22 — 10.3% of decisive runs.** Same defect class as
+> **C-227-1** and **C-238-2**: the probe asserting about something it did not look at.
+>
+> **Fixed, and proven by replay rather than inspection.** A failed required step is decided **first**
+> and reported as itself, with a per-step ledger so the reader sees which guards ran. B-31's
+> signature is reserved for skips/absences with **no** required failure. Known-bad **run 402**
+> (`d8ca4fe`, the dead gate B-31 was filed on) `diff`s **empty** against its pre-fix §4b output — the
+> detector is not weakened; **run 418** now prints *"A REQUIRED CHECK FAILED. That is NOT B-31 and
+> NOT B-25"* and the ledger's `passed` row for the drift guard. `bash -n` clean. Verdict still exits
+> **1** on 418, correctly — a required check really did fail.
+>
+> **B-22 fired again and was NOT fixed here.** Run 418's red is `ScreensFromFixtureTest >
+> theProvenanceBannerIsShownOnEveryTab`, `ComposeTimeoutException at :72`. `08a8168`'s diff is
+> records + one bash script and cannot reach `:app`. The fix is an `:app` file and **B-7** denies
+> `dl.google.com` here; shipping an uncompiled change into the suite whose reliability is in question
+> is what B-22's own entry forbids. **No re-run spent; no test skipped, disabled or quarantined.**
+> **B-22's smallest unblock is REVISED**: its previously-nominated `waitUntil` form **is in the tree**
+> (`30908de`, since 2026-08-22) and the 165-run sample is what it bought — pre-patch was 2 in 24
+> (~8%), post-patch 17 in 165 (10.3%). The next attempt is the **v2 `createComposeRule`** migration,
+> proven by **20/20** repetition, not a third synchronization tweak.
+>
+> **No gate ran and none is claimed** — `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`,
+> `adb`, `gh` **ABSENT**, `ANDROID_HOME` **UNSET**; §4b/§4c/§4d **read** what other machines
+> produced. **No vector byte, no pin move, no source file, no repository setting** (B-29/B-32 remain
+> the owner's), **nothing merged, closed, undrafted or force-pushed, no deploy, relay not contacted
+> at all.**
+
 > ## ✅ RUN 231 (2026-09-15) — **§4d WIDENED TO FOUR FIELDS, AND BOTH `main` BRANCHES TURN OUT TO BE UNPROTECTED (B-32).**
 >
 > **Heartbeat:** 2026-09-15, **two hundred and thirty-first** cloud iteration (Linux sandbox). Both
@@ -3926,8 +3987,18 @@ in [`RETURN-DAY.md`](RETURN-DAY.md)**.
 | **Terra (Codex)** | R6(b) BLOCKED, PR #26 draft, files claimed: **none** — read at iteration start, no collision |
 | **`:core` suite** | **244 / 0 across 17 classes**, measured here 2026-08-12 (**twentieth** run) via `scripts/core-probe.sh --rerun` — up from **216 / 0 across 15**, which was **re-measured in the same session** (new files moved aside, source pristine) rather than quoted from the nineteenth run. The delta is **+28** from two new files, `core/src/test/…/crypto/HkdfTest.kt` (**13**) and `…/crypto/Base64UrlTest.kt` (**15**), and **no production Kotlin changed** — `git diff --stat -- core/src/main/` is empty after **eight** mutate-and-revert cycles. **The load-bearing measurement is M1:** with `counter++` deleted from `Hkdf.expand`, the **pre-existing 216 go 0-failed green** — the shared pairing vectors included — while the three RFC 5869 cases fail. **This is one of the android gate's four tasks, not a gate result.** Re-verify: C-CR-1, C-CR-7. *Previously:* **216 / 0 across 15 classes**, measured 2026-08-11 (**nineteenth** run) via `scripts/core-probe.sh --rerun` — up from **190 / 0 across 14**, which was **re-measured in the same session** rather than quoted from the eighteenth run. The delta is one new file, `core/src/test/.../EnvelopeReceiverTest.kt` (**26 tests**), and **no production Kotlin changed** — `git diff --stat -- core/src/main/` is empty after six mutate-and-revert cycles. **This is one of the android gate's four tasks, not a gate result.** Re-verify: C-ER-1, C-ER-4 |
 | **HEARTBEAT — TWO HUNDRED AND TWENTY-SEVENTH RUN (2026-09-15, Linux cloud sandbox). B-31's blind-spot half closed — and the thing that had kept it open was an untested sentence in B-31's own "smallest unblock".** | **Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md` (android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged). **The engine checkout was READ ONLY.** Android branch `claude/android-a0-probe`, draft PR [#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) refreshed and **it stays draft** — never-self-merge. **Rule one first:** `git fetch --all --prune` in both checkouts; the tree again arrived detached at docs-only `main` (`ebfaf81`); every count is post-fetch. **Ground state:** `scripts/run-zero.sh ../careerseeker` → `NOTHING MOVED`, exit **0** — pin **`11bb1f5`** unchanged, corpus **30/30** byte-identical, citations **1118/1119/2**, mains **`14469ad`** / **`ebfaf81`** unmoved, all three S5 commits on main as expected (**C-227-5**). **Assigned slice DECLINED** for the reason the mission banner gives, re-verified first-person, not quoted: S5's spec half is on engine `main` since 08-09/08-12, and rebuilding it is the cross-repo drift event the prompt forbids. **THE SLICE TAKEN: `run-zero.sh` §4b.** It reads the branch's latest completed CI run **and its step array**, checks the **eight required gate steps BY NAME** (names, not numbers — the array carries `Set up job` and three `Post …` entries and numbering is not contiguous), and **can fail the verdict**, which is the only thing that distinguishes it from the MANUAL paragraphs 225 firings read past. `Upload debug APK` is **deliberately not required** — `workflow_dispatch`-gated (**B-25**), skipped by design; that one legitimate skip beside eight mandatory ones is the exact B-25-vs-B-31 ambiguity, now **encoded** rather than left to memory. **Measured live:** run **404** (`34916439815`), head `6f261d2`, `success`, all eight EXECUTED (**C-227-2**). **Proven falsifiable, because a detector that has only printed green is unproven:** `RUNZERO_GATE_RUN=34896487955` replays the actual B-31 run → eight `!! gate step NOT EXECUTED (skipped)` lines, the B-31-not-B-25 paragraph, exit **1** (**C-227-3**). The replay **reads** run 402's stored array; **the workflow was not re-run** — its log is the evidence. **Degradation designed, not discovered:** an unreadable API prints `??`, sets a blind flag, prints the exact MCP query, and does **not** fail — the VERDICT then leads with *"THE GATE WAS NOT READ THIS FIRING"*. Failing would turn every firing red the moment **B-29** lands private; silence would reproduce B-31; loud-but-not-failing is neither (**C-227-4**). **Stated honestly: the `404` branch is written but NOT exercised** — this proxy answers 403 first. **The script's own header, which asserted the API was unreachable from bash, was corrected in the same commit** (doc/verifier drift discipline), and B-31 keeps its wrong premise visible as the lesson. **NO GATE RAN and none is claimed:** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` **ABSENT**, `ANDROID_HOME` **UNSET**; **§4b reads a result CI produced, it does not produce one** (**C-227-6**). B-7 honoured, not routed around. **Terra read first:** codex-state **COMPLETE**, files claimed **none** — no collision. **No trigger fired, no escalation sent** (**C-227-7**): android **6 open, all draft, zero ever merged**; engine **3 open** (#60, #58, #26), all draft; prompt unchanged with its two known-stale facts; CI 404 is an own-push re-read, the class 223/224 correctly declined to call news. **B-29 not acted on** — §4b was built to degrade around it, not to depend on it silently. **Nothing merged, closed, undrafted, rebased, force-pushed or deleted; no deploy; relay not contacted at all.** |
+| **HEARTBEAT — TWO HUNDRED AND THIRTY-NINTH RUN (2026-09-17, Linux cloud sandbox). §4b called a working gate a dead one, on its commonest input — and the evidence was already in the array it was parsing.** | **Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md` (android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged). **The engine checkout was READ ONLY.** Android branch `claude/android-a0-probe`, draft PR [#6](https://github.com/ShivaClaw/careerseeker-android/pull/6) refreshed and **it stays draft** — never-self-merge. **Rule one first:** `git fetch --all --prune` in both checkouts; the tree again arrived detached at docs-only `main` (`ebfaf81`); every count is post-fetch. **Ground state:** `run-zero.sh ../careerseeker` → **exit 1**, VERDICT *"SOMETHING MOVED, or a local check failed"* — pin **`11bb1f5`** unchanged, corpus **30/30** byte-identical, citations **1156/1157/2**, mains **`14469ad`**/**`ebfaf81`** unmoved, all three S5 commits on main as expected. **NOT an empty firing:** the run-118 law needs `NOTHING MOVED` plus five negative triggers, and the android gate's latest completed run — **418** on `08a8168` — is **`failure`**. **Assigned slice DECLINED, the 192nd time**, re-verified first-person in `docs/Sync-Protocol.md` at engine main `14469ad`, not quoted (**C-239-4**); `generate.mjs --check` → `OK: 30 vector files match the generator.`, exit 0. **THE FINDING (C-239-1):** §4b tested `gate_skipped`/`gate_missing` **before** `gate_failed`, and CI runs the eight required checks in **one sequential job** — so a failing step leaves every later one `skipped` as its **consequence**, the skip arm won on all but a last-step failure, and the `gate_failed` arm was **unreachable**. §4b therefore printed B-31's signature and its claim that *"the vendored-vector drift guard is among the eight, so cross-repo drift is UNPROTECTED"*. **On run 418 that was FALSE** — the drift guard is step **8**, the failing `:app` test step **10**, steps 6-9 all `success`: the guard **executed and passed**. Only *Assemble debug APK*, *Lint*, *Assert no analytics* did not run. **A failure the gate CAUGHT is the gate working.** **Same defect class as C-227-1 and C-238-2** — the probe asserting about something it did not look at. **MEASURED BEFORE FIXED (C-239-2):** the whole post-mitigation population, all **197** run numbers 222–418, **165 decisive**, 32 `cancelled`; **22** failures — **17** `Unit tests (:app, Robolectric)`, 3 `Upload debug APK` (B-25), 1 citation guard, 1 `Set up Android SDK` (B-31, run 402). **17 of 22 = 10.3% of decisive runs**, so §4b had been mis-narrating its single commonest input since run 227 built it. **FIXED and PROVEN BY REPLAY BOTH WAYS, not by inspection:** a failed required step is decided first and reported as itself with a per-step ledger; B-31's signature is reserved for skips/absences with **no** required failure. Known-bad **run 402** (`d8ca4fe`) §4b output `diff`s **EMPTY** against its pre-fix capture — **the detector is not weakened**; **run 418** now prints *"A REQUIRED CHECK FAILED. That is NOT B-31 and NOT B-25"* plus the `passed` row for the drift guard. `bash -n` clean; verdict still exits **1** on 418, correctly. **B-22 fired again and was NOT fixed (C-239-3):** `ScreensFromFixtureTest > theProvenanceBannerIsShownOnEveryTab`, `ComposeTimeoutException at :72`; `08a8168`'s diff is records + one bash script and cannot reach `:app`. The fix is an `:app` file and **B-7** denies `dl.google.com` here. **No re-run spent; no test skipped, disabled or quarantined.** **B-22's smallest unblock REVISED** — its nominated `waitUntil` form **is in the tree** since `30908de` (2026-08-22) and bought nothing: pre-patch 2 in 24 (~8%), post-patch **17 in 165 (10.3%)**; next attempt is the **v2 `createComposeRule`** migration proven by **20/20** repetition. **NO GATE RAN and none is claimed:** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh` **ABSENT**, `ANDROID_HOME` **UNSET**; §4b/§4c/§4d **read** a result CI produced, they do not produce one. B-7 honoured, not routed around. **Terra read first:** codex-state `0c6ed69`, **COMPLETE**, files claimed **none** — no collision. **No vector byte, no pin move, no `:app`/`:core` source, no repository setting** (B-29/B-32 remain the owner's), **nothing merged, closed, undrafted, rebased, force-pushed or deleted; no deploy; relay not contacted at all.** |
 
 ## Ladder
+
+> **Unchanged at run 239 (2026-09-17), and that is the accurate entry.** Run 239's slice was **§4b's
+> reporting chain** in `run-zero.sh` — **infrastructure, not a rung**, the same class as run 93's
+> B-25, runs 227/228's gate sections and run 230's §4d. **No rung moved, no rung's status was
+> re-derived, and nothing in the table below was edited to look like progress.** The assigned S5
+> slice was declined for the **192nd** time on evidence re-derived first-person this run
+> (**C-239-4**); S5's row already reflects what is built and what is left. **B-22 fired again and
+> was not fixed** (C-239-3) — so every `:app` row below remains a single sample, now on a measured
+> 10.3% per-run failure rate rather than an asserted one.
 
 > **Unchanged at run 230 (2026-09-15), and that is the accurate entry.** Run 230's slice was **§4d**,
 > a repository-settings check in `run-zero.sh` — **infrastructure, not a rung**, the same class as
