@@ -518,6 +518,7 @@ for j in d.get("jobs",[]):
         print("%s\t%s"%(s.get("conclusion"),s.get("name")))
 ')
         gate_missing=0 gate_skipped=0 gate_failed=0 gate_want_n=0
+        gate_ran_ok='' gate_notrun=''
         while IFS= read -r want; do
           [ -z "$want" ] && continue
           gate_want_n=$((gate_want_n + 1))
@@ -531,21 +532,60 @@ for j in d.get("jobs",[]):
                     else if (worst=="") worst="success" }
             END   { print worst }')
           case "$got" in
-            success)  ;;
-            skipped)  bad "gate step NOT EXECUTED (skipped): $want"; gate_skipped=1 ;;
-            "")       bad "gate step ABSENT from the run: $want"; gate_missing=1 ;;
-            *)        bad "gate step $got: $want"; gate_failed=1 ;;
+            success)  gate_ran_ok="$gate_ran_ok  passed       $want
+" ;;
+            skipped)  bad "gate step NOT EXECUTED (skipped): $want"; gate_skipped=1
+                      gate_notrun="$gate_notrun  NOT EXECUTED $want
+" ;;
+            "")       bad "gate step ABSENT from the run: $want"; gate_missing=1
+                      gate_notrun="$gate_notrun  ABSENT       $want
+" ;;
+            *)        bad "gate step $got: $want"; gate_failed=1
+                      gate_ran_ok="$gate_ran_ok  FAILED       $want
+" ;;
           esac
         done <<EOF
 $GATE_REQUIRED_STEPS
 EOF
-        if [ $gate_skipped = 1 ] || [ $gate_missing = 1 ]; then
+        # ORDER MATTERS HERE, AND RUN 239 FOUND OUT THE EXPENSIVE WAY (C-239-1).
+        #
+        # This chain used to test `gate_skipped` FIRST, which made the `gate_failed` arm below
+        # UNREACHABLE for every failure except one in the LAST required step. CI runs all eight
+        # in ONE sequential job, so a step that fails leaves every later step `skipped` as its
+        # CONSEQUENCE. The old order read those consequential skips as B-31 -- a gate that never
+        # executed -- and printed the signature's claim that "the vendored-vector drift guard is
+        # among the eight, so cross-repo drift is UNPROTECTED".
+        #
+        # On run 418 (head 08a8168) that claim was FALSE. The drift guard is step 8, the failing
+        # `:app` test is step 10, so the guard had EXECUTED AND PASSED before anything skipped.
+        # B-22's intermittent `ComposeTimeoutException` is by far the commonest red here -- 17 of
+        # the 22 failures in run numbers 222..418 (C-239-2) -- so the section was mis-narrating
+        # its single most frequent input, and overstating the program's exposure while doing it.
+        # That is the same defect class as C-227-1 and C-238-2: the probe asserting about a check
+        # it did not look at. A failure that the gate CAUGHT is the gate working.
+        #
+        # So: a failed REQUIRED step is decided first and reported as itself, with the per-step
+        # ledger printed so the reader can see which guards did run rather than take a sentence's
+        # word for it. B-31's signature is reserved for what it was filed on -- skips or absences
+        # with NO required step failing, which is what a dead toolchain actually looks like (run
+        # 402 fails at "Set up Android SDK", a step that is not required, and all eight skip).
+        if [ $gate_failed = 1 ]; then
+          note ""
+          note "A REQUIRED CHECK FAILED. That is NOT B-31 and NOT B-25 — the toolchain is alive,"
+          note "the run REACHED this check, and the check said no. It is a better problem than"
+          note "either: read the job log before touching anything."
+          note ""
+          note "SKIPS BELOW A FAILURE ARE ITS CONSEQUENCE, NOT EVIDENCE OF A DEAD GATE. The eight"
+          note "run in one sequential job, so everything after the failing step reports 'skipped'"
+          note "whether or not the toolchain is healthy. Read this ledger, never the skip count:"
+          printf '%s' "$gate_ran_ok$gate_notrun" | sed 's/^/  /'
+          note ""
+          note "Only the NOT EXECUTED / ABSENT rows above are unprotected this run. If the"
+          note "vendored-vector drift guard is a 'passed' row, cross-repo drift IS guarded and"
+          note "saying otherwise overstates the exposure (C-239-1)."
+        elif [ $gate_skipped = 1 ] || [ $gate_missing = 1 ]; then
           note ""
           note "$gate_signature"
-        elif [ $gate_failed = 1 ]; then
-          note ""
-          note "The toolchain is fine and a REAL check is failing — a different, and better,"
-          note "problem than B-31. Read the job log before touching anything."
         elif [ -n "$GATE_OPTIONAL_STEPS" ]; then
           note "all $gate_want_n required checks EXECUTED and passed; '$GATE_OPTIONAL_STEPS' skipped by"
           note "design (B-25, workflow_dispatch). The gate is alive, not merely green."
