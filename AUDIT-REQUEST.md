@@ -23602,3 +23602,130 @@ node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
    does **not** establish when the image changed; runs 221–239 neither ran `core-probe.sh` nor
    recorded a JDK version, so the interval is **unmeasured** and is not claimed.
 6. **No gate ran.** Every §4b/§4c/§4d number is **read** from what another machine produced.
+
+---
+
+## Run 241 — 2026-09-17. C# compiles here; the offline suite measured first-person
+
+### Claim 1 — the assigned S5 spec half is already on engine `main` (194th decline)
+
+```bash
+cd careerseeker
+git fetch --all --prune
+git show origin/main:docs/Sync-Protocol.md | sed -n '608,618p;338p;358p;329,332p;1112p;1219p'
+ls docs/sync-vectors/v1/invalid-unknown-field.json
+node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+#   -> "OK: 30 vector files match the generator.", EXIT=0
+```
+
+*Observed run 241:* §4.3.3 defines `{product_id, acknowledged_at, order_id?}` stamped
+*"Decided 2026-08-07 (gate PQ-A6-1, default-proceed)"*; PQ-A2-1 at `:338`/`:358`; PQ-A2-2 at
+`:329-332`/`:1112`; `invalid-unknown-field.json` present; generator check **exit 0**.
+
+### Claim 2 — S5's **engine** half is already implemented (so the prompt's C# carve-out is moot)
+
+```bash
+cd careerseeker
+grep -rn "EntitlementAck\|entitlement_ack" --include=*.cs src/ tests/ | \
+  grep -E "SyncPayloads.cs:59|SyncPublisher.cs:162|SyncAckPublisher.cs:21|InboundDispatcher.cs:160|SyncHarness"
+```
+
+*Observed run 241:* all five sites present — `SyncPayloads.cs:59` builds the body,
+`SyncPublisher.cs:162` publishes, `SyncAckPublisher.cs:21` is the production publisher,
+`InboundDispatcher.cs:160` invokes it, `tests/SyncHarness/Program.cs:696-751` asserts it.
+
+### Claim 3 — **C-241-1**: the engine's C# builds on this image (run 240's boundary is wrong)
+
+```bash
+curl -sSL -o /tmp/ms.deb \
+  https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb
+dpkg -i /tmp/ms.deb && apt-get update -qq && apt-get install -y dotnet-sdk-8.0
+dotnet --version
+cd careerseeker && dotnet build CareerSeeker.sln -c Release 2>&1 | tail -5
+```
+
+*Observed run 241:* `dotnet --version` → **8.0.131**; build → **`Build succeeded. 0 Warning(s)
+0 Error(s)`**, **20.49s**. Contradicts LOG.md run 240's *"the prompt is right that they cannot be
+compiled here"* for the **C#** half. The **Kotlin/`:app`** half of that sentence stands (B-7).
+
+### Claim 4 — the offline total is 803/0 and the 816 pin closes exactly
+
+```bash
+cd careerseeker && dotnet build CareerSeeker.sln -c Release
+TOTAL=0
+for H in Slice EngineHarness ResearcherHarness HookHarness StoreParityHarness \
+         GatewayGateHarness DispatcherNoSendHarness LifecycleHarness \
+         RendererHarness SyncHarness; do
+  L=$(dotnet run --project tests/$H/$H.csproj -c Release --no-build 2>&1 \
+        | grep -oE "=== [0-9]+ passed, [0-9]+ failed ===" | tail -1)
+  P=$(echo "$L" | grep -oE "^=== [0-9]+" | grep -oE "[0-9]+")
+  printf "%-26s %s\n" "$H" "$L"; TOTAL=$((TOTAL + P))
+done
+echo "measured offline total: $TOTAL"
+grep -n 'ExpectedOfflineTotal = ' scripts/Verify-Alpha.ps1
+dotnet run --project tests/EngineHarness/EngineHarness.csproj -c Release --no-build 2>&1 | grep -c SKIP
+```
+
+*Observed run 241:* 28 / 217 / 57 / 16 / 28 / 36 / 35 / 45 / 6 / 335 = **803 passed, 0 failed**,
+every harness exit **0**; pin `$ExpectedOfflineTotal = 816` at `:358`; **2** SKIP lines carrying
+**6 + 7 = 13** Windows-only assertions. **803 + 13 = 816.** NOT a gate result — the offline arm only.
+
+### Claim 5 — PR #60's 201-assertion drift reproduced first-person
+
+```bash
+cd careerseeker
+grep -rn "| SyncHarness | 134 |" README.md docs/CareerSeeker-Project-Summary.md src/Engine/README.md
+grep -n "'| SyncHarness | 134 |'" scripts/Verify-Alpha.ps1
+dotnet run --project tests/SyncHarness/SyncHarness.csproj -c Release --no-build 2>&1 | tail -1
+```
+
+*Observed run 241:* docs at `README.md:83`, `Project-Summary:60`, `Engine/README.md:161` all say
+**134**; the verifier asserts that same string at `:671`, `:700`, `:705`; the harness reports
+**`=== 335 passed, 0 failed ===`**. Doc and verifier agree, so the trap passes — the gap is **201**.
+This is draft **PR #60** (open 2026-09-14) and was **not fixed here**.
+
+### Claim 6 — the §5 stamp renders, and renders safely
+
+```bash
+cd careerseeker-android
+bash -n scripts/run-zero.sh; echo "SYNTAX=$?"
+bash scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/dotnet  -> ABSENT/,/pwsh    ->/p'
+```
+
+*Observed run 241:* `SYNTAX=0`; block prints the `Last VERIFIED (run 241 …)` stamp with
+`$ExpectedOfflineTotal` **still literal** (§6's backtick/interpolation trap avoided).
+
+### Claim 7 — all four notification triggers negative
+
+```bash
+cd careerseeker-android && bash scripts/run-zero.sh ../careerseeker; echo "EXIT=$?"
+# and, via the GitHub MCP server:
+#   list_pull_requests owner=ShivaClaw repo=careerseeker         state=open
+#   list_pull_requests owner=ShivaClaw repo=careerseeker-android state=open
+```
+
+*Observed run 241:* `NOTHING MOVED`, **exit 0**, six guards green; mains `14469ad` / `ebfaf81`
+unmoved; board **3 engine (#60, #58, #26) + 6 android (#6, #5, #4, #3, #2, #1)**, **all nine
+draft** — unchanged since run 238; gate run **421** on `ffe3c41` **success**, 8/8 executed; stored
+prompt unchanged. **Notification withheld.**
+
+### What an external auditor should attack first, run 241
+
+1. **The install is the confound, again.** Every number in Claims 3–5 exists **only after** this
+   firing changed the container with `dotnet-sdk-8.0`. As delivered, this image has no .NET at all.
+   Reproduce the install first or none of it replays.
+2. **803/0 is NOT `Verify-Alpha.ps1`.** It is that script's offline arm, re-summed **by hand** with
+   a `grep` I wrote, not by the script — which needs Windows and did not run. If my loop's regex
+   disagrees with `Verify-Alpha.ps1:1105`, my total is wrong and the agreement with 816 is luck.
+   **Attack the summing method, not the sum.**
+3. **`803 + 13 = 816` is arithmetic over two sources that could both be stale.** The 13 comes from
+   reading two SKIP lines' prose ("6 …", "7 …"), not from counting 13 skipped assertions execute.
+4. **C-241-1 refutes a sentence, not a capability boundary.** I proved the solution *builds* and its
+   offline harnesses *pass*. I did **not** write or compile any new C#, so "you could have written
+   the applier here" remains an inference — a strong one, but untested this run.
+5. **Claim 5 is a reproduction, not a fix.** The docs on `main` are still wrong by 201 and the
+   verifier still asserts the wrong string. I left a known defect in place on purpose; check that
+   deferring to #60 was right rather than an excuse.
+6. **The withheld notification is a judgement call.** Four triggers negative is the house test, but
+   B-18 is on its **194th** firing. An auditor may reasonably say the test itself is the bug.
+7. **No gate ran.** Every §4b/§4c/§4d number is **read** from what another machine produced.

@@ -1,5 +1,81 @@
 # STATE — android tree
 
+> ## ✅ RUN 241 (2026-09-17) — **RUN 240'S OWN BOUNDARY SAID C# "CANNOT BE COMPILED HERE". IT CAN — AND §5, FOUR SECTIONS ABOVE THE BLOCK IT WAS EDITING, HAD SAID SO FOR TWENTY RUNS (C-241-1).**
+>
+> **Heartbeat:** 2026-09-17, **two hundred and forty-first** cloud iteration (Linux sandbox). Both
+> checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+> before any write: tip `0c6ed69`, rung **COMPLETE**, **files claimed: none**, heartbeat
+> `2026-08-12T20:28:36-06:00` — stopped 36 days ago → **no collision**; Terra retains right-of-way.
+> `run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**, six guards green; mains
+> `14469ad`/`ebfaf81` unmoved, corpus **30/30** byte-identical at pin `11bb1f5`, citations
+> **1160 / 1161 / 2**. Assigned S5 spec half is **on engine `main`** — **declined, the 194th time**,
+> re-verified in `docs/Sync-Protocol.md` rather than quoted, and its nominated check run
+> first-person: `generate.mjs --check` → `OK: 30 vector files match the generator.`, exit 0.
+>
+> **Files claimed:** `scripts/run-zero.sh`, `LOG.md`, `AUDIT-REQUEST.md`, `BLOCKED.md`, `STATE.md`,
+> `FIRINGS.md` (android); `STATE.md` on `autonomy/claude-state` (engine, docs-only, never merged).
+> **Nothing else in the engine repo was written — it was READ ONLY.** **No rung's status changed.**
+>
+> **THE FINDING (C-241-1), and for once the wrong claim and its refutation sat in the same file.**
+> Run 240's closing boundary reads *"no Kotlin and no C#: **the prompt is right that they cannot be
+> compiled here**."* **The C# half is false.** §5 of `run-zero.sh` — four sections above the block
+> run 240 was editing — has stated for twenty runs that *"the .NET half of the engine is NOT out of
+> reach."* **Measured, not inferred:** the apt route §5 documents works, `dotnet --version` →
+> **8.0.131**, and `dotnet build CareerSeeker.sln -c Release` → **`0 Warning(s) / 0 Error(s)`** in
+> **20.49s** — CLAUDE.md's stated baseline, met on Linux. **Fourth instance of the class** (run 221
+> `dotnet ABSENT`, run 227 the Actions API, run 230 branch protection, now run 240's own boundary):
+> a claim about this program's reach, written without measuring.
+>
+> **It unblocks NOTHING in the ladder, and that is said plainly rather than dressed as progress.**
+> S5's engine half is **already written** — `src/Sync/SyncPayloads.cs:59`,
+> `src/Sync/SyncPublisher.cs:162`, `src/Engine/SyncAckPublisher.cs:21`,
+> `src/Sync/InboundDispatcher.cs:160`, asserted at `tests/SyncHarness/Program.cs:696-751`. What the
+> correction buys is a **standing capability** these records have denied themselves for 240 firings.
+> **The Kotlin half STANDS:** `:app` cannot build here (**B-7**, `dl.google.com`), and `:core` needs
+> JDK 17, which is **not in this container** — run 240 installed it in *its* container and the
+> sandbox is ephemeral. **`core-probe.sh` was NOT run this firing.**
+>
+> **RE-VERIFICATION, NOT A FINDING — the offline suite, first-person.** Ten harnesses, summed
+> exactly as `Verify-Alpha.ps1:1105` sums them: 28 / 217 / 57 / 16 / 28 / 36 / 35 / 45 / 6 / 335 =
+> **803 passed, 0 failed**, every harness exit 0. The 13 Windows-only skips are **6**
+> `FullDataDeletion` + **7** DPAPI vault (B-10), so **803 + 13 = 816 = `$ExpectedOfflineTotal`**
+> (`Verify-Alpha.ps1:358`) — the pin closes exactly. **This is the offline arm ONLY, re-summed by a
+> hand-written grep; `Verify-Alpha.ps1` needs Windows, did not run, and NO GATE IS CLAIMED.**
+>
+> **PR #60 reproduced first-person, and deliberately NOT fixed.** `README.md:83`,
+> `docs/CareerSeeker-Project-Summary.md:60` and `src/Engine/README.md:161` say
+> `| SyncHarness | 134 |`; `Verify-Alpha.ps1:671/700/705` **assert that same string**; the harness
+> emits **335**. Doc and verifier agree with each other, which is exactly why the drift trap cannot
+> see the **201**-assertion gap. Draft **#60** has carried the fix since 2026-09-14 — duplicating it
+> would collide and would touch the pinch point **B-17** is about. **Not a blocker: queued behind a
+> human, like the rest of the board.**
+>
+> **The slice: §5's dotnet block gets the stamp §6 got at run 238.** `dotnet` needs no detection row
+> — unlike run 240's misleading `java PRESENT`, the `command -v` loop at `:832` answers accurately.
+> The gap is **freshness**: the 803/816 numbers were measured at **run 221** and carried forward
+> twenty firings **with no date**, presented as a live fact. §6's board paragraph was wrong for
+> **sixteen** firings that way until run 238 stamped it; §5's JDK17 sentence went dark that way
+> (C-240-1). **This block was the third instance and the last one unstamped.** Added
+> `Last VERIFIED (run 241 …)` plus an instruction to **move the stamp** on re-measure — *a recording
+> presented as a live fact is the defect, even when the numbers still hold.* `bash -n` clean;
+> `$ExpectedOfflineTotal` still renders literal (§6's backtick trap avoided).
+>
+> **NO NOTIFICATION SENT.** All four run-82 triggers negative: mains unmoved; board **3 + 6, all
+> nine draft**, unchanged since run 238 (MCP, this run), zero android PRs have ever merged; prompt
+> unchanged (still pins `679a317`, still says S5 NOT STARTED); gate run **421** on `ffe3c41`
+> **success**, 8/8 executed — green on this branch's own commit, not an adverse change. C-241-1 is a
+> correction to **our own records**, not news to the owner.
+>
+> **No gate ran and none is claimed** — `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb`, `gh`
+> **ABSENT**, `ANDROID_HOME` **UNSET**; §4b/§4c/§4d **read** what other machines produced. **No
+> source file written in either repo** — no Kotlin, no **new** C#; the S5 appliers were read, not
+> edited. **No vector byte, no pin move, no `$ExpectedOfflineTotal` change, no `Verify-Alpha.ps1`
+> edit, no doc count corrected, no repository setting** (B-29/B-32 remain the owner's), **nothing
+> merged, closed, undrafted or force-pushed, no deploy, relay not contacted at all, no secrets read
+> or printed.** **The container was modified** — `dotnet-sdk-8.0` installed — which is a change to
+> the sandbox, not to either repository.
+
+
 > ## ✅ RUN 240 (2026-09-17) — **THE ONE GATE TASK THIS SANDBOX CAN RUN HAD GONE DARK, AND §5 SAID OTHERWISE (C-240-1). FIXED, PROVEN BOTH WAYS, AND THE LANE IS GREEN AGAIN.**
 >
 > **Heartbeat:** 2026-09-17, **two hundred and fortieth** cloud iteration (Linux sandbox). Both

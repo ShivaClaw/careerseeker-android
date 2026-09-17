@@ -6434,3 +6434,38 @@ transient rate-limit, not B-7.** Retry before recording anything.
   decision. **Unchanged; this session is forbidden to merge and did not.**
 - **B-4** (no `sdkmanager`/`avdmanager`), **B-5** (Room 2.8.4 under Robolectric), **B-2** (desktop
   `/pair` half) — untouched this run; nothing measured against them.
+
+---
+
+## Run 241 (2026-09-17) — no new blocker; B-18's 194th firing, and one standing claim RETIRED
+
+**No new blocker arose.** Nothing this run attempted was prevented by anything.
+
+**B-18 stays OPEN, unchanged, on its 194th firing.** Not restated here (run 118's law against
+restatement) — the smallest human unblock is still *a human stops or repoints the schedule*. What
+run 241 adds is one datum: the prompt's carve-out *"Do NOT write the C# applier … you cannot
+compile"* is **not merely redundant, it is factually wrong** (C-241-1), so the prompt now misstates
+this sandbox's reach in addition to re-issuing completed work.
+
+**RETIRED: "the C# appliers cannot be compiled here."** Written into run 240's boundary paragraph
+and echoed loosely before it. **Measured false run 241**: `dotnet-sdk-8.0` installs by the route
+`run-zero.sh` §5 documents, `dotnet build CareerSeeker.sln -c Release` → **0 Warning(s) / 0
+Error(s)** in 20.49s, and all ten offline harnesses run **803 / 0**. Do **not** re-derive this
+limit; it was assumed, never measured, and `run-zero.sh` §5 had contradicted it for twenty runs.
+
+**The Kotlin half of that sentence is NOT retired.** `:app` genuinely cannot build here — **B-7**
+denies `dl.google.com` — and that is unchanged. `:core` needs JDK 17, which is **not installed in
+this container** (run 240 installed it in *its* container; the sandbox is ephemeral and it did not
+persist). `core-probe.sh` was not run this firing.
+
+**Deliberate non-blocker — the 201-assertion doc drift is left in place.** `README.md:83`,
+`docs/CareerSeeker-Project-Summary.md:60` and `src/Engine/README.md:161` say `| SyncHarness | 134 |`
+while the harness measures **335**, and `Verify-Alpha.ps1:671/700/705` assert the same wrong string
+— which is why the drift trap cannot see it. **Draft PR #60 already carries the fix** and has since
+2026-09-14. Fixing it here would duplicate an open PR and touch the `Verify-Alpha.ps1` pinch point
+that B-17 is about. **Filing it as a blocker would manufacture a phantom** — it is not blocked, it is
+queued behind a human, like everything else on the board.
+
+**Still the owner's, still untouched:** **B-4** (no `sdkmanager`/emulator), **B-7** (Google egress),
+**B-22** (`:app` Robolectric flake), **B-29** (repo reads public vs. `README.md:7`), **B-32**
+(neither `main` protected, so both gates are advisory).

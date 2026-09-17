@@ -21425,3 +21425,146 @@ write is this iteration's heartbeat on the docs-only `autonomy/claude-state` bra
 
 **The container was modified** — `openjdk-17-jdk-headless` was installed. That is a change to the
 sandbox, not to either repository, and it is named here because the `:core` green depends on it.
+
+---
+
+# Run 241 — 2026-09-17. **Run 240's own boundary said C# "cannot be compiled here". It can, and §5 four sections earlier already said so (C-241-1).**
+
+**Heartbeat:** 2026-09-17, **two hundred and forty-first** cloud iteration (Linux sandbox). Both
+checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+before any write: tip `0c6ed69`, rung **COMPLETE**, **files claimed: none**, heartbeat
+`2026-08-12T20:28:36-06:00` — stopped 36 days ago. **No collision**; Terra retains right-of-way.
+`run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0**, six guards green.
+
+## Milestone 1 — the assignment, declined for the 194th time
+
+The stored prompt assigns S5's spec half: amend `docs/Sync-Protocol.md` §4.3 for `entitlement_ack`,
+add the vector, and close PQ-A2-1/2/3. **All four are on engine `main` already**, re-verified in the
+files rather than quoted:
+
+- §4.3.3 (`docs/Sync-Protocol.md:608-618`) defines `entitlement_ack body = {product_id,
+  acknowledged_at, order_id?}`, stamped *"Decided 2026-08-07 (gate PQ-A6-1, default-proceed)"*.
+- PQ-A2-1 at `:338` and `:358` — the 1 MiB cap is measured on the **decoded ciphertext**, amended in S5.
+- PQ-A2-2 at `:329-332` and `:1112` — structural rejection reports `decrypt_failed`, no `malformed` code.
+- PQ-A2-3 — `docs/sync-vectors/v1/invalid-unknown-field.json` **exists**; cited at `:1219`.
+
+The nominated check ran first-person: `node docs/sync-vectors/generate.mjs --check` →
+**`OK: 30 vector files match the generator.`**, exit **0**.
+
+**The prompt's second half is moot too, and that is new.** It says *"Do NOT write the C# applier …
+unless you can compile them — you cannot."* S5's engine half is **already implemented**:
+`src/Sync/SyncPayloads.cs:59` builds the §4.3.3 body, `src/Sync/SyncPublisher.cs:162` publishes it,
+`src/Engine/SyncAckPublisher.cs:21` is the production `IEntitlementAckPublisher`,
+`src/Sync/InboundDispatcher.cs:160` calls it, and `tests/SyncHarness/Program.cs:696-751` asserts the
+body byte-for-byte against both ack vectors. **This is B-18's 194th firing.**
+
+## Milestone 2 — THE FINDING (C-241-1): the boundary contradicted §5, and §5 was right
+
+Run 240's own closing paragraph reads: *"No Kotlin and no C#: … **the prompt is right that they
+cannot be compiled here** — `:core` compiles, `:app` does not."* **The C# half of that sentence is
+false, and this instrument has said so for twenty runs.** §5 of `run-zero.sh` — four sections
+earlier in the script run 240 was editing — states *"The .NET half of the engine is NOT out of
+reach, and a firing that reads `dotnet ABSENT` as `nothing measurable` is leaving real verification
+on the table."*
+
+**Measured, not inferred.** The apt route §5 documents works: `dotnet --version` → **8.0.131**. Then
+`dotnet build CareerSeeker.sln -c Release` → **`Build succeeded. 0 Warning(s) / 0 Error(s)`**,
+**20.49s** — which is CLAUDE.md's stated baseline, met on Linux.
+
+**Same defect class as C-221-*, C-227-1, C-230-* and C-240-1**: a claim about this program's own
+reach, written without measuring. It is the **fourth** instance, and the first where the refuting
+evidence was already sitting in the same file as the wrong claim.
+
+**What it does NOT unblock, stated plainly.** S5's C# applier is already written, so nothing in the
+ladder moves because of this. The correction is about **standing capability**: engine-side C# is
+writable *and provable* from this sandbox, and 240 firings' boundaries have said otherwise.
+`:app`/Kotlin remains genuinely unreachable — **B-7** denies `dl.google.com`. Run 240's sentence is
+half right, and the half that is wrong is the expensive half.
+
+## Milestone 3 — the offline suite, run first-person (RE-VERIFICATION, not a finding)
+
+All ten offline harnesses, `-c Release --no-build`, summed exactly as `Verify-Alpha.ps1:1105` sums
+them (`=== N passed, M failed ===`):
+
+| Harness | passed | failed |
+|---|---|---|
+| Slice | 28 | 0 |
+| EngineHarness | 217 | 0 |
+| ResearcherHarness | 57 | 0 |
+| HookHarness | 16 | 0 |
+| StoreParityHarness | 28 | 0 |
+| GatewayGateHarness | 36 | 0 |
+| DispatcherNoSendHarness | 35 | 0 |
+| LifecycleHarness | 45 | 0 |
+| RendererHarness | 6 | 0 |
+| SyncHarness | 335 | 0 |
+| **total** | **803** | **0** |
+
+Every harness exited **0**. The 13 Windows-only skips are **6** `FullDataDeletion` + **7** DPAPI
+vault, both in `EngineHarness` (B-10). **803 + 13 = 816 = `$ExpectedOfflineTotal`**
+(`Verify-Alpha.ps1:358`) — the pin closes exactly.
+
+**This is a RE-VERIFICATION and is NOT a gate result.** `Verify-Alpha.ps1` needs Windows and did not
+run; this is its offline arm only, and the live/package/publish/research arms are untouched.
+
+## Milestone 4 — PR #60 independently reproduced
+
+`README.md:83`, `docs/CareerSeeker-Project-Summary.md:60` and `src/Engine/README.md:161` each say
+`| SyncHarness | 134 |`, and `Verify-Alpha.ps1:671`, `:700` and `:705` **assert that same string**.
+Doc and verifier agree with each other, so the drift trap passes — **while the harness emits 335**.
+Measured this run. That is **draft PR #60**, open since 2026-09-14, and this is the first
+independent first-person reproduction of its 201-assertion gap. **Not fixed here**: #60 already
+carries the fix and is awaiting a human, and duplicating it would collide.
+
+## Milestone 5 — the change: §5's dotnet block gets the stamp §6 got at run 238
+
+`dotnet` needs no detection row — unlike run 240's `java PRESENT`, the `command -v` loop at
+`scripts/run-zero.sh:832` answers PRESENT/ABSENT **accurately**. The gap is **freshness**: the
+`803 / 816` numbers were measured at **run 221** and carried forward twenty firings **with no date**,
+presented as a live fact. §6's board paragraph was wrong for **sixteen** firings in exactly that way
+until run 238 stamped it; §5's JDK17 sentence went dark unnoticed in exactly that way (C-240-1).
+**This block was the third instance and the last one unstamped.**
+
+Added a `Last VERIFIED (run 241, …)` stamp carrying this run's measurement, and an instruction to
+**move the stamp** on re-measure. `bash -n` **clean**; the block renders with `$ExpectedOfflineTotal`
+still literal — §6's backtick/interpolation trap avoided.
+
+## Milestone 6 — notification: WITHHELD, and why
+
+All four of run 82's triggers are **negative**. Mains unmoved (`14469ad` / `ebfaf81`). Board
+**3 engine + 6 android, every one draft** — re-queried via MCP this run, unchanged since run 238; no
+PR merged or undrafted, and **zero android PRs have ever merged**. Stored prompt **unchanged** (still
+pins `679a317`, still says S5 NOT STARTED). Gate run **421** on `ffe3c41` → **success**, all 8
+required checks executed — green, on this branch's own commit, which is not an adverse change.
+Withheld per the standing reasoning that *a notification per firing trains the channel to be
+ignored*. **C-241-1 is a correction to our own records, not news to the owner.**
+
+## Boundary — what this run did NOT touch
+
+**No gate ran and none is claimed.** `pwsh`, `sdkmanager`, `avdmanager`, `emulator`, `adb` and `gh`
+are ABSENT; `ANDROID_HOME` is UNSET. Neither `Verify-Alpha.ps1` nor the five-task android command
+was reachable, and §4b/§4c/§4d are **read**, never *ran*. `core-probe.sh` was **not run this
+firing** — run 240's JDK 17 install does not persist into this container.
+
+**No source file was written in either repository.** No C# and no Kotlin — the S5 appliers were
+**read** to establish they exist, and nothing in `src/`, `tests/`, `relay/` or `core/` was edited.
+The only tracked file changed anywhere is **`scripts/run-zero.sh`** (android), plus this repo's four
+records and `FIRINGS.md`.
+
+**No vector byte was written and no pin moved** — corpus **30/30** byte-identical at `11bb1f5`; the
+generator check ran **read-only**. **No `$ExpectedOfflineTotal` change, no `Verify-Alpha.ps1` edit,
+no doc count corrected** — #60 owns that and was deliberately not duplicated. **`docs/Sync-Protocol.md`
+was read, never written.**
+
+**Nothing merged, closed, undrafted, deleted or force-pushed** in either repository; no history
+rewritten, no CI re-run triggered, **no test skipped, disabled or quarantined**. **No deploy of any
+kind**, and the production relay was **not contacted at all** — not even `/v1/health`. No
+Google/Play/OAuth console, no accounts, no purchases, no Gmail, **no secrets read or printed**.
+
+**No repository setting was changed** — **B-29** (public vs. `README.md:7`) and **B-32** (neither
+`main` protected) remain the owner's decisions; read, flipped nothing. **`careerseeker-ios` was not
+queried** — outside this session's GitHub scope. The **engine repository was READ ONLY**; its only
+write is this iteration's heartbeat on the docs-only `autonomy/claude-state` branch, never merged.
+
+**The container was modified** — `dotnet-sdk-8.0` was installed. That is a change to the sandbox,
+not to either repository, and it is named because Milestones 2 and 3 depend on it.
