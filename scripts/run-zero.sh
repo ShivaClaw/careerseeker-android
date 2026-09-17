@@ -390,6 +390,44 @@ for r in "$ANDROID" "$ENGINE"; do
   fi
 done
 
+# --- 3c. the ledger's own well-formedness -----------------------------------
+# Added run 243. FIRINGS.md's ledger is a FENCED block, and firing-line.sh's own USAGE text
+# warns in as many words: "Do NOT use a bare `>> FIRINGS.md`: that appends after the closing
+# ``` fence and drops the line out of the block. Run 122 did exactly that and had to undo it."
+# Runs 240 and 241 each did exactly that anyway, and their two lines sat OUTSIDE the closing
+# fence until run 243 found them by eye (C-243-1). Nothing detected it for three firings.
+#
+# This is the same class as 3b and the same lesson: the house wrote the warning down, in the
+# right file, and a warning is not a check. A prose caution that has now failed twice -- once
+# at run 122, once across 240/241 -- is a guard that was never built. This is that guard.
+#
+# Two assertions, both cheap:
+#   1. NO ledger line may sit outside a fence. The fence state is toggled by every ``` line,
+#      so this reads the file the way a Markdown renderer does rather than by line number.
+#   2. Run numbers ascend. A line inserted in the wrong place inside the block would pass
+#      assertion 1 and still be misfiled; monotonicity is what catches that. Gaps are LEGAL
+#      and deliberately not flagged -- a firing that finds something writes a full LOG entry
+#      and no ledger line at all, which is why 239 and 242 are absent by design.
+head2 "3c. FIRINGS.md ledger — every line inside the fence, run numbers ascending"
+ledger_md="$ANDROID/FIRINGS.md"
+if [ ! -f "$ledger_md" ]; then
+  bad "FIRINGS.md is missing from $(basename "$ANDROID") — the ledger is the empty-firing record."
+else
+  orphans=$(awk '/^```/{f=!f; next} !f && /^[0-9]+ \| [0-9]{4}-/{print NR": "substr($0,1,60)}' "$ledger_md")
+  order=$(awk '/^```/{f=!f; next} f && /^[0-9]+ \| [0-9]{4}-/{n=$1+0; if(n<=p) print NR": "p" -> "n; p=n}' "$ledger_md")
+  count=$(awk '/^```/{f=!f; next} f && /^[0-9]+ \| [0-9]{4}-/{c++} END{print c+0}' "$ledger_md")
+  last=$(awk '/^```/{f=!f; next} f && /^[0-9]+ \| [0-9]{4}-/{n=$1+0} END{print n+0}' "$ledger_md")
+  if [ -n "$orphans" ]; then
+    printf '%s\n' "$orphans" | sed 's/^/    /'
+    bad "ledger lines sit OUTSIDE the fenced block — insert inside it, per firing-line.sh USAGE."
+  elif [ -n "$order" ]; then
+    printf '%s\n' "$order" | sed 's/^/    /'
+    bad "ledger run numbers are not ascending — a line is misfiled inside the block."
+  else
+    note "ledger lines: $count   last run: $last   all inside the fence, ascending."
+  fi
+fi
+
 # --- 4. have the mains moved? ----------------------------------------------
 head2 "4. Both mains, against the recorded baselines"
 check_main() {
@@ -1010,11 +1048,12 @@ if [ "$SETTING_BLIND" -ne 0 ]; then
 fi
 if [ "$FAIL" -eq 0 ]; then
   cat <<'EOF'
-  NOTHING MOVED on every check this sandbox can run, and all six guards are green
+  NOTHING MOVED on every check this sandbox can run, and all seven guards are green
   (citations, plan-rot against its pinned spent state, conflict markers, vectors,
   the gates' own step arrays since run 227 -- §4b android, and §4c the engine gate
-  too, added at run 228 -- and, added at run 230 and widened at run 231, §4d's
-  repository settings: private, archived, default_branch and branch protection).
+  too, added at run 228 -- §4d's repository settings, added at run 230 and widened
+  at run 231: private, archived, default_branch and branch protection -- and, added
+  at run 243, §3c: the FIRINGS.md ledger's own fence and run-number ordering).
 
   §4d IS 'UNMOVED', NOT 'CORRECT'. TWO open blockers live behind that word, and
   neither is a firing's to close:
