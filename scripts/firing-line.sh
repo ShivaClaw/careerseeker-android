@@ -38,17 +38,33 @@
 # refuses to invent them.
 #
 # USAGE
-#   scripts/firing-line.sh <run-number> <engine-clone> <engine-open> <android-open> <esc-ledger> [note]
+#   scripts/firing-line.sh [--insert] <run-number> <engine-clone> <engine-open> <android-open> <esc-ledger> [note]
 #
 # EXAMPLE
 #   scripts/firing-line.sh 118 ../careerseeker 22 6 11 'declined: S5 spec half, 83rd'
+#   scripts/firing-line.sh --insert 243 ../careerseeker 3 6 19 'declined: S5 spec half, 191st'
 #
-# It PRINTS the line and does not append it. Read it, then insert it yourself —
-# INSIDE the fenced ledger block at the end of FIRINGS.md, under the last run.
-# Do NOT use a bare `>> FIRINGS.md`: that appends after the closing ``` fence and
-# drops the line out of the block. Run 122 did exactly that and had to undo it.
+# Without --insert it PRINTS the line and does not append it. Read it, then insert
+# it yourself — INSIDE the fenced ledger block at the end of FIRINGS.md, under the
+# last run. Do NOT use a bare `>> FIRINGS.md`: that appends after the closing ```
+# fence and drops the line out of the block. Run 122 did exactly that and had to
+# undo it.
+#
+# --insert DOES THE PLACEMENT FOR YOU, and exists because that warning failed.
+# Added run 243. The paragraph above has been in this file since run 118 and is
+# exact, and runs 240 and 241 each appended after the fence anyway; their two
+# lines sat outside the block for three firings until run 243 found them by eye
+# (C-243-1). Three misplacements in three attempts at a hand step is a defect in
+# the step, not in the three sessions. --insert writes the line immediately above
+# the LAST ``` in FIRINGS.md — the closing fence of the ledger block — and then
+# re-runs run-zero.sh §3c to prove the file it just wrote is well-formed. If §3c
+# is unhappy it restores the file and exits non-zero, so a bad insert cannot be
+# committed by a session that did not look.
 
 set -uo pipefail
+
+insert=0
+if [ "${1:-}" = "--insert" ]; then insert=1; shift; fi
 
 if [ "$#" -lt 5 ]; then
   sed -n '/^# USAGE/,/^$/p' "$0" | sed 's/^# \{0,1\}//'
@@ -102,7 +118,46 @@ if [ -z "$pin$eng_main$and_main" ]; then
   exit 1
 fi
 
-printf '%s | %s | %s | pin %s | corpus %s | %s | mains %s/%s | cites %s | board %s+%s open | esc %s%s\n' \
+line=$(printf '%s | %s | %s | pin %s | corpus %s | %s | mains %s/%s | cites %s | board %s+%s open | esc %s%s' \
   "$run" "$(date -u +%Y-%m-%d)" "$verdict" "$pin" "$corpus" "$gen" \
   "$eng_main" "$and_main" "$cites" "$eng_open" "$and_open" "$ledger" \
-  "${note:+ | $note}"
+  "${note:+ | $note}")
+
+printf '%s\n' "$line"
+
+[ "$insert" -eq 1 ] || exit 0
+
+# --- --insert: place it inside the fence, then prove the placement -----------
+ledger_md="$here/FIRINGS.md"
+[ -f "$ledger_md" ] || { echo "firing-line: $ledger_md is missing" >&2; exit 1; }
+
+fence=$(grep -n '^```' "$ledger_md" | tail -1 | cut -d: -f1)
+if [ -z "$fence" ]; then
+  echo "firing-line: no closing fence found in FIRINGS.md — insert by hand" >&2
+  exit 1
+fi
+
+backup=$(mktemp); cp "$ledger_md" "$backup"
+awk -v n="$fence" -v l="$line" 'NR==n{print l} {print}' "$ledger_md" > "$ledger_md.tmp" \
+  && mv "$ledger_md.tmp" "$ledger_md"
+
+# §3c is the arbiter, not this script's own idea of where the line went.
+#
+# CAPTURED IN TWO STEPS, DELIBERATELY. The first draft of this check was
+#   if bash run-zero.sh "$engine" 2>&1 | sed -n '/3c\./,/^== 4\./p' | grep -q '!!'
+# and it reported GREEN on a line this very guard had just rejected. This file sets
+# `set -uo pipefail`, so a pipeline's status is the last NON-ZERO exit in it: run-zero.sh
+# exits 1 whenever any guard fails, which is precisely when grep matches, so the pipeline
+# returned 1, the `if` read that as "no match", and the bad insert stood. The check could
+# only ever have fired when there was nothing to find. Same class as C-242-1 — an
+# instrument that cannot detect the thing it is pointed at — and caught here only because
+# the negative case was actually exercised. Never put this grep back inside an `if`.
+verdict3c="$(bash "$here/scripts/run-zero.sh" "$engine" 2>&1 | sed -n '/3c\./,/^== 4\./p')"
+if printf '%s\n' "$verdict3c" | grep -q '!!'; then
+  cp "$backup" "$ledger_md"; rm -f "$backup"
+  printf '%s\n' "$verdict3c" | sed 's/^/  /' >&2
+  echo "firing-line: §3c rejected the result; FIRINGS.md restored unchanged" >&2
+  exit 1
+fi
+rm -f "$backup"
+echo "firing-line: inserted at line $fence, inside the fence; §3c green." >&2
