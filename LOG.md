@@ -21735,3 +21735,183 @@ Google/Play/OAuth console, no accounts, no purchases, no Gmail, **no secrets rea
 `main` protected) remain the owner's decisions; read, flipped nothing. **`careerseeker-ios` was not
 queried** — outside this session's GitHub scope. The **engine repository was READ ONLY**; its only
 write is this iteration's heartbeat on the docs-only `autonomy/claude-state` branch, never merged.
+
+---
+
+# Run 243 — 2026-09-17. **Runs 240 and 241 filed their ledger lines outside the fenced block. The script's own USAGE warns about exactly that, in exactly those words, and a warning is not a check (C-243-1).**
+
+**Heartbeat:** 2026-09-17, **two hundred and forty-third** cloud iteration (Linux sandbox). Both
+checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+before any write: rung **COMPLETE**, **files claimed: none**, heartbeat
+`2026-08-12T20:28:36-06:00` — stopped 36 days ago. **No collision**; Terra retains right-of-way.
+`run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0** on entry.
+
+**This is not a pure empty firing.** The run-zero verdict is `NOTHING MOVED` and all five
+escalation triggers are negative, but a real new finding turned up in the house's own records, so
+house law (run 118, `FIRINGS.md`) sends this run to the four records rather than to a ledger line.
+**No ledger line was written for run 243.**
+
+## Milestone 1 — the assignment, declined for the 196th time
+
+The stored prompt assigns S5's spec half: amend `docs/Sync-Protocol.md` §4.3 for `entitlement_ack`,
+add the vector, close PQ-A2-1/-2/-3. **All four are on engine `main`**, and I read them in the
+product rather than quoting these records. `run-zero.sh` §1 reports `8575539`, `22b028e` and
+`7328a0b` each `on main (expected)`. First-person at `origin/main` `14469ad`:
+
+- `docs/Sync-Protocol.md:608` — `### 4.3.3 Entitlement acknowledgement body (entitlement_ack)`,
+  carrying `{product_id, acknowledged_at, order_id?}` under **"Decided 2026-08-07 (gate PQ-A6-1,
+  default-proceed)"**. **PQ-A6-1 closed.**
+- `:131` and `:337` — the 1 MiB cap **"measured on the ciphertext"**. **PQ-A2-1 closed.**
+- `:329` — structural rejection **"is reported as `decrypt_failed` (§7.2)"**. **PQ-A2-2 closed.**
+- `docs/sync-vectors/v1/invalid-unknown-field.json` present. **PQ-A2-3 closed.**
+- `node docs/sync-vectors/generate.mjs --check` → **`OK: 30 vector files match the generator.`**,
+  **exit 0**. Ran it myself, this firing, on the engine checkout at `origin/main`.
+
+Rebuilding it would author a second divergent §4.3 amendment and regenerate the corpus the phone
+vendors — the cross-repo drift event the prompt itself bars. **B-18's 196th firing.** The prompt's
+three known-stale facts are unchanged (pin `679a317` — the real pin is `11bb1f5`; S5 `NOT STARTED`;
+the `/pair` page "does not exist" — it landed in #42).
+
+## Milestone 2 — THE FINDING (C-243-1): the ledger had been malformed for three firings
+
+`FIRINGS.md`'s ledger is a **fenced block**, and `scripts/firing-line.sh`'s `USAGE` text has said
+this since run 118, verbatim:
+
+> Do NOT use a bare `>> FIRINGS.md`: that appends after the closing ``` fence and drops the line out
+> of the block. Run 122 did exactly that and had to undo it.
+
+**Runs 240 and 241 each did exactly that anyway.** Measured at entry this firing, before any edit:
+
+```
+$ grep -n '^```' FIRINGS.md | tail -1
+178:```
+$ awk 'NR>=176 {printf "%d:[%s]\n", NR, substr($0,1,40)}' FIRINGS.md
+176:[237 | 2026-09-16 | NOTHING MOVED | pin 1]
+177:[238 | 2026-09-17 | NOTHING MOVED | pin 1]
+178:[```]
+179:[240 | 2026-09-17 | NOTHING MOVED | pin 1]
+180:[241 | 2026-09-17 | NOTHING MOVED | pin 1]
+```
+
+The closing fence sat at line 178 with two ledger lines **below** it. Nothing detected this for
+three firings — not `check-citations.sh`, not `run-zero.sh`'s six guards, not the two sessions that
+wrote the lines. **Three misplacements in three attempts at that hand step (122, 240, 241) is a
+defect in the step, not in the three sessions**, and it is the same lesson as §3b: this house wrote
+the caution down, in the right file, and prose is not a guard.
+
+Scope, stated plainly so nobody reads this as worse than it is: **no ledger line's content was
+wrong, and none was lost.** The defect is placement. Its cost is that the block a reader or a tool
+treats as *the ledger* silently stopped containing the two most recent entries.
+
+**Repair.** One line changed — the fence moved from 178 to after 180. `git diff --stat` reports
+`1 insertion(+), 1 deletion(-)`, and the only `+`/`-` pair in the diff is ```` ``` ```` against
+```` ``` ````. **No ledger line was edited, reordered or rewritten.**
+
+## Milestone 3 — the guard that would have caught it (§3c), proven in both directions
+
+Added `run-zero.sh` **§3c**, alongside §3b's conflict-marker guard. Two assertions: no ledger line
+outside a fence (read by toggling on every ```` ``` ````, the way a renderer does, not by line
+number), and run numbers ascending. **Gaps are legal and deliberately unflagged** — a firing that
+finds something writes a full LOG entry and *no* ledger line, which is why 239 and 242 are absent
+by design.
+
+A guard is worth what its negative case proves, so both arms ran:
+
+```
+GREEN (repaired file):
+  == 3c. FIRINGS.md ledger — every line inside the fence, run numbers ascending
+    ledger lines: 114   last run: 241   all inside the fence, ascending.
+  probe exit 0
+
+RED (pre-repair file restored, guard in place):
+  == 3c. FIRINGS.md ledger — every line inside the fence, run numbers ascending
+      179: 240 | 2026-09-17 | NOTHING MOVED | pin 11bb1f5 | corpus 30/3
+      180: 241 | 2026-09-17 | NOTHING MOVED | pin 11bb1f5 | corpus 30/3
+    !! ledger lines sit OUTSIDE the fenced block — insert inside it, per firing-line.sh USAGE.
+  probe exit 1
+```
+
+The RED arm names both offending lines and turns the probe's exit non-zero, so a firing cannot
+record `NOTHING MOVED` over it. The VERDICT text now reads **seven** guards, not six.
+
+**One negative arm was run wrongly first, and the correction is the point.** My first attempt at
+the RED arm used `git stash`, which reverted `run-zero.sh` **and** `FIRINGS.md` together — so the
+guard was not present for the test that was supposed to exercise it, and it printed nothing at all.
+A test that removes the instrument it is testing proves nothing. Re-run with `git checkout HEAD --
+FIRINGS.md` alone, which restores the broken record while keeping the new guard, it produced the
+RED output above.
+
+## Milestone 4 — prevention (`--insert`), and a bug in my own check (C-243-2)
+
+Detection is not prevention: §3c catches the misfiling **after** a session commits it. So
+`firing-line.sh` gained an opt-in `--insert` that does the placement itself — writing the line
+immediately above the **last** ```` ``` ```` in `FIRINGS.md` — then re-runs §3c on the file it just
+wrote and **restores the original and exits non-zero** if §3c objects. The default behaviour
+(print, do not append) is unchanged.
+
+**C-243-2 — my first version of that verification could only ever have fired when there was nothing
+to find.** It was written as one pipeline inside an `if`:
+
+```bash
+if bash run-zero.sh "$engine" 2>&1 | sed -n '/3c\./,/^== 4\./p' | grep -q '!!'; then
+```
+
+`firing-line.sh` sets `set -uo pipefail`, so a pipeline's status is its **last non-zero** exit.
+`run-zero.sh` exits **1** whenever any guard fails — which is exactly when `grep` matches — so the
+pipeline returned 1, the `if` read that as *no match*, and the bad insert stood. Measured: a
+deliberately misordered line (run `100` filed after `241`) was reported **`§3c green`** by that
+version, while the probe run by hand against the same file printed `!! ledger run numbers are not
+ascending`. **Same class as C-242-1** — an instrument that cannot detect the thing it is pointed at
+— and it surfaced only because the negative case was actually exercised rather than assumed.
+
+Fixed by capturing the probe output into a variable first and grepping the variable. Both arms then
+measured:
+
+```
+POSITIVE  --insert 243 ...  -> exit 0; line lands at 180, fence at 181; "§3c green."
+NEGATIVE  --insert 100 ...  -> exit 1; prints §3c's rejection; FIRINGS.md md5 byte-identical
+                               to the pre-call file (0d926123214386b53984aad77048a523)
+```
+
+Both self-test lines were **reverted**; the committed `FIRINGS.md` differs from `HEAD` by the moved
+fence and nothing else.
+
+## Milestone 5 — the board, and the five triggers
+
+Queried through the GitHub MCP server, not guessed, per §6's *"TRY THE QUERIES BEFORE DEFERRING"*:
+
+| Repo | Open | Drafts | Merged ever |
+| --- | --- | --- | --- |
+| `careerseeker` | **3** (#60, #58, #26) | **3/3** | — |
+| `careerseeker-android` | **6** (#6, #5, #4, #3, #2, #1) | **6/6** | **0** |
+
+All five escalation triggers **negative**: both `main`s unmoved (`14469ad` / `ebfaf81`, §4); **no
+PR merged or undrafted** (board identical to run 238's stamp); the **stored prompt is unchanged**
+(same three stale facts); the gates unmoved and **executed**, not merely reported (§4b android run
+**423** on `1199c9c` `success`, 8/8 required checks executed; §4c engine run **495** on `14469ad`
+`success`, 7/7); and **§4d repository settings unmoved** — `private: false`, `archived: false`,
+`default_branch: main`, `protected: false` on both. **No escalation sent**; the ledger stays at
+**19**. B-29 and B-32 remain open and remain the owner's decisions — read, nothing flipped.
+
+## Boundary — what this run did not touch
+
+**No gate ran and none is claimed.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`,
+`adb`, `gh` **ABSENT**; `ANDROID_HOME` **UNSET**; `JDK17(:core)` **ABSENT**, so `core-probe.sh` was
+**not runnable this firing** and no `:core` number is restated as mine. Neither
+`scripts\Verify-Alpha.ps1` nor the five-task android command was attempted. **The container is
+unmodified this run** — I installed nothing.
+
+**No Kotlin and no C# was written at all.** **No vector byte was written and no pin moved** —
+corpus **30/30** byte-identical at `11bb1f5`; `generate.mjs --check` ran **read-only**. No
+`$ExpectedOfflineTotal` change, no `Verify-Alpha.ps1` edit, no doc count corrected — **#60** owns
+the 201-assertion drift and was deliberately not duplicated. No pinch point touched.
+
+**No ledger line's content was edited**, none reordered, none deleted; the two `--insert` self-test
+lines were reverted and the `FIRINGS.md` diff is the moved fence alone. **Nothing merged, closed,
+undrafted, deleted or force-pushed** in either repository; no history rewritten, no CI re-run
+triggered, **no test skipped, disabled or quarantined**. **No deploy of any kind**, and the
+production relay was **not contacted at all** — not even `/v1/health`. No Google/Play/OAuth
+console, no accounts, no purchases, no Gmail, **no secrets read or printed**. **No repository
+setting was changed.** **`careerseeker-ios` was not queried** — outside this session's GitHub
+scope. The **engine repository was READ ONLY**; its only write is this iteration's heartbeat on the
+docs-only `autonomy/claude-state` branch, never merged.

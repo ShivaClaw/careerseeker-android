@@ -1,5 +1,86 @@
 # STATE — android tree
 
+> ## ✅ RUN 243 (2026-09-17) — **RUNS 240 AND 241 FILED THEIR LEDGER LINES OUTSIDE THE FENCE. `firing-line.sh`'S OWN USAGE WARNS ABOUT EXACTLY THAT, IN EXACTLY THOSE WORDS, AND A WARNING IS NOT A CHECK (C-243-1).**
+>
+> **Heartbeat:** 2026-09-17, **two hundred and forty-third** cloud iteration (Linux sandbox). Both
+> checkouts `git fetch --all --prune`d **before any count** (rule one). `autonomy/codex-state` read
+> before any write: rung **COMPLETE**, **files claimed: none**, heartbeat
+> `2026-08-12T20:28:36-06:00` — stopped 36 days ago → **no collision**; Terra retains right-of-way.
+> `run-zero.sh ../careerseeker` → **`NOTHING MOVED`, exit 0** on entry; mains `14469ad`/`ebfaf81`
+> unmoved, corpus **30/30** byte-identical at pin `11bb1f5`, citations **1167 / 1168 / 2** after
+> this run's writes. Assigned S5 spec half is **on engine `main`** — **declined, the 196th time**,
+> and its nominated check run first-person: `generate.mjs --check` → `OK: 30 vector files match the
+> generator.`, exit 0.
+>
+> **Files claimed:** `FIRINGS.md`, `scripts/run-zero.sh`, `scripts/firing-line.sh`, `LOG.md`,
+> `AUDIT-REQUEST.md`, `STATE.md` (android); `STATE.md` on `autonomy/claude-state` (engine,
+> docs-only, never merged). **Nothing else in the engine repo was written — it was READ ONLY.**
+> **No rung's status changed.** `BLOCKED.md` **not written**: nothing this run attempted was
+> blocked, and filing a phantom sends the next session hunting.
+>
+> **THE FINDING (C-243-1).** `FIRINGS.md`'s ledger is a **fenced block**, and
+> `scripts/firing-line.sh`'s `USAGE` has said so since run 118, verbatim: *"Do NOT use a bare `>>
+> FIRINGS.md`: that appends after the closing ``` fence and drops the line out of the block. Run 122
+> did exactly that and had to undo it."* **Runs 240 and 241 each did exactly that anyway.** Measured
+> at entry: the closing fence at line **178**, ledger lines **240** and **241** at 179–180, *below*
+> it. Nothing detected it for three firings — not `check-citations.sh`, not the six guards, not the
+> two sessions that wrote the lines. **Three misplacements in three attempts at that hand step (122,
+> 240, 241) is a defect in the step, not in the three sessions**, and it is §3b's lesson again: the
+> caution was written down, in the right file, and prose is not a guard.
+>
+> **SAID BEFORE IT IS READ AS BIGGER THAN IT IS: no ledger line's content was wrong, and none was
+> lost.** The defect is **placement**. Its cost is that the block a reader or a tool treats as *the
+> ledger* silently stopped containing the two most recent entries. Repaired by moving the fence —
+> `git diff --stat` reports **1 insertion / 1 deletion**, and the only `+`/`-` pair is a fence
+> against a fence. **No ledger line was edited, reordered or rewritten.**
+>
+> **THE GUARD (§3c), PROVEN BOTH WAYS.** `run-zero.sh` gained a seventh guard beside §3b's: no
+> ledger line outside a fence (toggling on every ``` , the way a renderer reads it, not by line
+> number), and run numbers ascending. **Gaps are legal and deliberately unflagged** — a firing that
+> finds something writes a full LOG entry and *no* ledger line, which is why 239 and 242 are absent
+> by design. GREEN on the repaired file (`ledger lines: 114   last run: 241   all inside the fence,
+> ascending.`, probe exit 0); **RED** on the pre-repair file with the guard in place — both offending
+> lines named, `!! ledger lines sit OUTSIDE the fenced block`, **probe exit 1**. The VERDICT now reads
+> **seven** guards.
+>
+> **A NEGATIVE ARM WAS RUN WRONGLY FIRST, AND THAT IS THE REUSABLE PART.** The first RED attempt used
+> `git stash`, which reverted `run-zero.sh` **and** `FIRINGS.md` together — so the instrument under
+> test was not present, and it printed nothing at all. **A test that removes the instrument it is
+> testing proves nothing.** Re-run with `git checkout HEAD -- FIRINGS.md` alone it produced the RED
+> output above.
+>
+> **PREVENTION, AND A BUG I WROTE THIS RUN (C-243-2).** Detection is not prevention, so
+> `firing-line.sh` gained an opt-in `--insert` that places the line above the last ``` itself, then
+> re-runs §3c and **restores the file and exits non-zero** if §3c objects; the print-only default is
+> unchanged. **My first version of that verification could only ever have fired when there was
+> nothing to find.** It was one pipeline inside an `if`, and the script sets `set -uo pipefail`, so
+> the pipeline's status is its **last non-zero** exit — `run-zero.sh` exits **1** whenever a guard
+> fails, which is exactly when `grep` matches. The `if` read a **detected** fault as **clean**:
+> a deliberately misordered line (run `100` after `241`) was reported **`§3c green`** while the probe
+> run by hand on the same file printed `!! ledger run numbers are not ascending`. **Same class as
+> C-242-1**, and it surfaced only because the negative case was actually exercised. Fixed by
+> capturing the output to a variable. Both arms then measured: POSITIVE inserts at 180 with the fence
+> at 181; NEGATIVE exits **1** and leaves `FIRINGS.md` **byte-identical** (md5 unchanged). Both
+> self-test lines were **reverted**.
+>
+> **THE BOARD AND THE FIVE TRIGGERS — ALL NEGATIVE.** Queried through the GitHub MCP server per §6's
+> *"TRY THE QUERIES BEFORE DEFERRING"*: engine **3 open** (#60, #58, #26), android **6 open**
+> (#6, #5, #4, #3, #2, #1), **every row `draft: true`**, **zero android PRs have ever merged** —
+> identical to run 238's stamp. Both `main`s unmoved; **no PR merged or undrafted**; **stored prompt
+> unchanged** (still pins `679a317`, still says S5 `NOT STARTED`, still says the `/pair` page does not
+> exist — it landed in #42); gates **executed**, not merely reported (android **423** on `1199c9c`
+> `success` 8/8; engine **495** on `14469ad` `success` 7/7); §4d settings **unmoved** on both.
+> **No escalation sent; the ledger stays at 19.** **B-29** and **B-32** remain open and remain the
+> owner's decisions — read, nothing flipped.
+>
+> **NO GATE RAN AND NONE IS CLAIMED.** `dotnet`, `pwsh`, `sdkmanager`, `avdmanager`, `emulator`,
+> `adb`, `gh` **ABSENT**; `ANDROID_HOME` **UNSET**; `JDK17(:core)` **ABSENT**, so `core-probe.sh` was
+> **not runnable this firing** and no `:core` number is restated as mine. **No Kotlin and no C# was
+> written at all**; no vector byte, no pin move, no `$ExpectedOfflineTotal` change, no
+> `Verify-Alpha.ps1` edit, no pinch point touched. **The container is unmodified this run.** Nothing
+> merged, closed, undrafted or deleted; **no deploy**, and the production relay was **not contacted at
+> all**.
+
 > ## ✅ RUN 242 (2026-09-17) — **B-7'S RE-VERIFICATION COMMAND POINTED AT A HOST WITH NO DNS RECORD FOR 196 FIRINGS. THE BLOCKER IS REAL; THE COMMAND COULD NEVER HAVE TOLD US OTHERWISE (C-242-1).**
 >
 > **Heartbeat:** 2026-09-17, **two hundred and forty-second** cloud iteration (Linux sandbox). Both

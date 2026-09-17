@@ -23879,3 +23879,153 @@ regenerate the corpus the phone vendors, which is the cross-repo drift event the
    a fair hit.
 7. **No gate ran.** Every §4b/§4c/§4d number is **read** from what another machine produced, and
    `core-probe.sh` did not run this firing (`JDK17(:core) ABSENT`).
+
+---
+
+## Run 243 — 2026-09-17
+
+### C-243-1 — runs 240 and 241 filed their ledger lines outside the fenced block, and nothing detected it for three firings
+
+`FIRINGS.md`'s ledger is a fenced block. `scripts/firing-line.sh`'s `USAGE` has warned against a
+bare `>> FIRINGS.md` since run 118, naming run 122's identical mistake. Runs 240 and 241 each
+appended after the closing fence anyway; at this firing's entry the fence was at line **178** with
+ledger lines **240** and **241** at 179–180, **below** it.
+
+Scope: **no line's content was wrong and none was lost** — the defect is placement. Repaired by
+moving the fence, one line changed, no ledger line edited.
+
+Re-verify the repair (both must print nothing):
+
+```bash
+cd careerseeker-android
+# 1. no ledger line outside a fence
+awk '/^```/{f=!f; next} !f && /^[0-9]+ \| [0-9]{4}-/{print "ORPHAN " NR}' FIRINGS.md
+# 2. run numbers ascend inside the block
+awk '/^```/{f=!f; next} f && /^[0-9]+ \| [0-9]{4}-/{n=$1+0; if(n<=p) print NR": "p" -> "n; p=n}' FIRINGS.md
+```
+
+Re-verify that the repair moved **only** the fence:
+
+```bash
+git show <this-commit> -- FIRINGS.md | grep -E '^[+-]' | grep -v '^[+-][+-][+-]'
+# expected: exactly two lines, '-```' and '+```'
+```
+
+### C-243-2 — the first `--insert` verification could only have fired when there was nothing to find (`pipefail`)
+
+`firing-line.sh --insert` re-runs §3c to prove its own placement. The first version of that check
+was a single pipeline inside an `if`. The script sets `set -uo pipefail`, so the pipeline's status
+is its **last non-zero** exit; `run-zero.sh` exits **1** whenever a guard fails, which is precisely
+when `grep -q '!!'` matches. The `if` therefore read a **detected** fault as **clean**. Measured: a
+line deliberately misordered (run `100` after `241`) was reported `§3c green` by that version while
+the probe, run by hand on the same file, printed `!! ledger run numbers are not ascending`.
+
+Same class as C-242-1: an instrument that cannot detect the thing it is pointed at. Fixed by
+capturing the probe output to a variable and grepping the variable.
+
+Re-verify the fix — the negative arm must reject **and** roll back:
+
+```bash
+cd careerseeker-android
+md5sum FIRINGS.md                      # note the value
+bash scripts/firing-line.sh --insert 100 ../careerseeker 3 6 19 'must be rejected'; echo "EXIT=$?"
+# expected: EXIT=1, stderr carries '!! ledger run numbers are not ascending'
+#           and 'FIRINGS.md restored unchanged'
+md5sum FIRINGS.md                      # expected: identical to the value above
+```
+
+Re-verify the pipefail trap itself is gone (the grep must not sit inside an `if`):
+
+```bash
+grep -n 'verdict3c=' scripts/firing-line.sh          # capture-then-test form present
+grep -n 'if bash .*run-zero.*grep -q' scripts/firing-line.sh   # expected: no output
+```
+
+### C-243-3 — `run-zero.sh` §3c: the guard, proven in both directions
+
+Re-verify GREEN (repaired file) and RED (the defect restored, guard in place):
+
+```bash
+cd careerseeker-android
+bash scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/3c\./,/^== 4\./p'
+# expected: 'ledger lines: N   last run: M   all inside the fence, ascending.'
+
+# RED arm — restore the pre-repair record WITHOUT reverting the script.
+# Do NOT use `git stash`: it reverts run-zero.sh too, removing the instrument
+# under test, and prints nothing at all. That error was made and corrected at run 243.
+cp FIRINGS.md /tmp/good.md
+git checkout 1199c9c -- FIRINGS.md
+bash scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/3c\./,/^== 4\./p'
+# expected: both offending lines named, then
+#   '!! ledger lines sit OUTSIDE the fenced block'
+bash scripts/run-zero.sh ../careerseeker >/dev/null 2>&1; echo "EXIT=$?"   # expected: 1
+cp /tmp/good.md FIRINGS.md
+```
+
+### C-243-4 — the assigned S5 spec half is on engine `main`, declined for the 196th time
+
+Re-verified **first-person** at engine `origin/main` `14469ad`, read in the product and not quoted
+from these records:
+
+```bash
+cd careerseeker && git fetch --all --prune
+git show origin/main:docs/Sync-Protocol.md | sed -n '608,618p'
+#   -> '### 4.3.3 Entitlement acknowledgement body (`entitlement_ack`)'
+#      'Decided 2026-08-07 (gate PQ-A6-1, default-proceed)'
+#      body {product_id, acknowledged_at, order_id?}                     [PQ-A6-1]
+git show origin/main:docs/Sync-Protocol.md | grep -n 'measured on the ciphertext'   # [PQ-A2-1]
+git show origin/main:docs/Sync-Protocol.md | grep -n 'reported as `decrypt_failed`' # [PQ-A2-2]
+ls docs/sync-vectors/v1/invalid-unknown-field.json                                  # [PQ-A2-3]
+node docs/sync-vectors/generate.mjs --check; echo "EXIT=$?"
+#   -> 'OK: 30 vector files match the generator.'  EXIT=0
+```
+
+*Observed run 243:* all five as stated, generator **exit 0**. Not rebuilt: doing so would author a
+second divergent §4.3 amendment and regenerate the corpus the phone vendors — the cross-repo drift
+event the prompt itself bars. The prompt's pin (`679a317`) is stale; the real pin is `11bb1f5` and
+the vendored corpus is **30/30 byte-identical** to it.
+
+### C-243-5 — board and the five escalation triggers, all negative
+
+```bash
+# GitHub MCP (no gh binary in this image):
+list_pull_requests owner=ShivaClaw repo=careerseeker         state=open
+list_pull_requests owner=ShivaClaw repo=careerseeker-android state=open
+bash scripts/run-zero.sh ../careerseeker 2>&1 | sed -n '/== 4\./,/== 5\./p'
+```
+
+*Observed run 243:* engine **3 open** (#60, #58, #26), android **6 open** (#6, #5, #4, #3, #2, #1),
+**every row `draft: true`**, **zero android PRs have ever merged** — identical to run 238's stamp.
+Both `main`s unmoved (`14469ad` / `ebfaf81`). Gates **executed**, not merely reported: android run
+**423** on `1199c9c` `success` 8/8; engine run **495** on `14469ad` `success` 7/7. §4d settings
+unmoved on both. Stored prompt unchanged. **No escalation sent; ledger stays at 19.**
+
+### What an external auditor should attack first, run 243
+
+1. **The finding is small, and I should not be allowed to inflate it.** No ledger line's *content*
+   was wrong and none was lost — two lines were in the wrong place in a Markdown file. If you think
+   that does not justify a full four-record entry over a one-line ledger entry, that is a fair hit,
+   and it is B-18's argument. My defence is house law's own wording ("a real new finding" ⇒ full
+   entry), not the severity.
+2. **§3c guards a convention this program invented.** It asserts that a fenced block in one
+   Markdown file is well-formed. Nothing about the product, the protocol or the phone is safer for
+   it. Attack whether a 243rd firing should be hardening its own bookkeeping at all.
+3. **C-243-2 is a bug I wrote this run and found this run.** Weigh it honestly in both directions:
+   it is evidence the negative case was genuinely exercised, and it is evidence I shipped a check
+   that could not fire. Had I skipped the negative arm, `--insert` would have gone in looking
+   correct.
+4. **The monotonicity assertion encodes a judgement.** I chose to allow gaps (239, 242 are absent
+   by design) and forbid non-ascending numbers. A run that legitimately needed to back-fill an
+   earlier line would now trip the guard. I think back-filling is already forbidden — `FIRINGS.md`'s
+   own header says earlier runs are deliberately not back-filled — but that is inference, not a
+   rule anyone wrote for this guard.
+5. **`--insert` writes to a record file.** It is opt-in and it rolls back on §3c's objection, but it
+   is the first thing in this program that edits `FIRINGS.md` without a human keystroke. If you
+   think a script should never write the evidence record, say so — the print-only default is
+   unchanged and `--insert` can simply be removed.
+6. **No gate ran.** Every §4b/§4c/§4d number is **read** from what another machine produced.
+   `core-probe.sh` did not run (`JDK17(:core) ABSENT`), so no `:core` number here is mine.
+   Nothing about `:app`, Room, the relay or the protocol was compiled, tested or executed.
+7. **Nothing in the ladder moved, and I am claiming that plainly.** No rung advanced. S3/S4/S6 are
+   still gate-blocked (B-4, B-7), S5's spec half remains on `main` and its two appliers still need a
+   machine that can compile them.
