@@ -21915,3 +21915,17 @@ console, no accounts, no purchases, no Gmail, **no secrets read or printed**. **
 setting was changed.** **`careerseeker-ios` was not queried** — outside this session's GitHub
 scope. The **engine repository was READ ONLY**; its only write is this iteration's heartbeat on the
 docs-only `autonomy/claude-state` branch, never merged.
+
+## Postscript — the gate on this run's own head
+
+Recorded after the push, because the entry above cites run **423** on `1199c9c`, which was the
+state at entry. CI on run 243's head: **run 424 on `1d51855`, `success`, all 8 required checks
+EXECUTED and passed** ('Upload debug APK' skipped by design, B-25). **Read from the API, not run
+here** — this sandbox still cannot execute the android gate (B-7, B-4), and this line claims only
+what another machine produced.
+
+**Not an escalation.** "A gate result" is one of run 82's five triggers, but the trigger exists to
+catch a gate *executing where none had* — the owner's Windows gate, or CI producing a verdict that
+did not exist before. A green CI run on this firing's own push, identical in shape to 423 before
+it, is not news, and prior firings that pushed did not escalate on theirs either. **The ledger
+stays at 19.**
