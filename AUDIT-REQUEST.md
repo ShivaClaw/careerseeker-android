@@ -23376,7 +23376,21 @@ done
 
 *Observed run 239:* the counts above, exactly as tabulated. Run 224's log —
 `ComposeTimeoutException at ScreensFromFixtureTest.kt:72`, **two** assertions failing, `35 tests
-completed, 2 failed, 3 skipped` — is the **first** run gated after the mitigation landed.
+completed, 2 failed, 3 skipped` — is the **first failure** after the mitigation landed.
+
+> **Corrected within run 239, before any reviewer read it.** This claim was first written as *"the
+> first run gated after the mitigation landed"*, and that is **false**: run **221** gated `30908de`
+> itself (`success`), run **222** was `success` and run **223** `cancelled`. Run 224 is the first
+> **failure**, three runs and about four hours after the patch — which is the point the claim was
+> making, but it is not the sentence that was written. Caught by re-deriving the boundary while
+> checking C-239-2's left edge, and corrected in a follow-up commit rather than silently amended,
+> because a records set selling "every claim has a command" cannot quietly repair the claims.
+>
+> ```bash
+> awk -F'\t' '$1>=220 && $1<=226' /tmp/runs.txt | sort -n
+> #   220 success cd915ca / 221 success 30908de / 222 success 8610253
+> #   223 cancelled 88c0f70 / 224 failure 5dcbca2
+> ```
 
 ### C-239-3 — B-22 is not new, was not fixed here, and the reason is the standing rule
 

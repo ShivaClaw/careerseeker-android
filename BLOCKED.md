@@ -6339,10 +6339,15 @@ measured the **whole post-mitigation population** — all 197 run numbers 222–
 
 **17 in 165 decisive runs — 10.3%.** B-22's original pre-patch figure was **2 in 24 (~8%)** over run
 numbers 172–201. **The mitigation did not lower the rate; on the widest sample available it is
-marginally higher.** Run **224** — the *first* run gated after `30908de` landed — already failed
-with `ComposeTimeoutException at :72` on **both** provenance assertions, read first-person this run.
-The `waitUntil` form converted an early `AssertionError` into a 5-second timeout and left the
-underlying race alone.
+marginally higher.** Run **224** — the *first failure* after `30908de` landed, **three runs and
+about four hours** after it (221 gated the patch itself `success`, 222 `success`, 223 `cancelled`)
+— already failed with `ComposeTimeoutException at :72` on **both** provenance assertions, read
+first-person this run. The `waitUntil` form converted an early `AssertionError` into a 5-second
+timeout and left the underlying race alone.
+
+> **This sentence was corrected inside run 239**; it first read *"the first run gated after
+> `30908de` landed"*, which is false — run 222 was, and it passed. See C-239-2's correction note
+> for the boundary and its command.
 
 **Attribution, in two honest tiers.** The failing *step* is measured from the jobs API for all 22.
 The *B-22 signature inside the step* is read first-person for **224** and **418**, and is already
