@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CareerSeeker</string>
+    <string name="p0_placeholder_title">CareerSeeker Dashboard</string>
+    <string name="p0_placeholder_body">P0 scaffold. Pairing arrives in P1.</string>
+</resources>

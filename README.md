@@ -36,9 +36,53 @@ vectors, which is how cross-repo drift gets caught in CI.
 
 ## Status
 
-Pre-P0. No app code yet. The phase plan and its blocking gates are in
-[`docs/P0-Runbook.md`](docs/P0-Runbook.md); scaffolding starts once that is reviewed and
-the gates are answered.
+**P0 — scaffold.** No product features yet. `:core` holds the Sync Protocol v1 constants
+and rules; `:app` renders a placeholder that proves the toolchain assembles and that
+`:core` is reachable. Pairing starts in P1.
+
+Phase plan, gate decisions, and exit criteria: [`docs/P0-Runbook.md`](docs/P0-Runbook.md).
+
+### Toolchain
+
+Versions verified against the artifact repositories and Play policy on 2026-07-22, not
+copied from the spec:
+
+| | |
+| --- | --- |
+| AGP | 9.3.0 (built-in Kotlin — do **not** apply `org.jetbrains.kotlin.android`) |
+| Gradle | 9.6.1 (AGP 9.3 requires 9.5.0+) |
+| JDK | 17 |
+| Kotlin | 2.4.10 |
+| Compose BOM | 2026.06.01 |
+| `compileSdk` | **37** — forced by AndroidX (core-ktx 1.19.0, lifecycle 2.11.0) |
+| `targetSdk` | **37** — clears Play's floor of 36 |
+| `minSdk` | 26 |
+
+**Play's floor is `targetSdk` 36** for new apps and updates from **2026-08-31**, verified
+2026-07-22. The program spec's "assume 35+" would be rejected outright; it flagged its own
+number for re-verification, and re-verification changed it.
+
+The two levels answer different questions — `compileSdk` is which APIs the code may
+*reference*, `targetSdk` is which runtime behaviors the app *opts into* — so they can
+legitimately differ. Both are 37 here: AndroidX forces the first, and lint's `OldTargetApi`
+treats a lagging `targetSdk` as an error. Lagging is defensible once there are features
+whose behavior could regress under a newer Android; there are none yet, and suppressing the
+check would silence the prompt to re-test when that changes.
+
+### Building
+
+The Gradle wrapper is committed and is the single source of the Gradle version
+(9.6.1). It was generated 2026-07-22 from the official distribution, with both the
+distribution zip and the resulting `gradle-wrapper.jar` verified against the sha256
+checksums published by services.gradle.org; `distributionSha256Sum` is pinned in
+`gradle-wrapper.properties` so every future download is verified too.
+
+```bash
+./gradlew checkCoreIsAndroidFree :core:test :app:assembleDebug :app:lintDebug
+```
+
+`:core` targets JVM 17 via `jvmToolchain(17)` — have a JDK 17 available (Android
+Studio's bundled JBR works for running Gradle itself).
 
 ## Working rules
 

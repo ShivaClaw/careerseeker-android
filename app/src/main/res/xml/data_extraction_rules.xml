@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Nothing this app stores leaves the device through a backup or transfer channel.
+
+  The local replica is derived state: every byte of it can be re-synced from the paired
+  PC, which is the authoritative copy. So there is no user benefit to backing it up, and a
+  real cost if we did. It contains job applications, draft correspondence, and resume text,
+  and the product promise is that this data lives on the user's own machines.
+
+  android:allowBackup="false" alone is not enough on Android 12 and higher: there it
+  governs cloud backup only, and device-to-device transfer would still copy app data. Both
+  channels are excluded explicitly below. allowBackup stays in the manifest because minSdk
+  is 26 and it is still what pre-12 devices honor.
+
+  Unpairing wipes the replica. A backup that outlived an unpair would quietly break that.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

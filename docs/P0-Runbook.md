@@ -227,7 +227,11 @@ A P0 PR that bumps the pin without touching the docs is a defect, not a nit.
 | Gate | Decision | Blocks | Recommendation |
 | --- | --- | --- | --- |
 | **P0-WORKER** | Entitlement Worker vs phone-only license verification | P4 architecture; P0 only records it | Worker (spec §6.3). The relay stays blind either way; the phone-only fallback is weaker against piracy but ships with zero new infra. |
-| **P0-SYNC-COPY** | Opt-in sync consent wording | P1 UI, privacy policy | Draft in P0 alongside the protocol doc so app copy, privacy-policy delta, and data-safety answers stay one artifact (spec §7.3). |
+| **P0-SYNC-COPY** | Opt-in sync consent wording | P1 UI, privacy policy | **Draft written** — [`Sync-Consent-Copy.md`](Sync-Consent-Copy.md), covering desktop opt-in, phone onboarding, the edit honesty line, the privacy-policy delta, and the data-safety mapping. Awaiting Brandon's review; one open sub-question (name Cloudflare in the policy or not) is flagged in the doc. |
+
+**P0-ACCOUNT progress (2026-07-22):** legal entity exists; D-U-N-S number requested and
+pending; Play business verification to follow. The program's longest external lead time is
+now running.
 
 **P-MONEY** ($4.99 one-time vs $1.99/mo) stays open per spec §6.4 — the build is identical
 either way until store-listing time. Recommendation remains **$4.99 one-time**, because it
